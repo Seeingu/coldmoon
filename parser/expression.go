@@ -33,6 +33,13 @@ type NumberExpression struct {
 	Expression
 	value int
 }
+
+type UnaryExpression struct {
+	Expression
+	unary t.Token
+	value Expression
+}
+
 type BooleanExpression struct {
 	Expression
 	value bool
@@ -75,7 +82,13 @@ type Block struct {
 
 type FunctionExpression struct {
 	Expression
-	name string
+	name t.Token
+	args []Expression
+	body Block
+}
+
+type ArrowFunctionExpression struct {
+	Expression
 	args []Expression
 	body Block
 }
@@ -83,4 +96,32 @@ type FunctionExpression struct {
 type ReturnExpression struct {
 	Expression
 	value Expression
+}
+
+type ForExpression struct {
+	Expression
+	init       Expression
+	step       Expression
+	comparison Expression
+	body       Block
+}
+
+type WhileExpression struct {
+	Expression
+	condition Expression
+	body      Block
+}
+
+type ArrayLiteralExpression struct {
+	Expression
+	elements []Expression
+}
+
+type PairExpression struct {
+	left  Expression
+	right Expression
+}
+type ObjectLiteralExpression struct {
+	Expression
+	pairs []PairExpression
 }

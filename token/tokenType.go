@@ -21,11 +21,41 @@ const (
 	Object
 	Function
 	Comma
+	Colon
+	Semicolon
+	Plus
+	PlusPlus
+	Minus
+	MinusMinus
+	PlusEqual
+	MinusEqual
+	Star
+	StarEqual
+	StarStar
+	Slash
+	SlashSlash
+	SlashEqual
+	Question
+	Tilde
 	Dot
 	DotDotDot
+	Bang
+	BangEqual
 	Equal
 	EqualEqual
 	EqualEqualEqual
+	// EqualGreater =>
+	EqualGreater
+	Greater
+	GreaterEqual
+	GreaterGreater
+	GreaterGreaterGreater
+	GreaterGreaterEqual
+	Less
+	LessLess
+	LessLessLess
+	LessEqual
+	LessLessEqual
 	LeftParenthesis
 	RightParenthesis
 	LeftBracket

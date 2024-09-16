@@ -113,7 +113,7 @@ func (s *Scanner) keyword(v string) (tt t.Token, ok bool) {
 
 func (s *Scanner) string() t.Token {
 	start := s.index
-	for !s.IsAtEnd() && !unicode.IsSpace(rune(s.source[s.index])) {
+	for !s.IsAtEnd() && !unicode.IsSpace(rune(s.source[s.index])) && unicode.IsOneOf([]) {
 		s.index++
 	}
 
@@ -135,14 +135,73 @@ func (s *Scanner) scanToken() t.Token {
 		return token
 	}
 	switch c {
+	case '+':
+		if s.match("+=") {
+			return t.NewToken(t.PlusEqual, "+=")
+		} else if s.match("++") {
+			return t.NewToken(t.PlusPlus, "++")
+		}
+		return t.NewToken(t.Plus, "+")
+	case '-':
+		if s.match("-=") {
+			return t.NewToken(t.MinusEqual, "-=")
+		} else if s.match("--") {
+			return t.NewToken(t.MinusMinus, "--")
+		}
+		return t.NewToken(t.Minus, "-")
+		case'*':
+			if s.match("*=") {
+				return t.NewToken(t.StarEqual, "*=")
+			} else if s.match("**") {
+				return t.NewToken(t.StarStar, "**")
+			}
+			return t.NewToken(t.Star, "*")
+	case '/':
+		if s.match("//") {
+			return t.NewToken(t.SlashSlash, "//")
+		} else if s.match("/=") {
+			return t.NewToken(t.SlashEqual, "/=")
+		}
+		return t.NewToken(t.Slash, "/")
+	case '!':
+		if s.match("!=") {
+			return t.NewToken(t.BangEqual, "!=")
+		}
+		return t.NewToken(t.Bang, "!")
 	case '=':
 		if s.match("===") {
 			return t.NewToken(t.EqualEqualEqual, "===")
 		} else if s.match("==") {
 			return t.NewToken(t.EqualEqual, "==")
+		} else if s.match("=>") {
+			return t.NewToken(t.EqualGreater, "=>")
 		} else {
 			return t.NewToken(t.Equal, "=")
 		}
+	case '>':
+		if s.match(">=") {
+			return t.NewToken(t.GreaterEqual, ">=")
+		} else if s.match(">>=") {
+			return t.NewToken(t.GreaterGreaterEqual, ">>=")
+		} else if s.match(">>") {
+			return t.NewToken(t.GreaterGreater, ">>")
+		} else if s.match(">>>") {
+			return t.NewToken(t.GreaterGreaterGreater, ">>>")
+		}
+		return t.NewToken(t.Greater, ">")
+	case '<':
+		if s.match("<=") {
+			return t.NewToken(t.LessEqual, "<=")
+		} else if s.match("<<=") {
+			return t.NewToken(t.LessEqual, "<<=")
+		} else if s.match("<<") {
+			return t.NewToken(t.LessLess, "<<")
+		} else if s.match("<<<") {
+			return t.NewToken(t.LessLessLess, "<<<")
+		}
+		return t.NewToken(t.Less, "<")
+	case '?':
+		return t.NewToken(t.Question, "?")
 	case '(':
 		return t.NewToken(t.LeftParenthesis, "(")
 	case ')':
@@ -157,11 +216,17 @@ func (s *Scanner) scanToken() t.Token {
 		return t.NewToken(t.RightSquareBracket, "]")
 	case ',':
 		return t.NewToken(t.Comma, ",")
+	case ':':
+		return t.NewToken(t.Colon, ":")
+	case ';':
+		return t.NewToken(t.Semicolon, ";")
 	case '.':
 		if s.match("...") {
 			return t.NewToken(t.DotDotDot, "...")
 		}
 		return t.NewToken(t.Dot, ".")
+	case '~':
+		return t.NewToken(t.Tilde, "~")
 	}
 
 	panic("unreachable")
