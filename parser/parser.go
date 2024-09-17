@@ -2,6 +2,7 @@ package parser
 
 import (
 	"errors"
+	"fmt"
 	t "github.com/Seeingu/coldmoon/token"
 	"log"
 	"strconv"
@@ -53,7 +54,7 @@ func (p *Parser) syntaxError(m string) (Expression, error) {
 
 // matchToken will consume token if matched
 func (p *Parser) matchToken(tokenType t.TokenType) (ok bool) {
-	if p.scanner.nextToken.TokenType == tokenType {
+	if !p.scanner.nextToken.Is(tokenType) {
 		return false
 	}
 	p.scanner.Scan()
@@ -137,7 +138,10 @@ func (p *Parser) leftParenthesis() (expr Expression, err error) {
 	// TODO: trinary, or anything else?
 
 	// Arrow function
-	args := p.functionArgs()
+	args, err := p.functionArgs()
+	if err != nil {
+		return
+	}
 
 	if !p.matchToken(t.RightParenthesis) {
 		return p.syntaxError("Arrow Function, )")
@@ -170,9 +174,6 @@ func (p *Parser) returnExpression() (expr Expression, err error) {
 
 func (p *Parser) stringExpression() (expr Expression, err error) {
 	str := p.scanner.currentToken.Literal
-	if environment.Exists(str) {
-		return IdentifierExpression{name: p.scanner.currentToken}, nil
-	}
 
 	return StringExpression{
 		value: str,
@@ -220,6 +221,8 @@ func (p *Parser) expression() (Expression, error) {
 		}, nil
 	case t.Bang, t.Tilde:
 		return p.unaryExpression()
+	case t.Identifier:
+		return p.identifier()
 	case t.String:
 		return p.stringExpression()
 	case t.Boolean:
@@ -233,11 +236,11 @@ func (p *Parser) expression() (Expression, error) {
 	case t.LeftParenthesis:
 		return p.leftParenthesis()
 	default:
-		return nil, errorGrammarNotValid
+		return p.syntaxError(fmt.Sprintf("token %+v is not matched", token))
 	}
 }
 
-func (p *Parser) block() (expr Block, err error) {
+func (p *Parser) block() (expr BlockExpression, err error) {
 	isInBracket := p.matchToken(t.LeftBracket)
 
 	var expressions []Expression
@@ -245,33 +248,48 @@ func (p *Parser) block() (expr Block, err error) {
 	if !isInBracket {
 		e, err := p.expression()
 		if err != nil {
-			return
+			return expr, err
 		}
 		expressions = append(expressions, e)
-		return
+		return expr, err
 	}
 
 	for p.scanner.NextToken().TokenType != t.RightBracket {
 		e, err := p.expression()
 		if err != nil {
-			return
+			return expr, err
 		}
 		expressions = append(expressions, e)
 	}
 
 	if ok := p.matchToken(t.RightBracket); !ok {
-		log.Println("block, bracket not matched")
-		err = errorGrammarNotValid
-		return
+		_, err := p.syntaxError("block, bracket not matched")
+		return expr, err
 	}
 
 	return
 }
 
-func (p *Parser) functionArgs() []Expression {
-	var args []Expression
+func (p *Parser) functionArgs() (args []Expression, err error) {
 
-	return args
+	if p.currentToken().Is(t.RightParenthesis) {
+		return
+	}
+	arg, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, arg)
+
+	for p.matchToken(t.Comma) {
+		arg, err := p.expression()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+	}
+
+	return args, nil
 }
 
 func (p *Parser) function() (expr Expression, err error) {
@@ -280,7 +298,10 @@ func (p *Parser) function() (expr Expression, err error) {
 		return p.syntaxError("function, (")
 	}
 
-	args := p.functionArgs()
+	args, err := p.functionArgs()
+	if err != nil {
+		return
+	}
 
 	if ok := p.matchToken(t.RightParenthesis); !ok {
 		return p.syntaxError("function, )")
@@ -306,7 +327,7 @@ func (p *Parser) arrayLiteralExpression() (expr Expression, err error) {
 	if !p.matchToken(t.RightSquareBracket) {
 		expr, err := p.expression()
 		if err != nil {
-			return
+			return expr, err
 		}
 		elems = append(elems, expr)
 	}
@@ -317,7 +338,7 @@ func (p *Parser) arrayLiteralExpression() (expr Expression, err error) {
 		}
 		expr, err := p.expression()
 		if err != nil {
-			return
+			return nil, err
 		}
 		elems = append(elems, expr)
 	}
@@ -335,7 +356,7 @@ func (p *Parser) objectLiteralExpression() (expr Expression, err error) {
 	for !p.matchToken(t.RightBracket) {
 		left, err := p.expression()
 		if err != nil {
-			return
+			return nil, err
 		}
 		if !p.matchToken(t.Colon) {
 			return p.syntaxError("Object, should insert : between key and value")
@@ -352,9 +373,8 @@ func (p *Parser) objectLiteralExpression() (expr Expression, err error) {
 }
 
 func (p *Parser) defineExpression(token t.Token) (expr Expression, err error) {
-	identifier, err := p.identifierExpression()
-	if err != nil {
-		return
+	identifier := IdentifierExpression{
+		name: p.scanner.Scan(),
 	}
 	var value Expression
 	if p.matchToken(t.Equal) {
@@ -383,25 +403,53 @@ func (p *Parser) defineExpression(token t.Token) (expr Expression, err error) {
 	default:
 		break
 	}
-	name := identifier.name.Literal
-	if environment.Exists(name) {
-		return p.semanticError("define, redeclare variable: " + name)
-	}
-	environment.Set(name, value)
 	return
-
 }
 
-func (p *Parser) identifierExpression() (expr IdentifierExpression, err error) {
-	token := p.scanner.Scan()
-	if token.TokenType != t.String {
-		log.Println("var, should use identifier after var keyword")
-		err = errorGrammarNotValid
-		return
-	}
+func (p *Parser) identifier() (expr Expression, err error) {
+	token := p.currentToken()
 	expr = IdentifierExpression{
 		name: token,
 	}
+
+	var keys []Expression
+	// Chaining
+	// TODO: ?.
+	for p.matchToken(t.Dot) {
+		id := p.currentToken()
+		if !p.matchToken(t.Identifier) {
+			return p.syntaxError("Identifier, unknown token after dot")
+		}
+		keys = append(keys, IdentifierExpression{
+			name: id,
+		})
+
+		// TODO: check value type
+		//return p.semanticError(fmt.Sprintf("Identifier, dot operation on %s is not allowed", reflect.TypeOf(value)))
+	}
+	if len(keys) > 0 {
+		return ChainExpression{
+			identifier: expr,
+			keys:       keys,
+		}, nil
+	}
+
+	// Call
+	if p.matchToken(t.LeftParenthesis) {
+		args, err := p.functionArgs()
+		if err != nil {
+			return nil, err
+		}
+		if !p.matchToken(t.RightParenthesis) {
+			return p.syntaxError("Identifier, missing ) in call expression")
+
+		}
+		return CallExpression{
+			caller: expr,
+			args:   args,
+		}, nil
+	}
+
 	return
 }
 
@@ -424,7 +472,7 @@ func (p *Parser) binaryExpression() (expr Expression, err error) {
 		if p.isPrecedenceHigher(aheadToken, token) {
 			newRight, err := p.expression()
 			if err != nil {
-				return
+				return nil, err
 			}
 			right = BinaryExpression{
 				left:     right,
@@ -434,7 +482,7 @@ func (p *Parser) binaryExpression() (expr Expression, err error) {
 		} else {
 			leftRight, err := p.expression()
 			if err != nil {
-				return
+				return expr, err
 			}
 			left = BinaryExpression{
 				left:     left,
@@ -455,8 +503,7 @@ func (p *Parser) binaryExpression() (expr Expression, err error) {
 
 func (p *Parser) ifExpression() (expr Expression, err error) {
 	if ok := p.matchToken(t.LeftParenthesis); !ok {
-		err = errorGrammarNotValid
-		return
+		return p.syntaxError("If, missing (")
 	}
 
 	condition, err := p.expression()
@@ -465,8 +512,7 @@ func (p *Parser) ifExpression() (expr Expression, err error) {
 	}
 
 	if ok := p.matchToken(t.RightParenthesis); !ok {
-		err = errorGrammarNotValid
-		return
+		return p.syntaxError("If, missing )")
 	}
 	leftBracketMatched := p.matchToken(t.LeftBracket)
 
@@ -474,9 +520,7 @@ func (p *Parser) ifExpression() (expr Expression, err error) {
 
 	if leftBracketMatched {
 		if ok := p.matchToken(t.RightBracket); !ok {
-			log.Println("If, RightBracket not matched")
-			err = errorGrammarNotValid
-			return
+			return p.syntaxError("If, RightBracket not matched")
 		}
 	}
 
@@ -486,7 +530,7 @@ func (p *Parser) ifExpression() (expr Expression, err error) {
 		if p.scanner.NextToken().TokenType == t.If {
 			b, err := p.expression()
 			if err != nil {
-				return
+				return expr, err
 			}
 			elseBranch = b
 		}
@@ -500,12 +544,15 @@ func (p *Parser) ifExpression() (expr Expression, err error) {
 	return
 }
 
-func (p *Parser) Parse() {
+func (p *Parser) Parse() ([]Expression, error) {
+	var expressions []Expression
 	s := p.scanner
-	for !s.IsAtEnd() {
-		token := s.Scan()
-		switch token.TokenType {
+	for s.HasNextToken() {
+		expression, err := p.expression()
+		if err != nil {
+			return nil, err
 		}
+		expressions = append(expressions, expression)
 	}
-
+	return expressions, nil
 }

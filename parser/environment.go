@@ -5,9 +5,9 @@ type Environment struct {
 	enclosing *Environment
 }
 
-func NewEnvironment() *Environment {
+func NewEnvironment(enclosing *Environment) *Environment {
 	return &Environment{
-		enclosing: nil,
+		enclosing: enclosing,
 		locals:    make(map[string]Expression),
 	}
 }

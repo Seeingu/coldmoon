@@ -14,6 +14,7 @@ type LetExpression struct {
 
 type ConstExpression struct {
 	Expression
+	token      t.Token
 	identifier IdentifierExpression
 	value      Expression
 }
@@ -21,6 +22,10 @@ type ConstExpression struct {
 type IdentifierExpression struct {
 	Expression
 	name t.Token
+}
+
+func (i IdentifierExpression) toString() string {
+	return i.name.Literal
 }
 
 type VarExpression struct {
@@ -60,7 +65,7 @@ type UndefinedExpression struct {
 type IfExpression struct {
 	Expression
 	condition  Expression
-	then       Block
+	then       BlockExpression
 	elseBranch Expression
 }
 
@@ -75,22 +80,15 @@ type BinaryExpression struct {
 	operator t.Token
 }
 
-type Block struct {
+type BlockExpression struct {
 	Expression
 	expressions []Expression
-}
-
-type FunctionExpression struct {
-	Expression
-	name t.Token
-	args []Expression
-	body Block
 }
 
 type ArrowFunctionExpression struct {
 	Expression
 	args []Expression
-	body Block
+	body BlockExpression
 }
 
 type ReturnExpression struct {
@@ -103,13 +101,13 @@ type ForExpression struct {
 	init       Expression
 	step       Expression
 	comparison Expression
-	body       Block
+	body       BlockExpression
 }
 
 type WhileExpression struct {
 	Expression
 	condition Expression
-	body      Block
+	body      BlockExpression
 }
 
 type ArrayLiteralExpression struct {
@@ -124,4 +122,28 @@ type PairExpression struct {
 type ObjectLiteralExpression struct {
 	Expression
 	pairs []PairExpression
+}
+
+type FunctionExpression struct {
+	Expression
+	name t.Token
+	args []Expression
+	body BlockExpression
+}
+
+type ChainExpression struct {
+	Expression
+	identifier Expression
+	keys       []Expression
+}
+
+type CallExpression struct {
+	Expression
+	caller Expression
+	args   []Expression
+}
+
+type NativeFunctionExpression struct {
+	Expression
+	fn func(...Object)
 }

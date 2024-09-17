@@ -13,6 +13,7 @@ const (
 	Undefined
 	True
 	False
+	Identifier
 	If
 	Else
 	Return
@@ -35,7 +36,9 @@ const (
 	Slash
 	SlashSlash
 	SlashEqual
+	SlashStar
 	Question
+	QuestionDot
 	Tilde
 	Dot
 	DotDotDot
@@ -62,4 +65,5 @@ const (
 	RightBracket
 	LeftSquareBracket
 	RightSquareBracket
+	EOF
 )
