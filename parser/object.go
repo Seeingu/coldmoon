@@ -26,3 +26,14 @@ type NullObject struct {
 type UndefinedObject struct {
 	Object
 }
+
+type ObjectPrototype struct {
+	Object
+	pairs map[string]Object
+}
+
+type FunctionObject struct {
+	Object
+	Prototype ObjectPrototype
+	pairs     map[string]Object
+}

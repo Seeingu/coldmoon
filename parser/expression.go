@@ -19,6 +19,12 @@ type ConstExpression struct {
 	value      Expression
 }
 
+type AssignExpression struct {
+	Expression
+	left  Expression
+	right Expression
+}
+
 type IdentifierExpression struct {
 	Expression
 	name t.Token
@@ -126,7 +132,7 @@ type ObjectLiteralExpression struct {
 
 type FunctionExpression struct {
 	Expression
-	name t.Token
+	name string
 	args []Expression
 	body BlockExpression
 }
@@ -134,7 +140,7 @@ type FunctionExpression struct {
 type ChainExpression struct {
 	Expression
 	identifier Expression
-	keys       []Expression
+	properties []Expression
 }
 
 type CallExpression struct {
@@ -146,4 +152,37 @@ type CallExpression struct {
 type NativeFunctionExpression struct {
 	Expression
 	fn func(...Object)
+}
+
+type ThrowExpression struct {
+	Expression
+	errorExpression Expression
+}
+
+type ClassInstantiateExpression struct {
+	Expression
+	caller Expression
+	args   []Expression
+}
+
+type ClassExpression struct {
+	Expression
+	name        Expression
+	constructor Expression
+	args        []Expression
+}
+
+type SingleLineCommentExpression struct {
+	Expression
+	content string
+}
+
+type MultiLineCommentExpression struct {
+	Expression
+	content string
+	// TODO: Doc comment
+}
+
+type ThisExpression struct {
+	Expression
 }

@@ -39,6 +39,10 @@ const (
 	SlashStar
 	Question
 	QuestionDot
+	Ampersand
+	AmpersandAmpersand
+	Bar
+	BarBar
 	Tilde
 	Dot
 	DotDotDot
@@ -65,5 +69,11 @@ const (
 	RightBracket
 	LeftSquareBracket
 	RightSquareBracket
+	Error
+	Throw
+	New
+	This
+	Super
+	Class
 	EOF
 )

@@ -15,6 +15,8 @@ type Parser struct {
 var precedenceMap = map[t.TokenType]int{}
 
 func NewParser(scanner *Scanner) Parser {
+	precedenceMap[t.BarBar] = 5
+	precedenceMap[t.AmpersandAmpersand] = 5
 	precedenceMap[t.Plus] = 10
 	precedenceMap[t.Minus] = precedenceMap[t.Plus]
 	precedenceMap[t.Star] = 15
@@ -25,6 +27,17 @@ func NewParser(scanner *Scanner) Parser {
 }
 
 // MARK: parser utils
+
+// skipToNextToken same as scan,
+// just means discard result
+func (p *Parser) skipToNextToken() {
+	p.scan()
+}
+
+// scan will return current token after move cursor
+func (p *Parser) scan() t.Token {
+	return p.scanner.Scan()
+}
 
 func (p *Parser) currentToken() t.Token {
 	return p.scanner.CurrentToken()
@@ -38,22 +51,36 @@ func (p *Parser) isPrecedenceHigher(a, b t.Token) bool {
 	return precedenceMap[a.TokenType] > precedenceMap[b.TokenType]
 }
 
+func (p *Parser) skipPossibleSemicolon() {
+	if p.currentToken().Is(t.Semicolon) {
+		p.skipToNextToken()
+	}
+}
+
 // MARK: parser errors
 
 func (p *Parser) semanticError(m string) (Expression, error) {
 	log.Printf("semantic error: %s\n", m)
-	log.Printf("current token: %v\n", p.scanner.currentToken)
+	log.Printf("current token: %+v\n", p.scanner.currentToken)
 	return nil, errorSemanticError
 }
 
 func (p *Parser) syntaxError(m string) (Expression, error) {
 	log.Printf("syntax error: %s\n", m)
-	log.Printf("current token: %v\n", p.scanner.currentToken)
+	log.Printf("current token: %+v\n", p.scanner.currentToken)
 	return nil, errorGrammarNotValid
 }
 
-// matchToken will consume token if matched
+// matchToken will consume if current token matched
 func (p *Parser) matchToken(tokenType t.TokenType) (ok bool) {
+	if !p.scanner.currentToken.Is(tokenType) {
+		return false
+	}
+	p.scanner.Scan()
+	return true
+}
+
+func (p *Parser) matchNextToken(tokenType t.TokenType) (ok bool) {
 	if !p.scanner.nextToken.Is(tokenType) {
 		return false
 	}
@@ -162,41 +189,120 @@ func (p *Parser) leftParenthesis() (expr Expression, err error) {
 }
 
 func (p *Parser) returnExpression() (expr Expression, err error) {
-	value, err := p.expression()
+	// skip return
+	p.skipToNextToken()
+	value, err := p.maybeBinary()
 	if err != nil {
 		return
 	}
 	expr = ReturnExpression{
 		value: value,
 	}
+	p.skipPossibleSemicolon()
 	return
 }
 
 func (p *Parser) stringExpression() (expr Expression, err error) {
 	str := p.scanner.currentToken.Literal
+	p.scanner.Scan()
 
 	return StringExpression{
 		value: str,
 	}, nil
 }
 
-func (p *Parser) unaryExpression() (expr Expression, err error) {
-	if p.scanner.nextToken.Is(t.Equal) {
-		return p.syntaxError("unaryExpression: unexpected =")
+// TODO: maybe split into two
+func (p *Parser) primaryOrIdentifier() (expr Expression, err error) {
+	token := p.currentToken()
+	switch token.TokenType {
+	case t.Number:
+		v, _ := strconv.Atoi(token.Literal)
+		p.scanner.Scan()
+		return NumberExpression{
+			value: v,
+		}, nil
+	case t.String:
+		return p.stringExpression()
+	case t.Identifier:
+		return p.identifier()
+	case t.Boolean:
+		return BooleanExpression{
+			value: token.TokenType == t.True,
+		}, nil
+	default:
+		return p.syntaxError("Primary, unreachable ")
 	}
 
-	value, err := p.expression()
+}
+
+func (p *Parser) maybeUnary() (expr Expression, err error) {
+	token := p.currentToken()
+	unaryTokenTypes := []t.TokenType{
+		t.Tilde,
+		t.Bang,
+	}
+
+	if token.Is(t.Function) {
+		return p.function()
+	}
+
+	if !token.IsOneOf(unaryTokenTypes) {
+		return p.primaryOrIdentifier()
+	}
+	p.scanner.Scan()
+	value, err := p.primaryOrIdentifier()
 	if err != nil {
 		return
 	}
 	return UnaryExpression{
-		unary: p.currentToken(),
+		unary: token,
 		value: value,
 	}, nil
 }
 
+func (p *Parser) instantiateClass() (expr Expression, err error) {
+	identifier := p.scanner.Scan()
+	name := IdentifierExpression{name: identifier}
+
+	if ok := p.matchToken(t.LeftParenthesis); !ok {
+		return p.syntaxError("Class, (")
+	}
+
+	args, err := p.functionArgs()
+	if err != nil {
+		return
+	}
+
+	if ok := p.matchToken(t.RightParenthesis); !ok {
+		return p.syntaxError("Class, )")
+	}
+
+	return ClassInstantiateExpression{
+		caller: name,
+		args:   args,
+	}, nil
+
+}
+
+func (p *Parser) throwExpression() (expr Expression, err error) {
+	var errorExpression Expression
+	if p.matchToken(t.New) {
+		errorExpression, err = p.instantiateClass()
+		if err != nil {
+			return nil, err
+		}
+	} else if p.currentToken().Is(t.String) {
+		errorExpression, err = p.stringExpression()
+	} else if p.currentToken().Is(t.Identifier) {
+		errorExpression, err = p.identifier()
+	}
+	return ThrowExpression{
+		errorExpression: errorExpression,
+	}, err
+}
+
 func (p *Parser) expression() (Expression, error) {
-	token := p.scanner.Scan()
+	token := p.currentToken()
 	switch token.TokenType {
 	case t.Function:
 		return p.function()
@@ -214,27 +320,22 @@ func (p *Parser) expression() (Expression, error) {
 		return p.objectLiteralExpression()
 	case t.Return:
 		return p.returnExpression()
-	case t.Number:
-		v, _ := strconv.Atoi(token.Literal)
-		return NumberExpression{
-			value: v,
-		}, nil
-	case t.Bang, t.Tilde:
-		return p.unaryExpression()
-	case t.Identifier:
-		return p.identifier()
-	case t.String:
-		return p.stringExpression()
-	case t.Boolean:
-		return BooleanExpression{
-			value: token.TokenType == t.True,
-		}, nil
 	case t.For:
 		return p.forExpression()
 	case t.While:
 		return p.whileExpression()
 	case t.LeftParenthesis:
 		return p.leftParenthesis()
+	case t.Throw:
+		return p.throwExpression()
+	case t.SlashSlash:
+		p.skipToNextToken()
+		return SingleLineCommentExpression{content: token.Literal}, nil
+	case t.SlashStar:
+		p.skipToNextToken()
+		return MultiLineCommentExpression{content: token.Literal}, nil
+	case t.Number, t.String, t.Boolean, t.Identifier, t.This:
+		return p.maybeAssign()
 	default:
 		return p.syntaxError(fmt.Sprintf("token %+v is not matched", token))
 	}
@@ -254,7 +355,7 @@ func (p *Parser) block() (expr BlockExpression, err error) {
 		return expr, err
 	}
 
-	for p.scanner.NextToken().TokenType != t.RightBracket {
+	for !p.matchToken(t.RightBracket) {
 		e, err := p.expression()
 		if err != nil {
 			return expr, err
@@ -262,27 +363,21 @@ func (p *Parser) block() (expr BlockExpression, err error) {
 		expressions = append(expressions, e)
 	}
 
-	if ok := p.matchToken(t.RightBracket); !ok {
-		_, err := p.syntaxError("block, bracket not matched")
-		return expr, err
-	}
-
 	return
 }
 
 func (p *Parser) functionArgs() (args []Expression, err error) {
-
 	if p.currentToken().Is(t.RightParenthesis) {
 		return
 	}
-	arg, err := p.expression()
+	arg, err := p.maybeBinary()
 	if err != nil {
 		return nil, err
 	}
 	args = append(args, arg)
 
 	for p.matchToken(t.Comma) {
-		arg, err := p.expression()
+		arg, err := p.maybeBinary()
 		if err != nil {
 			return nil, err
 		}
@@ -292,9 +387,20 @@ func (p *Parser) functionArgs() (args []Expression, err error) {
 	return args, nil
 }
 
+// TODO: check is anonymous available
 func (p *Parser) function() (expr Expression, err error) {
-	name := p.scanner.Scan()
-	if ok := p.matchToken(t.LeftParenthesis); !ok {
+	// anonymous
+	var name string
+	if p.nextToken().Is(t.LeftParenthesis) {
+		// skip function
+		p.skipToNextToken()
+	} else {
+		name = p.scan().Literal
+		// skip name
+		p.skipToNextToken()
+	}
+
+	if !p.matchToken(t.LeftParenthesis) {
 		return p.syntaxError("function, (")
 	}
 
@@ -303,7 +409,7 @@ func (p *Parser) function() (expr Expression, err error) {
 		return
 	}
 
-	if ok := p.matchToken(t.RightParenthesis); !ok {
+	if !p.matchToken(t.RightParenthesis) {
 		return p.syntaxError("function, )")
 	}
 
@@ -372,6 +478,71 @@ func (p *Parser) objectLiteralExpression() (expr Expression, err error) {
 	}, nil
 }
 
+func (p *Parser) maybeChain(target Expression) (expr Expression, err error) {
+	var keys []Expression
+	// Chaining
+	// TODO: ?.
+	for p.matchToken(t.Dot) {
+		id := p.currentToken()
+		if !p.matchToken(t.Identifier) {
+			return p.syntaxError("Identifier, unknown token after dot")
+		}
+		keys = append(keys, IdentifierExpression{
+			name: id,
+		})
+
+		// TODO: check value type
+		//return p.semanticError(fmt.Sprintf("Identifier, dot operation on %s is not allowed", reflect.TypeOf(value)))
+	}
+	if len(keys) > 0 {
+		return ChainExpression{
+			identifier: target,
+			properties: keys,
+		}, nil
+	}
+
+	return target, nil
+}
+
+func (p *Parser) maybeAssign() (expr Expression, err error) {
+	token := p.currentToken()
+
+	if token.Is(t.This) {
+		expr = ThisExpression{}
+	} else if token.Is(t.Identifier) {
+		expr = IdentifierExpression{
+			name: token,
+		}
+	}
+
+	// skip first key
+	p.skipToNextToken()
+	expr, err = p.maybeChain(expr)
+	if err != nil {
+		return nil, err
+	}
+	if p.matchToken(t.Equal) {
+		return p.assignExpression(expr)
+	}
+
+	p.skipPossibleSemicolon()
+	return
+
+}
+
+func (p *Parser) assignExpression(left Expression) (expr Expression, err error) {
+	right, err := p.maybeBinary()
+	if err != nil {
+		return nil, err
+	}
+	expr = AssignExpression{
+		left:  left,
+		right: right,
+	}
+	p.skipPossibleSemicolon()
+	return
+}
+
 func (p *Parser) defineExpression(token t.Token) (expr Expression, err error) {
 	identifier := IdentifierExpression{
 		name: p.scanner.Scan(),
@@ -412,26 +583,9 @@ func (p *Parser) identifier() (expr Expression, err error) {
 		name: token,
 	}
 
-	var keys []Expression
-	// Chaining
-	// TODO: ?.
-	for p.matchToken(t.Dot) {
-		id := p.currentToken()
-		if !p.matchToken(t.Identifier) {
-			return p.syntaxError("Identifier, unknown token after dot")
-		}
-		keys = append(keys, IdentifierExpression{
-			name: id,
-		})
-
-		// TODO: check value type
-		//return p.semanticError(fmt.Sprintf("Identifier, dot operation on %s is not allowed", reflect.TypeOf(value)))
-	}
-	if len(keys) > 0 {
-		return ChainExpression{
-			identifier: expr,
-			keys:       keys,
-		}, nil
+	expr, err = p.maybeChain(expr)
+	if err != nil {
+		return nil, err
 	}
 
 	// Call
@@ -453,24 +607,29 @@ func (p *Parser) identifier() (expr Expression, err error) {
 	return
 }
 
-func (p *Parser) binaryExpression() (expr Expression, err error) {
-	left, err := p.expression()
+func (p *Parser) maybeBinary() (expr Expression, err error) {
+	left, err := p.maybeUnary()
 	if err != nil {
 		return
 	}
-	token := p.scanner.Scan()
-	right, err := p.expression()
+	operatorToken := p.scan()
+	binaryTokenTypes := []t.TokenType{t.Plus, t.Minus, t.Star, t.Slash, t.BarBar, t.AmpersandAmpersand}
+	if !operatorToken.IsOneOf(binaryTokenTypes) {
+		return left, nil
+	}
+	// skip operator
+	p.skipToNextToken()
+	right, err := p.maybeUnary()
 	if err != nil {
 		return
 	}
 
 	aheadToken := p.nextToken()
-	binaryTokenTypes := []t.TokenType{t.Plus, t.Minus, t.Star, t.Slash}
 	if aheadToken.IsOneOf(binaryTokenTypes) {
-		// already know what the token is
+		// already know what the operatorToken is
 		p.scanner.Scan()
-		if p.isPrecedenceHigher(aheadToken, token) {
-			newRight, err := p.expression()
+		if p.isPrecedenceHigher(aheadToken, operatorToken) {
+			newRight, err := p.maybeUnary()
 			if err != nil {
 				return nil, err
 			}
@@ -480,7 +639,7 @@ func (p *Parser) binaryExpression() (expr Expression, err error) {
 				operator: aheadToken,
 			}
 		} else {
-			leftRight, err := p.expression()
+			leftRight, err := p.maybeUnary()
 			if err != nil {
 				return expr, err
 			}
@@ -495,7 +654,7 @@ func (p *Parser) binaryExpression() (expr Expression, err error) {
 	expr = BinaryExpression{
 		left:     left,
 		right:    right,
-		operator: token,
+		operator: operatorToken,
 	}
 	return
 

@@ -5,12 +5,16 @@ import "github.com/samber/lo"
 type Token struct {
 	TokenType TokenType
 	Literal   string
+	Line      uint
+	Col       uint
 }
 
-func NewToken(tokenType TokenType, literal string) Token {
+func NewToken(tokenType TokenType, literal string, line uint, col uint) Token {
 	return Token{
 		TokenType: tokenType,
 		Literal:   literal,
+		Line:      line,
+		Col:       col,
 	}
 }
 
