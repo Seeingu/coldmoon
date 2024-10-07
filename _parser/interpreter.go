@@ -1,4 +1,4 @@
-package parser
+package _parser
 
 import (
 	"fmt"
@@ -52,11 +52,14 @@ func (i *Interpreter) expression(expression Expression, env *Environment) Object
 		if env.Exists(expr.identifier.toString()) {
 			i.error("variable redeclared")
 		}
-		environment.Set(expr.identifier.toString(), expr.value)
+		environment.Set(expr.identifier.toString(), i.expression(expr.value, env))
+	case ThrowExpression:
+		panic(expr.toString())
 	case NumberExpression:
 		return NumberObject{value: expr.value}
 	case StringExpression:
 		return StringObject{value: expr.value}
+
 	case BooleanExpression:
 		if expr.value {
 			return trueObject
@@ -75,7 +78,7 @@ func (i *Interpreter) block(block BlockExpression, env *Environment) {
 	}
 }
 
-func (i *Interpreter) function(expression FunctionExpression, args []Expression) {
+func (i *Interpreter) function(expression FunctionObject, args []Expression) {
 	localEnv := NewEnvironment(environment)
 	for index, arg := range expression.args {
 		localEnv.Set(arg.toString(), args[index])
@@ -85,7 +88,7 @@ func (i *Interpreter) function(expression FunctionExpression, args []Expression)
 
 }
 
-func (i *Interpreter) nativeFunction(expression NativeFunctionExpression, args []Expression) {
+func (i *Interpreter) nativeFunction(expression NativeFunctionObject, args []Expression) {
 	var objectArgs []Object
 
 	for _, arg := range args {
@@ -103,9 +106,9 @@ func (i *Interpreter) call(expression CallExpression) {
 			i.error("identifier of function caller is not defined")
 		}
 		switch valueExpr := value.(type) {
-		case FunctionExpression:
+		case FunctionObject:
 			i.function(valueExpr, expression.args)
-		case NativeFunctionExpression:
+		case NativeFunctionObject:
 			i.nativeFunction(valueExpr, expression.args)
 		default:
 			i.error("function caller is not of type FunctionExpression")
@@ -121,7 +124,8 @@ func (i *Interpreter) call(expression CallExpression) {
 // MARK: Native
 
 func (i *Interpreter) registerNativeFunctions() {
-	environment.Set("print", NativeFunctionExpression{
+	environment.Set("print", NativeFunctionObject{
+		name: "print",
 		fn: func(args ...Object) {
 			var sb strings.Builder
 			for _, arg := range args {

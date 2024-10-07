@@ -1,4 +1,4 @@
-package parser
+package lexer
 
 import (
 	"errors"
@@ -16,6 +16,7 @@ type Scanner struct {
 	col          uint
 	currentToken t.Token
 	nextToken    t.Token
+	inObject     bool
 }
 
 func NewScanner(source string) *Scanner {
@@ -45,7 +46,7 @@ var (
 
 func (s *Scanner) PeekNextMany(i int) (r rune, err error) {
 	ii := s.index + i
-	if s.indexIsAtEnd(ii) {
+	if !s.indexIsValid(ii) {
 		err = errorIndexOutOfSource
 		return
 	}
@@ -64,6 +65,9 @@ func (s *Scanner) error(m string) {
 // match will update index if matched target str
 func (s *Scanner) match(str string) bool {
 	end := s.index + len(str)
+	if !s.indexIsValid(end) {
+		return false
+	}
 	if s.source[s.index:end] == str {
 		s.index = end
 		return true
@@ -81,19 +85,17 @@ func (s *Scanner) newToken(tokenType t.TokenType, literal string) t.Token {
 	return t.NewToken(tokenType, literal, s.line, s.col)
 }
 
-// TODO: Rename: it's a little bit confusing
 // matchUntil match until f(rune) not satisfy
 // if matched, move index to next position
 func (s *Scanner) matchUntil(f func(c rune) bool) string {
 	start := s.index
-	for !s.IsAtEnd() && f(s.Peek()) {
+	for !s.isAtEnd() && f(s.Peek()) {
 		if s.Peek() == '\n' {
 			s.newLine()
 		}
 		s.nextIndex()
 	}
 	l := s.source[start:s.index]
-	s.nextIndex()
 	return l
 }
 
@@ -172,23 +174,30 @@ func (s *Scanner) keyword(v string) (tt t.Token, ok bool) {
 }
 
 func (s *Scanner) string(endChar rune) t.Token {
+	// skip begin quote
 	s.nextIndex()
 	l := s.matchUntil(func(c rune) bool {
 		return c != endChar
 	})
+	// skip end quote
+	s.nextIndex()
 	return s.newToken(t.String, l)
 }
 
+var identifierSupportSpecialChars = []rune{'_', '$'}
+
 func (s *Scanner) identifier() t.Token {
 	start := s.index
-	supportSpecialChars := []rune{'_'}
-	for !s.IsAtEnd() {
+	for !s.isAtEnd() {
 		c := rune(s.source[s.index])
-		if unicode.IsSpace(c) || c == '(' || c == ')' || c == '.' || c == ';' {
+		if unicode.IsSpace(c) || c == '(' || c == ')' || c == '.' || c == ';' || c == '[' {
 			break
 		}
-		if unicode.IsLetter(c) || unicode.IsDigit(c) || lo.Contains(supportSpecialChars, c) {
+		if unicode.IsLetter(c) || unicode.IsDigit(c) || lo.Contains(identifierSupportSpecialChars, c) {
 			s.index++
+		} else if s.inObject && c == ':' {
+			l := s.source[start:s.index]
+			return s.newToken(t.String, l)
 		} else {
 			s.error("identifier, unexpected char: " + string(c))
 		}
@@ -203,17 +212,11 @@ func (s *Scanner) identifier() t.Token {
 }
 
 func (s *Scanner) scanToken() t.Token {
-	for unicode.IsSpace(s.Peek()) {
-		if s.Peek() == '\n' {
-			s.newLine()
-		}
-		s.nextIndex()
-	}
 	c := s.Peek()
 	if unicode.IsDigit(c) {
 		return s.number()
 	}
-	if unicode.IsLetter(c) || c == '_' {
+	if unicode.IsLetter(c) || lo.Contains(identifierSupportSpecialChars, c) {
 		return s.identifier()
 	}
 	switch c {
@@ -320,9 +323,11 @@ func (s *Scanner) scanToken() t.Token {
 		s.nextIndex()
 		return s.newToken(t.RightParenthesis, ")")
 	case '{':
+		s.inObject = true
 		s.nextIndex()
 		return s.newToken(t.LeftBracket, "{")
 	case '}':
+		s.inObject = false
 		s.nextIndex()
 		return s.newToken(t.RightBracket, "}")
 	case '[':
@@ -366,7 +371,17 @@ func (s *Scanner) NextToken() t.Token {
 
 // Scan will return current token after move cursor
 func (s *Scanner) Scan() t.Token {
-	if s.IsAtEnd() {
+	if s.nextToken.Is(t.EOF) {
+		s.currentToken = s.nextToken
+		return s.currentToken
+	}
+	for !s.isAtEnd() && unicode.IsSpace(s.Peek()) {
+		if s.Peek() == '\n' {
+			s.newLine()
+		}
+		s.nextIndex()
+	}
+	if s.isAtEnd() {
 		s.currentToken = s.nextToken
 		s.nextToken = s.newToken(t.EOF, "")
 		return s.currentToken
@@ -377,7 +392,7 @@ func (s *Scanner) Scan() t.Token {
 	return s.currentToken
 }
 
-func (s *Scanner) IsAtEnd() bool {
+func (s *Scanner) isAtEnd() bool {
 	return s.index >= len(s.source)
 }
 
@@ -385,6 +400,6 @@ func (s *Scanner) HasNextToken() bool {
 	return !s.nextToken.Is(t.EOF)
 }
 
-func (s *Scanner) indexIsAtEnd(index int) bool {
+func (s *Scanner) indexIsValid(index int) bool {
 	return index >= 0 && index < len(s.source)
 }

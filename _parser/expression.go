@@ -1,4 +1,4 @@
-package parser
+package _parser
 
 import t "github.com/Seeingu/coldmoon/token"
 
@@ -147,11 +147,6 @@ type CallExpression struct {
 	Expression
 	caller Expression
 	args   []Expression
-}
-
-type NativeFunctionExpression struct {
-	Expression
-	fn func(...Object)
 }
 
 type ThrowExpression struct {

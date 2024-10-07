@@ -1,5 +1,6 @@
 package token
 
+//go:generate stringer -type TokenType -trimprefix tokenType
 type TokenType int
 
 const (

@@ -1,7 +1,7 @@
 package main
 
 import (
-	p "github.com/Seeingu/coldmoon/parser"
+	p "github.com/Seeingu/coldmoon/_parser"
 )
 
 func main() {

@@ -1,14 +1,14 @@
-package parser
+package _parser
 
 type Environment struct {
-	locals    map[string]Expression
+	locals    map[string]Object
 	enclosing *Environment
 }
 
 func NewEnvironment(enclosing *Environment) *Environment {
 	return &Environment{
 		enclosing: enclosing,
-		locals:    make(map[string]Expression),
+		locals:    make(map[string]Object),
 	}
 }
 
@@ -17,7 +17,7 @@ func (e *Environment) Exists(key string) bool {
 	return ok
 }
 
-func (e *Environment) Get(key string) (expr Expression, ok bool) {
+func (e *Environment) Get(key string) (expr Object, ok bool) {
 	v, ok := e.locals[key]
 	if !ok && e.enclosing != nil {
 		return e.enclosing.Get(key)
@@ -25,6 +25,6 @@ func (e *Environment) Get(key string) (expr Expression, ok bool) {
 	return v, ok
 }
 
-func (e *Environment) Set(key string, value Expression) {
+func (e *Environment) Set(key string, value Object) {
 	e.locals[key] = value
 }
