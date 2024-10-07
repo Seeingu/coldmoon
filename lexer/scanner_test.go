@@ -13,6 +13,10 @@ func TestScannerTokens(t *testing.T) {
 < 
 "hello";
 let o = {a: 1, 'b': 2, "c": 3}
+
+	let sum = function(a, b) { a + b }
+	sum(1, 2)
+
 `)
 	var tokens []tt.Token
 	tokens = append(tokens, s.currentToken)
@@ -28,6 +32,7 @@ let o = {a: 1, 'b': 2, "c": 3}
 		tt.Less,
 		tt.String,
 		tt.Semicolon,
+		// let o = ...
 		tt.Let,
 		tt.Identifier,
 		// index: 10
@@ -37,8 +42,39 @@ let o = {a: 1, 'b': 2, "c": 3}
 		tt.Colon,
 		tt.Number,
 		tt.Comma,
+		tt.String,
+		tt.Colon,
+		tt.Number,
+		tt.Comma,
+		// index: 20
+		tt.String,
+		tt.Colon,
+		tt.Number,
+		tt.RightBracket,
+		// sum = ...
+		tt.Let,
+		tt.Identifier,
+		tt.Equal,
+		tt.Function,
+		tt.LeftParenthesis,
+		tt.Identifier,
+		tt.Comma,
+		tt.Identifier,
+		tt.RightParenthesis,
+		tt.LeftBracket,
+		tt.Identifier,
+		tt.Plus,
+		tt.Identifier,
+		tt.RightBracket,
+		// sum()
+		tt.Identifier,
+		tt.LeftParenthesis,
+		tt.Number,
+		tt.Comma,
+		tt.Number,
+		tt.RightParenthesis,
 	}
 	for i, tokenType := range tokenTypes {
-		assert.Equal(t, tokenType, tokens[i].TokenType, fmt.Sprintf("index: %d, token: %s", i, tokens[i].TokenType.String()))
+		assert.Equal(t, tokenType, tokens[i].TokenType, fmt.Sprintf("index: %d, expected: %s, actual: %s", i, tokenType.String(), tokens[i].TokenType.String()))
 	}
 }

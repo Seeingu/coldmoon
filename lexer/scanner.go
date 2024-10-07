@@ -190,7 +190,7 @@ func (s *Scanner) identifier() t.Token {
 	start := s.index
 	for !s.isAtEnd() {
 		c := rune(s.source[s.index])
-		if unicode.IsSpace(c) || c == '(' || c == ')' || c == '.' || c == ';' || c == '[' {
+		if unicode.IsSpace(c) || c == '(' || c == ')' || c == '.' || c == ';' || c == '[' || c == ',' {
 			break
 		}
 		if unicode.IsLetter(c) || unicode.IsDigit(c) || lo.Contains(identifierSupportSpecialChars, c) {

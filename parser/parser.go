@@ -37,6 +37,7 @@ func New(l *lexer.Scanner) *Parser {
 	p.registerPrefix(t.Minus, p.parsePrefixExpression)
 	p.registerPrefix(t.Bang, p.parsePrefixExpression)
 	p.registerPrefix(t.If, p.parseIfExpression)
+	p.registerPrefix(t.Function, p.parseFunctionLiteral)
 
 	p.infixParseFns = make(map[t.TokenType]infixParseFn)
 	p.registerInfix(t.Plus, p.parseInfixExpression)
@@ -50,6 +51,7 @@ func New(l *lexer.Scanner) *Parser {
 	p.registerInfix(t.LessEqual, p.parseInfixExpression)
 	p.registerInfix(t.BangEqual, p.parseInfixExpression)
 	p.registerInfix(t.LeftSquareBracket, p.parseIndexExpression)
+	p.registerInfix(t.LeftParenthesis, p.parseCallExpression)
 	return p
 }
 
@@ -108,6 +110,8 @@ func (p *Parser) parseStatement() ast.Statement {
 	switch p.currentToken().TokenType {
 	case t.Let:
 		return p.parseLetStatement()
+	case t.Return:
+		return p.parseReturnStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -132,6 +136,18 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 		p.scanner.Scan()
 	}
 
+	return stmt
+}
+
+func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
+	stmt := &ast.ReturnStatement{Token: p.currentToken()}
+	// skip return
+	p.scanner.Scan()
+
+	stmt.ReturnValue = p.parseExpression(PLowest)
+	if p.nextToken().Is(t.Semicolon) {
+		p.scanner.Scan()
+	}
 	return stmt
 }
 
@@ -318,6 +334,61 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	return e
 }
 
+// function <identifier> params block
+func (p *Parser) parseFunctionLiteral() ast.Expression {
+	f := &ast.FunctionLiteral{Token: p.currentToken()}
+
+	if !p.nextToken().Is(t.LeftParenthesis) {
+		p.scanner.Scan()
+		f.Name = p.parseIdentifier().(*ast.IdentifierExpression)
+	}
+
+	if !p.expectNextToken(t.LeftParenthesis) {
+		return nil
+	}
+	f.Parameters = p.parseFunctionParameters()
+
+	if !p.expectNextToken(t.LeftBracket) {
+		return nil
+	}
+
+	f.Body = p.parseBlockStatement()
+
+	return f
+}
+
+// startToken: (
+// endToken: after )
+func (p *Parser) parseFunctionParameters() []*ast.IdentifierExpression {
+	var params []*ast.IdentifierExpression
+
+	if p.nextToken().Is(t.RightParenthesis) {
+		p.scanner.Scan()
+		return params
+	}
+
+	// Skip (
+	p.scanner.Scan()
+
+	param := &ast.IdentifierExpression{Token: p.currentToken(), Value: p.currentToken().Literal}
+	params = append(params, param)
+
+	for p.nextToken().Is(t.Comma) {
+		// Skip current literal
+		p.scanner.Scan()
+		// Skip ,
+		p.scanner.Scan()
+		param := &ast.IdentifierExpression{Token: p.currentToken(), Value: p.currentToken().Literal}
+		params = append(params, param)
+	}
+
+	if !p.expectNextToken(t.RightParenthesis) {
+		return nil
+	}
+
+	return params
+}
+
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	b := &ast.BlockStatement{Token: p.currentToken()}
 	b.Statements = []ast.Statement{}
@@ -361,6 +432,13 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 		return nil
 	}
 
+	return e
+}
+
+func (p *Parser) parseCallExpression(fn ast.Expression) ast.Expression {
+	e := &ast.CallExpression{Token: p.currentToken()}
+	e.FunctionName = fn
+	e.Arguments = p.parseExpressionList(t.RightParenthesis)
 	return e
 }
 
@@ -426,5 +504,5 @@ func (p *Parser) expectNextToken(tokenType t.TokenType) bool {
 }
 
 func (p *Parser) tokenMatchError(token t.Token, tokenType t.TokenType) {
-	p.errors = append(p.errors, fmt.Sprintf("expected match token %d, got %d", token.TokenType, tokenType))
+	p.errors = append(p.errors, fmt.Sprintf("expected match token %s, got %s", token.TokenType.String(), tokenType.String()))
 }

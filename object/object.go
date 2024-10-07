@@ -1,6 +1,9 @@
 package object
 
-import "hash/fnv"
+import (
+	"github.com/Seeingu/coldmoon/code"
+	"hash/fnv"
+)
 
 //go:generate stringer -type Type -trimprefix type
 type Type int
@@ -11,6 +14,7 @@ const (
 	TypeString
 	TypeArray
 	TypeObject
+	TypeCompiledFunction
 )
 
 type Object interface {
@@ -96,6 +100,15 @@ type ObjectObject struct {
 }
 
 func (o ObjectObject) Type() Type { return TypeObject }
+
+type CompiledFunction struct {
+	Object
+	Instructions  code.Instructions
+	NumLocals     int
+	NumParameters int
+}
+
+func (c *CompiledFunction) Type() Type { return TypeCompiledFunction }
 
 type NativeFunctionObject struct {
 	Object

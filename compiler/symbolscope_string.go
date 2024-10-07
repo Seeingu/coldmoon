@@ -9,11 +9,12 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[GlobalScope-0]
+	_ = x[LocalScope-1]
 }
 
-const _SymbolScope_name = "GlobalScope"
+const _SymbolScope_name = "GlobalScopeLocalScope"
 
-var _SymbolScope_index = [...]uint8{0, 11}
+var _SymbolScope_index = [...]uint8{0, 11, 21}
 
 func (i SymbolScope) String() string {
 	if i < 0 || i >= SymbolScope(len(_SymbolScope_index)-1) {

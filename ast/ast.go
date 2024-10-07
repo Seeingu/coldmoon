@@ -45,6 +45,12 @@ type LetStatement struct {
 	Value Expression
 }
 
+type ReturnStatement struct {
+	Statement
+	Token       t.Token
+	ReturnValue Expression
+}
+
 type IntegerLiteral struct {
 	Expression
 	Token t.Token
@@ -109,4 +115,20 @@ type IfExpression struct {
 	Condition   Expression
 	Consequence *BlockStatement
 	Alternative *BlockStatement
+}
+
+type FunctionLiteral struct {
+	Expression
+	Token t.Token
+	// Name is optional, maybe not exist in anonymous function
+	Name       *IdentifierExpression
+	Parameters []*IdentifierExpression
+	Body       *BlockStatement
+}
+
+type CallExpression struct {
+	Expression
+	Token        t.Token
+	FunctionName Expression
+	Arguments    []Expression
 }

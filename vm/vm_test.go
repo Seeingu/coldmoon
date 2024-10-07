@@ -11,6 +11,89 @@ import (
 	"testing"
 )
 
+func TestFunctionScopes(t *testing.T) {
+	tests := []vmTest{
+		{
+			input: `
+	let globalA = 10;
+	let minusOne = function () {
+		let n = 1;
+		globalA - n;
+	}
+	let minusTwo = function () {
+		let n = 2;
+		globalA - n;
+	}
+
+	minusOne() + minusTwo();
+`,
+			expected: 17,
+		},
+		{
+			input: `
+	let aa = function () {
+		let b = function() { 1; }
+		b;
+	}
+	aa()()
+`,
+			expected: 1,
+		},
+		{
+			input: `
+	let id = function(a) { a; };
+	id(4);
+`, expected: 4,
+		},
+		{
+			input: `
+	let sum = function(a, b) { a + b; };
+	let sum1 = function(a) {
+		return sum(1, a);
+	}
+	sum1(2);
+`, expected: 3,
+		},
+	}
+	runVMTests(t, tests)
+}
+
+func TestFunctionCalls(t *testing.T) {
+	tests := []vmTest{
+		{
+			input: `
+	let fivePlusTen = function() { 5 + 10; };
+	fivePlusTen();
+`,
+			expected: 15,
+		},
+		{
+			input: `
+	let a = function() { 1 };
+	let b = function() { a() + 2 };
+	b();
+`,
+			expected: 3,
+		},
+		{
+			input: `
+	let a = function() {  };
+	a();
+`,
+			expected: JSUndefined,
+		},
+		{
+			input: `
+	let a = function() { 1 };
+	let b = function() { a };
+	b()();
+`,
+			expected: 1,
+		},
+	}
+	runVMTests(t, tests)
+}
+
 func TestIndexExpression(t *testing.T) {
 	tests := []vmTest{
 		{"[1, 2, 3][1]", 2},

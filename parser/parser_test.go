@@ -7,6 +7,56 @@ import (
 	"testing"
 )
 
+func TestFunctionCalls(t *testing.T) {
+	input := "a(1, 2 + 3)"
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	assert.Equal(t, 1, len(program.Statements))
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	assert.True(t, ok)
+	exp, ok := stmt.Expression.(*ast.CallExpression)
+	assert.True(t, ok)
+
+	testIdentifier(t, exp.FunctionName, "a")
+
+	assert.Equal(t, 2, len(exp.Arguments))
+	testLiteralExpression(t, exp.Arguments[0], 1)
+	testInfixExpression(t, exp.Arguments[1], infixExpected{
+		2, "+", 3,
+	})
+}
+
+func TestFunction(t *testing.T) {
+	input := "function a(b, c) { return d + e; }"
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+	assert.Equal(t, 1, len(program.Statements))
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	assert.True(t, ok)
+
+	function, ok := stmt.Expression.(*ast.FunctionLiteral)
+	testLiteralExpression(t, function.Parameters[0], "b")
+	testLiteralExpression(t, function.Parameters[1], "c")
+
+	returnStmt, ok := function.Body.Statements[0].(*ast.ReturnStatement)
+	assert.True(t, ok)
+	testInfixExpression(t, returnStmt.ReturnValue, infixExpected{
+		leftValue:  "d",
+		operator:   "+",
+		rightValue: "e",
+	})
+
+}
+
 func TestIndex(t *testing.T) {
 	input := "myArray[1 + 1]"
 
@@ -102,6 +152,7 @@ func TestLetComplicated(t *testing.T) {
 	input := `
 	let one = 1;
 	let two = one;
+	let a = function() { 1 };
 	two;`
 
 	l := lexer.New(input)
@@ -109,7 +160,7 @@ func TestLetComplicated(t *testing.T) {
 	program := p.ParseProgram()
 	checkParserErrors(t, p)
 
-	assert.Equal(t, 3, len(program.Statements))
+	assert.Equal(t, 4, len(program.Statements))
 }
 
 func TestLet(t *testing.T) {

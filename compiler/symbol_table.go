@@ -5,6 +5,7 @@ type SymbolScope int
 
 const (
 	GlobalScope SymbolScope = iota
+	LocalScope
 )
 
 type Symbol struct {
@@ -14,6 +15,7 @@ type Symbol struct {
 }
 
 type SymbolTable struct {
+	Outer          *SymbolTable
 	store          map[string]Symbol
 	numDefinitions int
 }
@@ -24,11 +26,21 @@ func NewSymbolTable() *SymbolTable {
 	}
 }
 
+func NewEnclosingSymbolTable(outer *SymbolTable) *SymbolTable {
+	s := NewSymbolTable()
+	s.Outer = outer
+	return s
+}
+
 func (st *SymbolTable) Define(name string) Symbol {
 	symbol := Symbol{
 		Name:  name,
-		Scope: GlobalScope,
 		Index: st.numDefinitions,
+	}
+	if st.Outer == nil {
+		symbol.Scope = GlobalScope
+	} else {
+		symbol.Scope = LocalScope
 	}
 	st.store[name] = symbol
 	st.numDefinitions++
@@ -37,5 +49,8 @@ func (st *SymbolTable) Define(name string) Symbol {
 
 func (st *SymbolTable) Resolve(name string) (Symbol, bool) {
 	obj, ok := st.store[name]
+	if !ok && st.Outer != nil {
+		return st.Outer.Resolve(name)
+	}
 	return obj, ok
 }
