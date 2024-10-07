@@ -15,6 +15,7 @@ const (
 	TypeArray
 	TypeObject
 	TypeCompiledFunction
+	TypeClosure
 )
 
 type Object interface {
@@ -115,3 +116,22 @@ type NativeFunctionObject struct {
 	name string
 	fn   func(...Object)
 }
+
+type BuiltinFunction func(args ...Object) Object
+type Builtin struct {
+	Object
+	Fn BuiltinFunction
+}
+
+type Error struct {
+	Object
+	Message string
+}
+
+type Closure struct {
+	Object
+	Fn   *CompiledFunction
+	Free []Object
+}
+
+func (c *Closure) Type() Type { return TypeClosure }

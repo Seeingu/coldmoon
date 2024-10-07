@@ -13,11 +13,13 @@ func _() {
 	_ = x[TypeString-2]
 	_ = x[TypeArray-3]
 	_ = x[TypeObject-4]
+	_ = x[TypeCompiledFunction-5]
+	_ = x[TypeClosure-6]
 }
 
-const _Type_name = "TypeIntTypeBoolTypeStringTypeArrayTypeObject"
+const _Type_name = "TypeIntTypeBoolTypeStringTypeArrayTypeObjectTypeCompiledFunctionTypeClosure"
 
-var _Type_index = [...]uint8{0, 7, 15, 25, 34, 44}
+var _Type_index = [...]uint8{0, 7, 15, 25, 34, 44, 64, 75}
 
 func (i Type) String() string {
 	if i < 0 || i >= Type(len(_Type_index)-1) {

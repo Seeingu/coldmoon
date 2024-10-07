@@ -10,11 +10,14 @@ func _() {
 	var x [1]struct{}
 	_ = x[GlobalScope-0]
 	_ = x[LocalScope-1]
+	_ = x[BuiltinScope-2]
+	_ = x[FreeScope-3]
+	_ = x[FunctionScope-4]
 }
 
-const _SymbolScope_name = "GlobalScopeLocalScope"
+const _SymbolScope_name = "GlobalScopeLocalScopeBuiltinScopeFreeScopeFunctionScope"
 
-var _SymbolScope_index = [...]uint8{0, 11, 21}
+var _SymbolScope_index = [...]uint8{0, 11, 21, 33, 42, 55}
 
 func (i SymbolScope) String() string {
 	if i < 0 || i >= SymbolScope(len(_SymbolScope_index)-1) {

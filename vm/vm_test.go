@@ -11,6 +11,50 @@ import (
 	"testing"
 )
 
+func TestRecursiveFunctions(t *testing.T) {
+	tests := []vmTest{
+		{
+			input: `
+	let countDown = function(x) {
+		if (x == 0) {
+			return 0;
+		} else {
+			return countDown(x - 1);
+		}
+	}
+	countDown(5);
+`, expected: 0,
+		},
+	}
+	runVMTests(t, tests)
+}
+
+func TestClosures(t *testing.T) {
+	tests := []vmTest{
+		{
+			input: `
+	let newClosure = function (a) {
+		let b = function() { a; }	
+		return b;
+	}
+	let closure = newClosure(12);
+	closure();
+`,
+			expected: 12,
+		},
+	}
+	runVMTests(t, tests)
+}
+
+func TestBuiltins(t *testing.T) {
+	tests := []vmTest{
+		{`len("")`, 0},
+		{`len("4")`, 1},
+		{"len([1,2,3])", 3},
+	}
+	runVMTests(t, tests)
+}
+
 func TestFunctionScopes(t *testing.T) {
 	tests := []vmTest{
 		{

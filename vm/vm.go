@@ -31,7 +31,9 @@ type VM struct {
 
 func New(bytecode *compiler.Bytecode) *VM {
 	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
-	mainFrame := NewFrame(mainFn, 0)
+	mainClosure := &object.Closure{Fn: mainFn}
+	mainFrame := NewFrame(mainClosure, 0)
+
 	frames := make([]*Frame, MaxFrames)
 	frames[0] = mainFrame
 
@@ -160,7 +162,7 @@ func (vm *VM) Run() error {
 			numArgs := code.ReadUint8(ins[ip+1:])
 			vm.currentFrame().ip += 1
 
-			err := vm.callFunction(int(numArgs))
+			err := vm.executeCall(int(numArgs))
 			if err != nil {
 				return err
 			}
@@ -193,6 +195,38 @@ func (vm *VM) Run() error {
 
 			frame := vm.currentFrame()
 			err := vm.push(vm.stack[frame.basePointer+int(localIndex)])
+			if err != nil {
+				return err
+			}
+		case code.OpGetBuiltin:
+			builtinIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			definition := object.Builtins[builtinIndex]
+			err := vm.push(definition.Builtin)
+			if err != nil {
+				return err
+			}
+		case code.OpClosure:
+			constIndex := code.ReadUint16(ins[ip+1:])
+			numFree := code.ReadUint8(ins[ip+3:])
+			vm.currentFrame().ip += 3
+
+			err := vm.pushClosure(int(constIndex), int(numFree))
+			if err != nil {
+				return err
+			}
+		case code.OpGetFree:
+			freeIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+			currentClosure := vm.currentFrame().cl
+			err := vm.push(currentClosure.Free[freeIndex])
+			if err != nil {
+				return err
+			}
+		case code.OpCurrentClosure:
+			currentClosure := vm.currentFrame().cl
+			err := vm.push(currentClosure)
 			if err != nil {
 				return err
 			}
@@ -309,17 +343,43 @@ func (vm *VM) executeBinaryOperation(op code.Opcode) error {
 
 }
 
-func (vm *VM) callFunction(numArgs int) error {
-	fn, ok := vm.stack[vm.sp-1-numArgs].(*object.CompiledFunction)
-	if !ok {
-		return fmt.Errorf("expected a compiled function")
+func (vm *VM) executeCall(numArgs int) error {
+	callee := vm.stack[vm.sp-1-numArgs]
+	switch callee := callee.(type) {
+	case *object.Closure:
+		return vm.callClosure(callee, numArgs)
+	case *object.Builtin:
+		return vm.callBuiltin(callee, numArgs)
+	default:
+		return fmt.Errorf("unknown function call %d", callee)
 	}
-	if numArgs != fn.NumParameters {
-		return fmt.Errorf("expected %d parameters, got %d", numArgs, fn.NumParameters)
+}
+
+func (vm *VM) callClosure(cl *object.Closure, numArgs int) error {
+	if numArgs != cl.Fn.NumParameters {
+		return fmt.Errorf("expected %d parameters, got %d", numArgs, cl.Fn.NumParameters)
 	}
-	frame := NewFrame(fn, vm.sp-numArgs)
+	frame := NewFrame(cl, vm.sp-numArgs)
 	vm.pushFrame(frame)
-	vm.sp = frame.basePointer + fn.NumLocals
+	vm.sp = frame.basePointer + cl.Fn.NumLocals
+	return nil
+}
+
+func (vm *VM) callBuiltin(callee *object.Builtin, numArgs int) error {
+	args := vm.stack[vm.sp-numArgs : vm.sp]
+	result := callee.Fn(args...)
+	vm.sp = vm.sp - numArgs - 1
+	if result != nil {
+		err := vm.push(result)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := vm.push(JSUndefined)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -373,7 +433,7 @@ func (vm *VM) executeBinaryStringOperation(op code.Opcode, left object.Object, r
 func (vm *VM) buildArray(startIndex int, endIndex int) object.Object {
 	elements := make([]object.Object, endIndex-startIndex)
 	for i := startIndex; i < endIndex; i++ {
-		elements[i] = vm.stack[i]
+		elements[i-startIndex] = vm.stack[i]
 	}
 	return &object.ArrayObject{Elements: elements}
 }
@@ -431,6 +491,22 @@ func (vm *VM) executeObjectIndex(left object.Object, i object.Object) error {
 	}
 
 	return vm.push(pair.Value)
+}
+
+func (vm *VM) pushClosure(constIndex, numFree int) error {
+	constant := vm.constants[constIndex]
+	function, ok := constant.(*object.CompiledFunction)
+	if !ok {
+		return fmt.Errorf("invalid closure constant: %d", constIndex)
+	}
+	free := make([]object.Object, numFree)
+	for i := 0; i < numFree; i++ {
+		free[i] = vm.stack[vm.sp-numFree+i]
+	}
+	vm.sp = vm.sp - numFree
+
+	closure := &object.Closure{Fn: function, Free: free}
+	return vm.push(closure)
 }
 
 func nativeBoolToBooleanObject(input bool) object.Object {

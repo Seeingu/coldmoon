@@ -132,6 +132,11 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	p.scanner.Scan()
 
 	stmt.Value = p.parseExpression(PLowest)
+
+	if fn, ok := stmt.Value.(*ast.FunctionLiteral); ok {
+		fn.Name = stmt.Name
+	}
+
 	if p.nextToken().Is(t.Semicolon) {
 		p.scanner.Scan()
 	}

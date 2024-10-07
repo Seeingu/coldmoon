@@ -12,6 +12,7 @@ func TestInstructionsString(t *testing.T) {
 		Make(OpConstant, 65535),
 		Make(OpSetLocal, 1),
 		Make(OpGetLocal, 255),
+		Make(OpClosure, 2, 1),
 	}
 
 	expected := `0000 OpAdd
@@ -19,6 +20,7 @@ func TestInstructionsString(t *testing.T) {
 0004 OpConstant 65535
 0007 OpSetLocal 1
 0009 OpGetLocal 255
+0011 OpClosure 2 1
 `
 
 	concatted := Instructions{}

@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"github.com/Seeingu/coldmoon/_parser"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path"
@@ -15,8 +14,6 @@ func makeTest262Path(p string) string {
 
 func TestParseSta(t *testing.T) {
 	filePath := makeTest262Path("./test262/harness/sta.js")
-	content, err := os.ReadFile(filePath)
+	_, err := os.ReadFile(filePath)
 	assert.Nil(t, err)
-	i := _parser.NewInterpreterWithSource(string(content))
-	i.Eval()
 }

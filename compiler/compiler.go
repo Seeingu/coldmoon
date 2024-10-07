@@ -29,12 +29,19 @@ type Compiler struct {
 
 func New() *Compiler {
 	mainScope := CompilationScope{}
+	symbolTable := NewSymbolTable()
+
+	for i, v := range object.Builtins {
+		symbolTable.DefineBuiltin(i, v.Name)
+	}
 	return &Compiler{
-		symbolTable: NewSymbolTable(),
+		symbolTable: symbolTable,
 		scopes:      []CompilationScope{mainScope},
 		scopeIndex:  0,
 	}
 }
+
+// MARK: Compile
 
 func (c *Compiler) Compile(node ast.JSNode) error {
 	switch node := node.(type) {
@@ -59,11 +66,11 @@ func (c *Compiler) Compile(node ast.JSNode) error {
 			}
 		}
 	case *ast.LetStatement:
+		symbol := c.symbolTable.Define(node.Name.Value)
 		err := c.Compile(node.Value)
 		if err != nil {
 			return err
 		}
-		symbol := c.symbolTable.Define(node.Name.Value)
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
 		} else {
@@ -74,11 +81,7 @@ func (c *Compiler) Compile(node ast.JSNode) error {
 		if !ok {
 			return fmt.Errorf("symbol not found: %s", node.Value)
 		}
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpGetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpGetLocal, symbol.Index)
-		}
+		c.loadSymbol(symbol)
 	case *ast.IfExpression:
 		err := c.Compile(node.Condition)
 		if err != nil {
@@ -193,12 +196,10 @@ func (c *Compiler) Compile(node ast.JSNode) error {
 		}
 		c.emit(code.OpIndex)
 	case *ast.FunctionLiteral:
-		if node.Name != nil {
-			symbol := c.symbolTable.Define(node.Name.Value)
-			c.emit(code.OpSetGlobal, symbol.Index)
-		}
-
 		c.enterScope()
+		if node.Name != nil {
+			c.symbolTable.DefineFunctionName(node.Name.Value)
+		}
 
 		for _, parameter := range node.Parameters {
 			c.symbolTable.Define(parameter.Value)
@@ -214,14 +215,19 @@ func (c *Compiler) Compile(node ast.JSNode) error {
 		if !c.lastInstructionIs(code.OpReturnValue) {
 			c.emit(code.OpReturn)
 		}
+		freeSymbols := c.symbolTable.FreeSymbols
 		numLocals := c.symbolTable.numDefinitions
 		instructions := c.leaveScope()
+		for _, s := range freeSymbols {
+			c.loadSymbol(s)
+		}
 		compiledFn := &object.CompiledFunction{
 			Instructions:  instructions,
 			NumLocals:     numLocals,
 			NumParameters: len(node.Parameters),
 		}
-		c.emit(code.OpConstant, c.addConstant(compiledFn))
+		fnIndex := c.addConstant(compiledFn)
+		c.emit(code.OpClosure, fnIndex, len(freeSymbols))
 	case *ast.ReturnStatement:
 		err := c.Compile(node.ReturnValue)
 		if err != nil {
@@ -277,6 +283,8 @@ func (c *Compiler) ByteCode() *Bytecode {
 
 // MARK: Private
 
+// MARK: Scope
+
 func (c *Compiler) currentInstructions() code.Instructions {
 	return c.scopes[c.scopeIndex].instructions
 }
@@ -299,6 +307,8 @@ func (c *Compiler) leaveScope() code.Instructions {
 	c.symbolTable = c.symbolTable.Outer
 	return instructions
 }
+
+// MARK: Utils
 
 func (c *Compiler) addConstant(obj object.Object) int {
 	c.constants = append(c.constants, obj)
@@ -364,4 +374,19 @@ func (c *Compiler) removeLastPop() {
 
 	c.scopes[c.scopeIndex].instructions = newInstructions
 	c.scopes[c.scopeIndex].lastInstruction = previous
+}
+
+func (c *Compiler) loadSymbol(s Symbol) {
+	switch s.Scope {
+	case GlobalScope:
+		c.emit(code.OpGetGlobal, s.Index)
+	case LocalScope:
+		c.emit(code.OpGetLocal, s.Index)
+	case BuiltinScope:
+		c.emit(code.OpGetBuiltin, s.Index)
+	case FreeScope:
+		c.emit(code.OpGetFree, s.Index)
+	case FunctionScope:
+		c.emit(code.OpCurrentClosure)
+	}
 }

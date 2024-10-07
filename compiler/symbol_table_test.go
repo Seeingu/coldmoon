@@ -5,6 +5,89 @@ import (
 	"testing"
 )
 
+func TestNameShadow(t *testing.T) {
+	global := NewSymbolTable()
+	global.DefineFunctionName("a")
+
+	expected := Symbol{"a", FunctionScope, 0}
+	result, ok := global.Resolve(expected.Name)
+	assert.True(t, ok)
+	assert.Equal(t, expected, result)
+}
+
+func TestResolveFree(t *testing.T) {
+	global := NewSymbolTable()
+	global.Define("a")
+
+	firstLocal := NewEnclosingSymbolTable(global)
+	firstLocal.Define("b")
+
+	secondLocal := NewEnclosingSymbolTable(firstLocal)
+	secondLocal.Define("c")
+
+	tests := []struct {
+		table               *SymbolTable
+		expectedSymbols     []Symbol
+		expectedFreeSymbols []Symbol
+	}{
+		{
+			firstLocal,
+			[]Symbol{
+				{"a", GlobalScope, 0},
+				{"b", LocalScope, 0},
+			},
+			[]Symbol{},
+		},
+		{
+			secondLocal,
+			[]Symbol{
+				{"a", GlobalScope, 0},
+				{"b", FreeScope, 0},
+				{"c", LocalScope, 0},
+			},
+			[]Symbol{
+				{"b", LocalScope, 0},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		for _, sym := range tt.expectedSymbols {
+			result, ok := tt.table.Resolve(sym.Name)
+			assert.True(t, ok)
+			assert.Equal(t, sym, result)
+		}
+
+		assert.Equal(t, len(tt.table.FreeSymbols), len(tt.expectedFreeSymbols))
+
+		for i, sym := range tt.expectedFreeSymbols {
+			result := tt.table.FreeSymbols[i]
+			assert.Equal(t, sym, result)
+		}
+	}
+}
+
+func TestResolveBuiltin(t *testing.T) {
+	global := NewSymbolTable()
+	firstLocal := NewEnclosingSymbolTable(global)
+
+	expected := []Symbol{
+		{"a", BuiltinScope, 0},
+		{"b", BuiltinScope, 1},
+	}
+
+	for i, v := range expected {
+		global.DefineBuiltin(i, v.Name)
+	}
+	for _, table := range []*SymbolTable{global, firstLocal} {
+		for _, sym := range expected {
+			result, ok := table.Resolve(sym.Name)
+			assert.True(t, ok)
+			assert.Equal(t, sym, result)
+		}
+	}
+}
+
 func TestResolveLocal(t *testing.T) {
 	global := NewSymbolTable()
 	global.Define("a")
@@ -20,8 +103,8 @@ func TestResolveLocal(t *testing.T) {
 	expected := []Symbol{
 		{"a", GlobalScope, 0},
 		{"b", GlobalScope, 1},
-		{"c", LocalScope, 0},
-		{"d", LocalScope, 1},
+		{"c", FreeScope, 0},
+		{"d", FreeScope, 1},
 		{"e", LocalScope, 0},
 	}
 	for _, s := range expected {

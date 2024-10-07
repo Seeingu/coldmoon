@@ -37,6 +37,8 @@ func (ins Instructions) fmtInstruction(def *Definition, operands []int) string {
 		return def.Name
 	case 1:
 		return fmt.Sprintf("%s %d", def.Name, operands[0])
+	case 2:
+		return fmt.Sprintf("%s %d %d", def.Name, operands[0], operands[1])
 	}
 	return fmt.Sprintf("ERROR: unhandled operandCount for %s: %d", def.Name, operandCount)
 }
@@ -75,6 +77,10 @@ const (
 	OpCall
 	OpReturnValue
 	OpReturn
+	OpGetBuiltin
+	OpClosure
+	OpGetFree
+	OpCurrentClosure
 )
 
 type Definition struct {
@@ -83,35 +89,39 @@ type Definition struct {
 }
 
 var definitions = map[Opcode]*Definition{
-	OpConstant:     {"OpConstant", []int{2}},
-	OpAdd:          {"OpAdd", []int{}},
-	OpSub:          {"OpSub", []int{}},
-	OpMul:          {"OpMul", []int{}},
-	OpDiv:          {"OpDiv", []int{}},
-	OpPop:          {"OpPop", []int{}},
-	OpTrue:         {"OpTrue", []int{}},
-	OpFalse:        {"OpFalse", []int{}},
-	OpEqual:        {"OpEqual", []int{}},
-	OpNotEqual:     {"OpNotEqual", []int{}},
-	OpGreaterEqual: {"OpGreaterEqual", []int{}},
-	OpGreaterThan:  {"OpGreaterThan", []int{}},
-	OpLessThan:     {"OpLessThan", []int{}},
-	OpLessEqual:    {"OpLessEqual", []int{}},
-	OpNegate:       {"OpNegate", []int{}},
-	OpNot:          {"OpNot", []int{}},
-	OpJump:         {"OpJump", []int{2}},
-	OpJumpFalse:    {"OpJumpFalse", []int{2}},
-	OpNull:         {"OpNull", []int{}},
-	OpGetGlobal:    {"OpGetGlobal", []int{2}},
-	OpSetGlobal:    {"OpSetGlobal", []int{2}},
-	OpGetLocal:     {"OpGetLocal", []int{1}},
-	OpSetLocal:     {"OpSetLocal", []int{1}},
-	OpArray:        {"OpArray", []int{2}},
-	OpObject:       {"OpObject", []int{2}},
-	OpIndex:        {"OpIndex", []int{}},
-	OpCall:         {"OpCall", []int{1}},
-	OpReturnValue:  {"OpReturnValue", []int{}},
-	OpReturn:       {"OpReturn", []int{}},
+	OpConstant:       {"OpConstant", []int{2}},
+	OpAdd:            {"OpAdd", []int{}},
+	OpSub:            {"OpSub", []int{}},
+	OpMul:            {"OpMul", []int{}},
+	OpDiv:            {"OpDiv", []int{}},
+	OpPop:            {"OpPop", []int{}},
+	OpTrue:           {"OpTrue", []int{}},
+	OpFalse:          {"OpFalse", []int{}},
+	OpEqual:          {"OpEqual", []int{}},
+	OpNotEqual:       {"OpNotEqual", []int{}},
+	OpGreaterEqual:   {"OpGreaterEqual", []int{}},
+	OpGreaterThan:    {"OpGreaterThan", []int{}},
+	OpLessThan:       {"OpLessThan", []int{}},
+	OpLessEqual:      {"OpLessEqual", []int{}},
+	OpNegate:         {"OpNegate", []int{}},
+	OpNot:            {"OpNot", []int{}},
+	OpJump:           {"OpJump", []int{2}},
+	OpJumpFalse:      {"OpJumpFalse", []int{2}},
+	OpNull:           {"OpNull", []int{}},
+	OpGetGlobal:      {"OpGetGlobal", []int{2}},
+	OpSetGlobal:      {"OpSetGlobal", []int{2}},
+	OpGetLocal:       {"OpGetLocal", []int{1}},
+	OpSetLocal:       {"OpSetLocal", []int{1}},
+	OpArray:          {"OpArray", []int{2}},
+	OpObject:         {"OpObject", []int{2}},
+	OpIndex:          {"OpIndex", []int{}},
+	OpCall:           {"OpCall", []int{1}},
+	OpReturnValue:    {"OpReturnValue", []int{}},
+	OpReturn:         {"OpReturn", []int{}},
+	OpGetBuiltin:     {"OpGetBuiltin", []int{1}},
+	OpClosure:        {"OpClosure", []int{2, 1}},
+	OpGetFree:        {"OpGetFree", []int{1}},
+	OpCurrentClosure: {"OpCurrentClosure", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {
