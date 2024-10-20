@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/Seeingu/coldmoon/ast"
 	"github.com/Seeingu/coldmoon/code"
 	"github.com/Seeingu/coldmoon/object"
@@ -258,6 +260,37 @@ func (c *Compiler) Compile(node ast.JSNode) error {
 		} else {
 			c.emit(code.OpFalse)
 		}
+	case *ast.PropertyAccessExpression:
+		err := c.Compile(node.Left)
+		if err != nil {
+			return err
+		}
+		err = c.Compile(node.Property)
+		if err != nil {
+			return err
+		}
+		c.emit(code.OpGetProp)
+	case *ast.AssignmentExpression:
+		err := c.Compile(node.Left)
+		var isSetProp bool
+		if c.lastInstructionIs(code.OpGetProp) {
+			isSetProp = true
+			c.removeLastInstruction()
+		}
+		if err != nil {
+			return err
+		}
+		err = c.Compile(node.Value)
+		if err != nil {
+			return err
+		}
+		if isSetProp {
+			c.emit(code.OpSetProp)
+		} else {
+			log.Fatalln("Assign Unimplemented: ", node)
+		}
+	default:
+		log.Fatalln("Unimplemented: ", node)
 	}
 	return nil
 }
@@ -267,6 +300,15 @@ func (c *Compiler) Bytecode() *Bytecode {
 		Instructions: c.currentInstructions(),
 		Constants:    c.constants,
 	}
+}
+
+func (c *Compiler) PrintBytecode() {
+	fmt.Printf("Constants: \n")
+	for index, constant := range c.constants {
+		fmt.Printf("%d: %s\n", index, constant.String())
+	}
+	fmt.Println()
+	fmt.Printf("Instructions:\n%s------\n\n", c.Bytecode().Instructions.String())
 }
 
 type Bytecode struct {
@@ -365,7 +407,7 @@ func (c *Compiler) lastInstructionIs(op code.Opcode) bool {
 	return c.currentScope().lastInstruction.Opcode == op
 }
 
-func (c *Compiler) removeLastPop() {
+func (c *Compiler) removeLastInstruction() {
 	last := c.currentScope().lastInstruction
 	previous := c.currentScope().previousInstruction
 
@@ -374,6 +416,9 @@ func (c *Compiler) removeLastPop() {
 
 	c.scopes[c.scopeIndex].instructions = newInstructions
 	c.scopes[c.scopeIndex].lastInstruction = previous
+}
+func (c *Compiler) removeLastPop() {
+	c.removeLastInstruction()
 }
 
 func (c *Compiler) loadSymbol(s Symbol) {

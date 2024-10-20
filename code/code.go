@@ -45,6 +45,7 @@ func (ins Instructions) fmtInstruction(def *Definition, operands []int) string {
 
 // MARK: Op
 
+//go:generate stringer -type=Opcode
 type Opcode byte
 
 const (
@@ -81,6 +82,9 @@ const (
 	OpClosure
 	OpGetFree
 	OpCurrentClosure
+	OpSetProp
+	OpGetProp
+	OpAssign
 )
 
 type Definition struct {
@@ -122,6 +126,9 @@ var definitions = map[Opcode]*Definition{
 	OpClosure:        {"OpClosure", []int{2, 1}},
 	OpGetFree:        {"OpGetFree", []int{1}},
 	OpCurrentClosure: {"OpCurrentClosure", []int{}},
+	OpSetProp:        {"OpSetProp", []int{}},
+	OpGetProp:        {"OpGetProp", []int{}},
+	OpAssign:         {"OpAssign", []int{}},
 }
 
 func Lookup(op byte) (*Definition, error) {

@@ -1,6 +1,7 @@
 package object
 
 import (
+	"fmt"
 	"github.com/Seeingu/coldmoon/code"
 	"hash/fnv"
 )
@@ -19,8 +20,9 @@ const (
 )
 
 type Object interface {
-	toString()
+	String() string
 	Type() Type
+	ToObject() *ObjectObject
 }
 
 type Integer struct {
@@ -29,6 +31,9 @@ type Integer struct {
 }
 
 func (i Integer) Type() Type { return TypeInt }
+func (i Integer) String() string {
+	return fmt.Sprintf("%d", i.Value)
+}
 
 type NumberObject struct {
 	Object
@@ -40,6 +45,12 @@ type StringObject struct {
 	Hashable
 	Value string
 }
+
+func (s StringObject) String() string {
+	return s.Value
+}
+
+var _ Object = (*StringObject)(nil)
 
 func (s StringObject) Type() Type { return TypeString }
 func (s StringObject) HashKey() HashKey {
@@ -100,13 +111,36 @@ type ObjectObject struct {
 	Pairs map[HashKey]HashPair
 }
 
+var _ Object = (*ObjectObject)(nil)
+
+func (o ObjectObject) ToObject() *ObjectObject {
+	return &o
+}
+func (o ObjectObject) String() string {
+	var s string
+	for _, pair := range o.Pairs {
+		s += pair.Key.String() + ":" + pair.Value.String() + ","
+	}
+	return s
+}
+
 func (o ObjectObject) Type() Type { return TypeObject }
 
 type CompiledFunction struct {
 	Object
+	Prototype     *ObjectObject
 	Instructions  code.Instructions
 	NumLocals     int
 	NumParameters int
+}
+
+var _ Object = (*CompiledFunction)(nil)
+
+func (c *CompiledFunction) ToObject() *ObjectObject {
+	return c.Prototype
+}
+func (c *CompiledFunction) String() string {
+	return "CompiledFunction"
 }
 
 func (c *CompiledFunction) Type() Type { return TypeCompiledFunction }
@@ -135,3 +169,9 @@ type Closure struct {
 }
 
 func (c *Closure) Type() Type { return TypeClosure }
+func (c *Closure) String() string {
+	return "[Native]"
+}
+func (c *Closure) ToObject() *ObjectObject {
+	return c.Fn.Prototype
+}

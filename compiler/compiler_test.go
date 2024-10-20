@@ -321,6 +321,31 @@ func TestIndex(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestObject(t *testing.T) {
+	tests := []compilerTestCase{
+		{
+			input: `
+	let a = {};
+	a.b = 2;
+`,
+			expectedConstants: []interface{}{
+				"a", "b", 2,
+			},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpObject, 0),
+				code.Make(code.OpSetGlobal, 0),
+				code.Make(code.OpGetGlobal, 0),
+				code.Make(code.OpConstant, 1),
+				code.Make(code.OpConstant, 2),
+				code.Make(code.OpSetProp),
+				code.Make(code.OpPop),
+			},
+		},
+	}
+	runCompilerTests(t, tests)
+}
+
 func TestObjectLiterals(t *testing.T) {
 	tests := []compilerTestCase{
 		{
@@ -675,6 +700,7 @@ func runCompilerTests(t *testing.T, tests []compilerTestCase) {
 
 	for _, tt := range tests {
 		program := parse(tt.input)
+		parser.PrintProgram(program)
 
 		compiler := New()
 		err := compiler.Compile(program)

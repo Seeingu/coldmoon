@@ -2,10 +2,11 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/Seeingu/coldmoon/ast"
 	"github.com/Seeingu/coldmoon/lexer"
 	t "github.com/Seeingu/coldmoon/token"
-	"strconv"
 )
 
 type (
@@ -40,6 +41,7 @@ func New(l *lexer.Scanner) *Parser {
 	p.registerPrefix(t.Function, p.parseFunctionLiteral)
 
 	p.infixParseFns = make(map[t.TokenType]infixParseFn)
+	p.registerInfix(t.Equal, p.parseAssignExpression)
 	p.registerInfix(t.Plus, p.parseInfixExpression)
 	p.registerInfix(t.Minus, p.parseInfixExpression)
 	p.registerInfix(t.Star, p.parseInfixExpression)
@@ -52,6 +54,7 @@ func New(l *lexer.Scanner) *Parser {
 	p.registerInfix(t.BangEqual, p.parseInfixExpression)
 	p.registerInfix(t.LeftSquareBracket, p.parseIndexExpression)
 	p.registerInfix(t.LeftParenthesis, p.parseCallExpression)
+	p.registerInfix(t.Dot, p.parsePropertyAccessExpression)
 	return p
 }
 
@@ -72,7 +75,10 @@ func (p *Parser) ParseProgram() *ast.Program {
 		p.scanner.Scan()
 	}
 	return program
+}
 
+func PrintProgram(p *ast.Program) {
+	fmt.Println(p.String())
 }
 
 // MARK: Private
@@ -82,7 +88,8 @@ type precedenceType int
 const (
 	_ precedenceType = iota
 	PLowest
-	PEquals
+	PEqual
+	PEqualsComparison
 	PLessOrGreater
 	PSum
 	PProduct
@@ -92,9 +99,10 @@ const (
 )
 
 var precedences = map[t.TokenType]precedenceType{
-	t.EqualEqual:        PEquals,
-	t.EqualEqualEqual:   PEquals,
-	t.BangEqual:         PEquals,
+	t.Equal:             PEqual,
+	t.EqualEqual:        PEqualsComparison,
+	t.EqualEqualEqual:   PEqualsComparison,
+	t.BangEqual:         PEqualsComparison,
 	t.LessEqual:         PLessOrGreater,
 	t.Less:              PLessOrGreater,
 	t.Greater:           PLessOrGreater,
@@ -104,6 +112,7 @@ var precedences = map[t.TokenType]precedenceType{
 	t.Slash:             PProduct,
 	t.LeftParenthesis:   PCall,
 	t.LeftSquareBracket: PIndex,
+	t.Dot:               PIndex,
 }
 
 func (p *Parser) parseStatement() ast.Statement {
@@ -112,6 +121,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseLetStatement()
 	case t.Return:
 		return p.parseReturnStatement()
+	case t.Function:
+		return p.parseFunctionStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -135,6 +146,7 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 
 	if fn, ok := stmt.Value.(*ast.FunctionLiteral); ok {
 		fn.Name = stmt.Name
+		fn.FunType = ast.FAnonymous
 	}
 
 	if p.nextToken().Is(t.Semicolon) {
@@ -339,6 +351,27 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	return e
 }
 
+func (p *Parser) parseFunctionStatement() ast.Expression {
+	f := &ast.FunctionLiteral{Token: p.currentToken()}
+
+	p.scanner.Scan()
+	f.Name = p.parseIdentifier().(*ast.IdentifierExpression)
+	f.FunType = ast.FLiteral
+
+	if !p.expectNextToken(t.LeftParenthesis) {
+		return nil
+	}
+	f.Parameters = p.parseFunctionParameters()
+
+	if !p.expectNextToken(t.LeftBracket) {
+		return nil
+	}
+
+	f.Body = p.parseBlockStatement()
+
+	return &ast.LetStatement{Token: f.Token, Name: f.Name, Value: f}
+}
+
 // function <identifier> params block
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	f := &ast.FunctionLiteral{Token: p.currentToken()}
@@ -346,6 +379,7 @@ func (p *Parser) parseFunctionLiteral() ast.Expression {
 	if !p.nextToken().Is(t.LeftParenthesis) {
 		p.scanner.Scan()
 		f.Name = p.parseIdentifier().(*ast.IdentifierExpression)
+		f.FunType = ast.FLiteral
 	}
 
 	if !p.expectNextToken(t.LeftParenthesis) {
@@ -425,6 +459,26 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 
 	return e
 
+}
+
+func (p *Parser) parseAssignExpression(left ast.Expression) ast.Expression {
+	e := &ast.AssignmentExpression{Token: p.currentToken(), Left: left}
+
+	p.scanner.Scan()
+	e.Value = p.parseExpression(PLowest)
+
+	return e
+}
+
+func (p *Parser) parsePropertyAccessExpression(left ast.Expression) ast.Expression {
+	e := &ast.PropertyAccessExpression{Token: p.currentToken(), Left: left}
+
+	if !p.expectNextToken(t.Identifier) {
+		return nil
+	}
+	e.Property = &ast.StringLiteral{Token: p.currentToken(), Value: p.currentToken().Literal}
+
+	return e
 }
 
 func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {

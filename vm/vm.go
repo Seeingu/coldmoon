@@ -140,7 +140,7 @@ func (vm *VM) Run() error {
 			numElements := int(code.ReadUint16(ins[ip+1:]))
 			vm.currentFrame().ip += 2
 
-			o, err := vm.buildHash(vm.sp-numElements, vm.sp)
+			o, err := vm.buildObject(vm.sp-numElements, vm.sp)
 			if err != nil {
 				return err
 			}
@@ -230,6 +230,25 @@ func (vm *VM) Run() error {
 			if err != nil {
 				return err
 			}
+		case code.OpSetProp:
+			value := vm.pop()
+			prop := vm.pop()
+			o := vm.pop()
+			o.ToObject().Pairs[prop.(*object.StringObject).HashKey()] = object.HashPair{Key: prop, Value: value}
+			err := vm.push(o)
+			if err != nil {
+				return err
+			}
+		case code.OpGetProp:
+			prop := vm.pop()
+			o := vm.pop()
+			value := o.ToObject().Pairs[prop.(*object.StringObject).HashKey()].Value
+			err := vm.push(value)
+			if err != nil {
+				return err
+			}
+		default:
+			panic(fmt.Sprintf("unknown opcode %s", op.String()))
 		}
 	}
 	return nil
@@ -438,7 +457,7 @@ func (vm *VM) buildArray(startIndex int, endIndex int) object.Object {
 	return &object.ArrayObject{Elements: elements}
 }
 
-func (vm *VM) buildHash(startIndex int, endIndex int) (object.Object, error) {
+func (vm *VM) buildObject(startIndex int, endIndex int) (object.Object, error) {
 	pairs := make(map[object.HashKey]object.HashPair)
 
 	for i := startIndex; i < endIndex; i += 2 {
@@ -496,6 +515,7 @@ func (vm *VM) executeObjectIndex(left object.Object, i object.Object) error {
 func (vm *VM) pushClosure(constIndex, numFree int) error {
 	constant := vm.constants[constIndex]
 	function, ok := constant.(*object.CompiledFunction)
+	function.Prototype = &object.ObjectObject{Pairs: make(map[object.HashKey]object.HashPair)}
 	if !ok {
 		return fmt.Errorf("invalid closure constant: %d", constIndex)
 	}

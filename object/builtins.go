@@ -31,6 +31,16 @@ var Builtins = []struct {
 			}
 		}},
 	},
+	{
+		"print",
+		&Builtin{Fn: func(args ...Object) Object {
+			for _, arg := range args {
+				fmt.Println(arg.String())
+			}
+			return nil
+		},
+		},
+	},
 }
 
 func newError(format string, a ...interface{}) *Error {
