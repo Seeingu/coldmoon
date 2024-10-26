@@ -48,6 +48,56 @@ func (o *Object) PropertyStorage() *PropertyStorage {
 	return &o.data.propertyStorage
 }
 
-func IsExtensible(o *Object) bool {
+// 7.1.1.1
+func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
+	var methodNames []string
+	switch hint {
+	case PreferredTypeString:
+		methodNames = []string{"toString", "valueOf"}
+	default:
+		methodNames = []string{"valueOf", "toString"}
+	}
+
+	for _, name := range methodNames {
+		method := o.Get(NewStringPropertyKey(name))
+		if isCallable(method) {
+			result := CallAssumeCallableNoArgs(method, NewValueFromObject(o))
+			if _, isObject := result.(*ObjectValue); !isObject {
+				return result
+			}
+		}
+	}
+
+	panic("TypeError")
+}
+
+// 7.2.5
+func (o *Object) IsExtensible() bool {
 	return o.InternalMethods().IsExtensible(o)
+}
+
+// 7.3.2
+func (o *Object) Get(key PropertyKey) Value {
+	return o.InternalMethods().Get(o, key, NewValueFromObject(o))
+}
+
+// 7.3.4
+func (o *Object) Set(key PropertyKey, value Value, throw bool) *CompletionRecord {
+	success := o.InternalMethods().Set(o, key, value, NewValueFromObject(o))
+	if !success && throw {
+		return TypeErrorCompletion
+	}
+
+	return NormalCompletion(NewStringValue("UNUSED"))
+}
+
+// 7.3.5
+func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
+	newDesc := o.InternalMethods().DefineOwnProperty(o, key, &PropertyDescriptor{
+		Value:        value,
+		Writable:     true,
+		Enumerable:   true,
+		Configurable: true,
+	})
+	return newDesc
 }

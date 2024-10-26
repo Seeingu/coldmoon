@@ -8,6 +8,10 @@ type PropertyKey interface {
 	Hash() string
 }
 
+func NewStringPropertyKey(value string) StringPropertyKey {
+	return StringPropertyKey{Value: value}
+}
+
 type StringPropertyKey struct {
 	PropertyKey
 	Value string

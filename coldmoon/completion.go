@@ -26,3 +26,5 @@ func NormalCompletion(value Value) *CompletionRecord {
 func ThrowCompletion(value Value) *CompletionRecord {
 	return &CompletionRecord{Type: Throw, Value: value}
 }
+
+var TypeErrorCompletion = ThrowCompletion(NewStringValue("TypeError"))

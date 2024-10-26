@@ -5,3 +5,7 @@ type Symbol struct {
 	Id          uint64
 	Description string
 }
+
+func (s Symbol) String() string {
+	panic("implement me")
+}

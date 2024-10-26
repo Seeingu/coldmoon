@@ -157,7 +157,7 @@ func OrdinaryGet(object *Object, key PropertyKey, receiver Value) Value {
 		return UndefinedValue
 	}
 
-	panic("implement me")
+	return CallAssumeCallableNoArgs(NewValueFromObject(getter), receiver)
 }
 
 func InternalSet(object *Object, key PropertyKey, value Value, receiver Value) bool {
@@ -170,8 +170,70 @@ func OrdinarySet(object *Object, key PropertyKey, value Value, receiver Value) b
 
 }
 
-func OrdinarySetWithOwnDescriptor(object *Object, key PropertyKey, value Value, receiver Value, ownDesc *PropertyDescriptor) bool {
-	panic("implement me")
+// 10.1.9.2
+func OrdinarySetWithOwnDescriptor(
+	object *Object,
+	key PropertyKey,
+	value Value,
+	receiver Value,
+	ownDesc *PropertyDescriptor,
+) bool {
+	if ownDesc == nil {
+		parent := object.InternalMethods().GetPrototypeOf(object)
+		if parent != nil {
+			return parent.InternalMethods().Set(parent, key, value, receiver)
+		} else {
+			ownDesc = &PropertyDescriptor{
+				Value:        UndefinedValue,
+				Writable:     true,
+				Enumerable:   true,
+				Configurable: true,
+			}
+		}
+	}
+
+	if ownDesc.IsDataDescriptor() {
+		if !ownDesc.Writable {
+			return false
+		}
+
+		r, isObject := receiver.(*ObjectValue)
+		if !isObject {
+			return false
+		}
+		receiverObject := r.Object
+
+		existingDescriptor := object.InternalMethods().GetOwnProperty(receiverObject, key)
+
+		if existingDescriptor != nil {
+			if existingDescriptor.IsAccessorDescriptor() {
+				return false
+			}
+			if !existingDescriptor.Writable {
+				return false
+			}
+
+			valueDesc := &PropertyDescriptor{
+				Value: value,
+			}
+			return receiverObject.InternalMethods().DefineOwnProperty(
+				receiverObject, key, valueDesc,
+			)
+		} else {
+			Assert(!receiverObject.PropertyStorage().Has(key))
+
+			return receiverObject.CreateDataProperty(key, value)
+		}
+	}
+
+	Assert(ownDesc.IsAccessorDescriptor())
+
+	setter := ownDesc.Set
+	if setter == nil {
+		return false
+	}
+	_ = CallAssumeCallable(NewValueFromObject(setter), receiver, []Value{value})
+	return true
 }
 
 func InternalDelete(object *Object, key PropertyKey) bool {
