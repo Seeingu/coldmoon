@@ -1,0 +1,27 @@
+package coldmoon
+
+import (
+	"fmt"
+)
+
+type PropertyKey interface {
+	Hash() string
+}
+
+type StringPropertyKey struct {
+	PropertyKey
+	Value string
+}
+
+func (s StringPropertyKey) Hash() string {
+	return s.Value
+}
+
+type SymbolPropertyKey struct {
+	PropertyKey
+	Value Symbol
+}
+
+func (s SymbolPropertyKey) Hash() string {
+	return fmt.Sprintf("%d", s.Value.Id)
+}
