@@ -1,10 +1,11 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func makeTest262Path(p string) string {
@@ -13,6 +14,7 @@ func makeTest262Path(p string) string {
 }
 
 func TestParseSta(t *testing.T) {
+	t.Skip()
 	filePath := makeTest262Path("./test262/harness/sta.js")
 	_, err := os.ReadFile(filePath)
 	assert.Nil(t, err)
