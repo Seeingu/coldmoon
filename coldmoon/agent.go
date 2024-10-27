@@ -1,10 +1,23 @@
 package coldmoon
 
 type Agent struct {
-	symbolId uint64
+	symbolId  uint64
+	exception *Value
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]Symbol{}
+
+//go:generate stringer -type=ExceptionType
+type ExceptionType int
+
+const (
+	EvalError ExceptionType = iota
+	RangeError
+	ReferenceError
+	SyntaxError
+	TypeError
+	UriError
+)
 
 func NewAgent() *Agent {
 	a := &Agent{}
@@ -53,4 +66,11 @@ func (a *Agent) CreateSymbol(desc string) Symbol {
 	}
 	a.symbolId += 1
 	return s
+}
+
+// 5.2.3.2
+func (a *Agent) ThrowException(exceptionType ExceptionType, message string) {
+	m := exceptionType.String() + " " + message
+	*a.exception = NewStringValue(m)
+	panic("Exception: " + m)
 }

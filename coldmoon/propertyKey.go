@@ -11,6 +11,9 @@ type PropertyKey interface {
 func NewStringPropertyKey(value string) StringPropertyKey {
 	return StringPropertyKey{Value: value}
 }
+func NewSymbolPropertyKey(value *Symbol) SymbolPropertyKey {
+	return SymbolPropertyKey{Value: value}
+}
 
 type StringPropertyKey struct {
 	PropertyKey
@@ -23,7 +26,7 @@ func (s StringPropertyKey) Hash() string {
 
 type SymbolPropertyKey struct {
 	PropertyKey
-	Value Symbol
+	Value *Symbol
 }
 
 func (s SymbolPropertyKey) Hash() string {

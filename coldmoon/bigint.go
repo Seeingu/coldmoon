@@ -9,6 +9,16 @@ type BigInt struct {
 
 var _ Value = (*BigInt)(nil)
 
+func NewBigIntFromBoolean(b bool) BigInt {
+	var i int64
+	if b {
+		i = 1
+	}
+	return BigInt{
+		Data: *big.NewInt(i),
+	}
+}
+
 func (b *BigInt) String() string {
 	return b.Data.String()
 }

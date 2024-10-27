@@ -6,6 +6,12 @@ type Symbol struct {
 	Description string
 }
 
-func (s Symbol) String() string {
-	panic("implement me")
+var _ Value = (*Symbol)(nil)
+
+func (s *Symbol) String() string {
+	panic("TypeError")
+}
+
+func (s *Symbol) ToBoolean() bool {
+	return true
 }

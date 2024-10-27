@@ -68,7 +68,9 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 		}
 	}
 
-	panic("TypeError")
+	message := "Could not convert object to primitive"
+	o.Agent().ThrowException(TypeError, message)
+	panic("")
 }
 
 // 7.2.5
@@ -82,13 +84,11 @@ func (o *Object) Get(key PropertyKey) Value {
 }
 
 // 7.3.4
-func (o *Object) Set(key PropertyKey, value Value, throw bool) *CompletionRecord {
+func (o *Object) Set(key PropertyKey, value Value, throw bool) {
 	success := o.InternalMethods().Set(o, key, value, NewValueFromObject(o))
 	if !success && throw {
-		return TypeErrorCompletion
+		o.Agent().ThrowException(TypeError, "Set failed")
 	}
-
-	return NormalCompletion(NewStringValue("UNUSED"))
 }
 
 // 7.3.5
