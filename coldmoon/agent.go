@@ -1,8 +1,9 @@
 package coldmoon
 
 type Agent struct {
-	symbolId  uint64
-	exception *Value
+	symbolId              uint64
+	exception             *Value
+	executionContextStack []*ExecutionContext
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]Symbol{}
@@ -24,6 +25,32 @@ func NewAgent() *Agent {
 	initWellKnownSymbols(a)
 	return a
 }
+
+func (a *Agent) runningExecutionContext() *ExecutionContext {
+	Assert(len(a.executionContextStack) > 0)
+	return a.executionContextStack[len(a.executionContextStack)-1]
+}
+
+func (a *Agent) currentRealm() *Realm {
+	return a.runningExecutionContext().Realm
+}
+
+// 9.4.1
+func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
+	if len(a.executionContextStack) == 0 {
+		return ScriptOrModuleNull
+	}
+	var ec *ExecutionContext
+	for i := len(a.executionContextStack) - 1; i >= 0; i-- {
+		ec = a.executionContextStack[i]
+		if ec.ScriptOrModule != ScriptOrModuleNull {
+			return ec.ScriptOrModule
+		}
+	}
+	return ScriptOrModuleNull
+}
+
+// MARK: - Well-known Symbols
 
 type WellKnownSymbolsKey string
 

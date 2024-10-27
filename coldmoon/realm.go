@@ -24,6 +24,7 @@ func CreateRealm() *Realm {
 	return r
 }
 
+// 9.3.2
 func (r *Realm) CreateIntrinsics() {
 	r.Instringics = Intrinsics{}
 }
