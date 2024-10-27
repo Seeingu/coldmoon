@@ -432,6 +432,39 @@ func IsIntegralNumber(value Value) bool {
 	return true
 }
 
+// 7.2.10
+func SameValue(x Value, y Value) bool {
+	if ValueType(x) != ValueType(y) {
+		return false
+	}
+	if number, ok := x.(*NumberValue); ok {
+		return number.SameValue(*y.(*NumberValue))
+	}
+
+	return SameValueNonNumber(x, y)
+}
+
+// 7.2.12
+func SameValueNonNumber(x Value, y Value) bool {
+	Assert(ValueType(x) == ValueType(y))
+	switch x.(type) {
+	case *undefinedValue, *nullValue:
+		return true
+	case *BigInt:
+		return x.(*BigInt).Equal(*y.(*BigInt))
+	case *StringValue:
+		return x.(*StringValue).Data == y.(*StringValue).Data
+	case *BooleanValue:
+		return x.(*BooleanValue).Data == y.(*BooleanValue).Data
+	case *Symbol:
+		return x.(*Symbol).Id == y.(*Symbol).Id
+	case *ObjectValue:
+		return x.(*ObjectValue).Object == y.(*ObjectValue).Object
+	default:
+		panic("unreachable")
+	}
+}
+
 // 7.3.14
 func Call(self Value, value Value, argumentsList []Value) Value {
 	if !isCallable(value) {
@@ -451,4 +484,27 @@ func CallAssumeCallable(self Value, value Value, argumentsList []Value) Value {
 
 func CallAssumeCallableNoArgs(self, value Value) Value {
 	return CallAssumeCallable(self, self, nil)
+}
+
+func ValueType(value Value) string {
+	switch value.(type) {
+	case *undefinedValue:
+		return "undefined"
+	case *nullValue:
+		return "object"
+	case *BooleanValue:
+		return "boolean"
+	case *StringValue:
+		return "string"
+	case *NumberValue:
+		return "number"
+	case *BigInt:
+		return "bigint"
+	case *Symbol:
+		return "symbol"
+	case *ObjectValue:
+		return "object"
+	default:
+		panic("unreachable")
+	}
 }

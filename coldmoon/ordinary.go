@@ -18,7 +18,7 @@ func InternalSetPrototypeOf(object *Object, prototype *Object) bool {
 func OrdinarySetPrototypeOf(object *Object, prototype *Object) bool {
 	current := object.Prototype()
 
-	if SameValue(prototype, current) {
+	if ObjectSameValue(prototype, current) {
 		return true
 	}
 
@@ -32,7 +32,7 @@ func OrdinarySetPrototypeOf(object *Object, prototype *Object) bool {
 	for !done {
 		if p == nil {
 			done = true
-		} else if SameValue(p, object) {
+		} else if ObjectSameValue(p, object) {
 			return false
 		} else if !pkg.FuncEqual(p.InternalMethods().GetPrototypeOf, InternalGetPrototypeOf) {
 			done = true
@@ -267,6 +267,6 @@ func OrdinaryOwnPropertyKeys(object *Object) []PropertyKey {
 	return keys
 }
 
-func SameValue(x, y *Object) bool {
+func ObjectSameValue(x, y *Object) bool {
 	return x == y
 }

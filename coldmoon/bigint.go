@@ -29,3 +29,7 @@ func (b *BigInt) ToBoolean() bool {
 	}
 	return true
 }
+
+func (b *BigInt) Equal(other BigInt) bool {
+	return b.Data.Cmp(&other.Data) == 0
+}
