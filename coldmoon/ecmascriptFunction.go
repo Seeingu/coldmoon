@@ -8,16 +8,18 @@ func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 	Assert(!function.PropertyStorage().Has(NewStringPropertyKey("name")))
 
 	var name string
-	symbol, isSymbol := key.(*SymbolPropertyKey)
-	if isSymbol {
-		description := symbol.Value.Description
+	switch k := key.(type) {
+	case SymbolPropertyKey:
+		description := k.Value.Description
 
 		if description == "" {
 			name = description
 		} else {
 			name = fmt.Sprintf("[%s]", description)
 		}
-	} else {
+	case StringPropertyKey:
+		name = k.Value
+	default:
 		panic("unimplemented")
 	}
 

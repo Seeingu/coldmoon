@@ -8,6 +8,10 @@ type BuiltinFunction struct {
 	Behavior    BehaviorFn
 }
 
+func (b *BuiltinFunction) ToObject() *Object {
+	return b.Object
+}
+
 // 10.3.1
 func BuiltinCall(o ObjectType, thisArgument Value, argumentsList []Value) Value {
 	return o.(*BuiltinFunction).BuiltinCallOrConstruct(thisArgument, argumentsList, nil)
@@ -39,9 +43,10 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 }
 
 type builtinFunctionArgs struct {
-	realm     *Realm
-	prototype *Object
-	prefix    string
+	realm         *Realm
+	prototype     ObjectType
+	prefix        string
+	isConstructor bool
 }
 
 // 10.3.4
@@ -51,7 +56,7 @@ func CreateBuiltinFunction(
 	length float64,
 	name string,
 	args builtinFunctionArgs,
-) *BuiltinFunction {
+) ObjectType {
 	realm := args.realm
 	if realm == nil {
 		realm = agent.CurrentRealm()
@@ -59,11 +64,10 @@ func CreateBuiltinFunction(
 
 	prototype := args.prototype
 	if prototype == nil {
-		//prototype = realm.Intrinsics
-		panic("unimplemented")
+		prototype = realm.Intrinsics.FunctionPrototype
 	}
 
-	object := NewObject(agent, prototype)
+	object := NewObject(agent, prototype.ToObject())
 	object.SetExtensible(true)
 	function := &BuiltinFunction{
 		Object:      object,
@@ -72,10 +76,12 @@ func CreateBuiltinFunction(
 		InitialName: "",
 	}
 	function.InternalMethods().Call = BuiltinCall
-	function.InternalMethods().Construct = BuiltinConstruct
+	if args.isConstructor {
+		function.InternalMethods().Construct = BuiltinConstruct
+	}
 
 	SetFunctionLength(function.Object, length)
-	SetFunctionName(function.Object, NewStringPropertyKey(name), args.prefix)
+	SetFunctionName(function, NewStringPropertyKey(name), args.prefix)
 
 	return function
 }

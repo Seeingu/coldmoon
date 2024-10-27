@@ -274,8 +274,8 @@ func ObjectSameValue(x, y *Object) bool {
 }
 
 // 10.1.12
-func OrdinaryObjectCreate(agent *Agent, proto *Object, internalSlotsList []string) *Object {
-	obj := NewObject(agent, proto)
+func OrdinaryObjectCreate(agent *Agent, proto ObjectType, internalSlotsList []string) *Object {
+	obj := NewObject(agent, proto.ToObject())
 
 	return obj
 }

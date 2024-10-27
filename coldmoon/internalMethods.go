@@ -4,6 +4,7 @@ type ObjectType interface {
 	IsExtensible() bool
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
+	ToObject() *Object
 }
 type InternalMethods struct {
 	GetPrototypeOf    func(o ObjectType) *Object

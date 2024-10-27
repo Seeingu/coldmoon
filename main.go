@@ -7,7 +7,7 @@ import (
 
 func main() {
 	agent := coldmoon.NewAgent()
-	coldmoon.InitializeHostDefinedRealm(agent)
+	coldmoon.InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	_ = coldmoon.ParseScript("", realm, nil)
 

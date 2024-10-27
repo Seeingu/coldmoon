@@ -2,27 +2,26 @@ package coldmoon
 
 type (
 	Environment struct{}
-	Intrinsics  struct{}
 )
-
-func (i *Intrinsics) Get(key string) interface{} {
-	return nil
-}
 
 type Realm struct {
 	AgentSignifier interface{}
-	Intrinsics     Intrinsics
-	GlobalObject   Object
+	Intrinsics     *Intrinsics
+	GlobalObject   *Object
 	GlobalEnv      Environment
 	TemplateMap    interface{}
 	LoadedModules  interface{}
 	HostDefined    interface{}
+	Agent          *Agent
 }
 
 // CreateRealm creates a new realm.
 // 9.3.1
-func CreateRealm() *Realm {
-	r := &Realm{}
+func CreateRealm(agent *Agent) *Realm {
+	r := &Realm{
+		Agent:      agent,
+		Intrinsics: &Intrinsics{},
+	}
 	r.CreateIntrinsics()
 
 	return r
@@ -30,12 +29,39 @@ func CreateRealm() *Realm {
 
 // 9.3.2
 func (r *Realm) CreateIntrinsics() {
-	r.Intrinsics = Intrinsics{}
+	r.Intrinsics.ObjectPrototype = NewObjectPrototype(r.Agent)
+	r.Intrinsics.FunctionPrototype = NewFunctionPrototype(r)
+}
+
+// 9.3.3
+func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue Value) {
+	obj := globalObj
+	if obj == nil {
+		obj = OrdinaryObjectCreate(r.Agent, r.Intrinsics.ObjectPrototype, []string{})
+	}
+
+	this := thisValue
+	if this == nil {
+		this = NewValueFromObject(obj)
+	}
+
+	r.GlobalObject = obj
+	r.GlobalEnv = Environment{}
+}
+
+// 9.3.4
+func (r *Realm) SetDefaultGlobalBindings() *Object {
+	global := r.GlobalObject
+
+	return global
 }
 
 // 9.6
-func InitializeHostDefinedRealm(agent *Agent) {
-	realm := CreateRealm()
+func InitializeHostDefinedRealm(
+	agent *Agent,
+	globalObject *Object,
+) {
+	realm := CreateRealm(agent)
 	newContext := &ExecutionContext{
 		Function:       nil,
 		Realm:          realm,
@@ -43,4 +69,10 @@ func InitializeHostDefinedRealm(agent *Agent) {
 	}
 
 	agent.executionContextStack = append(agent.executionContextStack, newContext)
+
+	global := globalObject
+
+	realm.SetRealmGlobalObject(global, nil)
+
+	realm.SetDefaultGlobalBindings()
 }
