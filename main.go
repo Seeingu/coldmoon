@@ -6,18 +6,19 @@ import (
 )
 
 func main() {
-	_ = coldmoon.NewAgent()
-	realm := coldmoon.CreateRealm()
+	agent := coldmoon.NewAgent()
+	coldmoon.InitializeHostDefinedRealm(agent)
+	realm := agent.CurrentRealm()
 	_ = coldmoon.ParseScript("", realm, nil)
 
-	o := coldmoon.NewObject(nil)
+	o := coldmoon.NewObject(agent, nil)
 	key := coldmoon.StringPropertyKey{Value: "a"}
 	o.InternalMethods().DefineOwnProperty(
 		o,
 		key,
 		&coldmoon.PropertyDescriptor{Value: &coldmoon.NumberValue{Data: 12}},
 	)
-	o2 := coldmoon.NewObject(o)
+	o2 := coldmoon.NewObject(agent, o)
 	value := o2.InternalMethods().Get(o2, key, nil)
 	fmt.Println("Value: ", value.(*coldmoon.NumberValue).Data)
 }

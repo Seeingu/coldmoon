@@ -1,19 +1,24 @@
 package coldmoon
 
+type ObjectType interface {
+	IsExtensible() bool
+	PropertyStorage() *PropertyStorage
+	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
+}
 type InternalMethods struct {
-	GetPrototypeOf    func(o *Object) *Object
-	SetPrototypeOf    func(o *Object, v *Object) bool
-	IsExtensible      func(o *Object) bool
-	PreventExtensions func(o *Object) bool
-	GetOwnProperty    func(o *Object, p PropertyKey) *PropertyDescriptor
-	DefineOwnProperty func(o *Object, p PropertyKey, desc *PropertyDescriptor) bool
-	HasProperty       func(o *Object, p PropertyKey) bool
-	Get               func(o *Object, p PropertyKey, receiver Value) Value
-	Set               func(o *Object, p PropertyKey, v Value, receiver Value) bool
-	Delete            func(o *Object, p PropertyKey) bool
-	OwnPropertyKeys   func(o *Object) []PropertyKey
-	Call              func(o *Object, this Value, arguments []Value) Value
-	Construct         func(o *Object, arguments []Value) *Object
+	GetPrototypeOf    func(o ObjectType) *Object
+	SetPrototypeOf    func(o ObjectType, v *Object) bool
+	IsExtensible      func(o ObjectType) bool
+	PreventExtensions func(o ObjectType) bool
+	GetOwnProperty    func(o ObjectType, p PropertyKey) *PropertyDescriptor
+	DefineOwnProperty func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool
+	HasProperty       func(o ObjectType, p PropertyKey) bool
+	Get               func(o ObjectType, p PropertyKey, receiver Value) Value
+	Set               func(o ObjectType, p PropertyKey, v Value, receiver Value) bool
+	Delete            func(o ObjectType, p PropertyKey) bool
+	OwnPropertyKeys   func(o ObjectType) []PropertyKey
+	Call              func(o ObjectType, this Value, arguments []Value) Value
+	Construct         func(o ObjectType, arguments []Value, newTarget *Object) Value
 }
 
 func NewInternalMethods() InternalMethods {

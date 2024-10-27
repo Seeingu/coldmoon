@@ -9,12 +9,14 @@ type Data struct {
 }
 
 type Object struct {
+	ObjectType
 	data *Data
 }
 
-func NewObject(prototype *Object) *Object {
+func NewObject(agent *Agent, prototype *Object) *Object {
 	o := &Object{
 		data: &Data{
+			agent:           agent,
 			prototype:       prototype,
 			internalMethods: NewInternalMethods(),
 			propertyStorage: NewPropertyStorage(),
@@ -34,6 +36,9 @@ func (o *Object) SetPrototype(p *Object) {
 
 func (o *Object) Extensible() bool {
 	return o.data.extensible
+}
+func (o *Object) SetExtensible(v bool) {
+	o.data.extensible = v
 }
 
 func (o *Object) Agent() *Agent {
@@ -100,4 +105,41 @@ func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 		Configurable: true,
 	})
 	return newDesc
+}
+
+// 7.3.8
+func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
+	success := o.InternalMethods().DefineOwnProperty(o, key, desc)
+	if !success {
+		o.Agent().ThrowException(TypeError, "DefinePropertyOrThrow failed")
+	}
+	return success
+}
+
+// 7.3.9
+func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
+	success := o.InternalMethods().Delete(o, key)
+	if !success {
+		o.Agent().ThrowException(TypeError, "DeletePropertyOrThrow failed")
+	}
+	return success
+}
+
+type constructArgs struct {
+	newTarget     *Object
+	argumentLists []Value
+}
+
+// 7.3.14
+func (o *Object) Construct(args constructArgs) Value {
+	newTarget := args.newTarget
+	if newTarget == nil {
+		newTarget = o
+	}
+	return o.InternalMethods().Construct(o, args.argumentLists, newTarget)
+}
+
+// 7.3.24
+func (o *Object) GetFunctionRealm() *Realm {
+	return o.Agent().CurrentRealm()
 }

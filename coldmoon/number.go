@@ -10,6 +10,12 @@ type NumberValue struct {
 	Data float64
 }
 
+func NewNumberValue(v float64) *NumberValue {
+	return &NumberValue{
+		Data: v,
+	}
+}
+
 var _ Value = (*NumberValue)(nil)
 
 func (n *NumberValue) String() string {

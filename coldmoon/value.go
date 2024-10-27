@@ -114,7 +114,7 @@ func ToPrimitive(value Value, hint PreferredType) Value {
 		if exoticToPrim != UndefinedValue {
 			hintString := hint.String()
 
-			result := Call(exoticToPrim, value, []Value{
+			result := ValueCall(exoticToPrim, value, []Value{
 				NewStringValue(hintString),
 			})
 			if _, isObject = result.(*ObjectValue); !isObject {
@@ -466,7 +466,7 @@ func SameValueNonNumber(x Value, y Value) bool {
 }
 
 // 7.3.14
-func Call(self Value, value Value, argumentsList []Value) Value {
+func ValueCall(self Value, value Value, argumentsList []Value) Value {
 	if !isCallable(value) {
 		panic("TypeError")
 	}
@@ -475,7 +475,7 @@ func Call(self Value, value Value, argumentsList []Value) Value {
 }
 
 func CallNoArgs(self Value, value Value) Value {
-	return Call(self, value, nil)
+	return ValueCall(self, value, nil)
 }
 
 func CallAssumeCallable(self Value, value Value, argumentsList []Value) Value {

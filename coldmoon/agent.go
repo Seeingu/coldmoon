@@ -31,7 +31,7 @@ func (a *Agent) runningExecutionContext() *ExecutionContext {
 	return a.executionContextStack[len(a.executionContextStack)-1]
 }
 
-func (a *Agent) currentRealm() *Realm {
+func (a *Agent) CurrentRealm() *Realm {
 	return a.runningExecutionContext().Realm
 }
 

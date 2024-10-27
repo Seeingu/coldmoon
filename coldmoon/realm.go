@@ -5,9 +5,13 @@ type (
 	Intrinsics  struct{}
 )
 
+func (i *Intrinsics) Get(key string) interface{} {
+	return nil
+}
+
 type Realm struct {
 	AgentSignifier interface{}
-	Instringics    Intrinsics
+	Intrinsics     Intrinsics
 	GlobalObject   Object
 	GlobalEnv      Environment
 	TemplateMap    interface{}
@@ -26,5 +30,17 @@ func CreateRealm() *Realm {
 
 // 9.3.2
 func (r *Realm) CreateIntrinsics() {
-	r.Instringics = Intrinsics{}
+	r.Intrinsics = Intrinsics{}
+}
+
+// 9.6
+func InitializeHostDefinedRealm(agent *Agent) {
+	realm := CreateRealm()
+	newContext := &ExecutionContext{
+		Function:       nil,
+		Realm:          realm,
+		ScriptOrModule: ScriptOrModuleNull,
+	}
+
+	agent.executionContextStack = append(agent.executionContextStack, newContext)
 }

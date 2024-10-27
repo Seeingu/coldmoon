@@ -1,17 +1,19 @@
 package coldmoon
 
-import "github.com/Seeingu/coldmoon/pkg"
+import (
+	"github.com/Seeingu/coldmoon/pkg"
+)
 
-func InternalGetPrototypeOf(object *Object) *Object {
-	return OrdinaryGetPrototypeOf(object)
+func InternalGetPrototypeOf(object ObjectType) *Object {
+	return OrdinaryGetPrototypeOf(object.(*Object))
 }
 
 func OrdinaryGetPrototypeOf(object *Object) *Object {
 	return object.Prototype()
 }
 
-func InternalSetPrototypeOf(object *Object, prototype *Object) bool {
-	return OrdinarySetPrototypeOf(object, prototype)
+func InternalSetPrototypeOf(object ObjectType, prototype *Object) bool {
+	return OrdinarySetPrototypeOf(object.(*Object), prototype)
 }
 
 // 10.1.2.1
@@ -46,16 +48,16 @@ func OrdinarySetPrototypeOf(object *Object, prototype *Object) bool {
 	return true
 }
 
-func InternalIsExtensible(object *Object) bool {
-	return OrdinaryIsExtensible(object)
+func InternalIsExtensible(object ObjectType) bool {
+	return OrdinaryIsExtensible(object.(*Object))
 }
 
 func OrdinaryIsExtensible(object *Object) bool {
 	return object.Extensible()
 }
 
-func InternalPreventExtensions(object *Object) bool {
-	return OrdinaryPreventExtensions(object)
+func InternalPreventExtensions(object ObjectType) bool {
+	return OrdinaryPreventExtensions(object.(*Object))
 }
 
 func OrdinaryPreventExtensions(object *Object) bool {
@@ -63,8 +65,8 @@ func OrdinaryPreventExtensions(object *Object) bool {
 	return true
 }
 
-func InternalGetOwnProperty(object *Object, key PropertyKey) *PropertyDescriptor {
-	return OrdinaryGetOwnProperty(object, key)
+func InternalGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescriptor {
+	return OrdinaryGetOwnProperty(object.(*Object), key)
 }
 
 func OrdinaryGetOwnProperty(object *Object, key PropertyKey) *PropertyDescriptor {
@@ -93,8 +95,8 @@ func OrdinaryGetOwnProperty(object *Object, key PropertyKey) *PropertyDescriptor
 	return d
 }
 
-func InternalDefineOwnProperty(object *Object, key PropertyKey, desc *PropertyDescriptor) bool {
-	return OrdinaryDefineOwnProperty(object, key, desc)
+func InternalDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
+	return OrdinaryDefineOwnProperty(object.(*Object), key, desc)
 }
 
 func OrdinaryDefineOwnProperty(object *Object, key PropertyKey, desc *PropertyDescriptor) bool {
@@ -110,8 +112,8 @@ func ValidateAndApplyPropertyDescriptor(object *Object, key PropertyKey, extensi
 	return true
 }
 
-func InternalHasProperty(object *Object, key PropertyKey) bool {
-	return OrdinaryHasProperty(object, key)
+func InternalHasProperty(object ObjectType, key PropertyKey) bool {
+	return OrdinaryHasProperty(object.(*Object), key)
 }
 
 func OrdinaryHasProperty(object *Object, key PropertyKey) bool {
@@ -128,8 +130,8 @@ func OrdinaryHasProperty(object *Object, key PropertyKey) bool {
 	return false
 }
 
-func InternalGet(object *Object, key PropertyKey, receiver Value) Value {
-	return OrdinaryGet(object, key, receiver)
+func InternalGet(object ObjectType, key PropertyKey, receiver Value) Value {
+	return OrdinaryGet(object.(*Object), key, receiver)
 }
 
 func OrdinaryGet(object *Object, key PropertyKey, receiver Value) Value {
@@ -160,8 +162,8 @@ func OrdinaryGet(object *Object, key PropertyKey, receiver Value) Value {
 	return CallAssumeCallableNoArgs(NewValueFromObject(getter), receiver)
 }
 
-func InternalSet(object *Object, key PropertyKey, value Value, receiver Value) bool {
-	return OrdinarySet(object, key, value, receiver)
+func InternalSet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
+	return OrdinarySet(object.(*Object), key, value, receiver)
 }
 
 func OrdinarySet(object *Object, key PropertyKey, value Value, receiver Value) bool {
@@ -236,8 +238,8 @@ func OrdinarySetWithOwnDescriptor(
 	return true
 }
 
-func InternalDelete(object *Object, key PropertyKey) bool {
-	return OrdinaryDelete(object, key)
+func InternalDelete(object ObjectType, key PropertyKey) bool {
+	return OrdinaryDelete(object.(*Object), key)
 }
 
 func OrdinaryDelete(object *Object, key PropertyKey) bool {
@@ -253,12 +255,12 @@ func OrdinaryDelete(object *Object, key PropertyKey) bool {
 	return false
 }
 
-func InternalOwnPropertyKeys(object *Object) []PropertyKey {
-	return OrdinaryOwnPropertyKeys(object)
+func InternalOwnPropertyKeys(object ObjectType) []PropertyKey {
+	return OrdinaryOwnPropertyKeys(object.(*Object))
 }
 
 func OrdinaryOwnPropertyKeys(object *Object) []PropertyKey {
-	keys := []PropertyKey{}
+	var keys []PropertyKey
 
 	for key := range object.PropertyStorage().Properties {
 		keys = append(keys, key)
@@ -269,4 +271,34 @@ func OrdinaryOwnPropertyKeys(object *Object) []PropertyKey {
 
 func ObjectSameValue(x, y *Object) bool {
 	return x == y
+}
+
+// 10.1.12
+func OrdinaryObjectCreate(agent *Agent, proto *Object, internalSlotsList []string) *Object {
+	obj := NewObject(agent, proto)
+
+	return obj
+}
+
+// 10.1.13
+func OrdinaryCreateFromConstructor(agent *Agent, constructor *Object, intrinsicDefaultProto string, internalSlotsList []string) *Object {
+	// TODO: Assert
+	proto := GetPrototypeFromConstructor(constructor, intrinsicDefaultProto)
+
+	return OrdinaryObjectCreate(agent, proto, internalSlotsList)
+}
+
+// 10.1.14
+func GetPrototypeFromConstructor(constructor *Object, intrinsicDefaultProto string) *Object {
+	// TODO: Assert
+	proto := constructor.Get(NewStringPropertyKey("prototype"))
+
+	switch p := proto.(type) {
+	case *ObjectValue:
+		return p.Object
+	default:
+		realm := constructor.GetFunctionRealm()
+		return realm.Intrinsics.Get(intrinsicDefaultProto).(*Object)
+	}
+
 }
