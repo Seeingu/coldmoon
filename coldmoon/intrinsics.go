@@ -5,6 +5,10 @@ type Intrinsics struct {
 	ObjectPrototype *ObjectPrototype
 	// %Function.Prototype%
 	FunctionPrototype ObjectType
+	// %Boolean.Prototype%
+	BooleanPrototype *BooleanPrototype
+	// %Boolean%
+	BooleanConstructor ObjectType
 }
 
 func (i *Intrinsics) Get(key string) interface{} {

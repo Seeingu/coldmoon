@@ -5,10 +5,17 @@ type ObjectType interface {
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	ToObject() *Object
+	Construct(
+		argumentLists []Value,
+		newTarget *Object,
+	) ObjectType
+	InternalMethods() *InternalMethods
+	Prototype() ObjectType
+	Extensible() bool
 }
 type InternalMethods struct {
-	GetPrototypeOf    func(o ObjectType) *Object
-	SetPrototypeOf    func(o ObjectType, v *Object) bool
+	GetPrototypeOf    func(o ObjectType) ObjectType
+	SetPrototypeOf    func(o ObjectType, v ObjectType) bool
 	IsExtensible      func(o ObjectType) bool
 	PreventExtensions func(o ObjectType) bool
 	GetOwnProperty    func(o ObjectType, p PropertyKey) *PropertyDescriptor
@@ -19,7 +26,7 @@ type InternalMethods struct {
 	Delete            func(o ObjectType, p PropertyKey) bool
 	OwnPropertyKeys   func(o ObjectType) []PropertyKey
 	Call              func(o ObjectType, this Value, arguments []Value) Value
-	Construct         func(o ObjectType, arguments []Value, newTarget *Object) Value
+	Construct         func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType
 }
 
 func NewInternalMethods() InternalMethods {

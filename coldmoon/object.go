@@ -1,7 +1,14 @@
 package coldmoon
 
+type Tag int
+
+const (
+	TagDefault Tag = iota
+	TagBoolean
+)
+
 type Data struct {
-	prototype       *Object
+	prototype       ObjectType
 	extensible      bool
 	agent           *Agent
 	internalMethods InternalMethods
@@ -13,7 +20,11 @@ type Object struct {
 	data *Data
 }
 
-func NewObject(agent *Agent, prototype *Object) *Object {
+func (o *Object) ToObject() *Object {
+	return o
+}
+
+func NewObject(agent *Agent, prototype ObjectType) *Object {
 	o := &Object{
 		data: &Data{
 			agent:           agent,
@@ -27,10 +38,10 @@ func NewObject(agent *Agent, prototype *Object) *Object {
 
 var EmptyObject = &Object{}
 
-func (o *Object) Prototype() *Object {
+func (o *Object) Prototype() ObjectType {
 	return o.data.prototype
 }
-func (o *Object) SetPrototype(p *Object) {
+func (o *Object) SetPrototype(p ObjectType) {
 	o.data.prototype = p
 }
 
@@ -107,6 +118,31 @@ func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 	return newDesc
 }
 
+// 7.3.6
+func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) bool {
+
+	success := o.CreateDataProperty(key, value)
+	if !success {
+		o.Agent().ThrowException(TypeError, "CreateDataPropertyOrThrow failed")
+	}
+	return success
+}
+
+// 7.3.7
+func (o *Object) CreateNonEnumerableDataProperty(key PropertyKey, value Value) bool {
+	for _, p := range o.PropertyStorage().Properties {
+		Assert(p.Configurable)
+	}
+
+	newDesc := o.DefinePropertyOrThrow(key, &PropertyDescriptor{
+		Value:        value,
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: true,
+	})
+	return newDesc
+}
+
 // 7.3.8
 func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
 	success := o.InternalMethods().DefineOwnProperty(o, key, desc)
@@ -126,17 +162,19 @@ func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
 }
 
 type constructArgs struct {
-	newTarget     *Object
-	argumentLists []Value
 }
 
 // 7.3.14
-func (o *Object) Construct(args constructArgs) Value {
-	newTarget := args.newTarget
+func ObjectConstruct(
+	o ObjectType,
+	_argumentLists []Value,
+	_newTarget ObjectType,
+) ObjectType {
+	newTarget := _newTarget
 	if newTarget == nil {
 		newTarget = o
 	}
-	return o.InternalMethods().Construct(o, args.argumentLists, newTarget)
+	return o.InternalMethods().Construct(o, _argumentLists, newTarget)
 }
 
 // 7.3.24

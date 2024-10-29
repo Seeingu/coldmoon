@@ -91,7 +91,8 @@ var NegativeInfinityValue = NumberValue{Data: math.Inf(-1)}
 
 type ObjectValue struct {
 	Value
-	Object *Object
+	Object ObjectType
+	tag    Tag
 }
 
 func (o ObjectValue) String() string {
@@ -102,8 +103,8 @@ func (o ObjectValue) String() string {
 	return primValue.String()
 }
 
-func NewValueFromObject(object *Object) Value {
-	return ObjectValue{Object: object}
+func NewValueFromObject(object ObjectType) Value {
+	return &ObjectValue{Object: object}
 }
 
 // 7.1.1
@@ -127,7 +128,7 @@ func ToPrimitive(value Value, hint PreferredType) Value {
 		if preferredType == PreferredTypeDefault {
 			preferredType = PreferredTypeNumber
 		}
-		return objectValue.Object.OrdinaryToPrimitive(preferredType)
+		return objectValue.Object.ToObject().OrdinaryToPrimitive(preferredType)
 	}
 
 	return value
@@ -395,7 +396,7 @@ func isCallable(value Value) bool {
 	if !isObject {
 		return false
 	}
-	if objectValue.Object.InternalMethods().Call != nil {
+	if objectValue.Object.ToObject().InternalMethods().Call != nil {
 		return true
 	}
 
@@ -409,7 +410,7 @@ func isConstructor(value Value) bool {
 	if !isObject {
 		return false
 	}
-	if objectValue.Object.InternalMethods().Construct != nil {
+	if objectValue.Object.ToObject().InternalMethods().Construct != nil {
 		return true
 	}
 
@@ -471,7 +472,7 @@ func ValueCall(self Value, value Value, argumentsList []Value) Value {
 		panic("TypeError")
 	}
 
-	return value.(*ObjectValue).Object.InternalMethods().Call(value.(*ObjectValue).Object, self, argumentsList)
+	return value.(*ObjectValue).Object.ToObject().InternalMethods().Call(value.(*ObjectValue).Object, self, argumentsList)
 }
 
 func CallNoArgs(self Value, value Value) Value {
@@ -479,11 +480,12 @@ func CallNoArgs(self Value, value Value) Value {
 }
 
 func CallAssumeCallable(self Value, value Value, argumentsList []Value) Value {
-	return self.(*ObjectValue).Object.InternalMethods().Call(self.(*ObjectValue).Object, self, argumentsList)
+	object := self.(*ObjectValue).Object
+	return object.InternalMethods().Call(object, value, argumentsList)
 }
 
 func CallAssumeCallableNoArgs(self, value Value) Value {
-	return CallAssumeCallable(self, self, nil)
+	return CallAssumeCallable(self, value, nil)
 }
 
 func ValueType(value Value) string {

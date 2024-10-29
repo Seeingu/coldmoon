@@ -1,6 +1,6 @@
 package coldmoon
 
-type BehaviorFn func(thisArgument Value, argumentsList []Value, newTarget *Object) Value
+type BehaviorFn func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value
 type BuiltinFunction struct {
 	*Object
 	Realm       *Realm
@@ -18,12 +18,13 @@ func BuiltinCall(o ObjectType, thisArgument Value, argumentsList []Value) Value 
 }
 
 // 10.3.2
-func BuiltinConstruct(b ObjectType, argumentsList []Value, newTarget *Object) Value {
-	return b.(*BuiltinFunction).BuiltinCallOrConstruct(&NullValue, argumentsList, newTarget)
+func BuiltinConstruct(b ObjectType, argumentsList []Value, newTarget ObjectType) ObjectType {
+	r := b.(*BuiltinFunction).BuiltinCallOrConstruct(&NullValue, argumentsList, newTarget)
+	return r.(*ObjectValue).Object
 }
 
 // 10.3.3
-func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsList []Value, newTarget *Object) Value {
+func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 	a := b.Agent()
 	callerContext := a.runningExecutionContext()
 	_ = callerContext

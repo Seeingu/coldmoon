@@ -4,20 +4,20 @@ import (
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
-func InternalGetPrototypeOf(object ObjectType) *Object {
-	return OrdinaryGetPrototypeOf(object.(*Object))
+func InternalGetPrototypeOf(object ObjectType) ObjectType {
+	return OrdinaryGetPrototypeOf(object)
 }
 
-func OrdinaryGetPrototypeOf(object *Object) *Object {
+func OrdinaryGetPrototypeOf(object ObjectType) ObjectType {
 	return object.Prototype()
 }
 
-func InternalSetPrototypeOf(object ObjectType, prototype *Object) bool {
+func InternalSetPrototypeOf(object ObjectType, prototype ObjectType) bool {
 	return OrdinarySetPrototypeOf(object.(*Object), prototype)
 }
 
 // 10.1.2.1
-func OrdinarySetPrototypeOf(object *Object, prototype *Object) bool {
+func OrdinarySetPrototypeOf(object ObjectType, prototype ObjectType) bool {
 	current := object.Prototype()
 
 	if ObjectSameValue(prototype, current) {
@@ -43,7 +43,7 @@ func OrdinarySetPrototypeOf(object *Object, prototype *Object) bool {
 		}
 	}
 
-	object.SetPrototype(prototype)
+	object.(*Object).SetPrototype(prototype)
 
 	return true
 }
@@ -66,10 +66,10 @@ func OrdinaryPreventExtensions(object *Object) bool {
 }
 
 func InternalGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescriptor {
-	return OrdinaryGetOwnProperty(object.(*Object), key)
+	return OrdinaryGetOwnProperty(object, key)
 }
 
-func OrdinaryGetOwnProperty(object *Object, key PropertyKey) *PropertyDescriptor {
+func OrdinaryGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescriptor {
 	if !object.PropertyStorage().Has(key) {
 		return nil
 	}
@@ -131,10 +131,10 @@ func OrdinaryHasProperty(object *Object, key PropertyKey) bool {
 }
 
 func InternalGet(object ObjectType, key PropertyKey, receiver Value) Value {
-	return OrdinaryGet(object.(*Object), key, receiver)
+	return OrdinaryGet(object, key, receiver)
 }
 
-func OrdinaryGet(object *Object, key PropertyKey, receiver Value) Value {
+func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) Value {
 	desc := object.InternalMethods().GetOwnProperty(object, key)
 
 	if desc == nil {
@@ -203,7 +203,7 @@ func OrdinarySetWithOwnDescriptor(
 		if !isObject {
 			return false
 		}
-		receiverObject := r.Object
+		receiverObject := r.Object.ToObject()
 
 		existingDescriptor := object.InternalMethods().GetOwnProperty(receiverObject, key)
 
@@ -269,19 +269,19 @@ func OrdinaryOwnPropertyKeys(object *Object) []PropertyKey {
 	return keys
 }
 
-func ObjectSameValue(x, y *Object) bool {
+func ObjectSameValue(x, y ObjectType) bool {
 	return x == y
 }
 
 // 10.1.12
 func OrdinaryObjectCreate(agent *Agent, proto ObjectType, internalSlotsList []string) *Object {
-	obj := NewObject(agent, proto.ToObject())
+	obj := NewObject(agent, proto)
 
 	return obj
 }
 
 // 10.1.13
-func OrdinaryCreateFromConstructor(agent *Agent, constructor *Object, intrinsicDefaultProto string, internalSlotsList []string) *Object {
+func OrdinaryCreateFromConstructor(agent *Agent, constructor ObjectType, intrinsicDefaultProto string, internalSlotsList []string) *Object {
 	// TODO: Assert
 	proto := GetPrototypeFromConstructor(constructor, intrinsicDefaultProto)
 
@@ -289,15 +289,15 @@ func OrdinaryCreateFromConstructor(agent *Agent, constructor *Object, intrinsicD
 }
 
 // 10.1.14
-func GetPrototypeFromConstructor(constructor *Object, intrinsicDefaultProto string) *Object {
+func GetPrototypeFromConstructor(constructor ObjectType, intrinsicDefaultProto string) ObjectType {
 	// TODO: Assert
-	proto := constructor.Get(NewStringPropertyKey("prototype"))
+	proto := constructor.ToObject().Get(NewStringPropertyKey("prototype"))
 
 	switch p := proto.(type) {
 	case *ObjectValue:
 		return p.Object
 	default:
-		realm := constructor.GetFunctionRealm()
+		realm := constructor.ToObject().GetFunctionRealm()
 		return realm.Intrinsics.Get(intrinsicDefaultProto).(*Object)
 	}
 

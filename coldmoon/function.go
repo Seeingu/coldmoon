@@ -9,7 +9,7 @@ func (f *FunctionPrototype) ToObject() *Object {
 }
 
 func NewFunctionPrototype(realm *Realm) ObjectType {
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget *Object) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return UndefinedValue
 	}
 	f := CreateBuiltinFunction(realm.Agent, behavior, 0, "", builtinFunctionArgs{

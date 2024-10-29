@@ -2,23 +2,36 @@ package main
 
 import (
 	"fmt"
-	"github.com/Seeingu/coldmoon/coldmoon"
+	. "github.com/Seeingu/coldmoon/coldmoon"
 )
 
 func main() {
-	agent := coldmoon.NewAgent()
-	coldmoon.InitializeHostDefinedRealm(agent, nil)
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	_ = coldmoon.ParseScript("", realm, nil)
+	_ = ParseScript("", realm, nil)
 
-	o := coldmoon.NewObject(agent, nil)
-	key := coldmoon.StringPropertyKey{Value: "a"}
-	o.InternalMethods().DefineOwnProperty(
-		o,
-		key,
-		&coldmoon.PropertyDescriptor{Value: &coldmoon.NumberValue{Data: 12}},
-	)
-	o2 := coldmoon.NewObject(agent, o)
-	value := o2.InternalMethods().Get(o2, key, nil)
-	fmt.Println("Value: ", value.(*coldmoon.NumberValue).Data)
+	{
+		o := NewObject(agent, nil)
+		key := StringPropertyKey{Value: "a"}
+		o.InternalMethods().DefineOwnProperty(
+			o,
+			key,
+			&PropertyDescriptor{Value: &NumberValue{Data: 12}},
+		)
+		o2 := NewObject(agent, o)
+		value := o2.InternalMethods().Get(o2, key, nil)
+		fmt.Println("Value: ", value.(*NumberValue).Data)
+	}
+
+	booleanConstructor := realm.GlobalObject.Get(NewStringPropertyKey("Boolean"))
+
+	oo := booleanConstructor.(*ObjectValue).Object.(*BuiltinFunction)
+	booleanObject := ObjectConstruct(
+		oo,
+		[]Value{&BooleanValue{Data: false}}, nil)
+
+	valueOf := booleanObject.ToObject().Get(NewStringPropertyKey("valueOf"))
+	value := CallAssumeCallableNoArgs(valueOf, NewValueFromObject(booleanObject))
+	fmt.Println("new Boolean(true).valueOf() = ", value.String())
 }

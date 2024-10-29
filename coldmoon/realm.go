@@ -31,6 +31,8 @@ func CreateRealm(agent *Agent) *Realm {
 func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.ObjectPrototype = NewObjectPrototype(r.Agent)
 	r.Intrinsics.FunctionPrototype = NewFunctionPrototype(r)
+	r.Intrinsics.BooleanPrototype = NewBooleanPrototype(r)
+	r.Intrinsics.BooleanConstructor = NewBooleanConstructor(r)
 }
 
 // 9.3.3
@@ -52,6 +54,26 @@ func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue Value) {
 // 9.3.4
 func (r *Realm) SetDefaultGlobalBindings() *Object {
 	global := r.GlobalObject
+
+	properties := []struct {
+		key   string
+		value Value
+	}{
+		{
+			"Boolean", NewValueFromObject(r.Intrinsics.BooleanConstructor),
+		},
+	}
+	for _, p := range properties {
+		name := NewStringPropertyKey(p.key)
+		value := p.value
+		descriptor := &PropertyDescriptor{
+			Value:        value,
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: true,
+		}
+		global.DefinePropertyOrThrow(name, descriptor)
+	}
 
 	return global
 }
