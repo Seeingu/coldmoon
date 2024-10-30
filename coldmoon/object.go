@@ -161,6 +161,17 @@ func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
 	return success
 }
 
+// 7.3.11
+func ObjectHasProperty(o ObjectType, key PropertyKey) bool {
+	return o.InternalMethods().HasProperty(o, key)
+}
+
+// 7.3.12
+func ObjectHasOwnProperty(o ObjectType, key PropertyKey) bool {
+	desc := o.InternalMethods().GetOwnProperty(o, key)
+	return desc != nil
+}
+
 type constructArgs struct {
 }
 

@@ -82,7 +82,7 @@ func NewStringValue(value string) *StringValue {
 	return &StringValue{Data: value}
 }
 
-var NullValue = nullValue{}
+var NullValue = &nullValue{}
 
 var NaNValue = NumberValue{Data: math.NaN()}
 
@@ -96,7 +96,7 @@ type ObjectValue struct {
 }
 
 func (o ObjectValue) String() string {
-	primValue := ToPrimitive(o, PreferredTypeString)
+	primValue := ToPrimitive(o, o.Object.ToObject().Agent(), PreferredTypeString)
 	if _, isObject := primValue.(*ObjectValue); isObject {
 		panic("")
 	}
@@ -108,14 +108,14 @@ func NewValueFromObject(object ObjectType) Value {
 }
 
 // 7.1.1
-func ToPrimitive(value Value, hint PreferredType) Value {
+func ToPrimitive(value Value, agent *Agent, hint PreferredType) Value {
 	if objectValue, isObject := value.(*ObjectValue); isObject {
-		// TODO:
-		exoticToPrim := UndefinedValue
-		if exoticToPrim != UndefinedValue {
+		symbol := WellKnownSymbols[WellKnownSymbolsToPrimitive]
+		exoticToPrim := GetMethod(value, agent, NewSymbolPropertyKey(&symbol))
+		if exoticToPrim != nil {
 			hintString := hint.String()
 
-			result := ValueCall(exoticToPrim, value, []Value{
+			result := CallAssumeCallable(NewValueFromObject(exoticToPrim), value, []Value{
 				NewStringValue(hintString),
 			})
 			if _, isObject = result.(*ObjectValue); !isObject {
@@ -134,7 +134,7 @@ func ToPrimitive(value Value, hint PreferredType) Value {
 	return value
 }
 
-func ToNumber(value Value) *NumberValue {
+func ToNumber(value Value, agent *Agent) *NumberValue {
 	switch value := value.(type) {
 	case *NumberValue:
 		return value
@@ -150,28 +150,28 @@ func ToNumber(value Value) *NumberValue {
 	case *StringValue:
 		return StringToNumber(value)
 	case *ObjectValue:
-		primValue := ToPrimitive(value, PreferredTypeNumber)
+		primValue := ToPrimitive(value, agent, PreferredTypeNumber)
 
 		if _, ok := primValue.(*ObjectValue); !ok {
 			Assert(false)
 		}
 
-		return ToNumber(primValue)
+		return ToNumber(primValue, agent)
 	}
 	panic("TypeError")
 
 }
 
 // 7.1.3
-func ToNumeric(value Value) Value {
-	primValue := ToPrimitive(value, PreferredTypeNumber)
+func ToNumeric(value Value, agent *Agent) Value {
+	primValue := ToPrimitive(value, agent, PreferredTypeNumber)
 	if bigInt, ok := primValue.(*BigInt); ok {
 		return bigInt
 	}
-	return ToNumber(primValue)
+	return ToNumber(primValue, agent)
 }
-func ToIntegerOrInfinity(value Value) float64 {
-	number := ToNumber(value)
+func ToIntegerOrInfinity(value Value, agent *Agent) float64 {
+	number := ToNumber(value, agent)
 	if number.IsNaN() {
 		return 0
 	}
@@ -192,8 +192,8 @@ var POW_2_15 = math.Pow(2, 15)
 var POW_2_8 = math.Pow(2, 8)
 var POW_2_7 = math.Pow(2, 7)
 
-func ToInt32(value Value) int32 {
-	number := ToNumber(value)
+func ToInt32(value Value, agent *Agent) int32 {
+	number := ToNumber(value, agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -208,8 +208,8 @@ func ToInt32(value Value) int32 {
 	}
 
 }
-func ToUint32(value Value) uint32 {
-	number := ToNumber(value)
+func ToUint32(value Value, agent *Agent) uint32 {
+	number := ToNumber(value, agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -219,8 +219,8 @@ func ToUint32(value Value) uint32 {
 	int32bit := math.Mod(intData, POW_2_32)
 	return uint32(int32bit)
 }
-func ToInt16(value Value) int16 {
-	number := ToNumber(value)
+func ToInt16(value Value, agent *Agent) int16 {
+	number := ToNumber(value, agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -235,8 +235,8 @@ func ToInt16(value Value) int16 {
 		return int16(int16bit)
 	}
 }
-func ToUint16(value Value) uint16 {
-	number := ToNumber(value)
+func ToUint16(value Value, agent *Agent) uint16 {
+	number := ToNumber(value, agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -244,8 +244,8 @@ func ToUint16(value Value) uint16 {
 	int16bit := math.Mod(intData, POW_2_16)
 	return uint16(int16bit)
 }
-func ToInt8(value Value) int8 {
-	number := ToNumber(value)
+func ToInt8(value Value, agent *Agent) int8 {
+	number := ToNumber(value, agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -257,8 +257,8 @@ func ToInt8(value Value) int8 {
 		return int8(int8bit)
 	}
 }
-func ToUint8(value Value) uint8 {
-	number := ToNumber(value)
+func ToUint8(value Value, agent *Agent) uint8 {
+	number := ToNumber(value, agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -266,8 +266,8 @@ func ToUint8(value Value) uint8 {
 	int8bit := math.Mod(intData, POW_2_8)
 	return uint8(int8bit)
 }
-func ToUint8Clamp(value Value) uint8 {
-	number := ToNumber(value)
+func ToUint8Clamp(value Value, agent *Agent) uint8 {
+	number := ToNumber(value, agent)
 	if number.IsNaN() {
 		return 0
 	}
@@ -294,8 +294,8 @@ func ToUint8Clamp(value Value) uint8 {
 
 	return fInt
 }
-func ToBigInt(value Value) BigInt {
-	prim := ToPrimitive(value, PreferredTypeNumber)
+func ToBigInt(value Value, agent *Agent) BigInt {
+	prim := ToPrimitive(value, agent, PreferredTypeNumber)
 	switch p := prim.(type) {
 	case *undefinedValue, *nullValue, *NumberValue, *Symbol:
 		panic("TypeError")
@@ -312,8 +312,8 @@ func ToBigInt(value Value) BigInt {
 }
 
 // 7.1.15
-func ToBigInt64(value Value) int64 {
-	n := ToBigInt(value)
+func ToBigInt64(value Value, agent *Agent) int64 {
+	n := ToBigInt(value, agent)
 
 	twoPow64 := uint128.New(0, 1)
 	twoPow63 := uint128.New(1<<63, 0)
@@ -327,12 +327,24 @@ func ToBigInt64(value Value) int64 {
 }
 
 // 7.1.16
-func ToBigUint64(value Value) uint64 {
-	n := ToBigInt(value)
+func ToBigUint64(value Value, agent *Agent) uint64 {
+	n := ToBigInt(value, agent)
 
 	twoPow64 := uint128.New(0, 1)
 	int64bit := uint128.FromBig(&n.Data).Mod(twoPow64)
 	return int64bit.Lo
+}
+
+// 7.1.18
+func ValueToObject(value Value, agent *Agent) ObjectType {
+	switch v := value.(type) {
+	case *undefinedValue, *nullValue:
+		panic("TypeError")
+	case *BooleanValue:
+		return NewBooleanObject(agent, v.Data)
+	default:
+		panic("unimplemented")
+	}
 }
 
 // 7.1.4.1.1
@@ -350,8 +362,8 @@ func StringToBigInt(value *StringValue) BigInt {
 }
 
 // 7.1.19
-func ToPropertyKey(value Value) PropertyKey {
-	key := ToPrimitive(value, PreferredTypeString)
+func ToPropertyKey(value Value, agent *Agent) PropertyKey {
+	key := ToPrimitive(value, agent, PreferredTypeString)
 	if symbolKey, ok := key.(*Symbol); ok {
 		return NewSymbolPropertyKey(symbolKey)
 	}
@@ -361,8 +373,8 @@ func ToPropertyKey(value Value) PropertyKey {
 }
 
 // 7.1.20
-func ToLength(value Value) uint64 {
-	length := ToIntegerOrInfinity(value)
+func ToLength(value Value, agent *Agent) uint64 {
+	length := ToIntegerOrInfinity(value, agent)
 
 	if length <= 0 {
 		return 0
@@ -372,12 +384,12 @@ func ToLength(value Value) uint64 {
 }
 
 // 7.1.22
-func ToIndex(value Value) uint64 {
+func ToIndex(value Value, agent *Agent) uint64 {
 	if value == UndefinedValue {
 		return 0
 	}
 
-	integer := ToIntegerOrInfinity(value)
+	integer := ToIntegerOrInfinity(value, agent)
 	if integer < 0 || integer >= math.Pow(2, 53) {
 		panic("RangeError")
 	}
@@ -464,6 +476,26 @@ func SameValueNonNumber(x Value, y Value) bool {
 	default:
 		panic("unreachable")
 	}
+}
+
+// 7.3.3
+func GetV(value Value, agent *Agent, key PropertyKey) Value {
+	object := ValueToObject(value, agent)
+	return object.InternalMethods().Get(object, key, value)
+}
+
+// 7.3.11
+func GetMethod(value Value, agent *Agent, key PropertyKey) ObjectType {
+	fun := GetV(value, agent, key)
+	if fun == UndefinedValue || fun == NullValue {
+		return nil
+	}
+
+	if !isCallable(fun) {
+		panic("TypeError")
+	}
+
+	return fun.(*ObjectValue).Object
 }
 
 // 7.3.14

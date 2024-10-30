@@ -11,17 +11,18 @@ func DefineBuiltinFunction(object ObjectType,
 		fn,
 		length,
 		name,
-		builtinFunctionArgs{
-			realm: realm,
-		},
+		builtinFunctionArgs{realm: realm},
 	)
 	object.ToObject().CreateNonEnumerableDataProperty(NewStringPropertyKey(name), NewValueFromObject(f))
 }
 
-func DefineBuiltinPropertyValue(object ObjectType, name string, value Value) {
-	object.ToObject().CreateNonEnumerableDataProperty(NewStringPropertyKey(name), value)
-}
-
-func DefineBuiltinPropertyDescriptor(object ObjectType, name string, value *PropertyDescriptor) {
-	object.DefinePropertyOrThrow(NewStringPropertyKey(name), value)
+func DefineBuiltinProperty(object ObjectType, name string, value interface{}) {
+	switch v := value.(type) {
+	case Value:
+		object.ToObject().CreateNonEnumerableDataProperty(NewStringPropertyKey(name), v)
+	case *PropertyDescriptor:
+		object.DefinePropertyOrThrow(NewStringPropertyKey(name), v)
+	default:
+		panic("invalid value")
+	}
 }

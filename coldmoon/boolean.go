@@ -31,6 +31,24 @@ type booleanType interface {
 }
 
 // MARK: - BooleanObject
+type BooleanObject struct {
+	booleanType
+	*Object
+	Data bool
+}
+
+func NewBooleanObject(agent *Agent, b bool) *BooleanObject {
+	return &BooleanObject{
+		Object: &Object{
+			data: &Data{
+				agent:     agent,
+				prototype: agent.CurrentRealm().Intrinsics.BooleanPrototype,
+			},
+		},
+		Data: b,
+	}
+}
+
 type BooleanConstructor struct {
 	booleanType
 	*Object
@@ -76,7 +94,7 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 			isConstructor: true,
 		})
 
-	DefineBuiltinPropertyDescriptor(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.BooleanPrototype),
 		Writable:     false,
 		Enumerable:   false,
@@ -118,7 +136,7 @@ func NewBooleanPrototype(realm *Realm) *BooleanPrototype {
 		return NewBooleanValue(thisBooleanValue(realm.Agent, thisArgument))
 	}
 
-	DefineBuiltinPropertyValue(object, "constructor",
+	DefineBuiltinProperty(object, "constructor",
 		NewValueFromObject(realm.Intrinsics.BooleanConstructor))
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)

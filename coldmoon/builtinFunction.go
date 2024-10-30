@@ -19,7 +19,7 @@ func BuiltinCall(o ObjectType, thisArgument Value, argumentsList []Value) Value 
 
 // 10.3.2
 func BuiltinConstruct(b ObjectType, argumentsList []Value, newTarget ObjectType) ObjectType {
-	r := b.(*BuiltinFunction).BuiltinCallOrConstruct(&NullValue, argumentsList, newTarget)
+	r := b.(*BuiltinFunction).BuiltinCallOrConstruct(NullValue, argumentsList, newTarget)
 	return r.(*ObjectValue).Object
 }
 
