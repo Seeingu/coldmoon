@@ -1,8 +1,10 @@
 package coldmoon
 
+import ast "github.com/Seeingu/coldmoon/coldmoon/parser"
+
 type ScriptRecord struct {
 	Realm          *Realm
-	ECMAScriptCode interface{}
+	ECMAScriptCode *ast.Script
 	LoadedModules  interface{}
 	HostDefined    interface{}
 }
@@ -10,8 +12,12 @@ type ScriptRecord struct {
 // ParseScript
 // 16.1.5
 func ParseScript(sourceText string, realm *Realm, hostDefined interface{}) *ScriptRecord {
-	s := &ScriptRecord{}
-	s.Realm = realm
-	s.HostDefined = hostDefined
+	script := ast.NewParser(sourceText).Parse()
+
+	s := &ScriptRecord{
+		Realm:          realm,
+		HostDefined:    hostDefined,
+		ECMAScriptCode: script,
+	}
 	return s
 }

@@ -5,8 +5,8 @@ type ScriptOrModule int
 
 const (
 	ScriptOrModuleNull ScriptOrModule = iota
-	Script
-	Module
+	TScript
+	TModule
 )
 
 type ExecutionContext struct {

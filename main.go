@@ -9,7 +9,9 @@ func main() {
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	_ = ParseScript("", realm, nil)
+	sourceText := "\t{true; false\u2028;;;}\r\nnull\uFEFF"
+	script := ParseScript(sourceText, realm, nil)
+	fmt.Println("AST: ", script.ECMAScriptCode.String())
 
 	{
 		o := NewObject(agent, nil)
