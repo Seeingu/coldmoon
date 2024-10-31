@@ -1,4 +1,4 @@
-package parser
+package coldmoon
 
 type Parser struct {
 	SourceText string
@@ -56,12 +56,16 @@ func (p *Parser) statement() Statement {
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
 	case TSemicolon:
-		p.tokenizer.Peek()
+		p.tokenizer.Next()
 		return &StatementEmpty{}
 	case TEOF:
 		return nil
 	case TLeftBrace:
 		return p.blockStatement()
+	case TDebugger:
+		p.tokenizer.Next()
+		return &StatementDebugger{}
+
 	default:
 		return p.expressionStatement()
 	}

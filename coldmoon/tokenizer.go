@@ -1,4 +1,4 @@
-package parser
+package coldmoon
 
 import lo "github.com/samber/lo"
 
@@ -60,6 +60,7 @@ const (
 	TRegularExpression
 	TTrue
 	TFalse
+	TDebugger
 	TNull
 	TEOF
 )
@@ -159,7 +160,7 @@ func (t *Tokenizer) peek() Token {
 }
 
 func (t *Tokenizer) keyword() Token {
-	keywords := []string{"break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "export", "extends", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "return", "super", "switch", "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield"}
+	keywords := []string{"break", "case", "catch", "class", "const", "continue", "default", "delete", "do", "else", "export", "extends", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "return", "super", "switch", "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield"}
 	if t.matchString("true") {
 		return Token{Type: TTrue, Value: "true"}
 	}
@@ -168,6 +169,9 @@ func (t *Tokenizer) keyword() Token {
 	}
 	if t.matchString("null") {
 		return Token{Type: TNull, Value: "null"}
+	}
+	if t.matchString("debugger") {
+		return Token{Type: TDebugger, Value: "debugger"}
 	}
 	for _, keyword := range keywords {
 		if t.matchString(keyword) {
