@@ -35,11 +35,11 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 		ScriptOrModule: ScriptOrModuleNull,
 	}
 
-	a.executionContextStack = append(a.executionContextStack, calleeContext)
+	a.ExecutionContextStack.Push(calleeContext)
 
 	result := b.Behavior(thisArgument, argumentsList, newTarget)
 
-	a.executionContextStack = a.executionContextStack[:len(a.executionContextStack)-1]
+	a.ExecutionContextStack.Pop()
 	return result
 }
 

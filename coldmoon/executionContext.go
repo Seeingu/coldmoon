@@ -9,8 +9,14 @@ const (
 	TModule
 )
 
+type ExecutionContextAdditionalState struct {
+	LexicalEnvironment  EnvironmentRecord
+	VariableEnvironment EnvironmentRecord
+	PrivateEnvironment  *PrivateEnvironment
+}
 type ExecutionContext struct {
 	Realm          *Realm
 	ScriptOrModule ScriptOrModule
 	Function       *Object
+	ECMAScriptCode *ExecutionContextAdditionalState
 }

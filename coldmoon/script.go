@@ -25,10 +25,31 @@ func ParseScript(sourceText string, realm *Realm, hostDefined interface{}) *Scri
 // 16.1.6
 func (s *ScriptRecord) Evaluate() Value {
 	agent := s.Realm.Agent
+
+	globalEnv := agent.CurrentRealm().GlobalEnv
+	scriptContext := &ExecutionContext{
+		Function:       nil,
+		Realm:          s.Realm,
+		ScriptOrModule: TScript,
+		ECMAScriptCode: &ExecutionContextAdditionalState{
+			VariableEnvironment: globalEnv,
+			LexicalEnvironment:  globalEnv,
+			PrivateEnvironment:  nil,
+		},
+	}
+
+	agent.ExecutionContextStack.Push(scriptContext)
+
+	script := s.ECMAScriptCode
+
 	exe := NewExecutable()
 	vm := NewVM(agent)
-	s.ECMAScriptCode.Bytecode(exe)
+	script.Bytecode(exe)
 	fmt.Println("Executable: ", exe.String())
+	result := vm.Run(exe)
 
-	return vm.Run(exe)
+	agent.ExecutionContextStack.Pop()
+	Assert(!agent.ExecutionContextStack.IsEmpty())
+
+	return result
 }

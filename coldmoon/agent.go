@@ -1,9 +1,11 @@
 package coldmoon
 
+import "github.com/Seeingu/coldmoon/pkg"
+
 type Agent struct {
 	symbolId              uint64
 	exception             *Value
-	executionContextStack []*ExecutionContext
+	ExecutionContextStack pkg.Stack[*ExecutionContext]
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]Symbol{}
@@ -27,8 +29,8 @@ func NewAgent() *Agent {
 }
 
 func (a *Agent) runningExecutionContext() *ExecutionContext {
-	Assert(len(a.executionContextStack) > 0)
-	return a.executionContextStack[len(a.executionContextStack)-1]
+	Assert(a.ExecutionContextStack.Len() > 0)
+	return a.ExecutionContextStack.Peek()
 }
 
 func (a *Agent) CurrentRealm() *Realm {
@@ -37,12 +39,12 @@ func (a *Agent) CurrentRealm() *Realm {
 
 // 9.4.1
 func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
-	if len(a.executionContextStack) == 0 {
+	if a.ExecutionContextStack.IsEmpty() {
 		return ScriptOrModuleNull
 	}
 	var ec *ExecutionContext
-	for i := len(a.executionContextStack) - 1; i >= 0; i-- {
-		ec = a.executionContextStack[i]
+	for i := a.ExecutionContextStack.Len() - 1; i >= 0; i-- {
+		ec = a.ExecutionContextStack.Index(i)
 		if ec.ScriptOrModule != ScriptOrModuleNull {
 			return ec.ScriptOrModule
 		}
@@ -50,9 +52,26 @@ func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
 	return ScriptOrModuleNull
 }
 
+// 9.4.3
+func (a *Agent) GetThisEnvironment() EnvironmentRecord {
+	env := a.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+
+	for {
+		exists := env.HasThisBinding()
+		if exists {
+			return env
+		}
+		outer := env.OuterEnv()
+		Assert(outer != nil)
+
+		env = outer
+	}
+}
+
 // 9.4.4
 func (a *Agent) ResolveThisBinding() Value {
-	return NewValueFromObject(a.CurrentRealm().GlobalObject)
+	envRec := a.GetThisEnvironment()
+	return NewValueFromObject(envRec.GetThisBinding())
 }
 
 // MARK: - Well-known Symbols

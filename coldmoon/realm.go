@@ -1,14 +1,10 @@
 package coldmoon
 
-type (
-	Environment struct{}
-)
-
 type Realm struct {
 	AgentSignifier interface{}
 	Intrinsics     *Intrinsics
 	GlobalObject   *Object
-	GlobalEnv      Environment
+	GlobalEnv      *GlobalEnvironment
 	TemplateMap    interface{}
 	LoadedModules  interface{}
 	HostDefined    interface{}
@@ -39,7 +35,7 @@ func (r *Realm) CreateIntrinsics() {
 }
 
 // 9.3.3
-func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue Value) {
+func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue ObjectType) {
 	obj := globalObj
 	if obj == nil {
 		obj = OrdinaryObjectCreate(r.Agent, r.Intrinsics.ObjectPrototype, []string{})
@@ -47,11 +43,11 @@ func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue Value) {
 
 	this := thisValue
 	if this == nil {
-		this = NewValueFromObject(obj)
+		this = globalObj
 	}
 
 	r.GlobalObject = obj
-	r.GlobalEnv = Environment{}
+	r.GlobalEnv = NewGlobalEnvironment(globalObj, this)
 }
 
 // 9.3.4
@@ -93,7 +89,7 @@ func InitializeHostDefinedRealm(
 		ScriptOrModule: ScriptOrModuleNull,
 	}
 
-	agent.executionContextStack = append(agent.executionContextStack, newContext)
+	agent.ExecutionContextStack.Push(newContext)
 
 	global := globalObject
 
