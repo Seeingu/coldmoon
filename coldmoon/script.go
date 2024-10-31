@@ -1,5 +1,7 @@
 package coldmoon
 
+import "fmt"
+
 type ScriptRecord struct {
 	Realm          *Realm
 	ECMAScriptCode *Script
@@ -18,4 +20,15 @@ func ParseScript(sourceText string, realm *Realm, hostDefined interface{}) *Scri
 		ECMAScriptCode: script,
 	}
 	return s
+}
+
+// 16.1.6
+func (s *ScriptRecord) Evaluate() Value {
+	agent := s.Realm.Agent
+	exe := NewExecutable()
+	vm := NewVM(agent)
+	s.ECMAScriptCode.Bytecode(exe)
+	fmt.Println("Executable: ", exe.String())
+
+	return vm.Run(exe)
 }

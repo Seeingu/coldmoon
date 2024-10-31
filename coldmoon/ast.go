@@ -129,7 +129,7 @@ type StatementDebugger struct {
 }
 
 func (s *StatementDebugger) Bytecode(e *Executable) {
-	panic("TODO: StatementDebugger")
+	// TODO: implement
 }
 
 func (s *StatementDebugger) String() string {

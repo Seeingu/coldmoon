@@ -19,13 +19,13 @@ func (vm *VM) Run(executable *Executable) Value {
 	for ip < len(executable.Instructions) {
 		i := executable.Instructions[ip]
 		switch ins := i.(type) {
-		case ILoad:
+		case *ILoad:
 			vm.stack.Push(vm.result)
-		case ILoadConstant:
+		case *ILoadConstant:
 			vm.stack.Push(ins.Value)
-		case IStore:
+		case *IStore:
 			vm.result = vm.stack.Pop()
-		case IStoreConstant:
+		case *IStoreConstant:
 			vm.result = ins.Value
 		}
 		ip += 1
