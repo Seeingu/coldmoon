@@ -17,8 +17,11 @@ func main() {
 		o.InternalMethods().DefineOwnProperty(
 			o,
 			key,
-			&PropertyDescriptor{Value: &NumberValue{Data: 12}},
+			&PropertyDescriptor{
+				Value: &NumberValue{Data: 12}},
 		)
+		keys := o.InternalMethods().OwnPropertyKeys(o)
+		fmt.Println("Keys: ", keys)
 		o2 := NewObject(agent, o)
 		value := o2.InternalMethods().Get(o2, key, nil)
 		fmt.Println("Value: ", value.(*NumberValue).Data)

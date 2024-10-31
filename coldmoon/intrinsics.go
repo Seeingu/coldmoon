@@ -9,6 +9,8 @@ type Intrinsics struct {
 	BooleanPrototype *BooleanPrototype
 	// %Boolean%
 	BooleanConstructor ObjectType
+	// %ThrowTypeError%
+	ThrowTypeError ObjectType
 }
 
 func (i *Intrinsics) Get(key string) interface{} {

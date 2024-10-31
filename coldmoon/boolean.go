@@ -37,6 +37,10 @@ type BooleanObject struct {
 	Data bool
 }
 
+func (b *BooleanObject) getData() bool {
+	return b.Data
+}
+
 func NewBooleanObject(agent *Agent, b bool) *BooleanObject {
 	return &BooleanObject{
 		Object: &Object{
@@ -100,6 +104,9 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: false,
 	})
+
+	DefineBuiltinProperty(realm.Intrinsics.BooleanPrototype, "constructor", NewValueFromObject(object))
+
 	return object
 }
 
@@ -149,8 +156,8 @@ func thisBooleanValue(agent *Agent, value Value) bool {
 	case *BooleanValue:
 		return value.ToBoolean()
 	case *ObjectValue:
-		if _, ok := o.Object.(*BooleanConstructor); ok {
-			b := o.Object.(booleanType).getData()
+		if o, ok := o.Object.(booleanType); ok {
+			b := o.getData()
 			return b
 		}
 	}

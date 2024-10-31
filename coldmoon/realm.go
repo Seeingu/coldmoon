@@ -33,6 +33,9 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.FunctionPrototype = NewFunctionPrototype(r)
 	r.Intrinsics.BooleanPrototype = NewBooleanPrototype(r)
 	r.Intrinsics.BooleanConstructor = NewBooleanConstructor(r)
+	r.Intrinsics.ThrowTypeError = NewThrowTypeError(r)
+
+	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
 }
 
 // 9.3.3

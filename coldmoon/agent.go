@@ -95,9 +95,14 @@ func (a *Agent) CreateSymbol(desc string) Symbol {
 	return s
 }
 
+type ErrorObject struct {
+	ObjectType
+}
+
 // 5.2.3.2
-func (a *Agent) ThrowException(exceptionType ExceptionType, message string) {
+func (a *Agent) ThrowException(exceptionType ExceptionType, message string) ObjectType {
 	m := exceptionType.String() + " " + message
 	*a.exception = NewStringValue(m)
-	panic("Exception: " + m)
+	// TODO
+	return &ErrorObject{}
 }

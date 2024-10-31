@@ -7,6 +7,13 @@ const (
 	TagBoolean
 )
 
+type IntegrityLevel int
+
+const (
+	IntegrityLevelSealed IntegrityLevel = iota
+	IntegrityLevelFrozen
+)
+
 type Data struct {
 	prototype       ObjectType
 	extensible      bool
@@ -29,6 +36,7 @@ func NewObject(agent *Agent, prototype ObjectType) *Object {
 		data: &Data{
 			agent:           agent,
 			prototype:       prototype,
+			extensible:      true,
 			internalMethods: NewInternalMethods(),
 			propertyStorage: NewPropertyStorage(),
 		},
@@ -172,9 +180,6 @@ func ObjectHasOwnProperty(o ObjectType, key PropertyKey) bool {
 	return desc != nil
 }
 
-type constructArgs struct {
-}
-
 // 7.3.14
 func ObjectConstruct(
 	o ObjectType,
@@ -186,6 +191,76 @@ func ObjectConstruct(
 		newTarget = o
 	}
 	return o.InternalMethods().Construct(o, _argumentLists, newTarget)
+}
+
+// 7.3.15
+func SetIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
+	status := o.InternalMethods().PreventExtensions(o)
+
+	if !status {
+		return false
+	}
+
+	keys := o.InternalMethods().OwnPropertyKeys(o)
+	switch level {
+	case IntegrityLevelSealed:
+		for _, k := range keys {
+			o.DefinePropertyOrThrow(k, &PropertyDescriptor{
+				Configurable: false,
+			})
+		}
+	case IntegrityLevelFrozen:
+		for _, k := range keys {
+			currentDesc := o.InternalMethods().GetOwnProperty(o, k)
+			var desc *PropertyDescriptor
+
+			if currentDesc != nil {
+				if currentDesc.IsAccessorDescriptor() {
+					desc = &PropertyDescriptor{
+						Configurable: false,
+					}
+				} else {
+					desc = &PropertyDescriptor{
+						Configurable: false,
+						Writable:     false,
+					}
+				}
+
+				o.DefinePropertyOrThrow(k, desc)
+			}
+		}
+	}
+	return true
+}
+
+// 7.3.16
+func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
+	extensible := o.IsExtensible()
+	if extensible {
+		return false
+	}
+
+	keys := o.InternalMethods().OwnPropertyKeys(o)
+
+	for _, k := range keys {
+		currentDesc := o.InternalMethods().GetOwnProperty(o, k)
+		if currentDesc == nil {
+			continue
+		}
+
+		if !currentDesc.Configurable {
+			return false
+		}
+
+		if level == IntegrityLevelFrozen && currentDesc.IsDataDescriptor() {
+			if currentDesc.Writable {
+				return false
+			}
+		}
+
+	}
+
+	return true
 }
 
 // 7.3.24

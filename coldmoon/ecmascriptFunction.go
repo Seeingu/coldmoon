@@ -2,6 +2,26 @@ package coldmoon
 
 import "fmt"
 
+// 10.2.4
+func AddRestrictedFunctionProperties(F ObjectType, realm *Realm) {
+	// TODO: Assert
+	thrower := realm.Intrinsics.ThrowTypeError
+	F.DefinePropertyOrThrow(NewStringPropertyKey("caller"), &PropertyDescriptor{
+		Get:          thrower,
+		Set:          thrower,
+		Enumerable:   false,
+		Configurable: true,
+	})
+
+	F.DefinePropertyOrThrow(NewStringPropertyKey("arguments"), &PropertyDescriptor{
+		Get:          thrower,
+		Set:          thrower,
+		Enumerable:   false,
+		Configurable: true,
+	})
+
+}
+
 // 10.2.9
 func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 	Assert(function.IsExtensible())

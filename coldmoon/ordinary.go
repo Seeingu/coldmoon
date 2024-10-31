@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"fmt"
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
@@ -107,8 +108,119 @@ func OrdinaryDefineOwnProperty(object *Object, key PropertyKey, desc *PropertyDe
 	return ValidateAndApplyPropertyDescriptor(object, key, extensible, desc, current)
 }
 
-func ValidateAndApplyPropertyDescriptor(object *Object, key PropertyKey, extensible bool, desc, current *PropertyDescriptor) bool {
-	object.PropertyStorage().Set(key, desc)
+// 10.1.6.2
+func IsCompatiblePropertyDescriptor(extensible bool, desc, current *PropertyDescriptor) bool {
+	return ValidateAndApplyPropertyDescriptor(nil, NewStringPropertyKey(""), extensible, desc, current)
+}
+
+// 10.1.6.3
+func ValidateAndApplyPropertyDescriptor(
+	object ObjectType,
+	key PropertyKey,
+	extensible bool,
+	desc, current *PropertyDescriptor,
+) bool {
+	// TODO: Assert
+	if current == nil {
+		if !extensible {
+			return false
+		}
+
+		if object == nil {
+			return true
+		}
+
+		if desc.IsAccessorDescriptor() {
+			object.PropertyStorage().Set(key, &PropertyDescriptor{
+				Get:          desc.Get,
+				Set:          desc.Set,
+				Enumerable:   desc.Enumerable,
+				Configurable: desc.Configurable,
+			})
+		} else {
+			object.PropertyStorage().Set(key, &PropertyDescriptor{
+				Value:        desc.Value,
+				Writable:     desc.Writable,
+				Enumerable:   desc.Enumerable,
+				Configurable: desc.Configurable,
+			})
+		}
+
+		return true
+	}
+
+	Assert(current.IsFullyPopulated())
+
+	if !desc.HasFields() {
+		return true
+	}
+
+	if !current.Configurable {
+		if desc.Configurable {
+			return false
+		}
+
+		if desc.Enumerable != current.Enumerable {
+			return false
+		}
+
+		if current.IsAccessorDescriptor() {
+			if desc.Get != nil &&
+				current.Get != nil &&
+				!pkg.FuncEqual(desc.Get, current.Get) {
+				return false
+			}
+
+			if desc.Set != nil &&
+				current.Set != nil &&
+				!pkg.FuncEqual(desc.Set, current.Set) {
+				return false
+			}
+		} else if !current.Writable {
+			if desc.Writable {
+				return false
+			}
+
+			if !SameValue(desc.Value, current.Value) {
+				return false
+			}
+		}
+	}
+
+	if object != nil {
+		if current.IsDataDescriptor() && desc.IsAccessorDescriptor() {
+			// TODO: i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
+			//    else let configurable be current.[[Configurable]].
+			configurable := desc.Configurable
+			// TODO: ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
+			//     let enumerable be current.[[Enumerable]].
+			enumerable := desc.Enumerable
+
+			// TODO: iii. Replace the property named P of object O with a data property whose
+			//      [[Configurable]] and [[Enumerable]] attributes are set to configurable and
+			//      enumerable, respectively, and whose [[Value]] and [[Writable]] attributes are
+			//      set to the value of the corresponding field in Desc if Desc has that field, or
+			//      to the attribute's default value otherwise.
+			object.PropertyStorage().Set(key, &PropertyDescriptor{
+				Value:        desc.Value,
+				Writable:     desc.Writable,
+				Enumerable:   enumerable,
+				Configurable: configurable,
+			})
+		} else {
+			// TODO: i. For each field of Desc, set the corresponding attribute of the property named P
+			//    of object O to the value of the field.
+			object.PropertyStorage().Set(key, &PropertyDescriptor{
+				Value:        desc.Value,
+				Writable:     desc.Writable,
+				Get:          desc.Get,
+				Set:          desc.Set,
+				Enumerable:   desc.Enumerable,
+				Configurable: desc.Configurable,
+			})
+		}
+	}
+
 	return true
 }
 
@@ -156,6 +268,7 @@ func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) Value {
 
 	getter := desc.Get
 	if getter == nil {
+		fmt.Println("DEBUG: getter is nil")
 		return UndefinedValue
 	}
 
