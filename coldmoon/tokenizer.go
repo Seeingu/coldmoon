@@ -44,6 +44,7 @@ const (
 	TEqualsEquals
 	TNotEqualsEquals
 	TPlusEquals
+	TThis
 	TMinusEquals
 	TStarEquals
 	TPercentEquals
@@ -161,6 +162,9 @@ func (t *Tokenizer) peek() Token {
 
 func (t *Tokenizer) keyword() Token {
 	keywords := []string{"break", "case", "catch", "class", "const", "continue", "default", "delete", "do", "else", "export", "extends", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "return", "super", "switch", "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield"}
+	if t.matchString("this") {
+		return Token{Type: TThis, Value: "this"}
+	}
 	if t.matchString("true") {
 		return Token{Type: TTrue, Value: "true"}
 	}

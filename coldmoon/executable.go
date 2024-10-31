@@ -38,6 +38,14 @@ func (i *IStoreConstant) String() string {
 	return "IStoreConstant " + i.Value.String()
 }
 
+type IResolveThisBinding struct {
+	Instruction
+}
+
+func (i *IResolveThisBinding) String() string {
+	return "IResolveThisBinding"
+}
+
 type Executable struct {
 	Instructions []Instruction
 	Constants    []Value

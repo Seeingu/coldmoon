@@ -91,6 +91,14 @@ func (p *Parser) expression() Expression {
 }
 
 func (p *Parser) primaryExpression() *ExpressionPrimary {
+	t := p.tokenizer.CurrentToken
+	if t.Type == TThis {
+		p.tokenizer.Next()
+		return &ExpressionPrimary{
+			PrimaryExpression: &PrimaryExpressionThis{},
+		}
+	}
+
 	literal := p.literal()
 
 	return &ExpressionPrimary{

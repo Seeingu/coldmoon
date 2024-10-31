@@ -50,6 +50,11 @@ func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
 	return ScriptOrModuleNull
 }
 
+// 9.4.4
+func (a *Agent) ResolveThisBinding() Value {
+	return NewValueFromObject(a.CurrentRealm().GlobalObject)
+}
+
 // MARK: - Well-known Symbols
 
 type WellKnownSymbolsKey string

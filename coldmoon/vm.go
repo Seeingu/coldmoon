@@ -27,6 +27,8 @@ func (vm *VM) Run(executable *Executable) Value {
 			vm.result = vm.stack.Pop()
 		case *IStoreConstant:
 			vm.result = ins.Value
+		case *IResolveThisBinding:
+			vm.result = vm.agent.ResolveThisBinding()
 		}
 		ip += 1
 	}

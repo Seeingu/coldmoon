@@ -22,8 +22,24 @@ func (p *PrimaryExpressionLiteral) String() string {
 	return p.Literal.String()
 }
 
+type PrimaryExpressionThis struct {
+	PrimaryExpression
+}
+
+func (p *PrimaryExpressionThis) Bytecode(e *Executable) {
+	e.AddInstruction(&IResolveThisBinding{})
+}
+
+func (p *PrimaryExpressionThis) String() string {
+	return "this"
+}
+
+// MARK: - Literal
+
 type Literal interface {
 	node
+	// 13.2.3.1
+	// Bytecode
 }
 
 type LiteralNull struct {
@@ -78,6 +94,8 @@ func (l *LiteralString) String() string {
 	return "TODO: LiteralString"
 }
 
+// MARK: - Expression
+
 type Expression interface {
 	node
 }
@@ -95,6 +113,7 @@ func (e *ExpressionPrimary) String() string {
 	return e.PrimaryExpression.String()
 }
 
+// MARK: - Statement
 type Statement interface {
 	node
 }
@@ -174,6 +193,7 @@ type Block struct {
 	StatementList StatementList
 }
 
+// 14.2.2
 func (b *Block) Bytecode(e *Executable) {
 	b.StatementList.Bytecode(e)
 }
@@ -238,6 +258,7 @@ type ExpressionStatement struct {
 	Expression Expression
 }
 
+// 14.5.1
 func (e *ExpressionStatement) Bytecode(ex *Executable) {
 	e.Expression.Bytecode(ex)
 }
