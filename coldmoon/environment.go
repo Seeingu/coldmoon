@@ -15,3 +15,28 @@ type EnvironmentRecord interface {
 	WithBaseObject() ObjectType
 	GetThisBinding() ObjectType
 }
+
+// 9.1.2.1
+func GetIdentifierReference(env EnvironmentRecord, name string, strict bool) *ReferenceRecord {
+	if env == nil {
+		return NewReferenceRecord(
+			&ReferenceRecordBaseUnresolvable{},
+			&ReferencedNameString{String: name},
+			strict,
+			nil,
+		)
+	}
+
+	exists := env.HasBinding(name)
+	if exists {
+		return NewReferenceRecord(
+			&ReferenceRecordBaseEnvironment{Environment: env},
+			&ReferencedNameString{String: name},
+			strict,
+			nil,
+		)
+	} else {
+		outer := env.OuterEnv()
+		return GetIdentifierReference(outer, name, strict)
+	}
+}

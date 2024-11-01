@@ -27,6 +27,10 @@ func (vm *VM) Run(executable *Executable) Value {
 			vm.result = vm.stack.Pop()
 		case *IStoreConstant:
 			vm.result = ins.Value
+		case *IResolveBinding:
+			// TODO: maybe ins.Name can pass to ResolveBinding directly
+			reference := vm.agent.ResolveBinding(string(ins.Name), nil)
+			vm.result = reference.GetValue()
 		case *IResolveThisBinding:
 			vm.result = vm.agent.ResolveThisBinding()
 		}

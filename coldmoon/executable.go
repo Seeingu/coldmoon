@@ -46,6 +46,15 @@ func (i *IResolveThisBinding) String() string {
 	return "IResolveThisBinding"
 }
 
+type IResolveBinding struct {
+	Instruction
+	Name IdentifierName
+}
+
+func (i *IResolveBinding) String() string {
+	return "IResolveBinding " + string(i.Name)
+}
+
 type Executable struct {
 	Instructions []Instruction
 	Constants    []Value

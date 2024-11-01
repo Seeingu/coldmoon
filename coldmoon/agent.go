@@ -52,6 +52,15 @@ func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
 	return ScriptOrModuleNull
 }
 
+// 9.4.2
+func (a *Agent) ResolveBinding(name string, env EnvironmentRecord) *ReferenceRecord {
+	if env == nil {
+		env = a.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	}
+	strict := false
+	return GetIdentifierReference(env, name, strict)
+}
+
 // 9.4.3
 func (a *Agent) GetThisEnvironment() EnvironmentRecord {
 	env := a.runningExecutionContext().ECMAScriptCode.LexicalEnvironment

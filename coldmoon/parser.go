@@ -86,17 +86,34 @@ func (p *Parser) expressionStatement() *ExpressionStatement {
 	}
 }
 
+// MARK: - Expression
+
 func (p *Parser) expression() Expression {
 	return p.primaryExpression()
 }
 
-func (p *Parser) primaryExpression() *ExpressionPrimary {
+func (p *Parser) identifierReference() *IdentifierReference {
+	t := p.tokenizer.CurrentToken
+	if t.Type != TIdentifier {
+		panic("identifierReference: expected identifier")
+	}
+	name := t.Value
+	p.tokenizer.Next()
+	return &IdentifierReference{
+		Identifier: IdentifierName(name),
+	}
+}
+
+func (p *Parser) primaryExpression() PrimaryExpression {
 	t := p.tokenizer.CurrentToken
 	if t.Type == TThis {
 		p.tokenizer.Next()
 		return &ExpressionPrimary{
 			PrimaryExpression: &PrimaryExpressionThis{},
 		}
+	}
+	if t.Type == TIdentifier {
+		return p.identifierReference()
 	}
 
 	literal := p.literal()

@@ -5,8 +5,39 @@ type node interface {
 	Bytecode(e *Executable)
 }
 
+// MARK: - IdentifierReference
+
+type IdentifierReference struct {
+	node
+	Identifier IdentifierName
+}
+
+func (i *IdentifierReference) Bytecode(e *Executable) {
+	e.AddInstruction(&IResolveBinding{Name: i.Identifier})
+}
+
+func (i *IdentifierReference) String() string {
+	return string(i.Identifier)
+}
+
+type IdentifierName string
+
+// MARK: - PrimaryExpression
+
 type PrimaryExpression interface {
 	node
+}
+
+type PrimaryExpressionIdentifierReference struct {
+	PrimaryExpression
+	IdentifierReference *IdentifierReference
+}
+
+func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable) {
+	p.IdentifierReference.Bytecode(e)
+}
+func (p *PrimaryExpressionIdentifierReference) String() string {
+	return p.IdentifierReference.String()
 }
 
 type PrimaryExpressionLiteral struct {
@@ -17,7 +48,6 @@ type PrimaryExpressionLiteral struct {
 func (p *PrimaryExpressionLiteral) Bytecode(e *Executable) {
 	p.Literal.Bytecode(e)
 }
-
 func (p *PrimaryExpressionLiteral) String() string {
 	return p.Literal.String()
 }

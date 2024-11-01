@@ -153,36 +153,66 @@ func (t *Tokenizer) peek() Token {
 		return Token{Type: TEquals, Value: "="}
 	default:
 		if lo.Contains(lo.LettersCharset, ch) {
-			return t.keyword()
+			if token, ok := t.keyword(); ok {
+				return token
+			}
+		}
+		if lo.Contains(identifierStartCharset, ch) {
+			return t.identifier()
 		}
 	}
 	panic("unhandled token: " + string(ch))
 
 }
 
-func (t *Tokenizer) keyword() Token {
-	keywords := []string{"break", "case", "catch", "class", "const", "continue", "default", "delete", "do", "else", "export", "extends", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "return", "super", "switch", "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield"}
-	if t.matchString("this") {
-		return Token{Type: TThis, Value: "this"}
-	}
-	if t.matchString("true") {
-		return Token{Type: TTrue, Value: "true"}
-	}
-	if t.matchString("false") {
-		return Token{Type: TFalse, Value: "false"}
-	}
-	if t.matchString("null") {
-		return Token{Type: TNull, Value: "null"}
-	}
-	if t.matchString("debugger") {
-		return Token{Type: TDebugger, Value: "debugger"}
-	}
-	for _, keyword := range keywords {
-		if t.matchString(keyword) {
-			return Token{Type: TIdentifier, Value: keyword}
+var identifierStartCharset = append(lo.LettersCharset, []rune{'$', '_'}...)
+var identifierCharset = append(identifierStartCharset, lo.NumbersCharset...)
+
+func (t *Tokenizer) identifier() Token {
+	start := t.Index
+	for t.Index < t.Length {
+		ch := t.SourceText[t.Index]
+		if lo.Contains(identifierCharset, ch) {
+			t.Index++
+		} else {
+			break
 		}
 	}
-	panic("unhandled keyword")
+	return Token{Type: TIdentifier, Value: string(t.SourceText[start:t.Index])}
+}
+
+func (t *Tokenizer) keyword() (token Token, ok bool) {
+	ok = true
+	//keywords := []string{"break", "case", "catch", "class", "const", "continue", "default", "delete", "do", "else", "export", "extends", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "return", "super", "switch", "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield"}
+	if t.matchString("this") {
+		token = Token{Type: TThis, Value: "this"}
+		return
+	}
+	if t.matchString("true") {
+		token = Token{Type: TTrue, Value: "true"}
+		return
+	}
+	if t.matchString("false") {
+		token = Token{Type: TFalse, Value: "false"}
+		return
+	}
+	if t.matchString("null") {
+		token = Token{Type: TNull, Value: "null"}
+		return
+	}
+	if t.matchString("debugger") {
+		token = Token{Type: TDebugger, Value: "debugger"}
+		return
+	}
+	// TODO: keyword Type
+	//for _, keyword := range keywords {
+	//	if t.matchString(keyword) {
+	//		token = Token{Type: TIdentifier, Value: keyword}
+	//		return
+	//	}
+	//}
+	ok = false
+	return
 
 }
 func (t *Tokenizer) matchString(s string) bool {
