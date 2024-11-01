@@ -255,6 +255,7 @@ func (s *StatementIf) Bytecode(e *Executable) {
 		jump.Target = len(e.Instructions)
 	} else {
 		jumpIfTrue.TargetElse = len(e.Instructions)
+		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 	}
 }
 
@@ -274,6 +275,8 @@ func (s *StatementIf) String() string {
 type IterationStatement interface {
 	node
 }
+
+// MARK: - WhileStatement
 
 type StatementWhile struct {
 	IterationStatement
@@ -304,6 +307,38 @@ func (s *StatementWhile) Bytecode(e *Executable) {
 
 func (s *StatementWhile) String() string {
 	sb := "While"
+	sb += " " + s.Condition.String() + " \n"
+	sb += s.Body.String()
+	return sb
+}
+
+// MARK: - DoWhileStatement
+type StatementDoWhile struct {
+	IterationStatement
+	Condition Expression
+	Body      Statement
+}
+
+func (s *StatementDoWhile) Bytecode(e *Executable) {
+	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
+
+	bodyIndex := len(e.Instructions)
+
+	e.AddInstruction(&IStore{})
+	s.Body.Bytecode(e)
+	e.AddInstruction(&ILoad{})
+
+	s.Condition.Bytecode(e)
+
+	e.AddInstruction(&ILoad{})
+	jumpIfTrue := &IJumpIfTrue{Target: bodyIndex, TargetElse: 0}
+	jumpIfTrue.TargetElse = len(e.Instructions)
+
+	e.AddInstruction(&IStore{})
+}
+
+func (s *StatementDoWhile) String() string {
+	sb := "DoWhile"
 	sb += " " + s.Condition.String() + " \n"
 	sb += s.Body.String()
 	return sb

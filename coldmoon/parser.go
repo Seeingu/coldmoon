@@ -67,7 +67,7 @@ func (p *Parser) statement() Statement {
 		return &StatementDebugger{}
 	case TIf:
 		return p.ifStatement()
-	case TWhile:
+	case TWhile, TDo:
 		return p.breakableStatement()
 	case TRightBrace:
 		return nil
@@ -83,7 +83,26 @@ func (p *Parser) breakableStatement() *BreakableStatement {
 }
 
 func (p *Parser) iterationStatement() IterationStatement {
+	t := p.tokenizer.CurrentToken
+	if t.Type == TDo {
+		return p.doWhileStatement()
+	}
 	return p.whileStatement()
+}
+
+func (p *Parser) doWhileStatement() *StatementDoWhile {
+	p.tokenizer.MustMatch(TDo)
+	body := p.statement()
+	p.tokenizer.MustMatch(TWhile)
+	p.tokenizer.MustMatch(TLeftParen)
+	condition := p.expression()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TSemicolon)
+
+	return &StatementDoWhile{
+		Body:      body,
+		Condition: condition,
+	}
 }
 
 func (p *Parser) whileStatement() *StatementWhile {

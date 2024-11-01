@@ -67,6 +67,7 @@ const (
 	TElse
 	TWhile
 	TBreak
+	TDo
 	TReturn
 	TEOF
 )
@@ -195,6 +196,7 @@ var keywordsMap = map[string]TokenType{
 	"this":     TThis,
 	"break":    TBreak,
 	"while":    TWhile,
+	"do":       TDo,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {
