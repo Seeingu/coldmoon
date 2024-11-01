@@ -4,7 +4,7 @@ import "github.com/Seeingu/coldmoon/pkg"
 
 type Agent struct {
 	symbolId              uint64
-	exception             *Value
+	exception             Value
 	ExecutionContextStack pkg.Stack[*ExecutionContext]
 }
 
@@ -135,7 +135,7 @@ type ErrorObject struct {
 // 5.2.3.2
 func (a *Agent) ThrowException(exceptionType ExceptionType, message string) ObjectType {
 	m := exceptionType.String() + " " + message
-	*a.exception = NewStringValue(m)
+	a.exception = NewStringValue(m)
 	// TODO
 	return &ErrorObject{}
 }

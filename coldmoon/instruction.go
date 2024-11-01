@@ -75,3 +75,7 @@ type IJumpIfTrue struct {
 func (i *IJumpIfTrue) String() string {
 	return fmt.Sprintf("IJumpIfTrue %d %d", i.Target, i.TargetElse)
 }
+
+type IThrow struct {
+	Instruction
+}

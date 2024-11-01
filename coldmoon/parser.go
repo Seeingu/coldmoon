@@ -69,11 +69,26 @@ func (p *Parser) statement() Statement {
 		return p.ifStatement()
 	case TWhile, TDo:
 		return p.breakableStatement()
+	case TThrow:
+		return p.throwStatement()
 	case TRightBrace:
 		return nil
 	default:
 		return p.expressionStatement()
 	}
+}
+
+func (p *Parser) throwStatement() *StatementThrow {
+	p.tokenizer.MustMatch(TThrow)
+	p.noLineTerminatorHere()
+	expr := p.expression()
+	return &StatementThrow{
+		Expression: expr,
+	}
+}
+
+func (p *Parser) noLineTerminatorHere() {
+	// TODO
 }
 
 func (p *Parser) breakableStatement() *BreakableStatement {

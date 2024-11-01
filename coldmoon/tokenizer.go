@@ -69,6 +69,7 @@ const (
 	TBreak
 	TDo
 	TReturn
+	TThrow
 	TEOF
 )
 
@@ -197,6 +198,7 @@ var keywordsMap = map[string]TokenType{
 	"break":    TBreak,
 	"while":    TWhile,
 	"do":       TDo,
+	"throw":    TThrow,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {

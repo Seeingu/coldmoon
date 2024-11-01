@@ -225,6 +225,23 @@ func (b *BreakableStatement) String() string {
 	return b.IterationStatement.String()
 }
 
+// MARK: - ThrowStatement
+
+type StatementThrow struct {
+	Statement
+	Expression Expression
+}
+
+func (s *StatementThrow) Bytecode(e *Executable) {
+	s.Expression.Bytecode(e)
+	e.AddInstruction(&ILoad{})
+	e.AddInstruction(&IThrow{})
+}
+
+func (s *StatementThrow) String() string {
+	return "Throw " + s.Expression.String()
+}
+
 // MARK: - IfStatement
 
 type StatementIf struct {

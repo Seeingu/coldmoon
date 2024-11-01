@@ -42,6 +42,10 @@ func (vm *VM) Run(executable *Executable) Value {
 			} else {
 				vm.ip = ins.TargetElse
 			}
+		case *IThrow:
+			value := vm.stack.Pop()
+			vm.agent.exception = value
+			panic("Throw")
 		}
 		vm.ip += 1
 	}
