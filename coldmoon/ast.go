@@ -211,6 +211,20 @@ func (s *StatementExpression) String() string {
 	return "TODO: StatementExpression"
 }
 
+// MARK: - BreakableStatement
+
+type BreakableStatement struct {
+	IterationStatement IterationStatement
+}
+
+func (b *BreakableStatement) Bytecode(e *Executable) {
+	b.IterationStatement.Bytecode(e)
+}
+
+func (b *BreakableStatement) String() string {
+	return b.IterationStatement.String()
+}
+
 // MARK: - IfStatement
 
 type StatementIf struct {
@@ -252,6 +266,46 @@ func (s *StatementIf) String() string {
 		sb += "Else\n"
 		sb += s.Alternate.String()
 	}
+	return sb
+}
+
+// MARK: - IterationStatement
+
+type IterationStatement interface {
+	node
+}
+
+type StatementWhile struct {
+	IterationStatement
+	Condition Expression
+	Body      Statement
+}
+
+func (s *StatementWhile) Bytecode(e *Executable) {
+	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
+
+	condition := len(e.Instructions)
+	s.Condition.Bytecode(e)
+
+	e.AddInstruction(&ILoad{})
+	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
+	e.AddInstruction(jumpIfTrue)
+
+	jumpIfTrue.Target = len(e.Instructions)
+	e.AddInstruction(&IStore{})
+	s.Body.Bytecode(e)
+	e.AddInstruction(&ILoad{})
+
+	e.AddInstruction(&IJump{Target: condition})
+
+	jumpIfTrue.TargetElse = len(e.Instructions)
+	e.AddInstruction(&IStore{})
+}
+
+func (s *StatementWhile) String() string {
+	sb := "While"
+	sb += " " + s.Condition.String() + " \n"
+	sb += s.Body.String()
 	return sb
 }
 

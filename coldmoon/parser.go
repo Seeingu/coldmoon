@@ -67,10 +67,35 @@ func (p *Parser) statement() Statement {
 		return &StatementDebugger{}
 	case TIf:
 		return p.ifStatement()
+	case TWhile:
+		return p.breakableStatement()
 	case TRightBrace:
 		return nil
 	default:
 		return p.expressionStatement()
+	}
+}
+
+func (p *Parser) breakableStatement() *BreakableStatement {
+	return &BreakableStatement{
+		IterationStatement: p.iterationStatement(),
+	}
+}
+
+func (p *Parser) iterationStatement() IterationStatement {
+	return p.whileStatement()
+}
+
+func (p *Parser) whileStatement() *StatementWhile {
+	p.tokenizer.MustMatch(TWhile)
+	p.tokenizer.MustMatch(TLeftParen)
+	condition := p.expression()
+	p.tokenizer.MustMatch(TRightParen)
+	body := p.statement()
+
+	return &StatementWhile{
+		Condition: condition,
+		Body:      body,
 	}
 }
 
@@ -127,7 +152,7 @@ func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpres
 func (p *Parser) identifierReference() *IdentifierReference {
 	t := p.tokenizer.CurrentToken
 	if t.Type != TIdentifier {
-		panic("identifierReference: expected identifier")
+		panic("identifierReference: expected identifierOrKeyword")
 	}
 	name := t.Value
 	p.tokenizer.Next()

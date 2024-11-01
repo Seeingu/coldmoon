@@ -65,6 +65,9 @@ const (
 	TNull
 	TIf
 	TElse
+	TWhile
+	TBreak
+	TReturn
 	TEOF
 )
 
@@ -154,13 +157,8 @@ func (t *Tokenizer) peek() Token {
 		}
 		return Token{Type: TEquals, Value: "="}
 	default:
-		if lo.Contains(lo.LettersCharset, ch) {
-			if token, ok := t.keyword(); ok {
-				return token
-			}
-		}
 		if lo.Contains(identifierStartCharset, ch) {
-			return t.identifier()
+			return t.identifierOrKeyword()
 		}
 	}
 	panic("unhandled token: " + string(ch))
@@ -170,7 +168,7 @@ func (t *Tokenizer) peek() Token {
 var identifierStartCharset = append(lo.LettersCharset, []rune{'$', '_'}...)
 var identifierCharset = append(identifierStartCharset, lo.NumbersCharset...)
 
-func (t *Tokenizer) identifier() Token {
+func (t *Tokenizer) identifierOrKeyword() Token {
 	start := t.Index
 	for t.Index < t.Length {
 		ch := t.SourceText[t.Index]
@@ -180,20 +178,27 @@ func (t *Tokenizer) identifier() Token {
 			break
 		}
 	}
-	return Token{Type: TIdentifier, Value: string(t.SourceText[start:t.Index])}
+	value := string(t.SourceText[start:t.Index])
+	if lo.Contains(lo.Keys(keywordsMap), value) {
+		return Token{Type: keywordsMap[value], Value: value}
+	}
+	return Token{Type: TIdentifier, Value: value}
+}
+
+var keywordsMap = map[string]TokenType{
+	"if":       TIf,
+	"else":     TElse,
+	"true":     TTrue,
+	"false":    TFalse,
+	"null":     TNull,
+	"debugger": TDebugger,
+	"this":     TThis,
+	"break":    TBreak,
+	"while":    TWhile,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {
-	m := map[string]TokenType{
-		"if":       TIf,
-		"else":     TElse,
-		"true":     TTrue,
-		"false":    TFalse,
-		"null":     TNull,
-		"debugger": TDebugger,
-		"this":     TThis,
-	}
-	for keyword, tokenType := range m {
+	for keyword, tokenType := range keywordsMap {
 		if t.matchString(keyword) {
 			ok = true
 			token = Token{Type: tokenType, Value: keyword}
