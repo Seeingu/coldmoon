@@ -12,6 +12,49 @@ func (o *ObjectEnvironment) OuterEnv() EnvironmentRecord {
 	return o.outerEnv
 }
 
+// 9.1.1.2.1
+func (o *ObjectEnvironment) HasBinding(name string) bool {
+	bindingObject := o.BindingObject
+	foundBinding := bindingObject.HasProperty(NewStringPropertyKey(name))
+	if !foundBinding {
+		return false
+	}
+	if !o.IsWithEnvironment {
+		return true
+	}
+
+	symbol := WellKnownSymbols[WellKnownSymbolsUnscopables]
+	unscopables := bindingObject.Get(
+		NewSymbolPropertyKey(&symbol),
+	)
+
+	if obj, ok := unscopables.(*ObjectValue); ok {
+		blocked := obj.Object.Get(NewStringPropertyKey(name)).ToBoolean()
+		if blocked {
+			return false
+		}
+	}
+	return true
+}
+
+// 9.1.1.2.6
+func (o *ObjectEnvironment) GetBindingValue(name string, strict bool) Value {
+	bindingObject := o.BindingObject
+	value := bindingObject.HasProperty(NewStringPropertyKey(name))
+	if !value {
+		if !strict {
+			return UndefinedValue
+		}
+		panic("ReferenceError")
+	}
+	return bindingObject.Get(NewStringPropertyKey(name))
+}
+
+// 9.1.1.2.8
+func (o *ObjectEnvironment) HasThisBinding() bool {
+	return false
+}
+
 // 9.1.2.3
 func NewObjectEnvironment(obj ObjectType, isWithEnvironment bool, outerEnv EnvironmentRecord) *ObjectEnvironment {
 	return &ObjectEnvironment{
@@ -19,9 +62,4 @@ func NewObjectEnvironment(obj ObjectType, isWithEnvironment bool, outerEnv Envir
 		IsWithEnvironment: isWithEnvironment,
 		outerEnv:          outerEnv,
 	}
-}
-
-// 9.1.1.2.8
-func (o *ObjectEnvironment) HasThisBinding() bool {
-	return false
 }

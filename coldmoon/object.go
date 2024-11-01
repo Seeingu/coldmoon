@@ -170,7 +170,7 @@ func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
 }
 
 // 7.3.11
-func ObjectHasProperty(o ObjectType, key PropertyKey) bool {
+func (o *Object) HasProperty(key PropertyKey) bool {
 	return o.InternalMethods().HasProperty(o, key)
 }
 

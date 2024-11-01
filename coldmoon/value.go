@@ -84,9 +84,9 @@ func NewStringValue(value string) *StringValue {
 
 var NullValue = &nullValue{}
 
-var NaNValue = NumberValue{Data: math.NaN()}
+var NaNValue = &NumberValue{Data: math.NaN()}
 
-var InfinityValue = NumberValue{Data: math.Inf(1)}
+var InfinityValue = &NumberValue{Data: math.Inf(1)}
 var NegativeInfinityValue = NumberValue{Data: math.Inf(-1)}
 
 type ObjectValue struct {
@@ -139,7 +139,7 @@ func ToNumber(value Value, agent *Agent) *NumberValue {
 	case *NumberValue:
 		return value
 	case *undefinedValue:
-		return &InfinityValue
+		return InfinityValue
 	case *nullValue:
 		return &NumberValue{Data: 0}
 	case *BooleanValue:

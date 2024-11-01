@@ -25,15 +25,35 @@ func NewGlobalEnvironment(globalObj *Object, thisValue ObjectType) *GlobalEnviro
 	return globalEnv
 }
 
+// 9.1.1.4.1
+func (g *GlobalEnvironment) HasBinding(name string) bool {
+	DclRec := g.DeclarativeRecord
+	if DclRec.HasBinding(name) {
+		return true
+	}
+	ObjRec := g.ObjectRecord
+	return ObjRec.HasBinding(name)
+}
+
+// 9.1.1.4.6
+func (g *GlobalEnvironment) GetBindingValue(name string, strict bool) Value {
+	DclRec := g.DeclarativeRecord
+	if DclRec.HasBinding(name) {
+		return DclRec.GetBindingValue(name, strict)
+	}
+	ObjRec := g.ObjectRecord
+	return ObjRec.GetBindingValue(name, strict)
+}
+
 // 9.1.1.4.8
-func (o *GlobalEnvironment) HasThisBinding() bool {
+func (g *GlobalEnvironment) HasThisBinding() bool {
 	return true
 }
 
-func (o *GlobalEnvironment) GetThisBinding() ObjectType {
-	return o.GlobalThisValue
+func (g *GlobalEnvironment) GetThisBinding() ObjectType {
+	return g.GlobalThisValue
 }
 
-func (o *GlobalEnvironment) OuterEnv() EnvironmentRecord {
-	return o.outerEnv
+func (g *GlobalEnvironment) OuterEnv() EnvironmentRecord {
+	return g.outerEnv
 }

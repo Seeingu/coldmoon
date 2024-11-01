@@ -17,6 +17,15 @@ func (d *DeclarativeEnvironment) HasThisBinding() bool {
 	return false
 }
 
+// 9.1.1.1.6
+func (d *DeclarativeEnvironment) GetBindingValue(name string, strict bool) Value {
+	panic("implement me")
+}
+
 func (d *DeclarativeEnvironment) OuterEnv() EnvironmentRecord {
 	return d.outerEnv
+}
+
+func (d *DeclarativeEnvironment) HasBinding(name string) bool {
+	return false
 }

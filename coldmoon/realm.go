@@ -54,24 +54,11 @@ func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue ObjectType) {
 func (r *Realm) SetDefaultGlobalBindings() *Object {
 	global := r.GlobalObject
 
-	properties := []struct {
-		key   string
-		value Value
-	}{
-		{
-			"Boolean", NewValueFromObject(r.Intrinsics.BooleanConstructor),
-		},
-	}
+	properties := GlobalObjectProperties(r)
 	for _, p := range properties {
-		name := NewStringPropertyKey(p.key)
-		value := p.value
-		descriptor := &PropertyDescriptor{
-			Value:        value,
-			Writable:     true,
-			Enumerable:   false,
-			Configurable: true,
-		}
-		global.DefinePropertyOrThrow(name, descriptor)
+		name := NewStringPropertyKey(p.Name)
+		desc := p.PropertyDescriptor
+		global.DefinePropertyOrThrow(name, desc)
 	}
 
 	return global

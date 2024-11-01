@@ -5,6 +5,8 @@ type ObjectType interface {
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	ToObject() *Object
+	Get(key PropertyKey) Value
+	HasProperty(key PropertyKey) bool
 	Construct(
 		argumentLists []Value,
 		newTarget *Object,
