@@ -63,6 +63,8 @@ const (
 	TFalse
 	TDebugger
 	TNull
+	TIf
+	TElse
 	TEOF
 )
 
@@ -182,36 +184,22 @@ func (t *Tokenizer) identifier() Token {
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {
-	ok = true
-	//keywords := []string{"break", "case", "catch", "class", "const", "continue", "default", "delete", "do", "else", "export", "extends", "finally", "for", "function", "if", "import", "in", "instanceof", "new", "return", "super", "switch", "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield"}
-	if t.matchString("this") {
-		token = Token{Type: TThis, Value: "this"}
-		return
+	m := map[string]TokenType{
+		"if":       TIf,
+		"else":     TElse,
+		"true":     TTrue,
+		"false":    TFalse,
+		"null":     TNull,
+		"debugger": TDebugger,
+		"this":     TThis,
 	}
-	if t.matchString("true") {
-		token = Token{Type: TTrue, Value: "true"}
-		return
+	for keyword, tokenType := range m {
+		if t.matchString(keyword) {
+			ok = true
+			token = Token{Type: tokenType, Value: keyword}
+			return
+		}
 	}
-	if t.matchString("false") {
-		token = Token{Type: TFalse, Value: "false"}
-		return
-	}
-	if t.matchString("null") {
-		token = Token{Type: TNull, Value: "null"}
-		return
-	}
-	if t.matchString("debugger") {
-		token = Token{Type: TDebugger, Value: "debugger"}
-		return
-	}
-	// TODO: keyword Type
-	//for _, keyword := range keywords {
-	//	if t.matchString(keyword) {
-	//		token = Token{Type: TIdentifier, Value: keyword}
-	//		return
-	//	}
-	//}
-	ok = false
 	return
 
 }
@@ -234,10 +222,21 @@ func (t *Tokenizer) Peek() Token {
 	return t.CurrentToken
 }
 
+// TODO: remove
 func (t *Tokenizer) Next() Token {
 	t.skipWhiteSpace()
 	token := t.Peek()
 	return token
+}
+
+// MustMatch consumes the current token if it matches the given type.
+// Will throw an error if the current token does not match the given type.
+func (t *Tokenizer) MustMatch(tokenType TokenType) {
+	if t.CurrentToken.Type == tokenType {
+		t.Next()
+		return
+	}
+	panic("unexpected token: " + t.CurrentToken.Value)
 }
 
 // 12.3

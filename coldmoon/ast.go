@@ -59,9 +59,21 @@ type PrimaryExpressionThis struct {
 func (p *PrimaryExpressionThis) Bytecode(e *Executable) {
 	e.AddInstruction(&IResolveThisBinding{})
 }
-
 func (p *PrimaryExpressionThis) String() string {
 	return "this"
+}
+
+type PrimaryExpressionParenthesizedExpression struct {
+	PrimaryExpression
+	Expression Expression
+}
+
+func (p *PrimaryExpressionParenthesizedExpression) Bytecode(e *Executable) {
+	p.Expression.Bytecode(e)
+}
+
+func (p *PrimaryExpressionParenthesizedExpression) String() string {
+	return "(" + p.Expression.String() + ")"
 }
 
 // MARK: - Literal
@@ -124,7 +136,7 @@ func (l *LiteralString) String() string {
 	return "TODO: LiteralString"
 }
 
-// MARK: - Expression
+// MARK: - Condition
 
 type Expression interface {
 	node
@@ -168,10 +180,11 @@ type StatementEmpty struct {
 func (s *StatementEmpty) Bytecode(e *Executable) {
 	// empty
 }
-
 func (s *StatementEmpty) String() string {
 	return ""
 }
+
+// MARK: - DebuggerStatement
 
 type StatementDebugger struct {
 	Statement
@@ -180,11 +193,11 @@ type StatementDebugger struct {
 func (s *StatementDebugger) Bytecode(e *Executable) {
 	// TODO: implement
 }
-
 func (s *StatementDebugger) String() string {
 	return "debugger"
 }
 
+// MARK: - ExpressionStatement
 type StatementExpression struct {
 	Statement
 	Expression Expression
@@ -197,6 +210,52 @@ func (s *StatementExpression) Bytecode(e *Executable) {
 func (s *StatementExpression) String() string {
 	return "TODO: StatementExpression"
 }
+
+// MARK: - IfStatement
+
+type StatementIf struct {
+	Statement
+	Condition  Expression
+	Consequent Statement
+	Alternate  Statement
+}
+
+// 14.6.2
+func (s *StatementIf) Bytecode(e *Executable) {
+	s.Condition.Bytecode(e)
+
+	e.AddInstruction(&ILoad{})
+	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
+	e.AddInstruction(jumpIfTrue)
+
+	jumpIfTrue.Target = len(e.Instructions)
+	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
+	s.Consequent.Bytecode(e)
+
+	if s.Alternate != nil {
+		jump := &IJump{Target: 0}
+		e.AddInstruction(jump)
+
+		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
+		s.Alternate.Bytecode(e)
+		jump.Target = len(e.Instructions)
+	} else {
+		jumpIfTrue.TargetElse = len(e.Instructions)
+	}
+}
+
+func (s *StatementIf) String() string {
+	sb := "If"
+	sb += " " + s.Condition.String() + " \n"
+	sb += s.Consequent.String()
+	if s.Alternate != nil {
+		sb += "Else\n"
+		sb += s.Alternate.String()
+	}
+	return sb
+}
+
+// MARK: - Declaration
 
 type Declaration interface {
 	node

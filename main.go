@@ -9,7 +9,14 @@ func main() {
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
+	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
+	sourceText := `
+if (true) {
+	  true;
+} else {
+	false;
+}
+`
 	script := ParseScript(sourceText, realm, nil)
 	fmt.Println("AST: ", script.ECMAScriptCode.String())
 	result := script.Evaluate()

@@ -6,6 +6,7 @@ type VM struct {
 	agent  *Agent
 	stack  pkg.Stack[Value]
 	result Value
+	ip     int
 }
 
 func NewVM(agent *Agent) *VM {
@@ -15,9 +16,8 @@ func NewVM(agent *Agent) *VM {
 }
 
 func (vm *VM) Run(executable *Executable) Value {
-	ip := 0
-	for ip < len(executable.Instructions) {
-		i := executable.Instructions[ip]
+	for vm.ip < len(executable.Instructions) {
+		i := executable.Instructions[vm.ip]
 		switch ins := i.(type) {
 		case *ILoad:
 			vm.stack.Push(vm.result)
@@ -33,8 +33,17 @@ func (vm *VM) Run(executable *Executable) Value {
 			vm.result = reference.GetValue()
 		case *IResolveThisBinding:
 			vm.result = vm.agent.ResolveThisBinding()
+		case *IJump:
+			vm.ip = ins.Target
+		case *IJumpIfTrue:
+			value := vm.stack.Pop()
+			if value.ToBoolean() {
+				vm.ip = ins.Target
+			} else {
+				vm.ip = ins.TargetElse
+			}
 		}
-		ip += 1
+		vm.ip += 1
 	}
 	return vm.result
 }

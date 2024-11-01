@@ -46,7 +46,7 @@ func (p *Parser) statementListItem() StatementListItem {
 }
 
 func (p *Parser) automaticSemicolonInsertion() {
-	t := p.tokenizer.Peek()
+	t := p.tokenizer.CurrentToken
 	if t.Type == TSemicolon {
 		p.tokenizer.Next()
 	}
@@ -65,15 +65,38 @@ func (p *Parser) statement() Statement {
 	case TDebugger:
 		p.tokenizer.Next()
 		return &StatementDebugger{}
-
+	case TIf:
+		return p.ifStatement()
+	case TRightBrace:
+		return nil
 	default:
 		return p.expressionStatement()
 	}
 }
 
+func (p *Parser) ifStatement() *StatementIf {
+	p.tokenizer.MustMatch(TIf)
+	p.tokenizer.MustMatch(TLeftParen)
+	condition := p.expression()
+	p.tokenizer.MustMatch(TRightParen)
+	consequent := p.statement()
+
+	var alternate Statement
+	if p.tokenizer.Peek().Type == TElse {
+		p.tokenizer.Next()
+		alternate = p.statement()
+	}
+
+	return &StatementIf{
+		Condition:  condition,
+		Consequent: consequent,
+		Alternate:  alternate,
+	}
+}
+
 func (p *Parser) expressionStatement() *ExpressionStatement {
 	expr := p.expression()
-	t := p.tokenizer.Peek()
+	t := p.tokenizer.CurrentToken
 	if t.Type == TSemicolon {
 		p.tokenizer.Next()
 	}
@@ -86,10 +109,19 @@ func (p *Parser) expressionStatement() *ExpressionStatement {
 	}
 }
 
-// MARK: - Expression
+// MARK: - Condition
 
 func (p *Parser) expression() Expression {
 	return p.primaryExpression()
+}
+
+func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpression {
+	p.tokenizer.MustMatch(TLeftParen)
+	expr := p.expression()
+	p.tokenizer.MustMatch(TRightParen)
+	return &PrimaryExpressionParenthesizedExpression{
+		Expression: expr,
+	}
 }
 
 func (p *Parser) identifierReference() *IdentifierReference {
@@ -106,22 +138,24 @@ func (p *Parser) identifierReference() *IdentifierReference {
 
 func (p *Parser) primaryExpression() PrimaryExpression {
 	t := p.tokenizer.CurrentToken
-	if t.Type == TThis {
+	switch t.Type {
+	case TThis:
 		p.tokenizer.Next()
 		return &ExpressionPrimary{
 			PrimaryExpression: &PrimaryExpressionThis{},
 		}
-	}
-	if t.Type == TIdentifier {
+	case TIdentifier:
 		return p.identifierReference()
-	}
+	case TLeftParen:
+		return p.parenthesizedExpression()
+	default:
+		literal := p.literal()
 
-	literal := p.literal()
-
-	return &ExpressionPrimary{
-		PrimaryExpression: &PrimaryExpressionLiteral{
-			Literal: literal,
-		},
+		return &ExpressionPrimary{
+			PrimaryExpression: &PrimaryExpressionLiteral{
+				Literal: literal,
+			},
+		}
 	}
 }
 
@@ -147,19 +181,11 @@ func (p *Parser) blockStatement() *BlockStatementBlock {
 }
 
 func (p *Parser) block() *Block {
-	t := p.tokenizer.CurrentToken
-	if t.Type != TLeftBrace {
-		panic("block: expected {")
-	}
-	p.tokenizer.Next()
+	p.tokenizer.MustMatch(TLeftBrace)
 
 	list := p.statementList()
 
-	t = p.tokenizer.CurrentToken
-	if t.Type != TRightBrace {
-		panic("block: expected }")
-	}
-	p.tokenizer.Next()
+	p.tokenizer.MustMatch(TRightBrace)
 
 	return &Block{
 		StatementList: list,
