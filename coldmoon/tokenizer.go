@@ -159,6 +159,9 @@ func (t *Tokenizer) peek() Token {
 		}
 		return Token{Type: TEquals, Value: "="}
 	default:
+		if lo.Contains(lo.NumbersCharset, ch) {
+			return t.number()
+		}
 		if lo.Contains(identifierStartCharset, ch) {
 			return t.identifierOrKeyword()
 		}
@@ -167,6 +170,22 @@ func (t *Tokenizer) peek() Token {
 
 }
 
+// MARK: - Number
+func (t *Tokenizer) number() Token {
+	start := t.Index
+	for t.Index < t.Length {
+		ch := t.SourceText[t.Index]
+		if lo.Contains(lo.NumbersCharset, ch) {
+			t.Index++
+		} else {
+			break
+		}
+	}
+	value := string(t.SourceText[start:t.Index])
+	return Token{Type: TNumber, Value: value}
+}
+
+// MARK: - Identifier, Keyword
 var identifierStartCharset = append(lo.LettersCharset, []rune{'$', '_'}...)
 var identifierCharset = append(identifierStartCharset, lo.NumbersCharset...)
 

@@ -1,5 +1,7 @@
 package coldmoon
 
+import "strconv"
+
 type node interface {
 	String() string
 	Bytecode(e *Executable)
@@ -112,16 +114,55 @@ func (l *LiteralBoolean) String() string {
 	return "false"
 }
 
+// MARK: - LiteralNumeric
+
+type NumericSystem int
+
+const (
+	NumericSystemDecimal NumericSystem = iota
+	NumericSystemBinary
+	NumericSystemOctal
+	NumericSystemHex
+)
+
+type NumericProduction int
+
+const (
+	NumericProductionRegular NumericProduction = iota
+	NumericProductionLegacyOctal
+	NumericProductionNonOctalDecimalIntegerLiteral
+)
+
+type NumericType int
+
+const (
+	NumericTypeNumber NumericType = iota
+	NumericTypeBigInt
+)
+
 type LiteralNumeric struct {
 	Literal
+	Value string
+}
+
+func (l *LiteralNumeric) NumericValue() (Value, error) {
+	num, err := strconv.ParseFloat(l.Value, 64)
+	if err != nil {
+		return nil, err
+	}
+	return NewNumberValue(num), nil
 }
 
 func (l *LiteralNumeric) Bytecode(e *Executable) {
-	panic("TODO: LiteralNumeric")
+	v, err := l.NumericValue()
+	if err != nil {
+		panic(err)
+	}
+	e.AddInstruction(&IStoreConstant{Value: v})
 }
 
 func (l *LiteralNumeric) String() string {
-	return "TODO: LiteralNumeric"
+	return l.Value
 }
 
 type LiteralString struct {

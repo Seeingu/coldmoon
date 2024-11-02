@@ -4,18 +4,24 @@ import "math/big"
 
 type BigInt struct {
 	Value
-	Data big.Int
+	Data *big.Int
 }
 
 var _ Value = (*BigInt)(nil)
 
-func NewBigIntFromBoolean(b bool) BigInt {
+func NewBigIntValue(v *big.Int) *BigInt {
+	return &BigInt{
+		Data: v,
+	}
+}
+
+func NewBigIntFromBoolean(b bool) *BigInt {
 	var i int64
 	if b {
 		i = 1
 	}
-	return BigInt{
-		Data: *big.NewInt(i),
+	return &BigInt{
+		Data: big.NewInt(i),
 	}
 }
 
@@ -31,5 +37,5 @@ func (b *BigInt) ToBoolean() bool {
 }
 
 func (b *BigInt) Equal(other BigInt) bool {
-	return b.Data.Cmp(&other.Data) == 0
+	return b.Data.Cmp(other.Data) == 0
 }

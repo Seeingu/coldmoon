@@ -294,7 +294,7 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 
 	return fInt
 }
-func ToBigInt(value Value, agent *Agent) BigInt {
+func ToBigInt(value Value, agent *Agent) *BigInt {
 	prim := ToPrimitive(value, agent, PreferredTypeNumber)
 	switch p := prim.(type) {
 	case *undefinedValue, *nullValue, *NumberValue, *Symbol:
@@ -302,7 +302,7 @@ func ToBigInt(value Value, agent *Agent) BigInt {
 	case *BooleanValue:
 		return NewBigIntFromBoolean(p.Data)
 	case *BigInt:
-		return *p
+		return p
 	case *StringValue:
 		n := StringToBigInt(p)
 		return n
@@ -318,7 +318,7 @@ func ToBigInt64(value Value, agent *Agent) int64 {
 	twoPow64 := uint128.New(0, 1)
 	twoPow63 := uint128.New(1<<63, 0)
 
-	int64bit := uint128.FromBig(&n.Data).Mod(twoPow64)
+	int64bit := uint128.FromBig(n.Data).Mod(twoPow64)
 	if int64bit.Cmp(twoPow63) >= 0 {
 		return int64(int64bit.Sub(twoPow64).Lo)
 	} else {
@@ -331,7 +331,7 @@ func ToBigUint64(value Value, agent *Agent) uint64 {
 	n := ToBigInt(value, agent)
 
 	twoPow64 := uint128.New(0, 1)
-	int64bit := uint128.FromBig(&n.Data).Mod(twoPow64)
+	int64bit := uint128.FromBig(n.Data).Mod(twoPow64)
 	return int64bit.Lo
 }
 
@@ -355,9 +355,9 @@ func StringToNumber(value *StringValue) *NumberValue {
 }
 
 // 7.1.14
-func StringToBigInt(value *StringValue) BigInt {
-	return BigInt{
-		Data: *big.NewInt(0),
+func StringToBigInt(value *StringValue) *BigInt {
+	return &BigInt{
+		Data: big.NewInt(0),
 	}
 }
 
