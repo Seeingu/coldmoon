@@ -93,14 +93,44 @@ func (i *IThrow) String() string {
 }
 
 // MARK: - Call
+
 type IPrepareCall struct {
 	Instruction
 	IsReference bool
 }
 
+func (i *IPrepareCall) String() string {
+	return "IPrepareCall" + fmt.Sprintf(" %t", i.IsReference)
+}
+
 type ICall struct {
 	Instruction
 	ArgumentCount int
+}
+
+func (i *ICall) String() string {
+	return "ICall " + fmt.Sprintf("%d", i.ArgumentCount)
+}
+
+// MARK: - Property Access
+
+type IEvaluatePropertyAccessWithExpressionKey struct {
+	Instruction
+	Strict bool
+}
+
+func (i *IEvaluatePropertyAccessWithExpressionKey) String() string {
+	return "IEvaluatePropertyAccessWithExpressionKey " + fmt.Sprintf("%t", i.Strict)
+}
+
+type IEvaluatePropertyAccessWithIdentifierKey struct {
+	Instruction
+	Strict bool
+	Name   IdentifierName
+}
+
+func (i *IEvaluatePropertyAccessWithIdentifierKey) String() string {
+	return "IEvaluatePropertyAccessWithIdentifierKey " + fmt.Sprintf("%t %s", i.Strict, i.Name)
 }
 
 // MARK: - Instruction Constant

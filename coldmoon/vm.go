@@ -1,6 +1,9 @@
 package coldmoon
 
-import "github.com/Seeingu/coldmoon/pkg"
+import (
+	"github.com/Seeingu/coldmoon/pkg"
+	"strconv"
+)
 
 type evaluateCallContext struct {
 	reference *ReferenceRecord
@@ -93,6 +96,58 @@ func (vm *VM) Run(executable *Executable) Value {
 			value := vm.stack.Pop()
 			vm.agent.exception = value
 			panic("Throw")
+
+		case *IEvaluatePropertyAccessWithExpressionKey:
+			// 13.3.3
+			propertyNameValue := vm.stack.Pop()
+			strict := ins.Strict
+			baseValue := vm.stack.Pop()
+			propertyKey := ToPropertyKey(propertyNameValue, vm.agent)
+
+			var referencedName ReferencedName
+			switch p := propertyKey.(type) {
+			case StringPropertyKey:
+				referencedName = &ReferencedNameString{
+					String: p.Value,
+				}
+			case SymbolPropertyKey:
+				referencedName = &ReferencedNameSymbol{
+					Symbol: p.Value,
+				}
+			case IntegerIndexPropertyKey:
+				referencedName = &ReferencedNameString{
+					String: strconv.Itoa(p.Value),
+				}
+			}
+			reference := &ReferenceRecord{
+				Base: &ReferenceRecordBaseValue{
+					Value: baseValue,
+				},
+				ReferencedName: referencedName,
+				Strict:         strict,
+				ThisValue:      nil,
+			}
+			vm.result = reference.GetValue()
+			vm.lastReference = reference
+		case *IEvaluatePropertyAccessWithIdentifierKey:
+			// 13.3.4
+			propertyNameString := ins.Name
+			strict := ins.Strict
+			baseValue := vm.stack.Pop()
+
+			referencedName := &ReferencedNameString{
+				String: string(propertyNameString),
+			}
+			reference := &ReferenceRecord{
+				Base: &ReferenceRecordBaseValue{
+					Value: baseValue,
+				},
+				ReferencedName: referencedName,
+				Strict:         strict,
+				ThisValue:      nil,
+			}
+			vm.result = reference.GetValue()
+			vm.lastReference = reference
 		}
 		vm.ip += 1
 	}

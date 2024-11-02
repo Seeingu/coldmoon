@@ -106,6 +106,63 @@ func (p *PrimaryExpressionParenthesizedExpression) Analyze(a AnalyzeQuery) bool 
 	return p.Expression.Analyze(a)
 }
 
+// MARK: - MemberExpression
+type ASTProperty interface {
+	String() string
+}
+
+type ASTPropertyIdentifier struct {
+	ASTProperty
+	Identifier IdentifierName
+}
+
+func (a *ASTPropertyIdentifier) String() string {
+	return string(a.Identifier)
+}
+
+type ASTPropertyExpression struct {
+	ASTProperty
+	Expression Expression
+}
+
+func (a *ASTPropertyExpression) String() string {
+	return a.Expression.String()
+}
+
+type MemberExpression struct {
+	Expression
+	Member   Expression
+	Property ASTProperty
+}
+
+func (m *MemberExpression) Analyze(a AnalyzeQuery) bool {
+	return a == AnalyzeQueryIsReference
+}
+
+func (m *MemberExpression) Bytecode(e *Executable) {
+	m.Member.Bytecode(e)
+	e.AddInstruction(InsLoad)
+	strict := false
+
+	switch prop := m.Property.(type) {
+	case *ASTPropertyExpression:
+		prop.Expression.Bytecode(e)
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(&IEvaluatePropertyAccessWithExpressionKey{
+			Strict: strict,
+		})
+	case *ASTPropertyIdentifier:
+		e.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKey{
+			Strict: strict,
+			Name:   prop.Identifier,
+		})
+	}
+}
+
+func (m *MemberExpression) String() string {
+	return m.Member.String() + "." + m.Property.String()
+}
+
 // MARK: - Literal
 
 type Literal interface {

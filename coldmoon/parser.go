@@ -187,8 +187,39 @@ func (p *Parser) secondaryExpression(left PrimaryExpression) Expression {
 	switch t.Type {
 	case TLeftParen:
 		return p.callExpression(left)
+	case TLeftBracket, TPeriod:
+		return p.memberExpression(left)
 	default:
 		return nil
+	}
+}
+
+func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
+	token := p.tokenizer.CurrentToken
+	var property ASTProperty
+	if token.Type == TLeftBracket {
+		p.tokenizer.Next()
+		propertyExpression := p.expression()
+		p.tokenizer.MustMatch(TRightBracket)
+		property = &ASTPropertyExpression{
+			Expression: propertyExpression,
+		}
+	} else if token.Type == TPeriod {
+		p.tokenizer.Next()
+		identifier := p.tokenizer.Next()
+		if identifier.Type != TIdentifier {
+			panic("memberExpression: expected identifier")
+		}
+		property = &ASTPropertyIdentifier{
+			Identifier: IdentifierName(identifier.Value),
+		}
+	} else {
+		panic("memberExpression: unexpected token")
+	}
+
+	return &MemberExpression{
+		Member:   left,
+		Property: property,
 	}
 }
 

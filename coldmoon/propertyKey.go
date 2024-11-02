@@ -32,3 +32,12 @@ type SymbolPropertyKey struct {
 func (s SymbolPropertyKey) Hash() string {
 	return fmt.Sprintf("%d", s.Value.Id)
 }
+
+type IntegerIndexPropertyKey struct {
+	PropertyKey
+	Value int
+}
+
+func (i IntegerIndexPropertyKey) Hash() string {
+	return fmt.Sprintf("%d", i.Value)
+}
