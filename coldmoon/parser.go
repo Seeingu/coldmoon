@@ -228,6 +228,14 @@ func (p *Parser) literal() Literal {
 		}
 	case TNull:
 		return &LiteralNull{}
+	case TNumber:
+		return &LiteralNumeric{
+			Value: t.Value,
+		}
+	case TString:
+		return &LiteralString{
+			Value: t.Value,
+		}
 	default:
 		panic("literal: unhandled token")
 	}

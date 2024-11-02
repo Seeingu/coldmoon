@@ -158,6 +158,8 @@ func (t *Tokenizer) peek() Token {
 			return Token{Type: TEqualsEquals, Value: "=="}
 		}
 		return Token{Type: TEquals, Value: "="}
+	case '\'', '"':
+		return t.string()
 	default:
 		if lo.Contains(lo.NumbersCharset, ch) {
 			return t.number()
@@ -168,6 +170,23 @@ func (t *Tokenizer) peek() Token {
 	}
 	panic("unhandled token: " + string(ch))
 
+}
+
+// MARK: - String
+func (t *Tokenizer) string() Token {
+	start := t.Index
+	quote := t.SourceText[t.Index]
+	t.Index++
+	for t.Index < t.Length {
+		ch := t.SourceText[t.Index]
+		if ch == quote {
+			t.Index++
+			break
+		}
+		t.Index++
+	}
+	value := string(t.SourceText[start:t.Index])
+	return Token{Type: TString, Value: value}
 }
 
 // MARK: - Number

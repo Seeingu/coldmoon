@@ -167,14 +167,20 @@ func (l *LiteralNumeric) String() string {
 
 type LiteralString struct {
 	Literal
+	Value string
+}
+
+// 12.9.4.2
+func (l *LiteralString) StringValue() Value {
+	return NewStringValue(l.Value)
 }
 
 func (l *LiteralString) Bytecode(e *Executable) {
-	panic("TODO: LiteralString")
+	e.AddInstruction(&IStoreConstant{Value: l.StringValue()})
 }
 
 func (l *LiteralString) String() string {
-	return "TODO: LiteralString"
+	return l.Value
 }
 
 // MARK: - Condition
