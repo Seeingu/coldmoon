@@ -29,3 +29,8 @@ func (d *DeclarativeEnvironment) OuterEnv() EnvironmentRecord {
 func (d *DeclarativeEnvironment) HasBinding(name string) bool {
 	return false
 }
+
+// 9.1.1.1.10
+func (d *DeclarativeEnvironment) WithBaseObject() ObjectType {
+	return nil
+}

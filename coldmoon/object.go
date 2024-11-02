@@ -84,7 +84,7 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 
 	for _, name := range methodNames {
 		method := o.Get(NewStringPropertyKey(name))
-		if isCallable(method) {
+		if IsCallable(method) {
 			result := CallAssumeCallableNoArgs(method, NewValueFromObject(o))
 			if _, isObject := result.(*ObjectValue); !isObject {
 				return result

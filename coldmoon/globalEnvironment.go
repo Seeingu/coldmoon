@@ -50,6 +50,11 @@ func (g *GlobalEnvironment) HasThisBinding() bool {
 	return true
 }
 
+// 9.1.1.4.10
+func (g *GlobalEnvironment) WithBaseObject() ObjectType {
+	return nil
+}
+
 func (g *GlobalEnvironment) GetThisBinding() ObjectType {
 	return g.GlobalThisValue
 }

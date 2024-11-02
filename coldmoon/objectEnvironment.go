@@ -55,6 +55,14 @@ func (o *ObjectEnvironment) HasThisBinding() bool {
 	return false
 }
 
+// 9.1.1.2.10
+func (o *ObjectEnvironment) WithBaseObject() ObjectType {
+	if o.IsWithEnvironment {
+		return o.BindingObject
+	}
+	return nil
+}
+
 // 9.1.2.3
 func NewObjectEnvironment(obj ObjectType, isWithEnvironment bool, outerEnv EnvironmentRecord) *ObjectEnvironment {
 	return &ObjectEnvironment{

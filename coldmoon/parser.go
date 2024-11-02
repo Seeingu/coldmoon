@@ -171,7 +171,49 @@ func (p *Parser) expressionStatement() *ExpressionStatement {
 // MARK: - Condition
 
 func (p *Parser) expression() Expression {
-	return p.primaryExpression()
+	primary := p.primaryExpression()
+	var expr Expression = primary
+	for {
+		secondary := p.secondaryExpression(primary)
+		if secondary == nil {
+			return expr
+		}
+		expr = secondary
+	}
+}
+
+func (p *Parser) secondaryExpression(left PrimaryExpression) Expression {
+	t := p.tokenizer.CurrentToken
+	switch t.Type {
+	case TLeftParen:
+		return p.callExpression(left)
+	default:
+		return nil
+	}
+}
+
+func (p *Parser) callExpression(left PrimaryExpression) *CallExpression {
+	args := p.arguments()
+	return &CallExpression{
+		Callee:    left,
+		Arguments: args,
+	}
+}
+
+func (p *Parser) arguments() Arguments {
+	p.tokenizer.MustMatch(TLeftParen)
+	var list Arguments
+	for {
+		t := p.tokenizer.Peek()
+		if t.Type == TRightParen {
+			p.tokenizer.Next()
+			break
+		}
+		expr := p.expression()
+		list = append(list, expr)
+	}
+	p.tokenizer.MustMatch(TRightParen)
+	return list
 }
 
 func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpression {

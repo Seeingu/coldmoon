@@ -7,11 +7,21 @@ type node interface {
 	Bytecode(e *Executable)
 }
 
+type AnalyzeQuery int
+
+const (
+	AnalyzeQueryIsReference AnalyzeQuery = iota
+)
+
 // MARK: - IdentifierReference
 
 type IdentifierReference struct {
 	node
 	Identifier IdentifierName
+}
+
+func (i *IdentifierReference) Analyze(a AnalyzeQuery) bool {
+	return a == AnalyzeQueryIsReference
 }
 
 func (i *IdentifierReference) Bytecode(e *Executable) {
@@ -27,7 +37,7 @@ type IdentifierName string
 // MARK: - PrimaryExpression
 
 type PrimaryExpression interface {
-	node
+	Expression
 }
 
 type PrimaryExpressionIdentifierReference struct {
@@ -42,6 +52,13 @@ func (p *PrimaryExpressionIdentifierReference) String() string {
 	return p.IdentifierReference.String()
 }
 
+func (p *PrimaryExpressionIdentifierReference) Analyze(a AnalyzeQuery) bool {
+	if a == AnalyzeQueryIsReference {
+		return true
+	}
+	return false
+}
+
 type PrimaryExpressionLiteral struct {
 	PrimaryExpression
 	Literal Literal
@@ -54,6 +71,10 @@ func (p *PrimaryExpressionLiteral) String() string {
 	return p.Literal.String()
 }
 
+func (p *PrimaryExpressionLiteral) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
 type PrimaryExpressionThis struct {
 	PrimaryExpression
 }
@@ -63,6 +84,9 @@ func (p *PrimaryExpressionThis) Bytecode(e *Executable) {
 }
 func (p *PrimaryExpressionThis) String() string {
 	return "this"
+}
+func (p *PrimaryExpressionThis) Analyze(a AnalyzeQuery) bool {
+	return false
 }
 
 type PrimaryExpressionParenthesizedExpression struct {
@@ -76,6 +100,10 @@ func (p *PrimaryExpressionParenthesizedExpression) Bytecode(e *Executable) {
 
 func (p *PrimaryExpressionParenthesizedExpression) String() string {
 	return "(" + p.Expression.String() + ")"
+}
+
+func (p *PrimaryExpressionParenthesizedExpression) Analyze(a AnalyzeQuery) bool {
+	return p.Expression.Analyze(a)
 }
 
 // MARK: - Literal
@@ -165,6 +193,8 @@ func (l *LiteralNumeric) String() string {
 	return l.Value
 }
 
+// MARK: - LiteralString
+
 type LiteralString struct {
 	Literal
 	Value string
@@ -183,10 +213,11 @@ func (l *LiteralString) String() string {
 	return l.Value
 }
 
-// MARK: - Condition
+// MARK: - Expression
 
 type Expression interface {
 	node
+	Analyze(a AnalyzeQuery) bool
 }
 
 type ExpressionPrimary struct {
@@ -202,7 +233,49 @@ func (e *ExpressionPrimary) String() string {
 	return e.PrimaryExpression.String()
 }
 
+// MARK: - CallExpression
+
+type Arguments []Expression
+
+type CallExpression struct {
+	Expression
+	Callee    Expression
+	Arguments Arguments
+}
+
+func (c *CallExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (c *CallExpression) Bytecode(e *Executable) {
+	c.Callee.Bytecode(e)
+	e.AddInstruction(InsLoad)
+
+	isReference := c.Callee.Analyze(AnalyzeQueryIsReference)
+	e.AddInstruction(&IPrepareCall{IsReference: isReference})
+
+	for _, arg := range c.Arguments {
+		arg.Bytecode(e)
+		e.AddInstruction(InsLoad)
+	}
+
+	e.AddInstruction(&ICall{ArgumentCount: len(c.Arguments)})
+}
+
+func (c *CallExpression) String() string {
+	sb := c.Callee.String() + "("
+	for i, arg := range c.Arguments {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += arg.String()
+	}
+	sb += ")"
+	return sb
+}
+
 // MARK: - Statement
+
 type Statement interface {
 	node
 }
@@ -302,25 +375,24 @@ type StatementIf struct {
 func (s *StatementIf) Bytecode(e *Executable) {
 	s.Condition.Bytecode(e)
 
-	e.AddInstruction(&ILoad{})
+	e.AddInstruction(InsLoad)
 	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 	e.AddInstruction(jumpIfTrue)
 
 	jumpIfTrue.Target = len(e.Instructions)
 	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 	s.Consequent.Bytecode(e)
+	endJump := &IJump{Target: 0}
+	e.AddInstruction(endJump)
+
+	// else
+	jumpIfTrue.TargetElse = len(e.Instructions)
+	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 
 	if s.Alternate != nil {
-		jump := &IJump{Target: 0}
-		e.AddInstruction(jump)
-
-		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 		s.Alternate.Bytecode(e)
-		jump.Target = len(e.Instructions)
-	} else {
-		jumpIfTrue.TargetElse = len(e.Instructions)
-		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 	}
+	endJump.Target = len(e.Instructions)
 }
 
 func (s *StatementIf) String() string {

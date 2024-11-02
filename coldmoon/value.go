@@ -402,7 +402,7 @@ func isArray(value Value) bool {
 }
 
 // 7.2.3
-func isCallable(value Value) bool {
+func IsCallable(value Value) bool {
 	objectValue, isObject := value.(*ObjectValue)
 
 	if !isObject {
@@ -491,7 +491,7 @@ func GetMethod(value Value, agent *Agent, key PropertyKey) ObjectType {
 		return nil
 	}
 
-	if !isCallable(fun) {
+	if !IsCallable(fun) {
 		panic("TypeError")
 	}
 
@@ -500,7 +500,7 @@ func GetMethod(value Value, agent *Agent, key PropertyKey) ObjectType {
 
 // 7.3.14
 func ValueCall(self Value, value Value, argumentsList []Value) Value {
-	if !isCallable(value) {
+	if !IsCallable(value) {
 		panic("TypeError")
 	}
 

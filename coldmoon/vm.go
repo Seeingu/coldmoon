@@ -2,11 +2,15 @@ package coldmoon
 
 import "github.com/Seeingu/coldmoon/pkg"
 
+type evaluateCallContext struct {
+	reference *ReferenceRecord
+}
 type VM struct {
-	agent  *Agent
-	stack  pkg.Stack[Value]
-	result Value
-	ip     int
+	agent               *Agent
+	stack               pkg.Stack[Value]
+	result              Value
+	ip                  int
+	evaluateCallContext evaluateCallContext
 }
 
 func NewVM(agent *Agent) *VM {
@@ -31,6 +35,32 @@ func (vm *VM) Run(executable *Executable) Value {
 			// TODO: maybe ins.Name can pass to ResolveBinding directly
 			reference := vm.agent.ResolveBinding(string(ins.Name), nil)
 			vm.result = reference.GetValue()
+			vm.evaluateCallContext.reference = reference
+		case *ICall:
+			argumentCount := ins.ArgumentCount
+			arguments := make([]Value, argumentCount)
+			for i := argumentCount - 1; i >= 0; i-- {
+				arguments[i] = vm.stack.Pop()
+			}
+			this := vm.stack.Pop()
+			function := vm.stack.Pop()
+			vm.result = evaluateCall(
+				vm.agent,
+				function,
+				this,
+				arguments,
+			)
+		case *IPrepareCall:
+			isReference := ins.IsReference
+			var reference *ReferenceRecord
+			if isReference {
+				reference = vm.evaluateCallContext.reference
+			} else {
+				reference = nil
+			}
+			this := evaluateCallGetThisValue(reference)
+			vm.stack.Push(this)
+
 		case *IResolveThisBinding:
 			vm.result = vm.agent.ResolveThisBinding()
 		case *IJump:
@@ -50,4 +80,29 @@ func (vm *VM) Run(executable *Executable) Value {
 		vm.ip += 1
 	}
 	return vm.result
+}
+
+// 13.3.6.2
+func evaluateCall(agent *Agent, function Value, this Value, arguments []Value) Value {
+	if _, ok := function.(*ObjectValue); !ok {
+		panic("TypeError: function is not an object")
+	}
+	if !IsCallable(function) {
+		panic("TypeError: function is not callable")
+	}
+	return CallAssumeCallable(function, this, arguments)
+}
+
+func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
+	if reference == nil {
+		return nil
+	}
+	if reference.IsPropertyReference() {
+		return reference.GetThisValue()
+	}
+	refEnv := reference.Base.(*ReferenceRecordBaseEnvironment).Environment
+	if o := refEnv.WithBaseObject(); o != nil {
+		return NewValueFromObject(o)
+	}
+	return nil
 }

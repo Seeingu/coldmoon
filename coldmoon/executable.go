@@ -1,8 +1,11 @@
 package coldmoon
 
+import (
+	"fmt"
+)
+
 type Executable struct {
 	Instructions []Instruction
-	Constants    []Value
 }
 
 func NewExecutable() *Executable {
@@ -15,8 +18,8 @@ func (e *Executable) AddInstruction(i Instruction) {
 
 func (e *Executable) String() string {
 	sb := ""
-	for _, ins := range e.Instructions {
-		sb += ins.String() + "\n"
+	for i, ins := range e.Instructions {
+		sb += fmt.Sprintf("\t%d: %s\n", i, ins.String())
 	}
 	return sb
 }

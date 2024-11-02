@@ -6,6 +6,8 @@ type Instruction interface {
 	String() string
 }
 
+// MARK: - Load, Store
+
 type ILoad struct {
 	Instruction
 }
@@ -40,6 +42,8 @@ func (i *IStoreConstant) String() string {
 	return "IStoreConstant " + i.Value.String()
 }
 
+// MARK: - Resolve
+
 type IResolveThisBinding struct {
 	Instruction
 }
@@ -56,6 +60,8 @@ type IResolveBinding struct {
 func (i *IResolveBinding) String() string {
 	return "IResolveBinding " + string(i.Name)
 }
+
+// MARK: - Jump, JumpIfTrue
 
 type IJump struct {
 	Instruction
@@ -76,6 +82,28 @@ func (i *IJumpIfTrue) String() string {
 	return fmt.Sprintf("IJumpIfTrue %d %d", i.Target, i.TargetElse)
 }
 
+// MARK: - Throw
+
 type IThrow struct {
 	Instruction
 }
+
+func (i *IThrow) String() string {
+	return "IThrow"
+}
+
+// MARK: - Call
+type IPrepareCall struct {
+	Instruction
+	IsReference bool
+}
+
+type ICall struct {
+	Instruction
+	ArgumentCount int
+}
+
+// MARK: - Instruction Constant
+
+var InsLoad = &ILoad{}
+var InsThrow = &IThrow{}

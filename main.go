@@ -12,10 +12,8 @@ func main() {
 	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
 	sourceText := `
 if (true) {
-	  true;
-} else {
-	false;
-}
+	  123
+} 
 `
 	script := ParseScript(sourceText, realm, nil)
 	fmt.Println("AST: ", script.ECMAScriptCode.String())
