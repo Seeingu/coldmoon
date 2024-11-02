@@ -10,6 +10,7 @@ type VM struct {
 	stack               pkg.Stack[Value]
 	result              Value
 	ip                  int
+	lastReference       *ReferenceRecord
 	evaluateCallContext evaluateCallContext
 }
 
@@ -35,7 +36,7 @@ func (vm *VM) Run(executable *Executable) Value {
 			// TODO: maybe ins.Name can pass to ResolveBinding directly
 			reference := vm.agent.ResolveBinding(string(ins.Name), nil)
 			vm.result = reference.GetValue()
-			vm.evaluateCallContext.reference = reference
+			vm.lastReference = reference
 		case *ICall:
 			argumentCount := ins.ArgumentCount
 			arguments := make([]Value, argumentCount)
@@ -44,23 +45,39 @@ func (vm *VM) Run(executable *Executable) Value {
 			}
 			this := vm.stack.Pop()
 			function := vm.stack.Pop()
+
+			realm := vm.agent.CurrentRealm()
+			eval := realm.Intrinsics.Eval
+
+			if vm.evaluateCallContext.reference != nil {
+				ref := vm.evaluateCallContext.reference
+				refName, ok :=
+					ref.ReferencedName.(*ReferencedNameString)
+				if ref.IsPropertyReference() &&
+					ok &&
+					refName.String == "eval" &&
+					pkg.FuncEqual(function.(*ObjectValue).Object, eval) {
+					vm.result = directEval(vm.agent, arguments)
+					continue
+
+				}
+			}
+
 			vm.result = evaluateCall(
 				vm.agent,
 				function,
 				this,
 				arguments,
 			)
+
+			vm.evaluateCallContext.reference = nil
 		case *IPrepareCall:
 			isReference := ins.IsReference
-			var reference *ReferenceRecord
 			if isReference {
-				reference = vm.evaluateCallContext.reference
-			} else {
-				reference = nil
+				vm.evaluateCallContext.reference = vm.lastReference
 			}
-			this := evaluateCallGetThisValue(reference)
+			this := evaluateCallGetThisValue(vm.evaluateCallContext)
 			vm.stack.Push(this)
-
 		case *IResolveThisBinding:
 			vm.result = vm.agent.ResolveThisBinding()
 		case *IJump:
@@ -93,7 +110,8 @@ func evaluateCall(agent *Agent, function Value, this Value, arguments []Value) V
 	return CallAssumeCallable(function, this, arguments)
 }
 
-func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
+func evaluateCallGetThisValue(ctx evaluateCallContext) Value {
+	reference := ctx.reference
 	if reference == nil {
 		return nil
 	}
@@ -105,4 +123,13 @@ func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
 		return NewValueFromObject(o)
 	}
 	return nil
+}
+
+func directEval(agent *Agent, arguments []Value) Value {
+	if len(arguments) == 0 {
+		return nil
+	}
+	evalArg := arguments[0]
+	strictCaller := false
+	return PerformEval(agent, evalArg, strictCaller, true)
 }

@@ -16,9 +16,7 @@ if (true) {
 } 
 `
 	script := ParseScript(sourceText, realm, nil)
-	fmt.Println("AST: ", script.ECMAScriptCode.String())
-	result := script.Evaluate()
-	fmt.Println("Result: ", result.String())
+	_ = script.Evaluate()
 
 	{
 		o := NewObject(agent, nil)

@@ -53,7 +53,67 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			Name: "isFinite",
+			PropertyDescriptor: &PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.IsFinite),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
+		{
+			Name: "isNaN",
+			PropertyDescriptor: &PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.IsNaN),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
+		{
+			Name: "eval",
+			PropertyDescriptor: &PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.Eval),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
+}
 
+func NewIsFinite(realm *Realm) ObjectType {
+	var isFinite BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		number := ToNumber(args[0], realm.Agent)
+		return NewBooleanValue(number.IsFinite())
+	}
+
+	return CreateBuiltinFunction(realm.Agent, isFinite, 1, "isFinite", builtinFunctionArgs{
+		realm: realm,
+	})
+}
+
+func NewIsNaN(realm *Realm) ObjectType {
+	var isNaN BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		number := ToNumber(args[0], realm.Agent)
+		return NewBooleanValue(number.IsNaN())
+	}
+
+	return CreateBuiltinFunction(realm.Agent, isNaN, 1, "isNaN", builtinFunctionArgs{
+		realm: realm,
+	})
+}
+
+func NewEval(realm *Realm) ObjectType {
+	var eval BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		if len(args) == 0 {
+			return nil
+		}
+		return PerformEval(realm.Agent, args[0], false, false)
+	}
+	return CreateBuiltinFunction(realm.Agent, eval, 1, "eval", builtinFunctionArgs{
+		realm: realm,
+	})
 }

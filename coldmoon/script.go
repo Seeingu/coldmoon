@@ -19,6 +19,8 @@ func ParseScript(sourceText string, realm *Realm, hostDefined interface{}) *Scri
 		HostDefined:    hostDefined,
 		ECMAScriptCode: script,
 	}
+
+	fmt.Println("AST: ", s.ECMAScriptCode.String())
 	return s
 }
 
@@ -51,5 +53,6 @@ func (s *ScriptRecord) Evaluate() Value {
 	agent.ExecutionContextStack.Pop()
 	Assert(!agent.ExecutionContextStack.IsEmpty())
 
+	fmt.Println("Result: ", result.String())
 	return result
 }

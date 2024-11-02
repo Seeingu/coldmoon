@@ -9,6 +9,12 @@ type Intrinsics struct {
 	BooleanPrototype *BooleanPrototype
 	// %Boolean%
 	BooleanConstructor ObjectType
+	// %IsFinite%
+	IsFinite ObjectType
+	// %isNaN%
+	IsNaN ObjectType
+	// %eval%
+	Eval ObjectType
 	// %ThrowTypeError%
 	ThrowTypeError ObjectType
 }
