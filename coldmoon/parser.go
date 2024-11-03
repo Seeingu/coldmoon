@@ -170,6 +170,8 @@ func (p *Parser) expressionStatement() *ExpressionStatement {
 	}
 }
 
+// unaryExpression accept unary token
+// if token is not unary, return nil
 func (p *Parser) unaryExpression() Expression {
 	t := p.tokenizer.CurrentToken
 	var operator UnaryOperator
@@ -179,12 +181,14 @@ func (p *Parser) unaryExpression() Expression {
 		TTypeof: UnaryOperatorTypeof,
 		TPlus:   UnaryOperatorAddition,
 		TMinus:  UnaryOperatorSubtraction,
+		TNot:    UnaryOperatorLogicalNot,
+		TTilde:  UnaryOperatorBitwiseNot,
 	}
 	if op, ok := unaryMap[t.Type]; ok {
 		p.tokenizer.Next()
 		operator = op
 	} else {
-		panic("unimplemented")
+		return nil
 	}
 	expr := p.expression()
 	return &UnaryExpression{
@@ -195,9 +199,9 @@ func (p *Parser) unaryExpression() Expression {
 }
 
 func (p *Parser) expression() Expression {
-	t := p.tokenizer.CurrentToken
-	if t.Type == TVoid {
-		return p.unaryExpression()
+	unary := p.unaryExpression()
+	if unary != nil {
+		return unary
 	}
 
 	primary := p.primaryExpression()

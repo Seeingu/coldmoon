@@ -12,7 +12,7 @@ func main() {
 	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
 	sourceText := `
 if (true) {
-	  123
+	  !123
 } 
 `
 	script := ParseScript(sourceText, realm, nil)

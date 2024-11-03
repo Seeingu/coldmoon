@@ -76,6 +76,13 @@ func (n *NumberValue) UnaryMinus() *NumberValue {
 	}
 }
 
+// 6.1.6.1.2
+func (n *NumberValue) BitwiseNot() *NumberValue {
+	return &NumberValue{
+		Data: float64(^int64(n.Data)),
+	}
+}
+
 // 6.1.6.1.14
 func (n *NumberValue) SameValue(other NumberValue) bool {
 	if n.IsNaN() && other.IsNaN() {

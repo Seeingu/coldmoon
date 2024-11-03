@@ -46,3 +46,10 @@ func (b *BigIntValue) UnaryMinus() *BigIntValue {
 		Data: new(big.Int).Neg(b.Data),
 	}
 }
+
+// 6.1.6.2.2
+func (b *BigIntValue) BitwiseNot() *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Not(b.Data),
+	}
+}

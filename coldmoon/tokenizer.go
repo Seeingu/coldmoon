@@ -27,7 +27,6 @@ const (
 	TPlusPlus
 	TMinusMinus
 	TWave
-	TBang
 	TDelete
 	TStar
 	TPercent
@@ -187,6 +186,19 @@ func (t *Tokenizer) peek() Token {
 			return Token{Type: TEqualsEquals, Value: "=="}
 		}
 		return Token{Type: TEquals, Value: "="}
+	case '!':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+				t.Index++
+				return Token{Type: TStrictNotEquals, Value: "!=="}
+			}
+		}
+		return Token{Type: TNot, Value: "!"}
+	case '~':
+		t.Index++
+		return Token{Type: TTilde, Value: "~"}
 	case '\'', '"':
 		return t.string()
 	default:

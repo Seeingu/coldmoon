@@ -142,6 +142,21 @@ func (vm *VM) Run(executable *Executable) Value {
 				vm.result = v.UnaryMinus()
 			case *NumberValue:
 				vm.result = v.UnaryMinus()
+			default:
+				panic("unreachable")
+			}
+		case *ILogicalNot:
+			value := vm.stack.Pop()
+			vm.result = NewBooleanValue(!value.ToBoolean())
+		case *IBitwiseNot:
+			value := vm.stack.Pop()
+			switch v := value.(type) {
+			case *BigIntValue:
+				vm.result = v.BitwiseNot()
+			case *NumberValue:
+				vm.result = v.BitwiseNot()
+			default:
+				panic("unreachable")
 			}
 		case *IEvaluatePropertyAccessWithExpressionKey:
 			// 13.3.3

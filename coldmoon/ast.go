@@ -308,6 +308,8 @@ const (
 	UnaryOperatorTypeof
 	UnaryOperatorAddition
 	UnaryOperatorSubtraction
+	UnaryOperatorLogicalNot
+	UnaryOperatorBitwiseNot
 )
 
 type UnaryExpression struct {
@@ -354,6 +356,22 @@ func (u *UnaryExpression) Bytecode(e *Executable) {
 		e.AddInstruction(InsToNumeric)
 		e.AddInstruction(InsLoad)
 		e.AddInstruction(InsUnaryMinus)
+	case UnaryOperatorLogicalNot:
+		u.Operand.Bytecode(e)
+
+		if u.Operand.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(&ILogicalNot{})
+	case UnaryOperatorBitwiseNot:
+		u.Operand.Bytecode(e)
+
+		if u.Operand.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(&IBitwiseNot{})
 	}
 }
 

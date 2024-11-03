@@ -152,12 +152,42 @@ type IToNumber struct {
 	Instruction
 }
 
+func (i *IToNumber) String() string {
+	return "IToNumber"
+}
+
 type IToNumeric struct {
 	Instruction
 }
 
+func (i *IToNumeric) String() string {
+	return "IToNumeric"
+}
+
 type IUnaryMinus struct {
 	Instruction
+}
+
+func (i *IUnaryMinus) String() string {
+	return "IUnaryMinus"
+}
+
+// MARK: - Not
+
+type ILogicalNot struct {
+	Instruction
+}
+
+func (i *ILogicalNot) String() string {
+	return "ILogicalNot"
+}
+
+type IBitwiseNot struct {
+	Instruction
+}
+
+func (i *IBitwiseNot) String() string {
+	return "IBitwiseNot"
 }
 
 // MARK: - Instruction Constant
