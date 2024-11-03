@@ -13,7 +13,7 @@ func DefineBuiltinFunction(object ObjectType,
 		name,
 		builtinFunctionArgs{realm: realm},
 	)
-	object.ToObject().CreateNonEnumerableDataProperty(NewStringPropertyKey(name), NewValueFromObject(f))
+	DefineBuiltinProperty(object, name, NewValueFromObject(f))
 }
 
 func DefineBuiltinProperty(object ObjectType, name string, value interface{}) {

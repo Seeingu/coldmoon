@@ -267,3 +267,145 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 func (o *Object) GetFunctionRealm() *Realm {
 	return o.Agent().CurrentRealm()
 }
+
+// MARK: - Object Constructor
+
+// 20.1.1
+type ObjectConstructor struct {
+	*Object
+}
+
+func NewObjectConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		value := argumentsList[0]
+		if newTarget != nil && newTarget != agent.ActiveFunctionObject() {
+			return NewValueFromObject(OrdinaryCreateFromConstructor(
+				agent, newTarget, "%Object.prototype%", []string{},
+			))
+		}
+
+		if value == nil {
+			return NewValueFromObject(
+				OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{}),
+			)
+		}
+
+		return value
+	}
+
+	object := CreateBuiltinFunction(
+		agent,
+		behavior,
+		1, "Object",
+		builtinFunctionArgs{
+			realm:         realm,
+			prototype:     realm.Intrinsics.FunctionPrototype,
+			prefix:        "",
+			isConstructor: true,
+		},
+	)
+
+	// 20.1.2.6
+	var freeze BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj, ok := objectValue.(*ObjectValue)
+		if !ok {
+			return obj
+		}
+
+		status := SetIntegrityLevel(obj.Object, IntegrityLevelFrozen)
+		if !status {
+			realm.Agent.ThrowException(TypeError, "SetIntegrityLevel failed")
+		}
+		return obj
+	}
+	DefineBuiltinFunction(object, "freeze", freeze, 1, realm)
+
+	// 20.1.2.15
+	var ObjectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		arg1 := args[0]
+		arg2 := args[1]
+		return NewBooleanValue(SameValue(arg1, arg2))
+	}
+	DefineBuiltinFunction(object, "is", ObjectIs, 2, realm)
+
+	// 20.1.2.16
+	var isExtensible BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj, ok := objectValue.(*ObjectValue)
+		if !ok {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(obj.Object.IsExtensible())
+	}
+	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
+
+	// 20.1.2.17
+	var isFrozen BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj, ok := objectValue.(*ObjectValue)
+		if !ok {
+			return NewBooleanValue(true)
+		}
+		return NewBooleanValue(TestIntegrityLevel(obj.Object, IntegrityLevelFrozen))
+	}
+	DefineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm)
+
+	// 20.1.2.18
+	var isSealed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj, ok := objectValue.(*ObjectValue)
+		if !ok {
+			return NewBooleanValue(true)
+		}
+		return NewBooleanValue(TestIntegrityLevel(obj.Object, IntegrityLevelSealed))
+	}
+	DefineBuiltinFunction(object, "isSealed", isSealed, 1, realm)
+
+	// 20.1.2.20
+	var preventExtensions BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj, ok := objectValue.(*ObjectValue)
+		if !ok {
+			return obj
+		}
+
+		status := obj.Object.InternalMethods().PreventExtensions(obj.Object)
+		if !status {
+			realm.Agent.ThrowException(TypeError, "PreventExtensions failed")
+		}
+		return obj
+	}
+	DefineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm)
+
+	// 20.1.2.21
+	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+		Value:        NewValueFromObject(realm.Intrinsics.ObjectPrototype),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+
+	// 20.1.2.22
+	var seal BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj, ok := objectValue.(*ObjectValue)
+		if !ok {
+			return obj
+		}
+
+		status := SetIntegrityLevel(obj.Object, IntegrityLevelSealed)
+		if !status {
+			realm.Agent.ThrowException(TypeError, "SetIntegrityLevel failed")
+		}
+		return obj
+	}
+	DefineBuiltinFunction(object, "seal", seal, 1, realm)
+
+	// 20.1.3.1
+	DefineBuiltinProperty(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
+
+	return object
+
+}

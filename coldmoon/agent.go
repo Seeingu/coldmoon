@@ -37,6 +37,10 @@ func (a *Agent) CurrentRealm() *Realm {
 	return a.runningExecutionContext().Realm
 }
 
+func (a *Agent) ActiveFunctionObject() *Object {
+	return a.runningExecutionContext().Function
+}
+
 // 9.4.1
 func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
 	if a.ExecutionContextStack.IsEmpty() {

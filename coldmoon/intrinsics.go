@@ -3,6 +3,8 @@ package coldmoon
 type Intrinsics struct {
 	// %Object.Prototype%
 	ObjectPrototype *ObjectPrototype
+	// %Object%
+	ObjectConstructor ObjectType
 	// %Function.Prototype%
 	FunctionPrototype ObjectType
 	// %Boolean.Prototype%
