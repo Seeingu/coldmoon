@@ -1,17 +1,17 @@
 package coldmoon
 
-type Symbol struct {
+type SymbolValue struct {
 	Value
 	Id          uint64
 	Description string
 }
 
-var _ Value = (*Symbol)(nil)
+var _ Value = (*SymbolValue)(nil)
 
-func (s *Symbol) String() string {
+func (s *SymbolValue) String() string {
 	panic("TypeError")
 }
 
-func (s *Symbol) ToBoolean() bool {
+func (s *SymbolValue) ToBoolean() bool {
 	return true
 }

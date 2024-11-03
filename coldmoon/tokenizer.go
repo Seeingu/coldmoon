@@ -24,6 +24,11 @@ const (
 	TStrictNotEquals
 	TPlus
 	TMinus
+	TPlusPlus
+	TMinusMinus
+	TWave
+	TBang
+	TDelete
 	TStar
 	TPercent
 	TIncrement
@@ -70,6 +75,8 @@ const (
 	TDo
 	TReturn
 	TThrow
+	TVoid
+	TTypeof
 	TEOF
 )
 
@@ -237,6 +244,9 @@ var keywordsMap = map[string]TokenType{
 	"while":    TWhile,
 	"do":       TDo,
 	"throw":    TThrow,
+	"return":   TReturn,
+	"void":     TVoid,
+	"typeof":   TTypeof,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {

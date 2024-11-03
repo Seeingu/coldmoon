@@ -5,16 +5,16 @@ import (
 	"strconv"
 )
 
-type evaluateCallContext struct {
+type evaluateContext struct {
 	reference *ReferenceRecord
 }
 type VM struct {
-	agent               *Agent
-	stack               pkg.Stack[Value]
-	result              Value
-	ip                  int
-	lastReference       *ReferenceRecord
-	evaluateCallContext evaluateCallContext
+	agent                *Agent
+	stack                pkg.Stack[Value]
+	result               Value
+	ip                   int
+	reference            *ReferenceRecord
+	evaluateContextStack pkg.Stack[*evaluateContext]
 }
 
 func NewVM(agent *Agent) *VM {
@@ -31,15 +31,17 @@ func (vm *VM) Run(executable *Executable) Value {
 			vm.stack.Push(vm.result)
 		case *ILoadConstant:
 			vm.stack.Push(ins.Value)
+		case *ISetEvaluationContextReference:
+			vm.evaluateContextStack.Push(&evaluateContext{
+				reference: vm.reference,
+			})
 		case *IStore:
 			vm.result = vm.stack.Pop()
 		case *IStoreConstant:
 			vm.result = ins.Value
 		case *IResolveBinding:
 			// TODO: maybe ins.Name can pass to ResolveBinding directly
-			reference := vm.agent.ResolveBinding(string(ins.Name), nil)
-			vm.result = reference.GetValue()
-			vm.lastReference = reference
+			vm.reference = vm.agent.ResolveBinding(string(ins.Name), nil)
 		case *ICall:
 			argumentCount := ins.ArgumentCount
 			arguments := make([]Value, argumentCount)
@@ -52,8 +54,9 @@ func (vm *VM) Run(executable *Executable) Value {
 			realm := vm.agent.CurrentRealm()
 			eval := realm.Intrinsics.Eval
 
-			if vm.evaluateCallContext.reference != nil {
-				ref := vm.evaluateCallContext.reference
+			evaluateContext := vm.evaluateContextStack.Pop()
+			if evaluateContext.reference != nil {
+				ref := evaluateContext.reference
 				refName, ok :=
 					ref.ReferencedName.(*ReferencedNameString)
 				if ref.IsPropertyReference() &&
@@ -62,7 +65,6 @@ func (vm *VM) Run(executable *Executable) Value {
 					pkg.FuncEqual(function.(*ObjectValue).Object, eval) {
 					vm.result = directEval(vm.agent, arguments)
 					continue
-
 				}
 			}
 
@@ -72,14 +74,8 @@ func (vm *VM) Run(executable *Executable) Value {
 				this,
 				arguments,
 			)
-
-			vm.evaluateCallContext.reference = nil
-		case *IPrepareCall:
-			isReference := ins.IsReference
-			if isReference {
-				vm.evaluateCallContext.reference = vm.lastReference
-			}
-			this := evaluateCallGetThisValue(vm.evaluateCallContext)
+		case *ILoadThisValue:
+			this := evaluateCallGetThisValue(vm.evaluateContextStack.Peek())
 			vm.stack.Push(this)
 		case *IResolveThisBinding:
 			vm.result = vm.agent.ResolveThisBinding()
@@ -96,6 +92,42 @@ func (vm *VM) Run(executable *Executable) Value {
 			value := vm.stack.Pop()
 			vm.agent.exception = value
 			panic("Throw")
+		case *ITypeof:
+			if vm.reference != nil {
+				if vm.reference.IsUnresolvableReference() {
+					vm.result = NewStringValue("undefined")
+					continue
+				}
+			}
+			var value = vm.result
+			if vm.reference != nil {
+				value = vm.reference.GetValue()
+			}
+
+			switch v := value.(type) {
+			case *undefinedValue:
+				vm.result = NewStringValue("undefined")
+			case *nullValue:
+				vm.result = NewStringValue("object")
+			case *BooleanValue:
+				vm.result = NewStringValue("boolean")
+			case *NumberValue:
+				vm.result = NewStringValue("number")
+			case *StringValue:
+				vm.result = NewStringValue("string")
+			case *SymbolValue:
+				vm.result = NewStringValue("symbol")
+			case *BigIntValue:
+				vm.result = NewStringValue("bigint")
+			case *ObjectValue:
+				if v.Object.InternalMethods().Call != nil {
+					vm.result = NewStringValue("function")
+				} else {
+					vm.result = NewStringValue("object")
+				}
+			default:
+				panic("unreachable")
+			}
 
 		case *IEvaluatePropertyAccessWithExpressionKey:
 			// 13.3.3
@@ -119,7 +151,7 @@ func (vm *VM) Run(executable *Executable) Value {
 					String: strconv.Itoa(p.Value),
 				}
 			}
-			reference := &ReferenceRecord{
+			vm.reference = &ReferenceRecord{
 				Base: &ReferenceRecordBaseValue{
 					Value: baseValue,
 				},
@@ -127,8 +159,6 @@ func (vm *VM) Run(executable *Executable) Value {
 				Strict:         strict,
 				ThisValue:      nil,
 			}
-			vm.result = reference.GetValue()
-			vm.lastReference = reference
 		case *IEvaluatePropertyAccessWithIdentifierKey:
 			// 13.3.4
 			propertyNameString := ins.Name
@@ -138,7 +168,7 @@ func (vm *VM) Run(executable *Executable) Value {
 			referencedName := &ReferencedNameString{
 				String: string(propertyNameString),
 			}
-			reference := &ReferenceRecord{
+			vm.reference = &ReferenceRecord{
 				Base: &ReferenceRecordBaseValue{
 					Value: baseValue,
 				},
@@ -146,8 +176,11 @@ func (vm *VM) Run(executable *Executable) Value {
 				Strict:         strict,
 				ThisValue:      nil,
 			}
-			vm.result = reference.GetValue()
-			vm.lastReference = reference
+		case *IGetValue:
+			if vm.reference != nil {
+				vm.result = vm.reference.GetValue()
+			}
+			vm.reference = nil
 		}
 		vm.ip += 1
 	}
@@ -165,7 +198,7 @@ func evaluateCall(agent *Agent, function Value, this Value, arguments []Value) V
 	return CallAssumeCallable(function, this, arguments)
 }
 
-func evaluateCallGetThisValue(ctx evaluateCallContext) Value {
+func evaluateCallGetThisValue(ctx *evaluateContext) Value {
 	reference := ctx.reference
 	if reference == nil {
 		return nil

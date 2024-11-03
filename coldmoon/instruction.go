@@ -61,6 +61,10 @@ func (i *IResolveBinding) String() string {
 	return "IResolveBinding " + string(i.Name)
 }
 
+type ISetEvaluationContextReference struct {
+	Instruction
+}
+
 // MARK: - Jump, JumpIfTrue
 
 type IJump struct {
@@ -92,16 +96,25 @@ func (i *IThrow) String() string {
 	return "IThrow"
 }
 
-// MARK: - Call
-
-type IPrepareCall struct {
+type IGetValue struct {
 	Instruction
-	IsReference bool
 }
 
-func (i *IPrepareCall) String() string {
-	return "IPrepareCall" + fmt.Sprintf(" %t", i.IsReference)
+type ILoadThisValue struct {
+	Instruction
 }
+
+func (i *ILoadThisValue) String() string {
+	return "ILoadThisValue"
+}
+
+// MARK: - Typeof
+
+type ITypeof struct {
+	Instruction
+}
+
+// MARK: - Call
 
 type ICall struct {
 	Instruction
@@ -137,3 +150,6 @@ func (i *IEvaluatePropertyAccessWithIdentifierKey) String() string {
 
 var InsLoad = &ILoad{}
 var InsThrow = &IThrow{}
+var InsLoadThisValue = &ILoadThisValue{}
+var InsGetValue = &IGetValue{}
+var InsTypeof = &ITypeof{}

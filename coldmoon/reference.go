@@ -26,7 +26,7 @@ type ReferencedNameString struct {
 
 type ReferencedNameSymbol struct {
 	ReferencedName
-	Symbol *Symbol
+	Symbol *SymbolValue
 }
 
 type ReferencedNamePrivateName struct {

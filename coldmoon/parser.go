@@ -133,6 +133,8 @@ func (p *Parser) whileStatement() *StatementWhile {
 	}
 }
 
+// MARK: - Condition
+
 func (p *Parser) ifStatement() *StatementIf {
 	p.tokenizer.MustMatch(TIf)
 	p.tokenizer.MustMatch(TLeftParen)
@@ -168,9 +170,34 @@ func (p *Parser) expressionStatement() *ExpressionStatement {
 	}
 }
 
-// MARK: - Condition
+func (p *Parser) unaryExpression() Expression {
+	t := p.tokenizer.CurrentToken
+	var operator UnaryOperator
+	unaryMap := map[TokenType]UnaryOperator{
+		TDelete: UnaryOperatorDelete,
+		TVoid:   UnaryOperatorVoid,
+		TTypeof: UnaryOperatorTypeof,
+	}
+	if op, ok := unaryMap[t.Type]; ok {
+		p.tokenizer.Next()
+		operator = op
+	} else {
+		panic("unimplemented")
+	}
+	expr := p.expression()
+	return &UnaryExpression{
+		Operator: operator,
+		Operand:  expr,
+	}
+
+}
 
 func (p *Parser) expression() Expression {
+	t := p.tokenizer.CurrentToken
+	if t.Type == TVoid {
+		return p.unaryExpression()
+	}
+
 	primary := p.primaryExpression()
 	var expr Expression = primary
 	for {

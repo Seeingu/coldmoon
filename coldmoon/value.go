@@ -165,7 +165,7 @@ func ToNumber(value Value, agent *Agent) *NumberValue {
 // 7.1.3
 func ToNumeric(value Value, agent *Agent) Value {
 	primValue := ToPrimitive(value, agent, PreferredTypeNumber)
-	if bigInt, ok := primValue.(*BigInt); ok {
+	if bigInt, ok := primValue.(*BigIntValue); ok {
 		return bigInt
 	}
 	return ToNumber(primValue, agent)
@@ -294,14 +294,14 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 
 	return fInt
 }
-func ToBigInt(value Value, agent *Agent) *BigInt {
+func ToBigInt(value Value, agent *Agent) *BigIntValue {
 	prim := ToPrimitive(value, agent, PreferredTypeNumber)
 	switch p := prim.(type) {
-	case *undefinedValue, *nullValue, *NumberValue, *Symbol:
+	case *undefinedValue, *nullValue, *NumberValue, *SymbolValue:
 		panic("TypeError")
 	case *BooleanValue:
 		return NewBigIntFromBoolean(p.Data)
-	case *BigInt:
+	case *BigIntValue:
 		return p
 	case *StringValue:
 		n := StringToBigInt(p)
@@ -355,8 +355,8 @@ func StringToNumber(value *StringValue) *NumberValue {
 }
 
 // 7.1.14
-func StringToBigInt(value *StringValue) *BigInt {
-	return &BigInt{
+func StringToBigInt(value *StringValue) *BigIntValue {
+	return &BigIntValue{
 		Data: big.NewInt(0),
 	}
 }
@@ -364,7 +364,7 @@ func StringToBigInt(value *StringValue) *BigInt {
 // 7.1.19
 func ToPropertyKey(value Value, agent *Agent) PropertyKey {
 	key := ToPrimitive(value, agent, PreferredTypeString)
-	if symbolKey, ok := key.(*Symbol); ok {
+	if symbolKey, ok := key.(*SymbolValue); ok {
 		return NewSymbolPropertyKey(symbolKey)
 	}
 
@@ -463,14 +463,14 @@ func SameValueNonNumber(x Value, y Value) bool {
 	switch x.(type) {
 	case *undefinedValue, *nullValue:
 		return true
-	case *BigInt:
-		return x.(*BigInt).Equal(*y.(*BigInt))
+	case *BigIntValue:
+		return x.(*BigIntValue).Equal(*y.(*BigIntValue))
 	case *StringValue:
 		return x.(*StringValue).Data == y.(*StringValue).Data
 	case *BooleanValue:
 		return x.(*BooleanValue).Data == y.(*BooleanValue).Data
-	case *Symbol:
-		return x.(*Symbol).Id == y.(*Symbol).Id
+	case *SymbolValue:
+		return x.(*SymbolValue).Id == y.(*SymbolValue).Id
 	case *ObjectValue:
 		return x.(*ObjectValue).Object == y.(*ObjectValue).Object
 	default:
@@ -532,9 +532,9 @@ func ValueType(value Value) string {
 		return "string"
 	case *NumberValue:
 		return "number"
-	case *BigInt:
+	case *BigIntValue:
 		return "bigint"
-	case *Symbol:
+	case *SymbolValue:
 		return "symbol"
 	case *ObjectValue:
 		return "object"

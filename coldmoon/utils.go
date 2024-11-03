@@ -17,12 +17,19 @@ func DefineBuiltinFunction(object ObjectType,
 }
 
 func DefineBuiltinProperty(object ObjectType, name string, value interface{}) {
+	var descriptor *PropertyDescriptor
 	switch v := value.(type) {
 	case Value:
-		object.ToObject().CreateNonEnumerableDataProperty(NewStringPropertyKey(name), v)
+		descriptor = &PropertyDescriptor{
+			Value:        v,
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: true,
+		}
 	case *PropertyDescriptor:
-		object.DefinePropertyOrThrow(NewStringPropertyKey(name), v)
+		descriptor = v
 	default:
 		panic("invalid value")
 	}
+	object.DefinePropertyOrThrow(NewStringPropertyKey(name), descriptor)
 }

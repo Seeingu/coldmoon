@@ -107,6 +107,7 @@ func (p *PrimaryExpressionParenthesizedExpression) Analyze(a AnalyzeQuery) bool 
 }
 
 // MARK: - MemberExpression
+
 type ASTProperty interface {
 	String() string
 }
@@ -141,6 +142,9 @@ func (m *MemberExpression) Analyze(a AnalyzeQuery) bool {
 
 func (m *MemberExpression) Bytecode(e *Executable) {
 	m.Member.Bytecode(e)
+	if m.Member.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
 	e.AddInstruction(InsLoad)
 	strict := false
 
@@ -290,6 +294,53 @@ func (e *ExpressionPrimary) String() string {
 	return e.PrimaryExpression.String()
 }
 
+func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
+	return e.PrimaryExpression.Analyze(a)
+}
+
+// MARK: - UnaryExpression
+
+type UnaryOperator int
+
+const (
+	UnaryOperatorDelete UnaryOperator = iota
+	UnaryOperatorVoid
+	UnaryOperatorTypeof
+)
+
+type UnaryExpression struct {
+	Expression
+	Operator UnaryOperator
+	Operand  Expression
+}
+
+func (u *UnaryExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (u *UnaryExpression) Bytecode(e *Executable) {
+	u.Operand.Bytecode(e)
+	switch u.Operator {
+	case UnaryOperatorDelete:
+		panic("unimplemented")
+	case UnaryOperatorVoid:
+		u.Operand.Bytecode(e)
+		if u.Operand.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		e.AddInstruction(&IStoreConstant{
+			Value: UndefinedValue,
+		})
+	case UnaryOperatorTypeof:
+		u.Operand.Bytecode(e)
+		e.AddInstruction(InsTypeof)
+	}
+}
+
+func (u *UnaryExpression) String() string {
+	return "UnaryExpression " + u.Operand.String()
+}
+
 // MARK: - CallExpression
 
 type Arguments []Expression
@@ -306,13 +357,19 @@ func (c *CallExpression) Analyze(a AnalyzeQuery) bool {
 
 func (c *CallExpression) Bytecode(e *Executable) {
 	c.Callee.Bytecode(e)
-	e.AddInstruction(InsLoad)
 
+	e.AddInstruction(&ISetEvaluationContextReference{})
 	isReference := c.Callee.Analyze(AnalyzeQueryIsReference)
-	e.AddInstruction(&IPrepareCall{IsReference: isReference})
+	if isReference {
+		e.AddInstruction(InsGetValue)
+	}
 
+	e.AddInstruction(InsLoadThisValue)
 	for _, arg := range c.Arguments {
 		arg.Bytecode(e)
+		if arg.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
 		e.AddInstruction(InsLoad)
 	}
 
@@ -375,6 +432,7 @@ func (s *StatementDebugger) String() string {
 }
 
 // MARK: - ExpressionStatement
+
 type StatementExpression struct {
 	Statement
 	Expression Expression
@@ -382,10 +440,13 @@ type StatementExpression struct {
 
 func (s *StatementExpression) Bytecode(e *Executable) {
 	s.Expression.Bytecode(e)
+	if s.Expression.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
 }
 
 func (s *StatementExpression) String() string {
-	return "TODO: StatementExpression"
+	return "ExpressionStatement " + s.Expression.String()
 }
 
 // MARK: - BreakableStatement
@@ -411,6 +472,9 @@ type StatementThrow struct {
 
 func (s *StatementThrow) Bytecode(e *Executable) {
 	s.Expression.Bytecode(e)
+	if s.Expression.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
 	e.AddInstruction(&ILoad{})
 	e.AddInstruction(&IThrow{})
 }
@@ -432,6 +496,9 @@ type StatementIf struct {
 func (s *StatementIf) Bytecode(e *Executable) {
 	s.Condition.Bytecode(e)
 
+	if s.Condition.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
 	e.AddInstruction(InsLoad)
 	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 	e.AddInstruction(jumpIfTrue)
@@ -482,6 +549,9 @@ func (s *StatementWhile) Bytecode(e *Executable) {
 
 	condition := len(e.Instructions)
 	s.Condition.Bytecode(e)
+	if s.Condition.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
 
 	e.AddInstruction(&ILoad{})
 	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
@@ -522,6 +592,9 @@ func (s *StatementDoWhile) Bytecode(e *Executable) {
 	e.AddInstruction(&ILoad{})
 
 	s.Condition.Bytecode(e)
+	if s.Condition.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
 
 	e.AddInstruction(&ILoad{})
 	jumpIfTrue := &IJumpIfTrue{Target: bodyIndex, TargetElse: 0}
