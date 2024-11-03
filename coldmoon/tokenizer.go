@@ -147,6 +147,28 @@ func (t *Tokenizer) peek() Token {
 			return Token{Type: TLessThanEquals, Value: "<="}
 		}
 		return Token{Type: TLessThan, Value: "<"}
+	case '+':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '+' {
+			t.Index++
+			return Token{Type: TPlusPlus, Value: "++"}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			return Token{Type: TPlusEquals, Value: "+="}
+		}
+		return Token{Type: TPlus, Value: "+"}
+	case '-':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '-' {
+			t.Index++
+			return Token{Type: TMinusMinus, Value: "--"}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			return Token{Type: TMinusEquals, Value: "-="}
+		}
+		return Token{Type: TMinus, Value: "-"}
 	case '>':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {

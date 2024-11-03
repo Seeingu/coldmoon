@@ -177,6 +177,8 @@ func (p *Parser) unaryExpression() Expression {
 		TDelete: UnaryOperatorDelete,
 		TVoid:   UnaryOperatorVoid,
 		TTypeof: UnaryOperatorTypeof,
+		TPlus:   UnaryOperatorAddition,
+		TMinus:  UnaryOperatorSubtraction,
 	}
 	if op, ok := unaryMap[t.Type]; ok {
 		p.tokenizer.Next()

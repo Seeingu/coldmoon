@@ -306,6 +306,8 @@ const (
 	UnaryOperatorDelete UnaryOperator = iota
 	UnaryOperatorVoid
 	UnaryOperatorTypeof
+	UnaryOperatorAddition
+	UnaryOperatorSubtraction
 )
 
 type UnaryExpression struct {
@@ -334,6 +336,24 @@ func (u *UnaryExpression) Bytecode(e *Executable) {
 	case UnaryOperatorTypeof:
 		u.Operand.Bytecode(e)
 		e.AddInstruction(InsTypeof)
+	case UnaryOperatorAddition:
+		u.Operand.Bytecode(e)
+
+		if u.Operand.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(InsToNumber)
+	case UnaryOperatorSubtraction:
+		u.Operand.Bytecode(e)
+
+		if u.Operand.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(InsToNumeric)
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(InsUnaryMinus)
 	}
 }
 

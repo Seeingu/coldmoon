@@ -39,3 +39,10 @@ func (b *BigIntValue) ToBoolean() bool {
 func (b *BigIntValue) Equal(other BigIntValue) bool {
 	return b.Data.Cmp(other.Data) == 0
 }
+
+// 6.1.6.2.1
+func (b *BigIntValue) UnaryMinus() *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Neg(b.Data),
+	}
+}

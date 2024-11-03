@@ -129,6 +129,20 @@ func (vm *VM) Run(executable *Executable) Value {
 				panic("unreachable")
 			}
 
+		case *IToNumber:
+			value := vm.stack.Pop()
+			vm.result = ToNumber(value, vm.agent)
+		case *IToNumeric:
+			value := vm.stack.Pop()
+			vm.result = ToNumeric(value, vm.agent)
+		case *IUnaryMinus:
+			value := vm.stack.Pop()
+			switch v := value.(type) {
+			case *BigIntValue:
+				vm.result = v.UnaryMinus()
+			case *NumberValue:
+				vm.result = v.UnaryMinus()
+			}
 		case *IEvaluatePropertyAccessWithExpressionKey:
 			// 13.3.3
 			propertyNameValue := vm.stack.Pop()

@@ -146,6 +146,20 @@ func (i *IEvaluatePropertyAccessWithIdentifierKey) String() string {
 	return "IEvaluatePropertyAccessWithIdentifierKey " + fmt.Sprintf("%t %s", i.Strict, i.Name)
 }
 
+// MARK: - ToNumber
+
+type IToNumber struct {
+	Instruction
+}
+
+type IToNumeric struct {
+	Instruction
+}
+
+type IUnaryMinus struct {
+	Instruction
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
@@ -153,3 +167,6 @@ var InsThrow = &IThrow{}
 var InsLoadThisValue = &ILoadThisValue{}
 var InsGetValue = &IGetValue{}
 var InsTypeof = &ITypeof{}
+var InsToNumber = &IToNumber{}
+var InsToNumeric = &IToNumeric{}
+var InsUnaryMinus = &IUnaryMinus{}

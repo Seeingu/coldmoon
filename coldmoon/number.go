@@ -69,6 +69,13 @@ func (n *NumberValue) Floor() float64 {
 	return math.Floor(n.Data)
 }
 
+// 6.1.6.1.1
+func (n *NumberValue) UnaryMinus() *NumberValue {
+	return &NumberValue{
+		Data: -n.Data,
+	}
+}
+
 // 6.1.6.1.14
 func (n *NumberValue) SameValue(other NumberValue) bool {
 	if n.IsNaN() && other.IsNaN() {
