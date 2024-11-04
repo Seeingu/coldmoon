@@ -78,6 +78,7 @@ const (
 	TTypeof
 	TYield
 	TAwait
+	TFunction
 	TEOF
 )
 
@@ -285,6 +286,7 @@ var keywordsMap = map[string]TokenType{
 	"typeof":   TTypeof,
 	"yield":    TYield,
 	"await":    TAwait,
+	"function": TFunction,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {

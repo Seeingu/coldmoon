@@ -19,12 +19,12 @@ type CompletionRecord struct {
 	Target string
 }
 
-func NormalCompletion(value Value) *CompletionRecord {
+func NewNormalCompletion(value Value) *CompletionRecord {
 	return &CompletionRecord{Type: Normal, Value: value}
 }
 
-func ThrowCompletion(value Value) *CompletionRecord {
+func NewThrowCompletion(value Value) *CompletionRecord {
 	return &CompletionRecord{Type: Throw, Value: value}
 }
 
-var TypeErrorCompletion = ThrowCompletion(NewStringValue("TypeError"))
+var TypeErrorCompletion = NewThrowCompletion(NewStringValue("TypeError"))

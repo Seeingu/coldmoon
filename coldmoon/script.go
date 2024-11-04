@@ -39,20 +39,8 @@ func (s *ScriptRecord) Evaluate() Value {
 			PrivateEnvironment:  nil,
 		},
 	}
-
 	agent.ExecutionContextStack.Push(scriptContext)
+	defer agent.ExecutionContextStack.Pop()
 
-	script := s.ECMAScriptCode
-
-	exe := NewExecutable()
-	vm := NewVM(agent)
-	script.Bytecode(exe)
-	fmt.Println("Executable: ", exe.String())
-	result := vm.Run(exe)
-
-	agent.ExecutionContextStack.Pop()
-	Assert(!agent.ExecutionContextStack.IsEmpty())
-
-	fmt.Println("Result: ", result.String())
-	return result
+	return GenerateAndRunBytecode(agent, s.ECMAScriptCode).Value
 }

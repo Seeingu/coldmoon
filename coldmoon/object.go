@@ -108,9 +108,9 @@ func (o *Object) Get(key PropertyKey) Value {
 }
 
 // 7.3.4
-func (o *Object) Set(key PropertyKey, value Value, throw bool) {
+func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) {
 	success := o.InternalMethods().Set(o, key, value, NewValueFromObject(o))
-	if !success && throw {
+	if !success && throw == setThrowTypeThrow {
 		o.Agent().ThrowException(TypeError, "Set failed")
 	}
 }

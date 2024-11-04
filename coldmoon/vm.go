@@ -23,7 +23,7 @@ func NewVM(agent *Agent) *VM {
 	}
 }
 
-func (vm *VM) Run(executable *Executable) Value {
+func (vm *VM) Run(executable *Executable) *CompletionRecord {
 	for vm.ip < len(executable.Instructions) {
 		i := executable.Instructions[vm.ip]
 		switch ins := i.(type) {
@@ -214,7 +214,7 @@ func (vm *VM) Run(executable *Executable) Value {
 		}
 		vm.ip += 1
 	}
-	return vm.result
+	return NewNormalCompletion(vm.result)
 }
 
 // 13.3.6.2

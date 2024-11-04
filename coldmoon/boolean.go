@@ -1,6 +1,7 @@
 package coldmoon
 
 // MARK: - BooleanValue
+
 type BooleanValue struct {
 	Value
 	Data bool
@@ -31,6 +32,7 @@ type booleanType interface {
 }
 
 // MARK: - BooleanObject
+
 type BooleanObject struct {
 	booleanType
 	*Object
@@ -111,6 +113,7 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 }
 
 // MARK: - BooleanPrototype
+
 type BooleanPrototype struct {
 	booleanType
 	*Object

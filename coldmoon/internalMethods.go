@@ -1,11 +1,20 @@
 package coldmoon
 
+type setThrowType int
+
+const (
+	setThrowTypeThrow setThrowType = iota
+	setThrowTypeIgnore
+)
+
 type ObjectType interface {
 	IsExtensible() bool
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	ToObject() *Object
 	Get(key PropertyKey) Value
+	Set(key PropertyKey, value Value, throw setThrowType)
+	Agent() *Agent
 	HasProperty(key PropertyKey) bool
 	Construct(
 		argumentLists []Value,

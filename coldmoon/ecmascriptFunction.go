@@ -2,6 +2,168 @@ package coldmoon
 
 import "fmt"
 
+type ConstructorKind int
+
+const (
+	ConstructorKindBase ConstructorKind = iota
+	ConstructorKindDerived
+)
+
+type ThisMode int
+
+const (
+	ThisModeLexical ThisMode = iota
+	ThisModeStrict
+	ThisModeGlobal
+)
+
+type ECMAScriptFunction struct {
+	*Object
+	Realm              *Realm
+	Environment        EnvironmentRecord
+	PrivateEnvironment *PrivateEnvironment
+	FormalParameters   *FormalParameters
+	ECMAScriptCode     *FunctionBody
+	ConstructorKind    ConstructorKind
+	ScriptOrModule     ScriptOrModule
+	ThisMode           ThisMode
+	Strict             bool
+	HomeObject         ObjectType
+	SourceText         string
+	IsClassConstructor bool
+}
+
+// 10.2.1
+func Call(object ObjectType, thisArgument Value, argumentsList []Value) Value {
+	agent := object.Agent()
+	function := object.(*ECMAScriptFunction)
+
+	calleeContext := PrepareForOrdinaryCall(agent, function, nil)
+	Assert(calleeContext == agent.runningExecutionContext())
+
+	if function.IsClassConstructor {
+		panic("TypeError")
+	}
+
+	OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
+
+	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
+
+	agent.ExecutionContextStack.Pop()
+
+	if result.Type == Return {
+		return result.Value
+	}
+	return nil
+}
+
+// 10.2.1.1
+func PrepareForOrdinaryCall(agent *Agent, function *ECMAScriptFunction, newTarget ObjectType) *ExecutionContext {
+	localEnv := NewFunctionEnvironment(function, newTarget)
+
+	calleeContext := &ExecutionContext{
+		Function:       function.Object,
+		Realm:          function.Realm,
+		ScriptOrModule: function.ScriptOrModule,
+		ECMAScriptCode: &ExecutionContextAdditionalState{
+			LexicalEnvironment:  localEnv,
+			VariableEnvironment: localEnv,
+			PrivateEnvironment:  function.PrivateEnvironment,
+		},
+	}
+
+	agent.ExecutionContextStack.Push(calleeContext)
+
+	return calleeContext
+}
+
+// 10.2.1.2
+func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeContext *ExecutionContext, thisArgument Value) {
+	thisMode := function.ThisMode
+
+	if thisMode == ThisModeLexical {
+		return
+	}
+
+	calleeRealm := function.Realm
+
+	localEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
+
+	var thisValue Value
+	if thisMode == ThisModeStrict {
+		thisValue = thisArgument
+	} else {
+		if thisArgument == nil || thisArgument == UndefinedValue || thisArgument == NullValue {
+			globalEnv := calleeRealm.GlobalEnv
+			thisValue = NewValueFromObject(globalEnv.GlobalThisValue)
+		} else {
+			thisValue = NewValueFromObject(ValueToObject(thisArgument, agent))
+		}
+	}
+
+	funEnv, ok := localEnv.(*FunctionEnvironment)
+	Assert(ok)
+
+	_ = funEnv.BindThisValue(thisValue)
+
+	return
+}
+
+// 10.2.1.4
+func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+	return GenerateAndRunBytecode(agent, function.ECMAScriptCode)
+}
+
+type functionCreateThisMode int
+
+const (
+	functionCreateThisModeLexical functionCreateThisMode = iota
+	functionCreateThisModeNonLexical
+)
+
+// 10.2.3
+func OrdinaryFunctionCreate(
+	agent *Agent,
+	functionPrototype ObjectType,
+	sourceText string,
+	parameterList *FormalParameters,
+	body *FunctionBody,
+	functionCreateThisMode functionCreateThisMode,
+	env EnvironmentRecord,
+	privateEnv *PrivateEnvironment,
+	strict bool,
+) *ECMAScriptFunction {
+	var thisMode ThisMode = ThisModeLexical
+	if functionCreateThisMode == functionCreateThisModeNonLexical {
+		if strict {
+			thisMode = ThisModeStrict
+		} else {
+			thisMode = ThisModeGlobal
+		}
+	}
+	function := &ECMAScriptFunction{
+		Object:             NewObject(agent, functionPrototype),
+		Realm:              agent.CurrentRealm(),
+		SourceText:         sourceText,
+		FormalParameters:   parameterList,
+		ECMAScriptCode:     body,
+		Strict:             strict,
+		ThisMode:           thisMode,
+		IsClassConstructor: false,
+		Environment:        env,
+		PrivateEnvironment: privateEnv,
+		ScriptOrModule:     agent.GetActiveScriptOrModule(),
+		HomeObject:         nil,
+		ConstructorKind:    ConstructorKindBase,
+	}
+	function.InternalMethods().Call = Call
+
+	length := parameterList.ExpectedArgumentCount()
+	SetFunctionLength(function.Object, float64(length))
+
+	return function
+}
+
 // 10.2.4
 func AddRestrictedFunctionProperties(F ObjectType, realm *Realm) {
 	// TODO: Assert
@@ -59,7 +221,7 @@ func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 }
 
 // 10.2.10
-func SetFunctionLength(function *Object, length float64) {
+func SetFunctionLength(function ObjectType, length float64) {
 	Assert(function.IsExtensible())
 	Assert(!function.PropertyStorage().Has(NewStringPropertyKey("length")))
 

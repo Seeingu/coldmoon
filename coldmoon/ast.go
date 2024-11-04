@@ -1,13 +1,16 @@
 package coldmoon
 
-import "strconv"
+import (
+	"strconv"
+)
 
-type node interface {
+type ASTNode interface {
 	String() string
 	Bytecode(e *Executable, c *BytecodeContext)
 }
 
 type BytecodeContext struct {
+	agent                 *Agent
 	containedInStrictCode bool
 }
 
@@ -21,7 +24,7 @@ const (
 // MARK: - IdentifierReference
 
 type IdentifierReference struct {
-	node
+	ASTNode
 	Identifier IdentifierName
 }
 
@@ -189,7 +192,7 @@ func (m *MemberExpression) String() string {
 // MARK: - Literal
 
 type Literal interface {
-	node
+	ASTNode
 	Analyze(a AnalyzeQuery) bool
 	// 13.2.3.1
 	// Bytecode
@@ -321,7 +324,7 @@ func (l *LiteralString) Analyze(a AnalyzeQuery) bool {
 // MARK: - Expression
 
 type Expression interface {
-	node
+	ASTNode
 	Analyze(a AnalyzeQuery) bool
 }
 
@@ -479,7 +482,7 @@ func (c *CallExpression) String() string {
 // MARK: - Statement
 
 type Statement interface {
-	node
+	ASTNode
 	Analyze(a AnalyzeQuery) bool
 }
 
@@ -592,6 +595,64 @@ func (s *StatementThrow) String() string {
 	return "Throw " + s.Expression.String()
 }
 
+// MARK: - Function
+
+type FunctionBody struct {
+	ASTNode
+	StatementList StatementList
+}
+
+func (f *FunctionBody) Bytecode(e *Executable, c *BytecodeContext) {
+	f.StatementList.Bytecode(e, c)
+}
+
+func (f *FunctionBody) String() string {
+	return f.StatementList.String()
+}
+
+// MARK: - FormalParameters
+
+type FormalParameters struct {
+	Items []FormalParametersItem
+}
+
+// 15.1.5
+func (f *FormalParameters) ExpectedArgumentCount() int {
+	return len(f.Items)
+}
+
+func (f *FormalParameters) String() string {
+	var sb string
+	for i, item := range f.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+type FormalParametersItem interface {
+	ASTNode
+}
+
+type FormalParameter struct {
+	FormalParametersItem
+	BindingElement *BindingElement
+}
+
+func (f *FormalParameter) String() string {
+	return f.BindingElement.String()
+}
+
+type BindingElement struct {
+	Identifier IdentifierName
+}
+
+func (b *BindingElement) String() string {
+	return string(b.Identifier)
+}
+
 // MARK: - IfStatement
 
 type StatementIf struct {
@@ -645,7 +706,7 @@ func (s *StatementIf) String() string {
 // MARK: - IterationStatement
 
 type IterationStatement interface {
-	node
+	ASTNode
 }
 
 // MARK: - WhileStatement
@@ -687,6 +748,7 @@ func (s *StatementWhile) String() string {
 }
 
 // MARK: - DoWhileStatement
+
 type StatementDoWhile struct {
 	IterationStatement
 	Condition Expression
@@ -724,9 +786,72 @@ func (s *StatementDoWhile) String() string {
 // MARK: - Declaration
 
 type Declaration interface {
-	node
+	ASTNode
 	Analyze(a AnalyzeQuery) bool
 }
+
+type DeclarationHoistable struct {
+	Declaration
+	FunctionDeclaration *FunctionDeclaration
+}
+
+func (d *DeclarationHoistable) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (d *DeclarationHoistable) Bytecode(e *Executable, c *BytecodeContext) {
+	d.FunctionDeclaration.Bytecode(e, c)
+}
+
+func (d *DeclarationHoistable) String() string {
+	return d.FunctionDeclaration.String()
+}
+
+type FunctionDeclaration struct {
+	ASTNode
+	Identifier       IdentifierName
+	Body             *FunctionBody
+	FormalParameters *FormalParameters
+}
+
+// 15.2.2
+func (f *FunctionDeclaration) functionBodyContainsUseStrict() bool {
+	return f.Body.StatementList.ContainsDirective("use strict")
+}
+
+// 15.2.4
+func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+	realm := agent.CurrentRealm()
+	name := f.Identifier
+	sourceText := ""
+	function := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		f.FormalParameters,
+		f.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+		f.functionBodyContainsUseStrict(),
+	)
+
+	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	return function
+}
+
+func (f *FunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
+	realm := c.agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := f.instantiateOrdinaryFunctionObject(c.agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
+}
+
+func (f *FunctionDeclaration) String() string {
+	return "FunctionDeclaration " + string(f.Identifier)
+}
+
+// MARK: - BlockStatement
 
 type BlockStatement interface {
 	Statement
@@ -796,7 +921,7 @@ func (s StatementList) String() string {
 }
 
 type StatementListItem interface {
-	node
+	ASTNode
 	Analyze(a AnalyzeQuery) bool
 }
 type StatementListItemStatement struct {
@@ -804,7 +929,7 @@ type StatementListItemStatement struct {
 	Statement Statement
 }
 
-var _ node = (*StatementListItemStatement)(nil)
+var _ ASTNode = (*StatementListItemStatement)(nil)
 
 func (s *StatementListItemStatement) Analyze(a AnalyzeQuery) bool {
 	return s.Statement.Analyze(a)
@@ -823,7 +948,7 @@ type StatementListItemDeclaration struct {
 	Declaration Declaration
 }
 
-var _ node = (*StatementListItemDeclaration)(nil)
+var _ ASTNode = (*StatementListItemDeclaration)(nil)
 
 func (s *StatementListItemDeclaration) Analyze(a AnalyzeQuery) bool {
 	return s.Declaration.Analyze(a)
@@ -855,13 +980,11 @@ func (e *ExpressionStatement) String() string {
 }
 
 type Script struct {
+	ASTNode
 	StatementList StatementList
 }
 
-func (s *Script) Bytecode(e *Executable) {
-	c := &BytecodeContext{
-		containedInStrictCode: s.IsStrict(),
-	}
+func (s *Script) Bytecode(e *Executable, c *BytecodeContext) {
 	s.StatementList.Bytecode(e, c)
 }
 

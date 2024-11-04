@@ -37,14 +37,26 @@ func (p *Parser) statementList() (list StatementList) {
 }
 
 func (p *Parser) statementListItem() StatementListItem {
-	s := p.statement()
-	if s == nil {
-		p.automaticSemicolonInsertion()
-		return nil
+	t := p.tokenizer.CurrentToken
+	var stmt Statement
+	switch t.Type {
+	case TFunction:
+		d := p.declaration()
+		stmt = &StatementListItemDeclaration{
+			Declaration: d,
+		}
+	default:
+		s := p.statement()
+		if s == nil {
+			p.automaticSemicolonInsertion()
+			return nil
+		}
+
+		stmt = &StatementListItemStatement{
+			Statement: s,
+		}
 	}
-	return &StatementListItemStatement{
-		Statement: s,
-	}
+	return stmt
 }
 
 func (p *Parser) automaticSemicolonInsertion() {
@@ -89,8 +101,67 @@ func (p *Parser) throwStatement() *StatementThrow {
 	}
 }
 
+func (p *Parser) formalParameters() *FormalParameters {
+	var items []FormalParametersItem
+	for {
+		t := p.tokenizer.CurrentToken
+		if t.Type == TRightParen {
+			break
+		}
+		identifier := p.bindingIdentifier()
+		items = append(items, &FormalParameter{
+			BindingElement: &BindingElement{
+				Identifier: identifier,
+			},
+		})
+		if p.tokenizer.CurrentToken.Type == TComma {
+			p.tokenizer.Next()
+		}
+	}
+
+	return &FormalParameters{
+		Items: items,
+	}
+}
+
+func (p *Parser) functionDeclaration() *FunctionDeclaration {
+	p.tokenizer.MustMatch(TFunction)
+	identifier := p.bindingIdentifier()
+	p.tokenizer.MustMatch(TLeftParen)
+	params := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	statementList := p.statementList()
+	p.tokenizer.MustMatch(TRightBrace)
+	return &FunctionDeclaration{
+		Identifier:       identifier,
+		FormalParameters: params,
+		Body: &FunctionBody{
+			StatementList: statementList,
+		},
+	}
+}
+
 func (p *Parser) noLineTerminatorHere() {
 	// TODO
+}
+
+func (p *Parser) hoistableDeclaration() *DeclarationHoistable {
+	t := p.tokenizer.CurrentToken
+	if t.Type == TFunction {
+		return &DeclarationHoistable{
+			FunctionDeclaration: p.functionDeclaration(),
+		}
+	}
+	panic("unimplemented")
+}
+
+func (p *Parser) declaration() Declaration {
+	t := p.tokenizer.CurrentToken
+	if t.Type == TFunction {
+		return p.hoistableDeclaration()
+	}
+	panic("unimplemented")
 }
 
 func (p *Parser) breakableStatement() *BreakableStatement {
@@ -302,6 +373,17 @@ func (p *Parser) identifierReference() *IdentifierReference {
 	return &IdentifierReference{
 		Identifier: IdentifierName(name),
 	}
+}
+
+func (p *Parser) bindingIdentifier() IdentifierName {
+	t := p.tokenizer.CurrentToken
+	types := []TokenType{TIdentifier, TAwait, TYield}
+	if !lo.Contains(types, t.Type) {
+		panic("identifierReference: expected identifierOrKeyword")
+	}
+	name := t.Value
+	p.tokenizer.Next()
+	return IdentifierName(name)
 }
 
 func (p *Parser) primaryExpression() PrimaryExpression {
