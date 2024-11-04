@@ -76,6 +76,8 @@ const (
 	TThrow
 	TVoid
 	TTypeof
+	TYield
+	TAwait
 	TEOF
 )
 
@@ -281,6 +283,8 @@ var keywordsMap = map[string]TokenType{
 	"return":   TReturn,
 	"void":     TVoid,
 	"typeof":   TTypeof,
+	"yield":    TYield,
+	"await":    TAwait,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {

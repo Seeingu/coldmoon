@@ -54,7 +54,8 @@ func (i *IResolveThisBinding) String() string {
 
 type IResolveBinding struct {
 	Instruction
-	Name IdentifierName
+	Name   IdentifierName
+	Strict bool
 }
 
 func (i *IResolveBinding) String() string {
@@ -119,6 +120,7 @@ type ITypeof struct {
 type ICall struct {
 	Instruction
 	ArgumentCount int
+	Strict        bool
 }
 
 func (i *ICall) String() string {

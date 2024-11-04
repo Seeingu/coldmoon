@@ -4,13 +4,18 @@ import "strconv"
 
 type node interface {
 	String() string
-	Bytecode(e *Executable)
+	Bytecode(e *Executable, c *BytecodeContext)
+}
+
+type BytecodeContext struct {
+	containedInStrictCode bool
 }
 
 type AnalyzeQuery int
 
 const (
 	AnalyzeQueryIsReference AnalyzeQuery = iota
+	AnalyzeQueryIsStringLiteral
 )
 
 // MARK: - IdentifierReference
@@ -24,8 +29,8 @@ func (i *IdentifierReference) Analyze(a AnalyzeQuery) bool {
 	return a == AnalyzeQueryIsReference
 }
 
-func (i *IdentifierReference) Bytecode(e *Executable) {
-	e.AddInstruction(&IResolveBinding{Name: i.Identifier})
+func (i *IdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IResolveBinding{Name: i.Identifier, Strict: c.containedInStrictCode})
 }
 
 func (i *IdentifierReference) String() string {
@@ -45,8 +50,8 @@ type PrimaryExpressionIdentifierReference struct {
 	IdentifierReference *IdentifierReference
 }
 
-func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable) {
-	p.IdentifierReference.Bytecode(e)
+func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
+	p.IdentifierReference.Bytecode(e, c)
 }
 func (p *PrimaryExpressionIdentifierReference) String() string {
 	return p.IdentifierReference.String()
@@ -64,22 +69,29 @@ type PrimaryExpressionLiteral struct {
 	Literal Literal
 }
 
-func (p *PrimaryExpressionLiteral) Bytecode(e *Executable) {
-	p.Literal.Bytecode(e)
+func (p *PrimaryExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
+	p.Literal.Bytecode(e, c)
 }
 func (p *PrimaryExpressionLiteral) String() string {
 	return p.Literal.String()
 }
 
 func (p *PrimaryExpressionLiteral) Analyze(a AnalyzeQuery) bool {
-	return false
+	switch a {
+	case AnalyzeQueryIsReference:
+		return false
+	case AnalyzeQueryIsStringLiteral:
+		return p.Literal.Analyze(a)
+	default:
+		panic("unreachable")
+	}
 }
 
 type PrimaryExpressionThis struct {
 	PrimaryExpression
 }
 
-func (p *PrimaryExpressionThis) Bytecode(e *Executable) {
+func (p *PrimaryExpressionThis) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IResolveThisBinding{})
 }
 func (p *PrimaryExpressionThis) String() string {
@@ -94,8 +106,8 @@ type PrimaryExpressionParenthesizedExpression struct {
 	Expression Expression
 }
 
-func (p *PrimaryExpressionParenthesizedExpression) Bytecode(e *Executable) {
-	p.Expression.Bytecode(e)
+func (p *PrimaryExpressionParenthesizedExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	p.Expression.Bytecode(e, c)
 }
 
 func (p *PrimaryExpressionParenthesizedExpression) String() string {
@@ -103,7 +115,14 @@ func (p *PrimaryExpressionParenthesizedExpression) String() string {
 }
 
 func (p *PrimaryExpressionParenthesizedExpression) Analyze(a AnalyzeQuery) bool {
-	return p.Expression.Analyze(a)
+	switch a {
+	case AnalyzeQueryIsReference:
+		return p.Expression.Analyze(a)
+	case AnalyzeQueryIsStringLiteral:
+		return false
+	default:
+		panic("unreachable")
+	}
 }
 
 // MARK: - MemberExpression
@@ -140,17 +159,17 @@ func (m *MemberExpression) Analyze(a AnalyzeQuery) bool {
 	return a == AnalyzeQueryIsReference
 }
 
-func (m *MemberExpression) Bytecode(e *Executable) {
-	m.Member.Bytecode(e)
+func (m *MemberExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	m.Member.Bytecode(e, c)
 	if m.Member.Analyze(AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
 	e.AddInstruction(InsLoad)
-	strict := false
+	strict := c.containedInStrictCode
 
 	switch prop := m.Property.(type) {
 	case *ASTPropertyExpression:
-		prop.Expression.Bytecode(e)
+		prop.Expression.Bytecode(e, c)
 		e.AddInstruction(InsLoad)
 		e.AddInstruction(&IEvaluatePropertyAccessWithExpressionKey{
 			Strict: strict,
@@ -171,6 +190,7 @@ func (m *MemberExpression) String() string {
 
 type Literal interface {
 	node
+	Analyze(a AnalyzeQuery) bool
 	// 13.2.3.1
 	// Bytecode
 }
@@ -179,7 +199,9 @@ type LiteralNull struct {
 	Literal
 }
 
-func (l *LiteralNull) Bytecode(e *Executable) {
+var _ Literal = (*LiteralNull)(nil)
+
+func (l *LiteralNull) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: NullValue})
 }
 
@@ -187,12 +209,18 @@ func (l *LiteralNull) String() string {
 	return "null"
 }
 
+func (l *LiteralNull) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
 type LiteralBoolean struct {
 	Literal
 	Bool bool
 }
 
-func (l *LiteralBoolean) Bytecode(e *Executable) {
+var _ Literal = (*LiteralBoolean)(nil)
+
+func (l *LiteralBoolean) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: NewBooleanValue(l.Bool)})
 }
 
@@ -201,6 +229,10 @@ func (l *LiteralBoolean) String() string {
 		return "true"
 	}
 	return "false"
+}
+
+func (l *LiteralBoolean) Analyze(a AnalyzeQuery) bool {
+	return false
 }
 
 // MARK: - LiteralNumeric
@@ -234,6 +266,8 @@ type LiteralNumeric struct {
 	Value string
 }
 
+var _ Literal = (*LiteralNumeric)(nil)
+
 func (l *LiteralNumeric) NumericValue() (Value, error) {
 	num, err := strconv.ParseFloat(l.Value, 64)
 	if err != nil {
@@ -242,12 +276,16 @@ func (l *LiteralNumeric) NumericValue() (Value, error) {
 	return NewNumberValue(num), nil
 }
 
-func (l *LiteralNumeric) Bytecode(e *Executable) {
+func (l *LiteralNumeric) Bytecode(e *Executable, c *BytecodeContext) {
 	v, err := l.NumericValue()
 	if err != nil {
 		panic(err)
 	}
 	e.AddInstruction(&IStoreConstant{Value: v})
+}
+
+func (l *LiteralNumeric) Analyze(a AnalyzeQuery) bool {
+	return false
 }
 
 func (l *LiteralNumeric) String() string {
@@ -261,17 +299,23 @@ type LiteralString struct {
 	Value string
 }
 
+var _ Literal = (*LiteralString)(nil)
+
 // 12.9.4.2
 func (l *LiteralString) StringValue() Value {
 	return NewStringValue(l.Value)
 }
 
-func (l *LiteralString) Bytecode(e *Executable) {
+func (l *LiteralString) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: l.StringValue()})
 }
 
 func (l *LiteralString) String() string {
 	return l.Value
+}
+
+func (l *LiteralString) Analyze(a AnalyzeQuery) bool {
+	return a == AnalyzeQueryIsStringLiteral
 }
 
 // MARK: - Expression
@@ -286,8 +330,8 @@ type ExpressionPrimary struct {
 	PrimaryExpression PrimaryExpression
 }
 
-func (e *ExpressionPrimary) Bytecode(ex *Executable) {
-	e.PrimaryExpression.Bytecode(ex)
+func (e *ExpressionPrimary) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.PrimaryExpression.Bytecode(ex, c)
 }
 
 func (e *ExpressionPrimary) String() string {
@@ -295,7 +339,14 @@ func (e *ExpressionPrimary) String() string {
 }
 
 func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
-	return e.PrimaryExpression.Analyze(a)
+	switch a {
+	case AnalyzeQueryIsReference:
+		return e.PrimaryExpression.Analyze(a)
+	case AnalyzeQueryIsStringLiteral:
+		return e.PrimaryExpression.Analyze(a)
+	default:
+		panic("unreachable")
+	}
 }
 
 // MARK: - UnaryExpression
@@ -322,13 +373,13 @@ func (u *UnaryExpression) Analyze(a AnalyzeQuery) bool {
 	return false
 }
 
-func (u *UnaryExpression) Bytecode(e *Executable) {
-	u.Operand.Bytecode(e)
+func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	u.Operand.Bytecode(e, c)
 	switch u.Operator {
 	case UnaryOperatorDelete:
 		panic("unimplemented")
 	case UnaryOperatorVoid:
-		u.Operand.Bytecode(e)
+		u.Operand.Bytecode(e, c)
 		if u.Operand.Analyze(AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
@@ -336,41 +387,36 @@ func (u *UnaryExpression) Bytecode(e *Executable) {
 			Value: UndefinedValue,
 		})
 	case UnaryOperatorTypeof:
-		u.Operand.Bytecode(e)
+		u.Operand.Bytecode(e, c)
 		e.AddInstruction(InsTypeof)
 	case UnaryOperatorAddition:
-		u.Operand.Bytecode(e)
+		u.Operand.Bytecode(e, c)
 
 		if u.Operand.Analyze(AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
-		e.AddInstruction(InsLoad)
 		e.AddInstruction(InsToNumber)
 	case UnaryOperatorSubtraction:
-		u.Operand.Bytecode(e)
+		u.Operand.Bytecode(e, c)
 
 		if u.Operand.Analyze(AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
-		e.AddInstruction(InsLoad)
 		e.AddInstruction(InsToNumeric)
-		e.AddInstruction(InsLoad)
 		e.AddInstruction(InsUnaryMinus)
 	case UnaryOperatorLogicalNot:
-		u.Operand.Bytecode(e)
+		u.Operand.Bytecode(e, c)
 
 		if u.Operand.Analyze(AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
-		e.AddInstruction(InsLoad)
 		e.AddInstruction(&ILogicalNot{})
 	case UnaryOperatorBitwiseNot:
-		u.Operand.Bytecode(e)
+		u.Operand.Bytecode(e, c)
 
 		if u.Operand.Analyze(AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
-		e.AddInstruction(InsLoad)
 		e.AddInstruction(&IBitwiseNot{})
 	}
 }
@@ -389,12 +435,14 @@ type CallExpression struct {
 	Arguments Arguments
 }
 
+var _ Expression = (*CallExpression)(nil)
+
 func (c *CallExpression) Analyze(a AnalyzeQuery) bool {
 	return false
 }
 
-func (c *CallExpression) Bytecode(e *Executable) {
-	c.Callee.Bytecode(e)
+func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
+	c.Callee.Bytecode(e, bc)
 
 	e.AddInstruction(&ISetEvaluationContextReference{})
 	isReference := c.Callee.Analyze(AnalyzeQueryIsReference)
@@ -404,14 +452,16 @@ func (c *CallExpression) Bytecode(e *Executable) {
 
 	e.AddInstruction(InsLoadThisValue)
 	for _, arg := range c.Arguments {
-		arg.Bytecode(e)
+		arg.Bytecode(e, bc)
 		if arg.Analyze(AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
 		e.AddInstruction(InsLoad)
 	}
 
-	e.AddInstruction(&ICall{ArgumentCount: len(c.Arguments)})
+	strict := bc.containedInStrictCode
+
+	e.AddInstruction(&ICall{ArgumentCount: len(c.Arguments), Strict: strict})
 }
 
 func (c *CallExpression) String() string {
@@ -430,6 +480,7 @@ func (c *CallExpression) String() string {
 
 type Statement interface {
 	node
+	Analyze(a AnalyzeQuery) bool
 }
 
 type StatementBlock struct {
@@ -437,8 +488,14 @@ type StatementBlock struct {
 	BlockStatement BlockStatement
 }
 
-func (s *StatementBlock) Bytecode(e *Executable) {
-	s.BlockStatement.Bytecode(e)
+var _ Statement = (*StatementBlock)(nil)
+
+func (s *StatementBlock) Analyze(a AnalyzeQuery) bool {
+	return s.BlockStatement.Analyze(a)
+}
+
+func (s *StatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
+	s.BlockStatement.Bytecode(e, c)
 }
 
 func (s *StatementBlock) String() string {
@@ -449,7 +506,9 @@ type StatementEmpty struct {
 	Statement
 }
 
-func (s *StatementEmpty) Bytecode(e *Executable) {
+var _ Statement = (*StatementEmpty)(nil)
+
+func (s *StatementEmpty) Bytecode(e *Executable, c *BytecodeContext) {
 	// empty
 }
 func (s *StatementEmpty) String() string {
@@ -462,7 +521,13 @@ type StatementDebugger struct {
 	Statement
 }
 
-func (s *StatementDebugger) Bytecode(e *Executable) {
+var _ Statement = (*StatementDebugger)(nil)
+
+func (s *StatementDebugger) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (s *StatementDebugger) Bytecode(e *Executable, c *BytecodeContext) {
 	// TODO: implement
 }
 func (s *StatementDebugger) String() string {
@@ -476,8 +541,14 @@ type StatementExpression struct {
 	Expression Expression
 }
 
-func (s *StatementExpression) Bytecode(e *Executable) {
-	s.Expression.Bytecode(e)
+var _ Statement = (*StatementExpression)(nil)
+
+func (s *StatementExpression) Analyze(a AnalyzeQuery) bool {
+	return s.Expression.Analyze(a)
+}
+
+func (s *StatementExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	s.Expression.Bytecode(e, c)
 	if s.Expression.Analyze(AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
@@ -490,11 +561,12 @@ func (s *StatementExpression) String() string {
 // MARK: - BreakableStatement
 
 type BreakableStatement struct {
+	Statement
 	IterationStatement IterationStatement
 }
 
-func (b *BreakableStatement) Bytecode(e *Executable) {
-	b.IterationStatement.Bytecode(e)
+func (b *BreakableStatement) Bytecode(e *Executable, c *BytecodeContext) {
+	b.IterationStatement.Bytecode(e, c)
 }
 
 func (b *BreakableStatement) String() string {
@@ -508,13 +580,12 @@ type StatementThrow struct {
 	Expression Expression
 }
 
-func (s *StatementThrow) Bytecode(e *Executable) {
-	s.Expression.Bytecode(e)
+func (s *StatementThrow) Bytecode(e *Executable, c *BytecodeContext) {
+	s.Expression.Bytecode(e, c)
 	if s.Expression.Analyze(AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
-	e.AddInstruction(&ILoad{})
-	e.AddInstruction(&IThrow{})
+	e.AddInstruction(InsThrow)
 }
 
 func (s *StatementThrow) String() string {
@@ -530,20 +601,23 @@ type StatementIf struct {
 	Alternate  Statement
 }
 
+func (s *StatementIf) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
 // 14.6.2
-func (s *StatementIf) Bytecode(e *Executable) {
-	s.Condition.Bytecode(e)
+func (s *StatementIf) Bytecode(e *Executable, c *BytecodeContext) {
+	s.Condition.Bytecode(e, c)
 
 	if s.Condition.Analyze(AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
-	e.AddInstruction(InsLoad)
 	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 	e.AddInstruction(jumpIfTrue)
 
 	jumpIfTrue.Target = len(e.Instructions)
 	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
-	s.Consequent.Bytecode(e)
+	s.Consequent.Bytecode(e, c)
 	endJump := &IJump{Target: 0}
 	e.AddInstruction(endJump)
 
@@ -552,7 +626,7 @@ func (s *StatementIf) Bytecode(e *Executable) {
 	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 
 	if s.Alternate != nil {
-		s.Alternate.Bytecode(e)
+		s.Alternate.Bytecode(e, c)
 	}
 	endJump.Target = len(e.Instructions)
 }
@@ -582,22 +656,21 @@ type StatementWhile struct {
 	Body      Statement
 }
 
-func (s *StatementWhile) Bytecode(e *Executable) {
+func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
 
 	condition := len(e.Instructions)
-	s.Condition.Bytecode(e)
+	s.Condition.Bytecode(e, c)
 	if s.Condition.Analyze(AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
 
-	e.AddInstruction(&ILoad{})
 	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 	e.AddInstruction(jumpIfTrue)
 
 	jumpIfTrue.Target = len(e.Instructions)
 	e.AddInstruction(&IStore{})
-	s.Body.Bytecode(e)
+	s.Body.Bytecode(e, c)
 	e.AddInstruction(&ILoad{})
 
 	e.AddInstruction(&IJump{Target: condition})
@@ -620,16 +693,16 @@ type StatementDoWhile struct {
 	Body      Statement
 }
 
-func (s *StatementDoWhile) Bytecode(e *Executable) {
+func (s *StatementDoWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
 
 	bodyIndex := len(e.Instructions)
 
 	e.AddInstruction(&IStore{})
-	s.Body.Bytecode(e)
+	s.Body.Bytecode(e, c)
 	e.AddInstruction(&ILoad{})
 
-	s.Condition.Bytecode(e)
+	s.Condition.Bytecode(e, c)
 	if s.Condition.Analyze(AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
@@ -652,10 +725,11 @@ func (s *StatementDoWhile) String() string {
 
 type Declaration interface {
 	node
+	Analyze(a AnalyzeQuery) bool
 }
 
 type BlockStatement interface {
-	node
+	Statement
 }
 
 type BlockStatementBlock struct {
@@ -663,8 +737,8 @@ type BlockStatementBlock struct {
 	Block *Block
 }
 
-func (b *BlockStatementBlock) Bytecode(e *Executable) {
-	b.Block.Bytecode(e)
+func (b *BlockStatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
+	b.Block.Bytecode(e, c)
 }
 
 func (b *BlockStatementBlock) String() string {
@@ -676,8 +750,8 @@ type Block struct {
 }
 
 // 14.2.2
-func (b *Block) Bytecode(e *Executable) {
-	b.StatementList.Bytecode(e)
+func (b *Block) Bytecode(e *Executable, c *BytecodeContext) {
+	b.StatementList.Bytecode(e, c)
 }
 
 func (b *Block) String() string {
@@ -686,9 +760,25 @@ func (b *Block) String() string {
 
 type StatementList []StatementListItem
 
-func (s StatementList) Bytecode(e *Executable) {
+func (s StatementList) ContainsDirective(directive string) bool {
 	for _, item := range s {
-		item.Bytecode(e)
+		if !item.Analyze(AnalyzeQueryIsStringLiteral) {
+			break
+		}
+		statementItem := item.(*StatementListItemStatement).Statement
+		statementExpression := statementItem.(*StatementExpression).Expression
+		primary := statementExpression.(*ExpressionPrimary).PrimaryExpression
+		literal := primary.(*PrimaryExpressionLiteral).Literal.(*LiteralString)
+		if literal.Value == directive {
+			return true
+		}
+	}
+	return false
+}
+
+func (s StatementList) Bytecode(e *Executable, c *BytecodeContext) {
+	for _, item := range s {
+		item.Bytecode(e, c)
 	}
 }
 
@@ -707,6 +797,7 @@ func (s StatementList) String() string {
 
 type StatementListItem interface {
 	node
+	Analyze(a AnalyzeQuery) bool
 }
 type StatementListItemStatement struct {
 	StatementListItem
@@ -715,8 +806,12 @@ type StatementListItemStatement struct {
 
 var _ node = (*StatementListItemStatement)(nil)
 
-func (s *StatementListItemStatement) Bytecode(e *Executable) {
-	s.Statement.Bytecode(e)
+func (s *StatementListItemStatement) Analyze(a AnalyzeQuery) bool {
+	return s.Statement.Analyze(a)
+}
+
+func (s *StatementListItemStatement) Bytecode(e *Executable, c *BytecodeContext) {
+	s.Statement.Bytecode(e, c)
 }
 
 func (s *StatementListItemStatement) String() string {
@@ -728,8 +823,14 @@ type StatementListItemDeclaration struct {
 	Declaration Declaration
 }
 
-func (s *StatementListItemDeclaration) Bytecode(e *Executable) {
-	s.Declaration.Bytecode(e)
+var _ node = (*StatementListItemDeclaration)(nil)
+
+func (s *StatementListItemDeclaration) Analyze(a AnalyzeQuery) bool {
+	return s.Declaration.Analyze(a)
+}
+
+func (s *StatementListItemDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
+	s.Declaration.Bytecode(e, c)
 }
 
 func (s *StatementListItemDeclaration) String() string {
@@ -740,9 +841,13 @@ type ExpressionStatement struct {
 	Expression Expression
 }
 
+func (e *ExpressionStatement) Analyze(a AnalyzeQuery) bool {
+	return e.Expression.Analyze(a)
+}
+
 // 14.5.1
-func (e *ExpressionStatement) Bytecode(ex *Executable) {
-	e.Expression.Bytecode(ex)
+func (e *ExpressionStatement) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.Expression.Bytecode(ex, c)
 }
 
 func (e *ExpressionStatement) String() string {
@@ -754,9 +859,16 @@ type Script struct {
 }
 
 func (s *Script) Bytecode(e *Executable) {
-	s.StatementList.Bytecode(e)
+	c := &BytecodeContext{
+		containedInStrictCode: s.IsStrict(),
+	}
+	s.StatementList.Bytecode(e, c)
 }
 
 func (s *Script) String() string {
 	return s.StatementList.String()
+}
+
+func (s *Script) IsStrict() bool {
+	return s.StatementList.ContainsDirective("use strict")
 }

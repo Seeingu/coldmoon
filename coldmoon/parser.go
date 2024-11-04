@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/samber/lo"
+
 type Parser struct {
 	SourceText string
 	tokenizer  *Tokenizer
@@ -155,7 +157,7 @@ func (p *Parser) ifStatement() *StatementIf {
 	}
 }
 
-func (p *Parser) expressionStatement() *ExpressionStatement {
+func (p *Parser) expressionStatement() *StatementExpression {
 	expr := p.expression()
 	t := p.tokenizer.CurrentToken
 	if t.Type == TSemicolon {
@@ -165,7 +167,7 @@ func (p *Parser) expressionStatement() *ExpressionStatement {
 		panic("expressionStatement: expected expression")
 	}
 
-	return &ExpressionStatement{
+	return &StatementExpression{
 		Expression: expr,
 	}
 }
@@ -291,7 +293,8 @@ func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpres
 
 func (p *Parser) identifierReference() *IdentifierReference {
 	t := p.tokenizer.CurrentToken
-	if t.Type != TIdentifier {
+	types := []TokenType{TIdentifier, TAwait, TYield}
+	if !lo.Contains(types, t.Type) {
 		panic("identifierReference: expected identifierOrKeyword")
 	}
 	name := t.Value

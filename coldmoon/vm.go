@@ -41,10 +41,11 @@ func (vm *VM) Run(executable *Executable) Value {
 			vm.result = ins.Value
 		case *IResolveBinding:
 			// TODO: maybe ins.Name can pass to ResolveBinding directly
-			vm.reference = vm.agent.ResolveBinding(string(ins.Name), nil)
+			vm.reference = vm.agent.ResolveBinding(string(ins.Name), nil, ins.Strict)
 		case *ICall:
 			argumentCount := ins.ArgumentCount
 			arguments := make([]Value, argumentCount)
+			strict := ins.Strict
 			for i := argumentCount - 1; i >= 0; i-- {
 				arguments[i] = vm.stack.Pop()
 			}
@@ -63,7 +64,7 @@ func (vm *VM) Run(executable *Executable) Value {
 					ok &&
 					refName.String == "eval" &&
 					pkg.FuncEqual(function.(*ObjectValue).Object, eval) {
-					vm.result = directEval(vm.agent, arguments)
+					vm.result = directEval(vm.agent, arguments, strict)
 					continue
 				}
 			}
@@ -82,14 +83,14 @@ func (vm *VM) Run(executable *Executable) Value {
 		case *IJump:
 			vm.ip = ins.Target
 		case *IJumpIfTrue:
-			value := vm.stack.Pop()
+			value := vm.result
 			if value.ToBoolean() {
 				vm.ip = ins.Target
 			} else {
 				vm.ip = ins.TargetElse
 			}
 		case *IThrow:
-			value := vm.stack.Pop()
+			value := vm.result
 			vm.agent.exception = value
 			panic("Throw")
 		case *ITypeof:
@@ -130,13 +131,13 @@ func (vm *VM) Run(executable *Executable) Value {
 			}
 
 		case *IToNumber:
-			value := vm.stack.Pop()
+			value := vm.result
 			vm.result = ToNumber(value, vm.agent)
 		case *IToNumeric:
-			value := vm.stack.Pop()
+			value := vm.result
 			vm.result = ToNumeric(value, vm.agent)
 		case *IUnaryMinus:
-			value := vm.stack.Pop()
+			value := vm.result
 			switch v := value.(type) {
 			case *BigIntValue:
 				vm.result = v.UnaryMinus()
@@ -146,10 +147,10 @@ func (vm *VM) Run(executable *Executable) Value {
 				panic("unreachable")
 			}
 		case *ILogicalNot:
-			value := vm.stack.Pop()
+			value := vm.result
 			vm.result = NewBooleanValue(!value.ToBoolean())
 		case *IBitwiseNot:
-			value := vm.stack.Pop()
+			value := vm.result
 			switch v := value.(type) {
 			case *BigIntValue:
 				vm.result = v.BitwiseNot()
@@ -242,11 +243,11 @@ func evaluateCallGetThisValue(ctx *evaluateContext) Value {
 	return nil
 }
 
-func directEval(agent *Agent, arguments []Value) Value {
+func directEval(agent *Agent, arguments []Value, strict bool) Value {
 	if len(arguments) == 0 {
 		return nil
 	}
 	evalArg := arguments[0]
-	strictCaller := false
+	strictCaller := strict
 	return PerformEval(agent, evalArg, strictCaller, true)
 }
