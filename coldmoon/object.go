@@ -1,12 +1,5 @@
 package coldmoon
 
-type Tag int
-
-const (
-	TagDefault Tag = iota
-	TagBoolean
-)
-
 type IntegrityLevel int
 
 const (

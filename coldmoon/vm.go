@@ -225,7 +225,7 @@ func evaluateCall(agent *Agent, function Value, this Value, arguments []Value) V
 	if !IsCallable(function) {
 		panic("TypeError: function is not callable")
 	}
-	return CallAssumeCallable(function, this, arguments)
+	return function.CallAssumeCallable(this, arguments)
 }
 
 func evaluateCallGetThisValue(ctx *evaluateContext) Value {

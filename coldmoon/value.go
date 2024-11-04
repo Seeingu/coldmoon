@@ -26,9 +26,11 @@ func (hint PreferredType) String() string {
 	}
 }
 
+type ArgumentsList []Value
 type Value interface {
 	String() string
 	ToBoolean() bool
+	CallAssumeCallable(value Value, argumentsList ArgumentsList) Value
 }
 
 type undefinedValue struct {
@@ -92,10 +94,14 @@ var NegativeInfinityValue = NumberValue{Data: math.Inf(-1)}
 type ObjectValue struct {
 	Value
 	Object ObjectType
-	tag    Tag
 }
 
-func (o ObjectValue) String() string {
+func (o *ObjectValue) CallAssumeCallable(value Value, argumentsList ArgumentsList) Value {
+	object := o.Object
+	return object.InternalMethods().Call(object, value, argumentsList)
+}
+
+func (o *ObjectValue) String() string {
 	primValue := ToPrimitive(o, o.Object.ToObject().Agent(), PreferredTypeString)
 	if _, isObject := primValue.(*ObjectValue); isObject {
 		panic("")
@@ -115,7 +121,7 @@ func ToPrimitive(value Value, agent *Agent, hint PreferredType) Value {
 		if exoticToPrim != nil {
 			hintString := hint.String()
 
-			result := CallAssumeCallable(NewValueFromObject(exoticToPrim), value, []Value{
+			result := NewValueFromObject(exoticToPrim).CallAssumeCallable(value, []Value{
 				NewStringValue(hintString),
 			})
 			if _, isObject = result.(*ObjectValue); !isObject {
@@ -511,13 +517,8 @@ func CallNoArgs(self Value, value Value) Value {
 	return ValueCall(self, value, nil)
 }
 
-func CallAssumeCallable(self Value, value Value, argumentsList []Value) Value {
-	object := self.(*ObjectValue).Object
-	return object.InternalMethods().Call(object, value, argumentsList)
-}
-
 func CallAssumeCallableNoArgs(self, value Value) Value {
-	return CallAssumeCallable(self, value, nil)
+	return self.CallAssumeCallable(value, nil)
 }
 
 func ValueType(value Value) string {

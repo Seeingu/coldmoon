@@ -347,7 +347,7 @@ func OrdinarySetWithOwnDescriptor(
 	if setter == nil {
 		return false
 	}
-	_ = CallAssumeCallable(NewValueFromObject(setter), receiver, []Value{value})
+	_ = NewValueFromObject(setter).CallAssumeCallable(receiver, []Value{value})
 	return true
 }
 
