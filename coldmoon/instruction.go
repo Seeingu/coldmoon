@@ -42,6 +42,16 @@ func (i *IStoreConstant) String() string {
 	return "IStoreConstant " + i.Value.String()
 }
 
+// MARK: - Return
+
+type IReturn struct {
+	Instruction
+}
+
+func (i *IReturn) String() string {
+	return "IReturn"
+}
+
 // MARK: - Resolve
 
 type IResolveThisBinding struct {
@@ -202,3 +212,4 @@ var InsTypeof = &ITypeof{}
 var InsToNumber = &IToNumber{}
 var InsToNumeric = &IToNumeric{}
 var InsUnaryMinus = &IUnaryMinus{}
+var InsReturn = &IReturn{}

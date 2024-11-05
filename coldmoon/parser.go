@@ -5,6 +5,7 @@ import "github.com/samber/lo"
 type Parser struct {
 	SourceText string
 	tokenizer  *Tokenizer
+	inFunction bool
 }
 
 func NewParser(sourceText string) *Parser {
@@ -87,6 +88,8 @@ func (p *Parser) statement() Statement {
 		return p.throwStatement()
 	case TRightBrace:
 		return nil
+	case TReturn:
+		return p.returnStatement()
 	default:
 		return p.expressionStatement()
 	}
@@ -125,6 +128,12 @@ func (p *Parser) formalParameters() *FormalParameters {
 }
 
 func (p *Parser) functionDeclaration() *FunctionDeclaration {
+	inFunctionBefore := p.inFunction
+	p.inFunction = true
+	defer func() {
+		p.inFunction = inFunctionBefore
+	}()
+
 	p.tokenizer.MustMatch(TFunction)
 	identifier := p.bindingIdentifier()
 	p.tokenizer.MustMatch(TLeftParen)
@@ -170,6 +179,8 @@ func (p *Parser) breakableStatement() *BreakableStatement {
 	}
 }
 
+// MARK: - Iteration
+
 func (p *Parser) iterationStatement() IterationStatement {
 	t := p.tokenizer.CurrentToken
 	if t.Type == TDo {
@@ -203,6 +214,27 @@ func (p *Parser) whileStatement() *StatementWhile {
 	return &StatementWhile{
 		Condition: condition,
 		Body:      body,
+	}
+}
+
+// MARK: - Return
+
+func (p *Parser) returnStatement() *StatementReturn {
+	p.tokenizer.MustMatch(TReturn)
+	t := p.tokenizer.CurrentToken
+
+	if !p.inFunction {
+		panic("returnStatement: not in function")
+	}
+
+	if t.Type == TSemicolon {
+		p.tokenizer.Next()
+		return &StatementReturn{}
+	}
+	expr := p.expression()
+	p.tokenizer.MustMatch(TSemicolon)
+	return &StatementReturn{
+		Expression: expr,
 	}
 }
 

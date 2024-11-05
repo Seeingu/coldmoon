@@ -783,6 +783,32 @@ func (s *StatementDoWhile) String() string {
 	return sb
 }
 
+// MARK: - ReturnStatement
+
+type StatementReturn struct {
+	Statement
+	Expression Expression
+}
+
+func (s *StatementReturn) Bytecode(e *Executable, c *BytecodeContext) {
+	if s.Expression != nil {
+		s.Expression.Bytecode(e, c)
+		if s.Expression.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+	} else {
+		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
+	}
+	e.AddInstruction(InsReturn)
+}
+
+func (s *StatementReturn) String() string {
+	if s.Expression != nil {
+		return "Return " + s.Expression.String()
+	}
+	return "Return"
+}
+
 // MARK: - Declaration
 
 type Declaration interface {

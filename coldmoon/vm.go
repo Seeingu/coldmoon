@@ -80,6 +80,8 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 			vm.stack.Push(this)
 		case *IResolveThisBinding:
 			vm.result = vm.agent.ResolveThisBinding()
+		case *IReturn:
+			return NewNormalCompletion(vm.result)
 		case *IJump:
 			vm.ip = ins.Target
 		case *IJumpIfTrue:
