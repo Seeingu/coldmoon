@@ -128,6 +128,27 @@ func (p *PrimaryExpressionParenthesizedExpression) Analyze(a AnalyzeQuery) bool 
 	}
 }
 
+// MARK: - FunctionExpression
+
+type PrimaryExpressionFunctionExpression struct {
+	PrimaryExpression
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+}
+
+func (p *PrimaryExpressionFunctionExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (p *PrimaryExpressionFunctionExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IInstantiateOrdinaryFunctionExpression{FunctionExpression: p})
+}
+
+func (p *PrimaryExpressionFunctionExpression) String() string {
+	return "FunctionExpression " + string(p.Identifier)
+}
+
 // MARK: - MemberExpression
 
 type ASTProperty interface {
@@ -603,11 +624,20 @@ type FunctionBody struct {
 }
 
 func (f *FunctionBody) Bytecode(e *Executable, c *BytecodeContext) {
+	strictBefore := c.containedInStrictCode
+	c.containedInStrictCode = c.containedInStrictCode || f.FunctionBodyContainsUseStrict()
+	defer func() {
+		c.containedInStrictCode = strictBefore
+	}()
 	f.StatementList.Bytecode(e, c)
 }
 
 func (f *FunctionBody) String() string {
 	return f.StatementList.String()
+}
+
+func (f *FunctionBody) FunctionBodyContainsUseStrict() bool {
+	return f.StatementList.ContainsDirective("use strict")
 }
 
 // MARK: - FormalParameters
@@ -859,7 +889,6 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 		functionCreateThisModeNonLexical,
 		env,
 		privateEnv,
-		f.functionBodyContainsUseStrict(),
 	)
 
 	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")

@@ -151,6 +151,33 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	}
 }
 
+func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
+	inFunctionBefore := p.inFunction
+	p.inFunction = true
+	defer func() {
+		p.inFunction = inFunctionBefore
+	}()
+
+	p.tokenizer.MustMatch(TFunction)
+	var identifier IdentifierName
+	if p.tokenizer.CurrentToken.Type == TIdentifier {
+		identifier = p.bindingIdentifier()
+	}
+	p.tokenizer.MustMatch(TLeftParen)
+	params := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	statementList := p.statementList()
+	p.tokenizer.MustMatch(TRightBrace)
+	return &PrimaryExpressionFunctionExpression{
+		Identifier:       identifier,
+		FormalParameters: params,
+		Body: &FunctionBody{
+			StatementList: statementList,
+		},
+	}
+}
+
 func (p *Parser) noLineTerminatorHere() {
 	// TODO
 }
@@ -430,6 +457,8 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		return p.identifierReference()
 	case TLeftParen:
 		return p.parenthesizedExpression()
+	case TFunction:
+		return p.functionExpression()
 	default:
 		literal := p.literal()
 

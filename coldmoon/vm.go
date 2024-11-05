@@ -95,6 +95,14 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 			value := vm.result
 			vm.agent.exception = value
 			panic("Throw")
+		case *IInstantiateOrdinaryFunctionExpression:
+			functionExpression := ins.FunctionExpression
+			closure := InstantiateOrdinaryFunctionExpression(
+				vm.agent,
+				functionExpression,
+				"",
+			)
+			vm.result = NewValueFromObject(closure)
 		case *ITypeof:
 			if vm.reference != nil {
 				if vm.reference.IsUnresolvableReference() {
@@ -252,4 +260,50 @@ func directEval(agent *Agent, arguments []Value, strict bool) Value {
 	evalArg := arguments[0]
 	strictCaller := strict
 	return PerformEval(agent, evalArg, strictCaller, true)
+}
+
+// 15.2.5
+func InstantiateOrdinaryFunctionExpression(
+	agent *Agent,
+	functionExpression *PrimaryExpressionFunctionExpression,
+	name string,
+) ObjectType {
+	realm := agent.CurrentRealm()
+	if functionExpression.Identifier != "" {
+		Assert(name == "")
+		name = string(functionExpression.Identifier)
+		outerEnv := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := ""
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			functionExpression.FormalParameters,
+			functionExpression.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		return closure
+	} else {
+		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := ""
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			functionExpression.FormalParameters,
+			functionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		return closure
+	}
 }

@@ -202,6 +202,13 @@ func (i *IBitwiseNot) String() string {
 	return "IBitwiseNot"
 }
 
+// MARK: - Function
+
+type IInstantiateOrdinaryFunctionExpression struct {
+	Instruction
+	FunctionExpression *PrimaryExpressionFunctionExpression
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

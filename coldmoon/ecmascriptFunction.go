@@ -131,16 +131,10 @@ func OrdinaryFunctionCreate(
 	functionCreateThisMode functionCreateThisMode,
 	env EnvironmentRecord,
 	privateEnv *PrivateEnvironment,
-	strict bool,
 ) *ECMAScriptFunction {
 	var thisMode ThisMode = ThisModeLexical
-	if functionCreateThisMode == functionCreateThisModeNonLexical {
-		if strict {
-			thisMode = ThisModeStrict
-		} else {
-			thisMode = ThisModeGlobal
-		}
-	}
+	strict := body.FunctionBodyContainsUseStrict()
+
 	function := &ECMAScriptFunction{
 		Object:             NewObject(agent, functionPrototype),
 		Realm:              agent.CurrentRealm(),
