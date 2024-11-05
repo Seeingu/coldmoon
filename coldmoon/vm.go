@@ -275,7 +275,7 @@ func InstantiateOrdinaryFunctionExpression(
 		outerEnv := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		funcEnv := NewDeclarativeEnvironment(outerEnv)
 		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
-		sourceText := ""
+		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			agent,
 			realm.Intrinsics.FunctionPrototype,
@@ -291,7 +291,7 @@ func InstantiateOrdinaryFunctionExpression(
 	} else {
 		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
-		sourceText := ""
+		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			agent,
 			realm.Intrinsics.FunctionPrototype,

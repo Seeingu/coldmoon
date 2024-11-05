@@ -135,6 +135,7 @@ type PrimaryExpressionFunctionExpression struct {
 	Identifier       IdentifierName
 	FormalParameters *FormalParameters
 	Body             *FunctionBody
+	SourceText       string
 }
 
 func (p *PrimaryExpressionFunctionExpression) Analyze(a AnalyzeQuery) bool {
@@ -868,6 +869,7 @@ type FunctionDeclaration struct {
 	Identifier       IdentifierName
 	Body             *FunctionBody
 	FormalParameters *FormalParameters
+	SourceText       string
 }
 
 // 15.2.2
@@ -879,7 +881,7 @@ func (f *FunctionDeclaration) functionBodyContainsUseStrict() bool {
 func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
 	realm := agent.CurrentRealm()
 	name := f.Identifier
-	sourceText := ""
+	sourceText := f.SourceText
 	function := OrdinaryFunctionCreate(
 		agent,
 		realm.Intrinsics.FunctionPrototype,

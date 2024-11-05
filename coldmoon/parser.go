@@ -134,6 +134,7 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 		p.inFunction = inFunctionBefore
 	}()
 
+	startOffset := p.tokenizer.Index
 	p.tokenizer.MustMatch(TFunction)
 	identifier := p.bindingIdentifier()
 	p.tokenizer.MustMatch(TLeftParen)
@@ -142,9 +143,11 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	p.tokenizer.MustMatch(TLeftBrace)
 	statementList := p.statementList()
 	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
 	return &FunctionDeclaration{
 		Identifier:       identifier,
 		FormalParameters: params,
+		SourceText:       sourceText,
 		Body: &FunctionBody{
 			StatementList: statementList,
 		},
@@ -158,6 +161,7 @@ func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
 		p.inFunction = inFunctionBefore
 	}()
 
+	startOffset := p.tokenizer.Index
 	p.tokenizer.MustMatch(TFunction)
 	var identifier IdentifierName
 	if p.tokenizer.CurrentToken.Type == TIdentifier {
@@ -169,9 +173,11 @@ func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
 	p.tokenizer.MustMatch(TLeftBrace)
 	statementList := p.statementList()
 	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
 	return &PrimaryExpressionFunctionExpression{
 		Identifier:       identifier,
 		FormalParameters: params,
+		SourceText:       sourceText,
 		Body: &FunctionBody{
 			StatementList: statementList,
 		},
