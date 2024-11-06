@@ -3,23 +3,33 @@ package coldmoon
 import "github.com/samber/lo"
 
 type Parser struct {
-	SourceText string
-	tokenizer  *Tokenizer
-	inFunction bool
+	SourceText     string
+	tokenizer      *Tokenizer
+	inFunctionBody bool
+	ctx            ParserContext
 }
 
-func NewParser(sourceText string) *Parser {
+func NewParser(sourceText string, ctx ParserContext) *Parser {
 	return &Parser{
 		SourceText: sourceText,
 		tokenizer:  NewTokenizer(sourceText),
+		ctx:        ctx,
 	}
 }
 
-func (p *Parser) Parse() *Script {
-	list := p.statementList()
+func Parse(sourceText string, ctx ParserContext) *Script {
 	return &Script{
-		StatementList: list,
+		StatementList: ParseNode(sourceText, ctx),
 	}
+}
+
+type ParserContext struct {
+	FileName string
+}
+
+func ParseNode(sourceText string, ctx ParserContext) StatementList {
+	p := NewParser(sourceText, ctx)
+	return p.statementList()
 }
 
 func (p *Parser) statementList() (list StatementList) {
@@ -35,6 +45,19 @@ func (p *Parser) statementList() (list StatementList) {
 	}
 
 	return
+}
+
+func (p *Parser) functionBody() *FunctionBody {
+	inFunctionBodyBefore := p.inFunctionBody
+	p.inFunctionBody = true
+	defer func() {
+		p.inFunctionBody = inFunctionBodyBefore
+	}()
+
+	list := p.statementList()
+	return &FunctionBody{
+		StatementList: list,
+	}
 }
 
 func (p *Parser) statementListItem() StatementListItem {
@@ -128,12 +151,6 @@ func (p *Parser) formalParameters() *FormalParameters {
 }
 
 func (p *Parser) functionDeclaration() *FunctionDeclaration {
-	inFunctionBefore := p.inFunction
-	p.inFunction = true
-	defer func() {
-		p.inFunction = inFunctionBefore
-	}()
-
 	startOffset := p.tokenizer.Index
 	p.tokenizer.MustMatch(TFunction)
 	identifier := p.bindingIdentifier()
@@ -141,26 +158,18 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
-	statementList := p.statementList()
+	functionBody := p.functionBody()
 	p.tokenizer.MustMatch(TRightBrace)
 	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
 	return &FunctionDeclaration{
 		Identifier:       identifier,
 		FormalParameters: params,
 		SourceText:       sourceText,
-		Body: &FunctionBody{
-			StatementList: statementList,
-		},
+		Body:             functionBody,
 	}
 }
 
 func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
-	inFunctionBefore := p.inFunction
-	p.inFunction = true
-	defer func() {
-		p.inFunction = inFunctionBefore
-	}()
-
 	startOffset := p.tokenizer.Index
 	p.tokenizer.MustMatch(TFunction)
 	var identifier IdentifierName
@@ -171,16 +180,14 @@ func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
-	statementList := p.statementList()
+	functionBody := p.functionBody()
 	p.tokenizer.MustMatch(TRightBrace)
 	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
 	return &PrimaryExpressionFunctionExpression{
 		Identifier:       identifier,
 		FormalParameters: params,
 		SourceText:       sourceText,
-		Body: &FunctionBody{
-			StatementList: statementList,
-		},
+		Body:             functionBody,
 	}
 }
 
@@ -256,7 +263,7 @@ func (p *Parser) returnStatement() *StatementReturn {
 	p.tokenizer.MustMatch(TReturn)
 	t := p.tokenizer.CurrentToken
 
-	if !p.inFunction {
+	if !p.inFunctionBody {
 		panic("returnStatement: not in function")
 	}
 

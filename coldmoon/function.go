@@ -20,3 +20,28 @@ func NewFunctionPrototype(realm *Realm) ObjectType {
 	})
 	return f
 }
+
+// 20.2.3.5
+func (f *FunctionPrototype) ToString(thisValue Value) Value {
+	f.Object.Agent()
+	fun := thisValue
+	o, ok := fun.(*ObjectValue)
+	if ok {
+		ecmascriptFunction, ok := o.Object.(*ECMAScriptFunction)
+		if ok {
+			return NewStringValue(ecmascriptFunction.SourceText)
+		}
+
+		builtinFunction, ok := o.Object.(*BuiltinFunction)
+		if ok {
+			name := builtinFunction.InitialName
+			sourceText := "function " + name + "() { [native code] }"
+			return NewStringValue(sourceText)
+		}
+	}
+	if IsCallable(fun) {
+		return NewStringValue("function () { [native code] }")
+	}
+
+	panic("TypeError")
+}
