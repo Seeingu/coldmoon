@@ -121,7 +121,6 @@ func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 
 // 7.3.6
 func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) bool {
-
 	success := o.CreateDataProperty(key, value)
 	if !success {
 		o.Agent().ThrowException(TypeError, "CreateDataPropertyOrThrow failed")

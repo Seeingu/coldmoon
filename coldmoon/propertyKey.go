@@ -14,6 +14,9 @@ func NewStringPropertyKey(value string) StringPropertyKey {
 func NewSymbolPropertyKey(value *SymbolValue) SymbolPropertyKey {
 	return SymbolPropertyKey{Value: value}
 }
+func NewIntegerIndexPropertyKey(value int) IntegerIndexPropertyKey {
+	return IntegerIndexPropertyKey{Value: value}
+}
 
 type StringPropertyKey struct {
 	PropertyKey

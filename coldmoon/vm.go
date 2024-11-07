@@ -142,7 +142,7 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 
 		case *IToNumber:
 			value := vm.result
-			vm.result = ToNumber(value, vm.agent)
+			vm.result = ToNumber(vm.agent, value)
 		case *IToNumeric:
 			value := vm.result
 			vm.result = ToNumeric(value, vm.agent)

@@ -6,9 +6,13 @@ type Intrinsics struct {
 	// %Object%
 	ObjectConstructor ObjectType
 	// %Function.Prototype%
+	FunctionPrototype ObjectType
 	// %Function%
 	FunctionConstructor ObjectType
-	FunctionPrototype   ObjectType
+	// %Array%
+	ArrayConstructor ObjectType
+	// %Array.Prototype%
+	ArrayPrototype *ArrayPrototype
 	// %Boolean.Prototype%
 	BooleanPrototype *BooleanPrototype
 	// %Boolean%

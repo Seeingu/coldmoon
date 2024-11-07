@@ -11,6 +11,7 @@ type ObjectType interface {
 	IsExtensible() bool
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
+	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
 	ToObject() *Object
 	Get(key PropertyKey) Value
 	Set(key PropertyKey, value Value, throw setThrowType)

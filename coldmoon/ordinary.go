@@ -100,7 +100,7 @@ func InternalDefineOwnProperty(object ObjectType, key PropertyKey, desc *Propert
 	return OrdinaryDefineOwnProperty(object.(*Object), key, desc)
 }
 
-func OrdinaryDefineOwnProperty(object *Object, key PropertyKey, desc *PropertyDescriptor) bool {
+func OrdinaryDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
 	current := object.PropertyStorage().Get(key)
 
 	extensible := object.Extensible()

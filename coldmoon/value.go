@@ -140,7 +140,7 @@ func ToPrimitive(value Value, agent *Agent, hint PreferredType) Value {
 	return value
 }
 
-func ToNumber(value Value, agent *Agent) *NumberValue {
+func ToNumber(agent *Agent, value Value) *NumberValue {
 	switch value := value.(type) {
 	case *NumberValue:
 		return value
@@ -162,7 +162,7 @@ func ToNumber(value Value, agent *Agent) *NumberValue {
 			Assert(false)
 		}
 
-		return ToNumber(primValue, agent)
+		return ToNumber(agent, primValue)
 	}
 	panic("TypeError")
 
@@ -174,10 +174,10 @@ func ToNumeric(value Value, agent *Agent) Value {
 	if bigInt, ok := primValue.(*BigIntValue); ok {
 		return bigInt
 	}
-	return ToNumber(primValue, agent)
+	return ToNumber(agent, primValue)
 }
 func ToIntegerOrInfinity(value Value, agent *Agent) float64 {
-	number := ToNumber(value, agent)
+	number := ToNumber(agent, value)
 	if number.IsNaN() {
 		return 0
 	}
@@ -199,7 +199,7 @@ var POW_2_8 = math.Pow(2, 8)
 var POW_2_7 = math.Pow(2, 7)
 
 func ToInt32(value Value, agent *Agent) int32 {
-	number := ToNumber(value, agent)
+	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -214,8 +214,8 @@ func ToInt32(value Value, agent *Agent) int32 {
 	}
 
 }
-func ToUint32(value Value, agent *Agent) uint32 {
-	number := ToNumber(value, agent)
+func ToUint32(agent *Agent, value Value) uint32 {
+	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -226,7 +226,7 @@ func ToUint32(value Value, agent *Agent) uint32 {
 	return uint32(int32bit)
 }
 func ToInt16(value Value, agent *Agent) int16 {
-	number := ToNumber(value, agent)
+	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -242,7 +242,7 @@ func ToInt16(value Value, agent *Agent) int16 {
 	}
 }
 func ToUint16(value Value, agent *Agent) uint16 {
-	number := ToNumber(value, agent)
+	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -251,7 +251,7 @@ func ToUint16(value Value, agent *Agent) uint16 {
 	return uint16(int16bit)
 }
 func ToInt8(value Value, agent *Agent) int8 {
-	number := ToNumber(value, agent)
+	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -264,7 +264,7 @@ func ToInt8(value Value, agent *Agent) int8 {
 	}
 }
 func ToUint8(value Value, agent *Agent) uint8 {
-	number := ToNumber(value, agent)
+	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -273,7 +273,7 @@ func ToUint8(value Value, agent *Agent) uint8 {
 	return uint8(int8bit)
 }
 func ToUint8Clamp(value Value, agent *Agent) uint8 {
-	number := ToNumber(value, agent)
+	number := ToNumber(agent, value)
 	if number.IsNaN() {
 		return 0
 	}
@@ -404,6 +404,13 @@ func ToIndex(value Value, agent *Agent) uint64 {
 
 // 7.2.2
 func isArray(value Value) bool {
+	o, ok := value.(*ObjectValue)
+	if !ok {
+		return false
+	}
+	if _, ok = o.Object.(*ArrayObject); ok {
+		return true
+	}
 	return false
 }
 

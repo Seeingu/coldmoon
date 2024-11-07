@@ -98,13 +98,22 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"Array",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.ArrayConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }
 
 func NewIsFinite(realm *Realm) ObjectType {
 	var isFinite BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		number := ToNumber(args[0], realm.Agent)
+		number := ToNumber(realm.Agent, args[0])
 		return NewBooleanValue(number.IsFinite())
 	}
 
@@ -115,7 +124,7 @@ func NewIsFinite(realm *Realm) ObjectType {
 
 func NewIsNaN(realm *Realm) ObjectType {
 	var isNaN BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		number := ToNumber(args[0], realm.Agent)
+		number := ToNumber(realm.Agent, args[0])
 		return NewBooleanValue(number.IsNaN())
 	}
 
