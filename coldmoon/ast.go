@@ -193,6 +193,166 @@ func (p *PrimaryExpressionArrayLiteral) Analyze(a AnalyzeQuery) bool {
 	return false
 }
 
+// MARK: - ObjectLiteral
+
+type PrimaryExpressionObjectLiteral struct {
+	PrimaryExpression
+	PropertyList *PropertyDefinitionList
+}
+
+func (p *PrimaryExpressionObjectLiteral) Bytecode(e *Executable, c *BytecodeContext) {
+	if len(p.PropertyList.Items) == 0 {
+		e.AddInstruction(&IObjectCreate{})
+		return
+	}
+
+	e.AddInstruction(&IObjectCreate{})
+	e.AddInstruction(InsLoad)
+
+	p.PropertyList.Bytecode(e, c)
+
+	e.AddInstruction(InsStore)
+}
+
+func (p *PrimaryExpressionObjectLiteral) String() string {
+	sb := "{"
+	sb += p.PropertyList.String()
+	sb += "}"
+	return sb
+}
+
+type PropertyDefinitionList struct {
+	ASTNode
+	Items []PropertyDefinition
+}
+
+func (p *PropertyDefinitionList) Bytecode(e *Executable, c *BytecodeContext) {
+	for _, item := range p.Items {
+		item.Bytecode(e, c)
+	}
+}
+
+func (p *PropertyDefinitionList) String() string {
+	var sb string
+	for i, item := range p.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+type PropertyDefinition interface {
+	ASTNode
+}
+
+type PropertyDefinitionIdentifierReference struct {
+	PropertyDefinition
+	IdentifierReference *IdentifierReference
+}
+
+func (p *PropertyDefinitionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
+	propName := p.IdentifierReference.Identifier
+	e.AddInstruction(&ILoadConstant{
+		Value: NewStringValue(string(propName)),
+	})
+
+	e.AddInstruction(InsGetValue)
+	e.AddInstruction(InsLoad)
+
+	e.AddInstruction(&IObjectSetProperty{})
+	e.AddInstruction(InsLoad)
+}
+func (p *PropertyDefinitionIdentifierReference) String() string {
+	return p.IdentifierReference.String()
+}
+
+type PropertyDefinitionNameAndExpression struct {
+	PropertyDefinition
+	Name       PropertyName
+	Expression Expression
+}
+
+func (p *PropertyDefinitionNameAndExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	p.Name.Bytecode(e, c)
+
+	p.Expression.Bytecode(e, c)
+
+	if p.Expression.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	e.AddInstruction(InsLoad)
+	e.AddInstruction(&IObjectSetProperty{})
+	e.AddInstruction(InsLoad)
+}
+
+func (p *PropertyDefinitionNameAndExpression) String() string {
+	return p.Name.String() + ": " + p.Expression.String()
+}
+
+// MARK: - PropertyName
+
+type PropertyName interface {
+	ASTNode
+}
+type PropertyNameLiteral interface {
+	PropertyName
+}
+type PropertyNameLiteralIdentifier struct {
+	PropertyNameLiteral
+	Identifier IdentifierName
+}
+
+func (p *PropertyNameLiteralIdentifier) String() string {
+	return string(p.Identifier)
+}
+func (p *PropertyNameLiteralIdentifier) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&ILoadConstant{Value: NewStringValue(string(p.Identifier))})
+}
+
+type PropertyNameLiteralString struct {
+	PropertyNameLiteral
+	StringLiteral *LiteralString
+}
+
+func (p *PropertyNameLiteralString) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&ILoadConstant{Value: p.StringLiteral.StringValue()})
+}
+
+func (p *PropertyNameLiteralString) String() string {
+	return p.StringLiteral.String()
+}
+
+type PropertyNameLiteralNumeric struct {
+	PropertyNameLiteral
+	NumericLiteral *LiteralNumeric
+}
+
+func (p *PropertyNameLiteralNumeric) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&ILoadConstant{Value: NewStringValue(p.NumericLiteral.Value)})
+}
+
+func (p *PropertyNameLiteralNumeric) String() string {
+	return p.NumericLiteral.String()
+}
+
+type PropertyNameComputed struct {
+	PropertyName
+	Expression Expression
+}
+
+func (p *PropertyNameComputed) String() string {
+	return p.Expression.String()
+}
+func (p *PropertyNameComputed) Bytecode(e *Executable, c *BytecodeContext) {
+	p.Expression.Bytecode(e, c)
+	if p.Expression.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	e.AddInstruction(InsLoad)
+}
+
 // MARK: - FunctionExpression
 
 type PrimaryExpressionFunctionExpression struct {

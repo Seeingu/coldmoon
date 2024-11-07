@@ -370,7 +370,7 @@ func StringToBigInt(value *StringValue) *BigIntValue {
 }
 
 // 7.1.19
-func ToPropertyKey(value Value, agent *Agent) PropertyKey {
+func ToPropertyKey(agent *Agent, value Value) PropertyKey {
 	key := ToPrimitive(value, agent, PreferredTypeString)
 	if symbolKey, ok := key.(*SymbolValue); ok {
 		return NewSymbolPropertyKey(symbolKey)

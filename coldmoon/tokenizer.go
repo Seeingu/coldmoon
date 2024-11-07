@@ -115,6 +115,8 @@ func (t *Tokenizer) peek() Token {
 
 	ch := t.SourceText[t.Index]
 	switch ch {
+	case ':':
+		return Token{Type: TColon, Value: ":"}
 	case '{':
 		t.Index++
 		return Token{Type: TLeftBrace, Value: "{"}

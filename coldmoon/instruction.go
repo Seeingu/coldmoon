@@ -237,6 +237,24 @@ func (i *IArraySetLength) String() string {
 	return "IArraySetLength " + fmt.Sprintf("%d", i.Length)
 }
 
+// MARK: - Object
+
+type IObjectCreate struct {
+	Instruction
+}
+
+func (i *IObjectCreate) String() string {
+	return "IObjectCreate"
+}
+
+type IObjectSetProperty struct {
+	Instruction
+}
+
+func (i *IObjectSetProperty) String() string {
+	return "IObjectSetProperty"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

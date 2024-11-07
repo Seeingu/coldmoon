@@ -467,6 +467,8 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		}
 	case TLeftBracket:
 		return p.arrayLiteral()
+	case TLeftBrace:
+		return p.objectLiteral()
 	case TIdentifier:
 		return p.identifierReference()
 	case TLeftParen:
@@ -481,6 +483,78 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 				Literal: literal,
 			},
 		}
+	}
+}
+
+func (p *Parser) objectLiteral() *PrimaryExpressionObjectLiteral {
+	p.tokenizer.MustMatch(TLeftBrace)
+	list := p.propertyDefinitionList()
+	p.tokenizer.MustMatch(TRightBrace)
+	return &PrimaryExpressionObjectLiteral{
+		PropertyList: list,
+	}
+}
+func (p *Parser) propertyDefinitionList() *PropertyDefinitionList {
+	var list []PropertyDefinition
+	for {
+		t := p.tokenizer.CurrentToken
+		if t.Type == TRightBrace {
+			break
+		}
+		if t.Type == TComma {
+			p.tokenizer.Next()
+			continue
+		}
+		prop := p.propertyDefinition()
+		list = append(list, prop)
+		if p.tokenizer.CurrentToken.Type == TComma {
+			p.tokenizer.Next()
+		}
+	}
+	return &PropertyDefinitionList{
+		Items: list,
+	}
+}
+
+func (p *Parser) propertyDefinition() PropertyDefinition {
+	t := p.tokenizer.CurrentToken
+	var propertyName PropertyName
+	switch t.Type {
+	case TIdentifier:
+		identifierRef := p.identifierReference()
+		if p.tokenizer.CurrentToken.Type != TColon {
+			return &PropertyDefinitionIdentifierReference{
+				IdentifierReference: identifierRef,
+			}
+		}
+		propertyName = &PropertyNameLiteralIdentifier{
+			Identifier: identifierRef.Identifier,
+		}
+	case TString:
+		stringLiteral := p.stringLiteral()
+		propertyName = &PropertyNameLiteralString{
+			StringLiteral: stringLiteral,
+		}
+	case TNumber:
+		numberLiteral := p.numericLiteral()
+		propertyName = &PropertyNameLiteralNumeric{
+			NumericLiteral: numberLiteral,
+		}
+	case TLeftBracket:
+		p.tokenizer.Next()
+		computedPropertyName := p.expression()
+		propertyName = &PropertyNameComputed{
+			Expression: computedPropertyName,
+		}
+		p.tokenizer.MustMatch(TRightBracket)
+	default:
+		panic("propertyDefinition: unexpected token")
+	}
+	p.tokenizer.MustMatch(TColon)
+	value := p.expression()
+	return &PropertyDefinitionNameAndExpression{
+		Name:       propertyName,
+		Expression: value,
 	}
 }
 
@@ -522,15 +596,31 @@ func (p *Parser) literal() Literal {
 	case TNull:
 		return &LiteralNull{}
 	case TNumber:
-		return &LiteralNumeric{
-			Value: t.Value,
-		}
+		return p.numericLiteral()
 	case TString:
-		return &LiteralString{
-			Value: t.Value,
-		}
+		return p.stringLiteral()
 	default:
 		panic("literal: unhandled token")
+	}
+}
+
+func (p *Parser) numericLiteral() *LiteralNumeric {
+	t := p.tokenizer.CurrentToken
+	if t.Type != TNumber {
+		panic("numericLiteral: expected number")
+	}
+	return &LiteralNumeric{
+		Value: t.Value,
+	}
+}
+
+func (p *Parser) stringLiteral() *LiteralString {
+	t := p.tokenizer.CurrentToken
+	if t.Type != TString {
+		panic("stringLiteral: expected string")
+	}
+	return &LiteralString{
+		Value: t.Value,
 	}
 }
 

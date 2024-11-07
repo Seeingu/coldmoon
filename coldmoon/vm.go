@@ -159,6 +159,15 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 		case *ILogicalNot:
 			value := vm.result
 			vm.result = NewBooleanValue(!value.ToBoolean())
+		case *IObjectCreate:
+			object := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
+			vm.result = NewValueFromObject(object)
+		case *IObjectSetProperty:
+			value := vm.stack.Pop()
+			propertyKey := ToPropertyKey(vm.agent, vm.stack.Pop())
+			object := vm.stack.Pop().(*ObjectValue).Object
+			object.CreateDataPropertyOrThrow(propertyKey, value)
+			vm.result = NewValueFromObject(object)
 		case *IBitwiseNot:
 			value := vm.result
 			switch v := value.(type) {
@@ -174,7 +183,7 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 			propertyNameValue := vm.stack.Pop()
 			strict := ins.Strict
 			baseValue := vm.stack.Pop()
-			propertyKey := ToPropertyKey(propertyNameValue, vm.agent)
+			propertyKey := ToPropertyKey(vm.agent, propertyNameValue)
 
 			var referencedName ReferencedName
 			switch p := propertyKey.(type) {
