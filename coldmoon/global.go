@@ -89,6 +89,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"Function",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.FunctionConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

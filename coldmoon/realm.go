@@ -34,6 +34,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.IsNaN = NewIsNaN(r)
 	r.Intrinsics.Eval = NewEval(r)
 	r.Intrinsics.ObjectConstructor = NewObjectConstructor(r)
+	r.Intrinsics.FunctionConstructor = NewFunctionConstructor(r)
 
 	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
 }

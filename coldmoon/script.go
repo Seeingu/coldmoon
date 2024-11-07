@@ -12,7 +12,7 @@ type ScriptRecord struct {
 // ParseScript
 // 16.1.5
 func ParseScript(sourceText string, realm *Realm, hostDefined interface{}) *ScriptRecord {
-	script := Parse(sourceText, ParserContext{FileName: "file.js"})
+	script := NewParser(sourceText, ParserContext{FileName: "file.js"}).Parse()
 
 	s := &ScriptRecord{
 		Realm:          realm,

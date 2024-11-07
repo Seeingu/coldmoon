@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/samber/lo"
+
 type FunctionPrototype struct {
 	*Object
 }
@@ -44,4 +46,125 @@ func (f *FunctionPrototype) ToString(thisValue Value) Value {
 	}
 
 	panic("TypeError")
+}
+
+type FunctionConstructor struct {
+	*Object
+}
+
+type dynamicFunctionKind int
+
+const (
+	dynamicFunctionKindNormal dynamicFunctionKind = iota
+	dynamicFunctionKindGenerator
+	dynamicFunctionKindAsync
+	dynamicFunctionKindAsyncGenerator
+)
+
+// 20.2.1.1.1
+func CreateDynamicFunction(
+	agent *Agent,
+	constructor ObjectType,
+	newTarget ObjectType,
+	kind dynamicFunctionKind,
+	parameterList ArgumentsList,
+	bodyArg Value,
+) ObjectType {
+	realm := agent.CurrentRealm()
+
+	currentRealm := realm
+	_ = currentRealm
+
+	if newTarget == nil {
+		newTarget = constructor
+	}
+
+	var prefix string
+	var fallbackPrototype string
+	switch kind {
+	case dynamicFunctionKindNormal:
+		prefix = "function"
+		fallbackPrototype = "%Function.prototype%"
+
+	}
+
+	argCount := len(parameterList)
+	P := ""
+	if argCount > 0 {
+		P = parameterList[0].String()
+		for i := 1; i < argCount; i++ {
+			P += ", " + parameterList[i].String()
+		}
+	}
+
+	bodyString := bodyArg.String()
+
+	sourceString := prefix + " " + P + " " + bodyString
+
+	sourceText := sourceString
+
+	parameters := NewParser(P, ParserContext{
+		FileName: "Function",
+	}).formalParameters()
+
+	body := NewParser(bodyString, ParserContext{
+		FileName: "Function",
+	}).functionBody()
+
+	proto := GetPrototypeFromConstructor(newTarget, fallbackPrototype)
+
+	env := realm.GlobalEnv
+
+	var privateEnv *PrivateEnvironment
+
+	function := OrdinaryFunctionCreate(
+		agent,
+		proto,
+		sourceText,
+		parameters,
+		body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+
+	SetFunctionName(function, NewStringPropertyKey("anonymous"), "")
+	switch kind {
+	case dynamicFunctionKindNormal:
+		// TODO
+	default:
+		panic("unimplemented")
+	}
+	return function
+}
+
+func NewFunctionConstructor(realm *Realm) ObjectType {
+	// 20.2.1.1
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		parameters := argumentsList[0 : len(argumentsList)-1]
+		agent := realm.Agent
+
+		constructor := agent.ActiveFunctionObject()
+
+		bodyArg, ok := lo.Last(argumentsList)
+		if !ok {
+			bodyArg = NewStringValue("")
+		}
+
+		return NewValueFromObject(CreateDynamicFunction(
+			agent,
+			constructor,
+			newTarget,
+			dynamicFunctionKindNormal,
+			parameters,
+			bodyArg,
+		))
+	}
+	f := CreateBuiltinFunction(realm.Agent, behavior, 1, "Function", builtinFunctionArgs{
+		realm:         realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		prefix:        "",
+		isConstructor: true,
+	})
+	return f
 }

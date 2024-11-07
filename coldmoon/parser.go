@@ -17,9 +17,9 @@ func NewParser(sourceText string, ctx ParserContext) *Parser {
 	}
 }
 
-func Parse(sourceText string, ctx ParserContext) *Script {
+func (p *Parser) Parse() *Script {
 	return &Script{
-		StatementList: ParseNode(sourceText, ctx),
+		StatementList: p.ParseNode(),
 	}
 }
 
@@ -27,8 +27,7 @@ type ParserContext struct {
 	FileName string
 }
 
-func ParseNode(sourceText string, ctx ParserContext) StatementList {
-	p := NewParser(sourceText, ctx)
+func (p *Parser) ParseNode() StatementList {
 	return p.statementList()
 }
 
