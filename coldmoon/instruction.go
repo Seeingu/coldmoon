@@ -209,6 +209,34 @@ type IInstantiateOrdinaryFunctionExpression struct {
 	FunctionExpression *PrimaryExpressionFunctionExpression
 }
 
+// MARK: - Array
+
+type IArrayCreate struct {
+	Instruction
+}
+
+func (i *IArrayCreate) String() string {
+	return "IArrayCreate"
+}
+
+type IArraySetValue struct {
+	Instruction
+	Index int
+}
+
+func (i *IArraySetValue) String() string {
+	return "IArraySetValue"
+}
+
+type IArraySetLength struct {
+	Instruction
+	Length int
+}
+
+func (i *IArraySetLength) String() string {
+	return "IArraySetLength " + fmt.Sprintf("%d", i.Length)
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
@@ -220,3 +248,4 @@ var InsToNumber = &IToNumber{}
 var InsToNumeric = &IToNumeric{}
 var InsUnaryMinus = &IUnaryMinus{}
 var InsReturn = &IReturn{}
+var InsStore = &IStore{}

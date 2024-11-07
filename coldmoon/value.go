@@ -102,7 +102,7 @@ func (o *ObjectValue) CallAssumeCallable(value Value, argumentsList ArgumentsLis
 }
 
 func (o *ObjectValue) String() string {
-	primValue := ToPrimitive(o, o.Object.ToObject().Agent(), PreferredTypeString)
+	primValue := ToPrimitive(o, o.Object.Agent(), PreferredTypeString)
 	if _, isObject := primValue.(*ObjectValue); isObject {
 		panic("")
 	}
@@ -134,7 +134,7 @@ func ToPrimitive(value Value, agent *Agent, hint PreferredType) Value {
 		if preferredType == PreferredTypeDefault {
 			preferredType = PreferredTypeNumber
 		}
-		return objectValue.Object.ToObject().OrdinaryToPrimitive(preferredType)
+		return objectValue.Object.OrdinaryToPrimitive(preferredType)
 	}
 
 	return value
@@ -348,6 +348,8 @@ func ValueToObject(value Value, agent *Agent) ObjectType {
 		panic("TypeError")
 	case *BooleanValue:
 		return NewBooleanObject(agent, v.Data)
+	case *ObjectValue:
+		return v.Object
 	default:
 		panic("unimplemented")
 	}

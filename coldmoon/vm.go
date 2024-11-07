@@ -221,6 +221,21 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 				vm.result = vm.reference.GetValue()
 			}
 			vm.reference = nil
+		case *IArrayCreate:
+			vm.result = NewValueFromObject(ArrayCreate(vm.agent, 0, nil))
+		case *IArraySetLength:
+			length := ins.Length
+			array := vm.result.(*ObjectValue).Object
+			array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
+		case *IArraySetValue:
+			index := ins.Index
+			initValue := vm.stack.Pop()
+			array := vm.stack.Pop().(*ObjectValue).Object
+			array.CreateDataPropertyOrThrow(
+				NewIntegerIndexPropertyKey(index),
+				initValue,
+			)
+			vm.result = NewValueFromObject(array)
 		}
 		vm.ip += 1
 	}

@@ -64,11 +64,7 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 	}
 
 	arr := &ArrayObject{
-		Object: &Object{
-			data: &Data{
-				prototype: proto,
-			},
-		},
+		Object: NewObject(agent, proto),
 	}
 	arr.Object.InternalMethods().DefineOwnProperty = defineOwnProperty
 	OrdinaryDefineOwnProperty(arr, NewStringPropertyKey("length"), &PropertyDescriptor{
@@ -207,14 +203,10 @@ type ArrayPrototype struct {
 
 func NewArrayPrototype(realm *Realm) *ArrayPrototype {
 	object := &ArrayPrototype{
-		Object: &Object{
-			data: &Data{
-				prototype: realm.Intrinsics.ObjectPrototype,
-			},
-		},
+		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
 	}
 
-	DefineBuiltinProperty(object, "length", &PropertyDescriptor{
+	DefineBuiltinProperty(object.Object, "length", &PropertyDescriptor{
 		Value:        NewNumberValue(0),
 		Writable:     true,
 		Enumerable:   false,

@@ -465,6 +465,8 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		return &ExpressionPrimary{
 			PrimaryExpression: &PrimaryExpressionThis{},
 		}
+	case TLeftBracket:
+		return p.arrayLiteral()
 	case TIdentifier:
 		return p.identifierReference()
 	case TLeftParen:
@@ -479,6 +481,33 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 				Literal: literal,
 			},
 		}
+	}
+}
+
+func (p *Parser) arrayLiteral() *PrimaryExpressionArrayLiteral {
+	p.tokenizer.MustMatch(TLeftBracket)
+	var list []ArrayElement
+	for {
+		t := p.tokenizer.CurrentToken
+		if t.Type == TRightBracket {
+			p.tokenizer.Next()
+			break
+		}
+		if p.tokenizer.NextToken.Type == TComma {
+			list = append(list, &ArrayElementElision{})
+			p.tokenizer.Next()
+		} else {
+			expr := p.expression()
+			list = append(list, &ArrayElementExpression{
+				Expression: expr,
+			})
+			if p.tokenizer.CurrentToken.Type == TComma {
+				p.tokenizer.Next()
+			}
+		}
+	}
+	return &PrimaryExpressionArrayLiteral{
+		ElementList: list,
 	}
 }
 

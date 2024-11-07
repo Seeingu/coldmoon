@@ -90,6 +90,8 @@ func (p *PrimaryExpressionLiteral) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - ThisExpression
+
 type PrimaryExpressionThis struct {
 	PrimaryExpression
 }
@@ -103,6 +105,8 @@ func (p *PrimaryExpressionThis) String() string {
 func (p *PrimaryExpressionThis) Analyze(a AnalyzeQuery) bool {
 	return false
 }
+
+// MARK: - ParenthesizedExpression
 
 type PrimaryExpressionParenthesizedExpression struct {
 	PrimaryExpression
@@ -126,6 +130,67 @@ func (p *PrimaryExpressionParenthesizedExpression) Analyze(a AnalyzeQuery) bool 
 	default:
 		panic("unreachable")
 	}
+}
+
+// MARK: - ArrayLiteral
+
+type ArrayElement interface {
+}
+type ArrayElementElision struct {
+	ArrayElement
+}
+type ArrayElementExpression struct {
+	ArrayElement
+	Expression Expression
+}
+type PrimaryExpressionArrayLiteral struct {
+	PrimaryExpression
+	ElementList []ArrayElement
+}
+
+func (p *PrimaryExpressionArrayLiteral) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IArrayCreate{})
+	e.AddInstruction(InsLoad)
+	for i, element := range p.ElementList {
+		switch element := element.(type) {
+		case *ArrayElementExpression:
+			element.Expression.Bytecode(e, c)
+			if element.Expression.Analyze(AnalyzeQueryIsReference) {
+				e.AddInstruction(InsGetValue)
+			}
+			e.AddInstruction(InsLoad)
+			e.AddInstruction(&IArraySetValue{Index: i})
+			e.AddInstruction(InsLoad)
+		case *ArrayElementElision:
+			e.AddInstruction(InsStore)
+			e.AddInstruction(&IArraySetLength{
+				Length: i + 1,
+			})
+			e.AddInstruction(InsLoad)
+		}
+	}
+	e.AddInstruction(InsStore)
+}
+
+func (p *PrimaryExpressionArrayLiteral) String() string {
+	sb := "["
+	for i, element := range p.ElementList {
+		if i != 0 {
+			sb += ", "
+		}
+		switch element := element.(type) {
+		case *ArrayElementExpression:
+			sb += element.Expression.String()
+		case *ArrayElementElision:
+			sb += ","
+		}
+	}
+	sb += "]"
+	return sb
+}
+
+func (p *PrimaryExpressionArrayLiteral) Analyze(a AnalyzeQuery) bool {
+	return false
 }
 
 // MARK: - FunctionExpression
@@ -761,14 +826,14 @@ func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(jumpIfTrue)
 
 	jumpIfTrue.Target = len(e.Instructions)
-	e.AddInstruction(&IStore{})
+	e.AddInstruction(InsStore)
 	s.Body.Bytecode(e, c)
 	e.AddInstruction(&ILoad{})
 
 	e.AddInstruction(&IJump{Target: condition})
 
 	jumpIfTrue.TargetElse = len(e.Instructions)
-	e.AddInstruction(&IStore{})
+	e.AddInstruction(InsStore)
 }
 
 func (s *StatementWhile) String() string {
@@ -791,7 +856,7 @@ func (s *StatementDoWhile) Bytecode(e *Executable, c *BytecodeContext) {
 
 	bodyIndex := len(e.Instructions)
 
-	e.AddInstruction(&IStore{})
+	e.AddInstruction(InsStore)
 	s.Body.Bytecode(e, c)
 	e.AddInstruction(&ILoad{})
 
@@ -804,7 +869,7 @@ func (s *StatementDoWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	jumpIfTrue := &IJumpIfTrue{Target: bodyIndex, TargetElse: 0}
 	jumpIfTrue.TargetElse = len(e.Instructions)
 
-	e.AddInstruction(&IStore{})
+	e.AddInstruction(InsStore)
 }
 
 func (s *StatementDoWhile) String() string {

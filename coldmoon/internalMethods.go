@@ -12,6 +12,7 @@ type ObjectType interface {
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
+	OrdinaryToPrimitive(hint PreferredType) Value
 	ToObject() *Object
 	Get(key PropertyKey) Value
 	Set(key PropertyKey, value Value, throw setThrowType)
