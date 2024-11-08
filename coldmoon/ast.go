@@ -599,6 +599,80 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - EqualityExpression
+
+type EqualityOperator int
+
+const (
+	EqualityOperatorEqual EqualityOperator = iota
+	EqualityOperatorNotEqual
+	EqualityOperatorStrictEqual
+	EqualityOperatorStrictNotEqual
+)
+
+var operatorEqualityMap = map[TokenType]EqualityOperator{
+	TEquals:          EqualityOperatorEqual,
+	TNotEquals:       EqualityOperatorNotEqual,
+	TStrictEquals:    EqualityOperatorStrictEqual,
+	TStrictNotEquals: EqualityOperatorStrictNotEqual,
+}
+
+func (e EqualityOperator) String() string {
+	switch e {
+	case EqualityOperatorEqual:
+		return "=="
+	case EqualityOperatorNotEqual:
+		return "!="
+	case EqualityOperatorStrictEqual:
+		return "==="
+	case EqualityOperatorStrictNotEqual:
+		return "!=="
+	}
+	return ""
+}
+
+type ExpressionEqualityExpression struct {
+	Expression
+	Left     Expression
+	Operator EqualityOperator
+	Right    Expression
+}
+
+func (e *ExpressionEqualityExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (e *ExpressionEqualityExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.Left.Bytecode(ex, c)
+	if e.Left.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+	ex.AddInstruction(InsLoad)
+
+	e.Right.Bytecode(ex, c)
+	if e.Right.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+	ex.AddInstruction(InsLoad)
+
+	switch e.Operator {
+	case EqualityOperatorEqual:
+		ex.AddInstruction(InsLooselyEqual)
+	case EqualityOperatorNotEqual:
+		ex.AddInstruction(InsLooselyEqual)
+		ex.AddInstruction(InsLogicalNot)
+	case EqualityOperatorStrictEqual:
+		ex.AddInstruction(InsStrictlyEqual)
+	case EqualityOperatorStrictNotEqual:
+		ex.AddInstruction(InsStrictlyEqual)
+		ex.AddInstruction(InsLogicalNot)
+	}
+}
+
+func (e *ExpressionEqualityExpression) String() string {
+	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
+}
+
 // MARK: - RelationalExpression
 
 type RelationalOperator int

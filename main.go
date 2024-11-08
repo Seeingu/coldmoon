@@ -11,6 +11,7 @@ func main() {
 	realm := agent.CurrentRealm()
 	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
 	sourceText := `
+2 == 1;
 2 > 1;
 `
 	script := ParseScript(sourceText, realm, nil)

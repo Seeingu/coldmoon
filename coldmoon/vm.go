@@ -281,6 +281,14 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 			vm.result = NewBooleanValue(
 				InstanceOfOperator(vm.agent, left, right),
 			)
+		case *ILooselyEqual:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			vm.result = NewBooleanValue(IsLooselyEqual(vm.agent, right, left))
+		case *IStrictlyEqual:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			vm.result = NewBooleanValue(IsStrictlyEqual(right, left))
 		}
 		vm.ip += 1
 	}

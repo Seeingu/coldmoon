@@ -559,16 +559,45 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 		return p.callExpression(left)
 	case TLeftBracket, TPeriod:
 		return p.memberExpression(left)
+	case TLessThan,
+		TLessThanEquals,
+		TGreaterThan,
+		TGreaterThanEquals,
+		TInstanceof,
+		TIn:
+		return p.relationalExpression(left, accept)
+	case TEqualsEquals,
+		TNotEquals,
+		TStrictEquals,
+		TStrictNotEquals:
+		return p.equalityExpression(left, accept)
 	default:
-		expr, ok := p.relationalExpression(left, accept)
-		if !ok {
-			return nil
-		}
-		return expr
+		panic("secondaryExpression: unexpected token")
 	}
+	return left
 }
 
-func (p *Parser) relationalExpression(left PrimaryExpression, accept *acceptContext) (*ExpressionRelationalExpression, bool) {
+func (p *Parser) equalityExpression(left PrimaryExpression, accept *acceptContext) *ExpressionEqualityExpression {
+	t := p.tokenizer.CurrentToken
+	tokenTypes := []TokenType{
+		TEqualsEquals,
+		TNotEquals,
+		TStrictEquals,
+		TStrictNotEquals,
+	}
+	if lo.Contains(tokenTypes, t.Type) {
+		p.tokenizer.Next()
+		right := p.expression(accept)
+		return &ExpressionEqualityExpression{
+			Operator: operatorEqualityMap[t.Type],
+			Left:     left,
+			Right:    right,
+		}
+	}
+	panic("equalityExpression: unexpected token")
+}
+
+func (p *Parser) relationalExpression(left PrimaryExpression, accept *acceptContext) *ExpressionRelationalExpression {
 	t := p.tokenizer.CurrentToken
 	tokenTypes := []TokenType{
 		TLessThan,
@@ -585,9 +614,9 @@ func (p *Parser) relationalExpression(left PrimaryExpression, accept *acceptCont
 			Operator: operatorRelationMap[t.Type],
 			Left:     left,
 			Right:    right,
-		}, true
+		}
 	}
-	return nil, false
+	panic("relationalExpression: unexpected token")
 }
 
 func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {

@@ -305,6 +305,24 @@ func (i *ILessThanEquals) String() string {
 	return "ILessThanEquals"
 }
 
+// MARK: - Equality
+
+type ILooselyEqual struct {
+	Instruction
+}
+
+func (i *ILooselyEqual) String() string {
+	return "ILooselyEqual"
+}
+
+type IStrictlyEqual struct {
+	Instruction
+}
+
+func (i *IStrictlyEqual) String() string {
+	return "IStrictlyEqual"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
@@ -323,3 +341,6 @@ var InsGreaterThan = &IGreaterThan{}
 var InsGreaterThanEquals = &IGreaterThanEquals{}
 var InsInstanceOf = &IInstanceOf{}
 var InsHasProperty = &IHasProperty{}
+var InsStrictlyEqual = &IStrictlyEqual{}
+var InsLooselyEqual = &ILooselyEqual{}
+var InsLogicalNot = &ILogicalNot{}
