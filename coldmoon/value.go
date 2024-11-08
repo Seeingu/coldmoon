@@ -3,6 +3,7 @@ package coldmoon
 import (
 	"math"
 	"math/big"
+	"reflect"
 
 	"lukechampine.com/uint128"
 )
@@ -300,7 +301,7 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 
 	return fInt
 }
-func ToBigInt(value Value, agent *Agent) *BigIntValue {
+func ToBigInt(agent *Agent, value Value) *BigIntValue {
 	prim := ToPrimitive(agent, value, PreferredTypeNumber)
 	switch p := prim.(type) {
 	case *undefinedValue, *nullValue, *NumberValue, *SymbolValue:
@@ -310,7 +311,7 @@ func ToBigInt(value Value, agent *Agent) *BigIntValue {
 	case *BigIntValue:
 		return p
 	case *StringValue:
-		n := StringToBigInt(p)
+		n, _ := StringToBigInt(p)
 		return n
 	default:
 		panic("unreachable")
@@ -319,7 +320,7 @@ func ToBigInt(value Value, agent *Agent) *BigIntValue {
 
 // 7.1.15
 func ToBigInt64(value Value, agent *Agent) int64 {
-	n := ToBigInt(value, agent)
+	n := ToBigInt(agent, value)
 
 	twoPow64 := uint128.New(0, 1)
 	twoPow63 := uint128.New(1<<63, 0)
@@ -333,8 +334,8 @@ func ToBigInt64(value Value, agent *Agent) int64 {
 }
 
 // 7.1.16
-func ToBigUint64(value Value, agent *Agent) uint64 {
-	n := ToBigInt(value, agent)
+func ToBigUint64(agent *Agent, value Value) uint64 {
+	n := ToBigInt(agent, value)
 
 	twoPow64 := uint128.New(0, 1)
 	int64bit := uint128.FromBig(n.Data).Mod(twoPow64)
@@ -363,10 +364,15 @@ func StringToNumber(value *StringValue) *NumberValue {
 }
 
 // 7.1.14
-func StringToBigInt(value *StringValue) *BigIntValue {
-	return &BigIntValue{
-		Data: big.NewInt(0),
+func StringToBigInt(value *StringValue) (*BigIntValue, bool) {
+	bigInt := new(big.Int)
+	if _, ok := bigInt.SetString(value.Data, 10); !ok {
+		return nil, false
 	}
+
+	return &BigIntValue{
+		Data: bigInt,
+	}, true
 }
 
 // 7.1.19
@@ -466,7 +472,7 @@ func SameValue(x Value, y Value) bool {
 		return false
 	}
 	if number, ok := x.(*NumberValue); ok {
-		return number.SameValue(*y.(*NumberValue))
+		return number.SameValue(y.(*NumberValue))
 	}
 
 	return SameValueNonNumber(x, y)
@@ -500,6 +506,7 @@ const (
 	IsLessThanOrderRightFirst
 )
 
+// 7.2.13
 func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) bool {
 	var px, py Value
 	if order == IsLessThanOrderLeftFirst {
@@ -522,6 +529,96 @@ func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) bool {
 		return nx.Data < ny.Data
 	}
 
+}
+
+// 7.2.14
+func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
+	if reflect.TypeOf(x) == reflect.TypeOf(y) {
+		return IsStrictlyEqual(x, y)
+	}
+	if x == NullValue && y == UndefinedValue {
+		return true
+	}
+	if x == UndefinedValue && y == NullValue {
+		return true
+	}
+	if x == NullValue || y == UndefinedValue {
+		return false
+	}
+	if x == UndefinedValue || y == NullValue {
+		return false
+	}
+	if x == NaNValue && y == NaNValue {
+		return true
+	}
+
+	_, xIsString := x.(*StringValue)
+	_, xIsNumber := x.(*NumberValue)
+	_, xIsBigInt := x.(*BigIntValue)
+	_, xIsBoolean := x.(*BooleanValue)
+	_, xIsObject := x.(*ObjectValue)
+	_, xIsSymbol := x.(*SymbolValue)
+
+	yString, yIsString := y.(*StringValue)
+	_, yIsNumber := y.(*NumberValue)
+	_, yIsBigInt := y.(*BigIntValue)
+	_, yIsBoolean := y.(*BooleanValue)
+	_, yIsObject := y.(*ObjectValue)
+	_, yIsSymbol := y.(*SymbolValue)
+
+	if xIsNumber && yIsString {
+		return IsLooselyEqual(agent, x, ToNumber(agent, y))
+	}
+	if xIsString {
+		if yIsNumber {
+			return IsLooselyEqual(agent, ToNumber(agent, x), y)
+		}
+		if yIsBigInt {
+			return IsLooselyEqual(agent, y, x)
+		}
+	}
+	if xIsBigInt && yIsString {
+		n, ok := StringToBigInt(yString)
+		if !ok {
+			return false
+		}
+		return IsLooselyEqual(agent, x, n)
+	}
+	if xIsBoolean {
+		return IsLooselyEqual(agent, ToNumber(agent, x), y)
+	}
+
+	if yIsBoolean {
+		return IsLooselyEqual(agent, x, ToNumber(agent, y))
+	}
+
+	if (xIsString || xIsNumber || xIsBigInt || xIsSymbol) && yIsObject {
+		return IsLooselyEqual(agent, x, ToPrimitive(agent, y, PreferredTypeDefault))
+	}
+
+	if xIsObject && (yIsString || yIsNumber || yIsBigInt || yIsSymbol) {
+		return IsLooselyEqual(agent, ToPrimitive(agent, x, PreferredTypeDefault), y)
+	}
+
+	if (xIsBigInt && yIsNumber) || (xIsNumber && yIsBigInt) {
+	}
+
+	return false
+
+}
+
+// 7.2.15
+func IsStrictlyEqual(x Value, y Value) bool {
+	if reflect.TypeOf(x) != reflect.TypeOf(y) {
+		return false
+	}
+
+	_, xIsNumber := x.(*NumberValue)
+	if xIsNumber {
+		return x.(*NumberValue).SameValue(y.(*NumberValue))
+	}
+
+	return SameValueNonNumber(x, y)
 }
 
 // 7.3.3

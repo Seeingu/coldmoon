@@ -92,7 +92,7 @@ func (n *NumberValue) LessThan(other NumberValue) bool {
 }
 
 // 6.1.6.1.14
-func (n *NumberValue) SameValue(other NumberValue) bool {
+func (n *NumberValue) SameValue(other *NumberValue) bool {
 	if n.IsNaN() && other.IsNaN() {
 		return true
 	}
@@ -106,7 +106,7 @@ func (n *NumberValue) SameValue(other NumberValue) bool {
 }
 
 // 6.1.6.1.15
-func (n *NumberValue) SameValueZero(other NumberValue) bool {
+func (n *NumberValue) SameValueZero(other *NumberValue) bool {
 	if n.IsNaN() && other.IsNaN() {
 		return true
 	}
