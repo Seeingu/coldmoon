@@ -102,7 +102,7 @@ func (o *ObjectValue) CallAssumeCallable(value Value, argumentsList ArgumentsLis
 }
 
 func (o *ObjectValue) String() string {
-	primValue := ToPrimitive(o, o.Object.Agent(), PreferredTypeString)
+	primValue := ToPrimitive(o.Object.Agent(), o, PreferredTypeString)
 	if _, isObject := primValue.(*ObjectValue); isObject {
 		panic("")
 	}
@@ -114,10 +114,10 @@ func NewValueFromObject(object ObjectType) Value {
 }
 
 // 7.1.1
-func ToPrimitive(value Value, agent *Agent, hint PreferredType) Value {
+func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
 	if objectValue, isObject := value.(*ObjectValue); isObject {
 		symbol := WellKnownSymbols[WellKnownSymbolsToPrimitive]
-		exoticToPrim := GetMethod(value, agent, NewSymbolPropertyKey(&symbol))
+		exoticToPrim := GetMethod(agent, value, NewSymbolPropertyKey(&symbol))
 		if exoticToPrim != nil {
 			hintString := hint.String()
 
@@ -156,7 +156,7 @@ func ToNumber(agent *Agent, value Value) *NumberValue {
 	case *StringValue:
 		return StringToNumber(value)
 	case *ObjectValue:
-		primValue := ToPrimitive(value, agent, PreferredTypeNumber)
+		primValue := ToPrimitive(agent, value, PreferredTypeNumber)
 
 		if _, ok := primValue.(*ObjectValue); !ok {
 			Assert(false)
@@ -170,7 +170,7 @@ func ToNumber(agent *Agent, value Value) *NumberValue {
 
 // 7.1.3
 func ToNumeric(value Value, agent *Agent) Value {
-	primValue := ToPrimitive(value, agent, PreferredTypeNumber)
+	primValue := ToPrimitive(agent, value, PreferredTypeNumber)
 	if bigInt, ok := primValue.(*BigIntValue); ok {
 		return bigInt
 	}
@@ -301,7 +301,7 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 	return fInt
 }
 func ToBigInt(value Value, agent *Agent) *BigIntValue {
-	prim := ToPrimitive(value, agent, PreferredTypeNumber)
+	prim := ToPrimitive(agent, value, PreferredTypeNumber)
 	switch p := prim.(type) {
 	case *undefinedValue, *nullValue, *NumberValue, *SymbolValue:
 		panic("TypeError")
@@ -371,7 +371,7 @@ func StringToBigInt(value *StringValue) *BigIntValue {
 
 // 7.1.19
 func ToPropertyKey(agent *Agent, value Value) PropertyKey {
-	key := ToPrimitive(value, agent, PreferredTypeString)
+	key := ToPrimitive(agent, value, PreferredTypeString)
 	if symbolKey, ok := key.(*SymbolValue); ok {
 		return NewSymbolPropertyKey(symbolKey)
 	}
@@ -493,6 +493,37 @@ func SameValueNonNumber(x Value, y Value) bool {
 	}
 }
 
+type isLessThanOrder int
+
+const (
+	IsLessThanOrderLeftFirst isLessThanOrder = iota
+	IsLessThanOrderRightFirst
+)
+
+func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) bool {
+	var px, py Value
+	if order == IsLessThanOrderLeftFirst {
+		px = ToPrimitive(agent, x, PreferredTypeNumber)
+		py = ToPrimitive(agent, y, PreferredTypeNumber)
+	} else {
+		px = ToPrimitive(agent, y, PreferredTypeNumber)
+		py = ToPrimitive(agent, x, PreferredTypeNumber)
+	}
+	pxString, isPxString := px.(*StringValue)
+	pyString, isPyString := px.(*StringValue)
+	if isPxString && isPyString {
+		return pxString.Data < pyString.Data
+	} else {
+		nx := ToNumber(agent, px)
+		ny := ToNumber(agent, py)
+		if nx.IsNaN() || ny.IsNaN() {
+			return false
+		}
+		return nx.Data < ny.Data
+	}
+
+}
+
 // 7.3.3
 func GetV(value Value, agent *Agent, key PropertyKey) Value {
 	object := ValueToObject(value, agent)
@@ -500,7 +531,7 @@ func GetV(value Value, agent *Agent, key PropertyKey) Value {
 }
 
 // 7.3.11
-func GetMethod(value Value, agent *Agent, key PropertyKey) ObjectType {
+func GetMethod(agent *Agent, value Value, key PropertyKey) ObjectType {
 	fun := GetV(value, agent, key)
 	if fun == UndefinedValue || fun == NullValue {
 		return nil
@@ -520,6 +551,37 @@ func ValueCall(self Value, value Value, argumentsList []Value) Value {
 	}
 
 	return value.(*ObjectValue).Object.ToObject().InternalMethods().Call(value.(*ObjectValue).Object, self, argumentsList)
+}
+
+// 7.3.21
+func OrdinaryHasInstance(self Value, value Value) bool {
+	if IsCallable(self) {
+		return false
+	}
+	selfObject := self.(*ObjectValue).Object
+
+	objectValue, ok := value.(*ObjectValue)
+	if !ok {
+		return false
+	}
+
+	proto := selfObject.Get(NewStringPropertyKey("prototype"))
+	protoObject, ok := proto.(*ObjectValue)
+	if !ok {
+		panic("TypeError")
+	}
+
+	object := objectValue.Object
+	for {
+		object = object.InternalMethods().GetPrototypeOf(object)
+		if object == nil {
+			return false
+		}
+		if protoObject.Object == object {
+			return true
+		}
+	}
+
 }
 
 func CallNoArgs(self Value, value Value) Value {

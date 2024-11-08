@@ -1,5 +1,6 @@
 package coldmoon
 
+import "C"
 import (
 	"github.com/Seeingu/coldmoon/pkg"
 	"strconv"
@@ -245,6 +246,41 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 				initValue,
 			)
 			vm.result = NewValueFromObject(array)
+		case *IGreaterThan:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			r := IsLessThan(vm.agent, left, right, IsLessThanOrderRightFirst)
+			vm.result = NewBooleanValue(r)
+		case *IGreaterThanEquals:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			r := IsLessThan(vm.agent, left, right, IsLessThanOrderRightFirst)
+			vm.result = NewBooleanValue(!r)
+		case *ILessThan:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			r := IsLessThan(vm.agent, left, right, IsLessThanOrderLeftFirst)
+			vm.result = NewBooleanValue(r)
+		case *ILessThanEquals:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			r := IsLessThan(vm.agent, left, right, IsLessThanOrderLeftFirst)
+			vm.result = NewBooleanValue(!r)
+		case *IHasProperty:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			rightObject, ok := right.(*ObjectValue)
+			if !ok {
+				panic("TypeError: right is not an object")
+			}
+			vm.result = NewBooleanValue(
+				rightObject.Object.HasProperty(ToPropertyKey(vm.agent, left)))
+		case *IInstanceOf:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			vm.result = NewBooleanValue(
+				InstanceOfOperator(vm.agent, left, right),
+			)
 		}
 		vm.ip += 1
 	}
@@ -284,6 +320,26 @@ func directEval(agent *Agent, arguments []Value, strict bool) Value {
 	evalArg := arguments[0]
 	strictCaller := strict
 	return PerformEval(agent, evalArg, strictCaller, true)
+}
+
+// 13.10.2
+func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
+	if _, ok := target.(*ObjectValue); !ok {
+		panic("TypeError: target is not an object")
+	}
+	symbol := WellKnownSymbols[WellKnownSymbolsHasInstance]
+	instOfHandler := GetMethod(
+		agent,
+		target,
+		NewSymbolPropertyKey(&symbol))
+	if instOfHandler != nil {
+		return Call(instOfHandler, target, []Value{value}).ToBoolean()
+	}
+
+	if !IsCallable(target) {
+		panic("TypeError: target is not callable")
+	}
+	return OrdinaryHasInstance(target, value)
 }
 
 // 15.2.5

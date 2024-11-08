@@ -255,6 +255,56 @@ func (i *IObjectSetProperty) String() string {
 	return "IObjectSetProperty"
 }
 
+// MARK: - Relation
+
+type IGreaterThan struct {
+	Instruction
+}
+
+func (i *IGreaterThan) String() string {
+	return "IGreaterThan"
+}
+
+type IGreaterThanEquals struct {
+	Instruction
+}
+
+func (i *IGreaterThanEquals) String() string {
+	return "IGreaterThanEquals"
+}
+
+type IHasProperty struct {
+	Instruction
+}
+
+func (i *IHasProperty) String() string {
+	return "IHasProperty"
+}
+
+type IInstanceOf struct {
+	Instruction
+}
+
+func (i *IInstanceOf) String() string {
+	return "IInstanceOf"
+}
+
+type ILessThan struct {
+	Instruction
+}
+
+func (i *ILessThan) String() string {
+	return "ILessThan"
+}
+
+type ILessThanEquals struct {
+	Instruction
+}
+
+func (i *ILessThanEquals) String() string {
+	return "ILessThanEquals"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
@@ -267,3 +317,9 @@ var InsToNumeric = &IToNumeric{}
 var InsUnaryMinus = &IUnaryMinus{}
 var InsReturn = &IReturn{}
 var InsStore = &IStore{}
+var InsLessThan = &ILessThan{}
+var InsLessThanEquals = &ILessThanEquals{}
+var InsGreaterThan = &IGreaterThan{}
+var InsGreaterThanEquals = &IGreaterThanEquals{}
+var InsInstanceOf = &IInstanceOf{}
+var InsHasProperty = &IHasProperty{}

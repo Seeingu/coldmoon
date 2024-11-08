@@ -11,10 +11,7 @@ func main() {
 	realm := agent.CurrentRealm()
 	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
 	sourceText := `
-'use strict';
-if (true) {
-	  !123
-} 
+2 > 1;
 `
 	script := ParseScript(sourceText, realm, nil)
 	_ = script.Evaluate()

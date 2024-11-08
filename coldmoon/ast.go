@@ -599,6 +599,90 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - RelationalExpression
+
+type RelationalOperator int
+
+func (r RelationalOperator) String() string {
+	switch r {
+	case RelationalOperatorLessThan:
+		return "<"
+	case RelationalOperatorGreaterThan:
+		return ">"
+	case RelationalOperatorLessThanOrEqual:
+		return "<="
+	case RelationalOperatorGreaterThanOrEqual:
+		return ">="
+	case RelationalOperatorInstanceof:
+		return "instanceof"
+	case RelationalOperatorIn:
+		return "in"
+	}
+	return ""
+}
+
+const (
+	RelationalOperatorLessThan RelationalOperator = iota
+	RelationalOperatorGreaterThan
+	RelationalOperatorLessThanOrEqual
+	RelationalOperatorGreaterThanOrEqual
+	RelationalOperatorInstanceof
+	RelationalOperatorIn
+)
+
+var operatorRelationMap = map[TokenType]RelationalOperator{
+	TLessThan:          RelationalOperatorLessThan,
+	TGreaterThan:       RelationalOperatorGreaterThan,
+	TLessThanEquals:    RelationalOperatorLessThanOrEqual,
+	TGreaterThanEquals: RelationalOperatorGreaterThanOrEqual,
+	TInstanceof:        RelationalOperatorInstanceof,
+	TIn:                RelationalOperatorIn,
+}
+
+type ExpressionRelationalExpression struct {
+	Expression
+	Left     Expression
+	Operator RelationalOperator
+	Right    Expression
+}
+
+func (e *ExpressionRelationalExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (e *ExpressionRelationalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.Left.Bytecode(ex, c)
+	if e.Left.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+	ex.AddInstruction(InsLoad)
+
+	e.Right.Bytecode(ex, c)
+	if e.Right.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+	ex.AddInstruction(InsLoad)
+
+	switch e.Operator {
+	case RelationalOperatorLessThan:
+		ex.AddInstruction(InsLessThan)
+	case RelationalOperatorGreaterThan:
+		ex.AddInstruction(InsGreaterThan)
+	case RelationalOperatorLessThanOrEqual:
+		ex.AddInstruction(InsLessThanEquals)
+	case RelationalOperatorGreaterThanOrEqual:
+		ex.AddInstruction(InsGreaterThanEquals)
+	case RelationalOperatorInstanceof:
+		ex.AddInstruction(InsInstanceOf)
+	case RelationalOperatorIn:
+		ex.AddInstruction(InsHasProperty)
+	}
+}
+
+func (e *ExpressionRelationalExpression) String() string {
+	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
+}
+
 // MARK: - UnaryExpression
 
 type UnaryOperator int

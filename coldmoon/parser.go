@@ -535,7 +535,7 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 	primary := p.primaryExpression()
 	var expr Expression = primary
 	for {
-		nextToken := p.tokenizer.NextToken
+		nextToken := p.tokenizer.CurrentToken
 		newAcceptContext := p.acceptContext(nextToken.Type)
 		if newAcceptContext.precedence <= accept.precedence {
 			return expr
@@ -560,8 +560,34 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 	case TLeftBracket, TPeriod:
 		return p.memberExpression(left)
 	default:
-		return nil
+		expr, ok := p.relationalExpression(left, accept)
+		if !ok {
+			return nil
+		}
+		return expr
 	}
+}
+
+func (p *Parser) relationalExpression(left PrimaryExpression, accept *acceptContext) (*ExpressionRelationalExpression, bool) {
+	t := p.tokenizer.CurrentToken
+	tokenTypes := []TokenType{
+		TLessThan,
+		TLessThanEquals,
+		TGreaterThan,
+		TGreaterThanEquals,
+		TInstanceof,
+		TIn,
+	}
+	if lo.Contains(tokenTypes, t.Type) {
+		p.tokenizer.Next()
+		right := p.expression(accept)
+		return &ExpressionRelationalExpression{
+			Operator: operatorRelationMap[t.Type],
+			Left:     left,
+			Right:    right,
+		}, true
+	}
+	return nil, false
 }
 
 func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {

@@ -53,3 +53,8 @@ func (b *BigIntValue) BitwiseNot() *BigIntValue {
 		Data: new(big.Int).Not(b.Data),
 	}
 }
+
+// 6.1.6.2.12
+func (b *BigIntValue) LessThan(other BigIntValue) bool {
+	return b.Data.Cmp(other.Data) == -1
+}

@@ -83,6 +83,14 @@ func (n *NumberValue) BitwiseNot() *NumberValue {
 	}
 }
 
+// 6.1.6.1.12
+func (n *NumberValue) LessThan(other NumberValue) bool {
+	if n.IsNaN() || other.IsNaN() {
+		return false
+	}
+	return n.Data < other.Data
+}
+
 // 6.1.6.1.14
 func (n *NumberValue) SameValue(other NumberValue) bool {
 	if n.IsNaN() && other.IsNaN() {
