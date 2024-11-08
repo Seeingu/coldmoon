@@ -27,6 +27,182 @@ type ParserContext struct {
 	FileName string
 }
 
+type precedence int
+type precedenceAssociativityAlt int
+
+const (
+	precAssocNewArgs precedenceAssociativityAlt = iota
+	precAssocFunctionArgs
+	precAssocPostfixIncrement
+	precAssocPostfixDecrement
+	precAssocUnaryPlus
+	precAssocUnaryMinus
+)
+
+type associativity int
+
+const (
+	associativeNone associativity = iota
+	associativeLeft
+	associativeRight
+)
+
+type acceptContext struct {
+	precedence    precedence
+	associativity associativity
+}
+
+// MARK: - Precedence
+
+func (p *Parser) acceptContextLowest() *acceptContext {
+	return &acceptContext{
+		precedence: 0,
+	}
+}
+
+func (p *Parser) acceptContext(t TokenType) *acceptContext {
+	switch t {
+	case TLeftParen:
+		return &acceptContext{
+			precedence: 18,
+		}
+	case TPeriod, TQuestionDot:
+		return &acceptContext{
+			precedence:    17,
+			associativity: associativeLeft,
+		}
+	case TLeftBracket:
+		return &acceptContext{
+			precedence: 17,
+		}
+	case TNew:
+		return &acceptContext{
+			precedence: 16,
+		}
+	case TWave, TTypeof, TDelete, TNot:
+		return &acceptContext{
+			precedence: 14,
+		}
+	case TStarStar:
+		return &acceptContext{
+			precedence:    13,
+			associativity: associativeRight,
+		}
+	case TStar, TSlash, TPercent:
+		return &acceptContext{
+			precedence:    12,
+			associativity: associativeLeft,
+		}
+	case TPlus, TMinus:
+		return &acceptContext{
+			precedence:    11,
+			associativity: associativeLeft,
+		}
+	case TLeftShift, TRightShift, TUnsignedRightShift:
+		return &acceptContext{
+			precedence:    10,
+			associativity: associativeLeft,
+		}
+	case TLessThan, TLessThanEquals, TGreaterThan, TGreaterThanEquals, TInstanceof, TIn:
+		return &acceptContext{
+			precedence:    9,
+			associativity: associativeLeft,
+		}
+	case TEqualsEquals, TNotEquals, TStrictEquals, TStrictNotEquals:
+		return &acceptContext{
+			precedence:    8,
+			associativity: associativeLeft,
+		}
+	case TBitwiseAnd:
+		return &acceptContext{
+			precedence:    7,
+			associativity: associativeLeft,
+		}
+	case TCaret:
+		return &acceptContext{
+			precedence:    6,
+			associativity: associativeLeft,
+		}
+	case TPipe:
+		return &acceptContext{
+			precedence:    5,
+			associativity: associativeLeft,
+		}
+	case TAmpersandAmpersand:
+		return &acceptContext{
+			precedence:    4,
+			associativity: associativeLeft,
+		}
+	case TPipePipe, TQuestionQuestion:
+		return &acceptContext{
+			precedence:    3,
+			associativity: associativeLeft,
+		}
+	case TEquals, TPlusEquals, TMinusEquals, TStarEquals, TStarStarEquals, TPercentEquals, TLeftShiftEquals, TRightShiftEquals, TUnsignedRightShiftEquals, TAmpersandEquals, TCaretEquals, TPipeEquals:
+		return &acceptContext{
+			precedence:    2,
+			associativity: associativeRight,
+		}
+	case TQuestion:
+		return &acceptContext{
+			precedence:    2,
+			associativity: associativeRight,
+		}
+	case TEqualsGreaterThan:
+		return &acceptContext{
+			precedence:    2,
+			associativity: associativeRight,
+		}
+	case TYield, TDotDotDot:
+		return &acceptContext{
+			precedence: 2,
+		}
+	case TComma:
+		return &acceptContext{
+			precedence:    1,
+			associativity: associativeLeft,
+		}
+	default:
+		return p.acceptContextLowest()
+	}
+}
+
+func (p *Parser) precedence(t TokenType) precedence {
+	return p.acceptContext(t).precedence
+}
+
+func (p *Parser) acceptContextAlt(flag precedenceAssociativityAlt) *acceptContext {
+	switch flag {
+	case precAssocNewArgs, precAssocFunctionArgs:
+		return &acceptContext{
+			precedence: 17,
+		}
+	case precAssocPostfixIncrement, precAssocPostfixDecrement:
+		return &acceptContext{
+			precedence: 15,
+		}
+	case precAssocUnaryPlus, precAssocUnaryMinus:
+		return &acceptContext{
+			precedence: 14,
+		}
+	}
+	panic("unreachable")
+}
+
+func (p *Parser) precedenceAlt(flag precedenceAssociativityAlt) precedence {
+	return p.acceptContextAlt(flag).precedence
+}
+
+func (p *Parser) associativity(t TokenType) associativity {
+	return p.acceptContext(t).associativity
+}
+
+func (p *Parser) associativityAlt(flag precedenceAssociativityAlt) associativity {
+	return p.acceptContextAlt(flag).associativity
+}
+
+// MARK: - Parse
+
 func (p *Parser) ParseNode() StatementList {
 	return p.statementList()
 }
@@ -120,7 +296,7 @@ func (p *Parser) statement() Statement {
 func (p *Parser) throwStatement() *StatementThrow {
 	p.tokenizer.MustMatch(TThrow)
 	p.noLineTerminatorHere()
-	expr := p.expression()
+	expr := p.expression(p.acceptContextLowest())
 	return &StatementThrow{
 		Expression: expr,
 	}
@@ -233,7 +409,7 @@ func (p *Parser) doWhileStatement() *StatementDoWhile {
 	body := p.statement()
 	p.tokenizer.MustMatch(TWhile)
 	p.tokenizer.MustMatch(TLeftParen)
-	condition := p.expression()
+	condition := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TSemicolon)
 
@@ -246,7 +422,7 @@ func (p *Parser) doWhileStatement() *StatementDoWhile {
 func (p *Parser) whileStatement() *StatementWhile {
 	p.tokenizer.MustMatch(TWhile)
 	p.tokenizer.MustMatch(TLeftParen)
-	condition := p.expression()
+	condition := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
 	body := p.statement()
 
@@ -270,7 +446,7 @@ func (p *Parser) returnStatement() *StatementReturn {
 		p.tokenizer.Next()
 		return &StatementReturn{}
 	}
-	expr := p.expression()
+	expr := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TSemicolon)
 	return &StatementReturn{
 		Expression: expr,
@@ -282,7 +458,7 @@ func (p *Parser) returnStatement() *StatementReturn {
 func (p *Parser) ifStatement() *StatementIf {
 	p.tokenizer.MustMatch(TIf)
 	p.tokenizer.MustMatch(TLeftParen)
-	condition := p.expression()
+	condition := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
 	consequent := p.statement()
 
@@ -300,7 +476,7 @@ func (p *Parser) ifStatement() *StatementIf {
 }
 
 func (p *Parser) expressionStatement() *StatementExpression {
-	expr := p.expression()
+	expr := p.expression(p.acceptContextLowest())
 	t := p.tokenizer.CurrentToken
 	if t.Type == TSemicolon {
 		p.tokenizer.Next()
@@ -334,7 +510,15 @@ func (p *Parser) unaryExpression() Expression {
 	} else {
 		return nil
 	}
-	expr := p.expression()
+	var accept *acceptContext
+	if t.Type == TPlus {
+		accept = p.acceptContextAlt(precAssocUnaryPlus)
+	} else if t.Type == TMinus {
+		accept = p.acceptContextAlt(precAssocUnaryMinus)
+	} else {
+		accept = p.acceptContext(t.Type)
+	}
+	expr := p.expression(accept)
 	return &UnaryExpression{
 		Operator: operator,
 		Operand:  expr,
@@ -342,7 +526,7 @@ func (p *Parser) unaryExpression() Expression {
 
 }
 
-func (p *Parser) expression() Expression {
+func (p *Parser) expression(accept *acceptContext) Expression {
 	unary := p.unaryExpression()
 	if unary != nil {
 		return unary
@@ -351,7 +535,16 @@ func (p *Parser) expression() Expression {
 	primary := p.primaryExpression()
 	var expr Expression = primary
 	for {
-		secondary := p.secondaryExpression(primary)
+		nextToken := p.tokenizer.NextToken
+		newAcceptContext := p.acceptContext(nextToken.Type)
+		if newAcceptContext.precedence <= accept.precedence {
+			return expr
+		}
+		if newAcceptContext.precedence == accept.precedence && newAcceptContext.associativity == associativeLeft {
+			return expr
+		}
+
+		secondary := p.secondaryExpression(primary, newAcceptContext)
 		if secondary == nil {
 			return expr
 		}
@@ -359,7 +552,7 @@ func (p *Parser) expression() Expression {
 	}
 }
 
-func (p *Parser) secondaryExpression(left PrimaryExpression) Expression {
+func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptContext) Expression {
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
 	case TLeftParen:
@@ -376,7 +569,8 @@ func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
 	var property ASTProperty
 	if token.Type == TLeftBracket {
 		p.tokenizer.Next()
-		propertyExpression := p.expression()
+		accept := p.acceptContext(TLeftBracket)
+		propertyExpression := p.expression(accept)
 		p.tokenizer.MustMatch(TRightBracket)
 		property = &ASTPropertyExpression{
 			Expression: propertyExpression,
@@ -411,13 +605,14 @@ func (p *Parser) callExpression(left PrimaryExpression) *CallExpression {
 func (p *Parser) arguments() Arguments {
 	p.tokenizer.MustMatch(TLeftParen)
 	var list Arguments
+	accept := p.acceptContextAlt(precAssocFunctionArgs)
 	for {
 		t := p.tokenizer.Peek()
 		if t.Type == TRightParen {
 			p.tokenizer.Next()
 			break
 		}
-		expr := p.expression()
+		expr := p.expression(accept)
 		list = append(list, expr)
 	}
 	p.tokenizer.MustMatch(TRightParen)
@@ -426,7 +621,7 @@ func (p *Parser) arguments() Arguments {
 
 func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpression {
 	p.tokenizer.MustMatch(TLeftParen)
-	expr := p.expression()
+	expr := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
 	return &PrimaryExpressionParenthesizedExpression{
 		Expression: expr,
@@ -542,7 +737,8 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		}
 	case TLeftBracket:
 		p.tokenizer.Next()
-		computedPropertyName := p.expression()
+		computedPropertyName := p.expression(
+			p.acceptContext(TLeftBracket))
 		propertyName = &PropertyNameComputed{
 			Expression: computedPropertyName,
 		}
@@ -551,7 +747,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		panic("propertyDefinition: unexpected token")
 	}
 	p.tokenizer.MustMatch(TColon)
-	value := p.expression()
+	value := p.expression(p.acceptContext(TComma))
 	return &PropertyDefinitionNameAndExpression{
 		Name:       propertyName,
 		Expression: value,
@@ -561,6 +757,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 func (p *Parser) arrayLiteral() *PrimaryExpressionArrayLiteral {
 	p.tokenizer.MustMatch(TLeftBracket)
 	var list []ArrayElement
+	accept := p.acceptContext(TComma)
 	for {
 		t := p.tokenizer.CurrentToken
 		if t.Type == TRightBracket {
@@ -571,7 +768,7 @@ func (p *Parser) arrayLiteral() *PrimaryExpressionArrayLiteral {
 			list = append(list, &ArrayElementElision{})
 			p.tokenizer.Next()
 		} else {
-			expr := p.expression()
+			expr := p.expression(accept)
 			list = append(list, &ArrayElementExpression{
 				Expression: expr,
 			})

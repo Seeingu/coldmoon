@@ -12,7 +12,12 @@ const (
 	TLeftParen
 	TRightParen
 	TPeriod
+	TDotDotDot
 	TSemicolon
+	TPipe
+	TPipeEquals
+	TPipePipe
+	TPipePipeEquals
 	TComma
 	TLessThan
 	TGreaterThan
@@ -27,7 +32,6 @@ const (
 	TPlusPlus
 	TMinusMinus
 	TWave
-	TDelete
 	TStar
 	TPercent
 	TIncrement
@@ -36,21 +40,28 @@ const (
 	TRightShift
 	TUnsignedRightShift
 	TBitwiseAnd
-	TBitwiseOr
-	TBitwiseXor
 	TNot
-	TAnd
-	TOr
 	TQuestion
+	TQuestionQuestion
+	TQuestionQuestionEquals
+	TQuestionDot
+	TCaret
+	TCaretEquals
 	TColon
 	TTilde
 	TSlash
+	TSlashSlash
 	TEqualsEquals
-	TNotEqualsEquals
+	TEqualsGreaterThan
 	TPlusEquals
 	TThis
 	TMinusEquals
 	TStarEquals
+	TStarStar
+	TStarStarEquals
+	TAmpersandEquals
+	TAmpersandAmpersand
+	TAmpersandAmpersandEquals
 	TPercentEquals
 	TLeftShiftEquals
 	TRightShiftEquals
@@ -79,6 +90,31 @@ const (
 	TYield
 	TAwait
 	TFunction
+	TDelete
+	TIn
+	TInstanceof
+	TNew
+	TVar
+	TLet
+	TConst
+	TTry
+	TCatch
+	TFinally
+	TClass
+	TExtends
+	TSuper
+	TImport
+	TExport
+	TDefault
+	TFrom
+	TAs
+	TFor
+	TOf
+	TWith
+	TSwitch
+	TCase
+	TDefaultCase
+	TContinue
 	TEOF
 )
 
@@ -115,6 +151,13 @@ func (t *Tokenizer) peek() Token {
 
 	ch := t.SourceText[t.Index]
 	switch ch {
+	case '^':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			return Token{Type: TCaretEquals, Value: "^="}
+		}
+		return Token{Type: TCaret, Value: "^"}
 	case ':':
 		return Token{Type: TColon, Value: ":"}
 	case '{':
@@ -135,8 +178,63 @@ func (t *Tokenizer) peek() Token {
 	case ')':
 		t.Index++
 		return Token{Type: TRightParen, Value: ")"}
+	case '&':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '&' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+				t.Index++
+				return Token{Type: TAmpersandAmpersandEquals, Value: "&&="}
+			}
+			return Token{Type: TAmpersandAmpersand, Value: "&&"}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			return Token{Type: TAmpersandEquals, Value: "&="}
+		}
+		return Token{Type: TBitwiseAnd, Value: "&"}
+	case '%':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			return Token{Type: TPercentEquals, Value: "%="}
+		}
+		return Token{Type: TPercent, Value: "%"}
+	case '/':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			return Token{Type: TDivideEquals, Value: "/="}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '/' {
+			t.Index++
+			return Token{Type: TSlashSlash, Value: "//"}
+		}
+		return Token{Type: TSlash, Value: "/"}
+	case '*':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			return Token{Type: TStarEquals, Value: "*="}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '*' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+				t.Index++
+				return Token{Type: TStarStarEquals, Value: "**="}
+			}
+			return Token{Type: TStarStar, Value: "**"}
+		}
+		return Token{Type: TStar, Value: "*"}
 	case '.':
 		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '.' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '.' {
+				t.Index++
+				return Token{Type: TDotDotDot, Value: "..."}
+			}
+		}
 		return Token{Type: TPeriod, Value: "."}
 	case ';':
 		t.Index++
@@ -149,6 +247,14 @@ func (t *Tokenizer) peek() Token {
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
 			return Token{Type: TLessThanEquals, Value: "<="}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '<' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+				t.Index++
+				return Token{Type: TLeftShiftEquals, Value: "<<="}
+			}
+			return Token{Type: TLeftShift, Value: "<<"}
 		}
 		return Token{Type: TLessThan, Value: "<"}
 	case '+':
@@ -179,6 +285,22 @@ func (t *Tokenizer) peek() Token {
 			t.Index++
 			return Token{Type: TGreaterThanEquals, Value: ">="}
 		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '>' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+				t.Index++
+				return Token{Type: TRightShiftEquals, Value: ">>="}
+			}
+			if t.Index < t.Length && t.SourceText[t.Index] == '>' {
+				t.Index++
+				if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+					t.Index++
+					return Token{Type: TUnsignedRightShiftEquals, Value: ">>>="}
+				}
+				return Token{Type: TUnsignedRightShift, Value: ">>>"}
+			}
+			return Token{Type: TRightShift, Value: ">>"}
+		}
 		return Token{Type: TGreaterThan, Value: ">"}
 	case '=':
 		t.Index++
@@ -190,7 +312,26 @@ func (t *Tokenizer) peek() Token {
 			}
 			return Token{Type: TEqualsEquals, Value: "=="}
 		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '>' {
+			t.Index++
+			return Token{Type: TEqualsGreaterThan, Value: "=>"}
+		}
 		return Token{Type: TEquals, Value: "="}
+	case '|':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+			t.Index++
+			return Token{Type: TPipeEquals, Value: "|="}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '|' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+				t.Index++
+				return Token{Type: TPipePipeEquals, Value: "||="}
+			}
+			return Token{Type: TPipePipe, Value: "||"}
+		}
+		return Token{Type: TPipe, Value: "|"}
 	case '!':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
@@ -198,9 +339,26 @@ func (t *Tokenizer) peek() Token {
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
 				return Token{Type: TStrictNotEquals, Value: "!=="}
+			} else {
+				return Token{Type: TNotEquals, Value: "!="}
 			}
 		}
 		return Token{Type: TNot, Value: "!"}
+	case '?':
+		t.Index++
+		if t.Index < t.Length && t.SourceText[t.Index] == '.' {
+			t.Index++
+			return Token{Type: TQuestionDot, Value: "?."}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '?' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
+				t.Index++
+				return Token{Type: TQuestionQuestionEquals, Value: "??="}
+			}
+			return Token{Type: TQuestionQuestion, Value: "??"}
+		}
+		return Token{Type: TQuestion, Value: "?"}
 	case '~':
 		t.Index++
 		return Token{Type: TTilde, Value: "~"}
@@ -272,23 +430,45 @@ func (t *Tokenizer) identifierOrKeyword() Token {
 }
 
 var keywordsMap = map[string]TokenType{
-	"if":       TIf,
-	"else":     TElse,
-	"true":     TTrue,
-	"false":    TFalse,
-	"null":     TNull,
-	"debugger": TDebugger,
-	"this":     TThis,
-	"break":    TBreak,
-	"while":    TWhile,
-	"do":       TDo,
-	"throw":    TThrow,
-	"return":   TReturn,
-	"void":     TVoid,
-	"typeof":   TTypeof,
-	"yield":    TYield,
-	"await":    TAwait,
-	"function": TFunction,
+	"if":         TIf,
+	"else":       TElse,
+	"true":       TTrue,
+	"false":      TFalse,
+	"null":       TNull,
+	"debugger":   TDebugger,
+	"this":       TThis,
+	"break":      TBreak,
+	"while":      TWhile,
+	"do":         TDo,
+	"throw":      TThrow,
+	"return":     TReturn,
+	"void":       TVoid,
+	"typeof":     TTypeof,
+	"yield":      TYield,
+	"await":      TAwait,
+	"function":   TFunction,
+	"in":         TIn,
+	"instanceof": TInstanceof,
+	"new":        TNew,
+	"var":        TVar,
+	"let":        TLet,
+	"const":      TConst,
+	"try":        TTry,
+	"catch":      TCatch,
+	"finally":    TFinally,
+	"class":      TClass,
+	"extends":    TExtends,
+	"super":      TSuper,
+	"import":     TImport,
+	"export":     TExport,
+	"default":    TDefault,
+	"from":       TFrom,
+	"as":         TAs,
+	"for":        TFor,
+	"of":         TOf,
+	"with":       TWith,
+	"switch":     TSwitch,
+	"case":       TCase,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {
