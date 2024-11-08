@@ -599,6 +599,51 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - ConditionalExpression
+
+type ExpressionConditionalExpression struct {
+	Expression
+	Test       Expression
+	Consequent Expression
+	Alternate  Expression
+}
+
+func (e *ExpressionConditionalExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (e *ExpressionConditionalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.Test.Bytecode(ex, c)
+	if e.Test.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
+	ex.AddInstruction(jumpIfTrue)
+
+	jumpIfTrue.Target = len(ex.Instructions) - 1
+	e.Consequent.Bytecode(ex, c)
+
+	if e.Consequent.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+
+	jump := &IJump{Target: 0}
+	ex.AddInstruction(jump)
+
+	jumpIfTrue.TargetElse = len(ex.Instructions) - 1
+	e.Alternate.Bytecode(ex, c)
+
+	if e.Alternate.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+
+	jump.Target = len(ex.Instructions) - 1
+}
+
+func (e *ExpressionConditionalExpression) String() string {
+	return e.Test.String() + " ? " + e.Consequent.String() + " : " + e.Alternate.String()
+}
+
 // MARK: - LogicalExpression
 
 type LogicalOperator int

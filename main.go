@@ -14,6 +14,8 @@ func main() {
 2 == 1;
 2 > 1;
 false || 1;
+true && 1;
+true ? 2 : 1;
 `
 	script := ParseScript(sourceText, realm, nil)
 	_ = script.Evaluate()

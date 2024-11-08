@@ -159,6 +159,7 @@ func (t *Tokenizer) peek() Token {
 		}
 		return Token{Type: TCaret, Value: "^"}
 	case ':':
+		t.Index++
 		return Token{Type: TColon, Value: ":"}
 	case '{':
 		t.Index++

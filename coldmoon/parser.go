@@ -573,10 +573,25 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 		return p.equalityExpression(left, accept)
 	case TAmpersandAmpersand, TPipePipe, TQuestionQuestion:
 		return p.logicalExpression(left, accept)
+	case TQuestion:
+		return p.conditionalExpression(left)
 	default:
 		panic("secondaryExpression: unexpected token")
 	}
 	return left
+}
+
+func (p *Parser) conditionalExpression(left PrimaryExpression) *ExpressionConditionalExpression {
+	p.tokenizer.MustMatch(TQuestion)
+	accept := p.acceptContext(TQuestion)
+	consequent := p.expression(accept)
+	p.tokenizer.MustMatch(TColon)
+	alternate := p.expression(accept)
+	return &ExpressionConditionalExpression{
+		Test:       left,
+		Consequent: consequent,
+		Alternate:  alternate,
+	}
 }
 
 func (p *Parser) logicalExpression(left PrimaryExpression, accept *acceptContext) *ExpressionLogicalExpression {
