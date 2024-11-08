@@ -599,6 +599,109 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - LogicalExpression
+
+type LogicalOperator int
+
+const (
+	LogicalOperatorAnd LogicalOperator = iota
+	LogicalOperatorOr
+	LogicalOperatorNullishCoalescing
+)
+
+func (l LogicalOperator) String() string {
+	switch l {
+	case LogicalOperatorAnd:
+		return "&&"
+	case LogicalOperatorOr:
+		return "||"
+	case LogicalOperatorNullishCoalescing:
+		return "??"
+	}
+	return ""
+}
+
+var operatorLogicalMap = map[TokenType]LogicalOperator{
+	TAmpersandAmpersand: LogicalOperatorAnd,
+	TPipePipe:           LogicalOperatorOr,
+	TQuestionQuestion:   LogicalOperatorNullishCoalescing,
+}
+
+type ExpressionLogicalExpression struct {
+	Expression
+	Left     Expression
+	Operator LogicalOperator
+	Right    Expression
+}
+
+func (e *ExpressionLogicalExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (e *ExpressionLogicalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.Left.Bytecode(ex, c)
+	if e.Left.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+
+	switch e.Operator {
+	case LogicalOperatorAnd:
+		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
+		ex.AddInstruction(jumpIfTrue)
+
+		jumpIfTrue.Target = len(ex.Instructions)
+		e.Right.Bytecode(ex, c)
+
+		if e.Right.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+
+		jumpIfTrue.TargetElse = len(ex.Instructions)
+	case LogicalOperatorOr:
+		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
+		ex.AddInstruction(jumpIfTrue)
+
+		jumpIfTrue.TargetElse = len(ex.Instructions)
+		e.Right.Bytecode(ex, c)
+		if e.Right.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+
+		jumpIfTrue.Target = len(ex.Instructions)
+	case LogicalOperatorNullishCoalescing:
+		ex.AddInstruction(InsLoad)
+
+		ex.AddInstruction(InsLoad)
+		ex.AddInstruction(&ILoadConstant{
+			Value: UndefinedValue,
+		})
+		ex.AddInstruction(InsLooselyEqual)
+
+		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
+		ex.AddInstruction(jumpIfTrue)
+
+		jumpIfTrue.Target = len(ex.Instructions)
+		ex.AddInstruction(InsStore)
+
+		e.Right.Bytecode(ex, c)
+		if e.Right.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+
+		jump := &IJump{Target: 0}
+		ex.AddInstruction(jump)
+
+		jumpIfTrue.TargetElse = len(ex.Instructions)
+		ex.AddInstruction(InsStore)
+
+		jump.Target = len(ex.Instructions)
+	}
+}
+
+func (e *ExpressionLogicalExpression) String() string {
+	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
+}
+
 // MARK: - EqualityExpression
 
 type EqualityOperator int

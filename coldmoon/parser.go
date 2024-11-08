@@ -571,10 +571,31 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 		TStrictEquals,
 		TStrictNotEquals:
 		return p.equalityExpression(left, accept)
+	case TAmpersandAmpersand, TPipePipe, TQuestionQuestion:
+		return p.logicalExpression(left, accept)
 	default:
 		panic("secondaryExpression: unexpected token")
 	}
 	return left
+}
+
+func (p *Parser) logicalExpression(left PrimaryExpression, accept *acceptContext) *ExpressionLogicalExpression {
+	t := p.tokenizer.CurrentToken
+	tokenTypes := []TokenType{
+		TAmpersandAmpersand,
+		TPipePipe,
+		TQuestionQuestion,
+	}
+	if lo.Contains(tokenTypes, t.Type) {
+		p.tokenizer.Next()
+		right := p.expression(accept)
+		return &ExpressionLogicalExpression{
+			Operator: operatorLogicalMap[t.Type],
+			Left:     left,
+			Right:    right,
+		}
+	}
+	panic("logicalExpression: unexpected token")
 }
 
 func (p *Parser) equalityExpression(left PrimaryExpression, accept *acceptContext) *ExpressionEqualityExpression {

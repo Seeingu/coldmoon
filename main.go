@@ -13,6 +13,7 @@ func main() {
 	sourceText := `
 2 == 1;
 2 > 1;
+false || 1;
 `
 	script := ParseScript(sourceText, realm, nil)
 	_ = script.Evaluate()
