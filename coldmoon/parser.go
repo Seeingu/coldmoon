@@ -799,14 +799,13 @@ func (p *Parser) callExpression(left PrimaryExpression) *CallExpression {
 func (p *Parser) arguments() Arguments {
 	p.tokenizer.MustMatch(TLeftParen)
 	var list Arguments
-	accept := p.acceptContextAlt(precAssocFunctionArgs)
 	for {
 		t := p.tokenizer.Peek()
 		if t.Type == TRightParen {
 			p.tokenizer.Next()
 			break
 		}
-		expr := p.expression(accept)
+		expr := p.expression(p.acceptContextLowest())
 		list = append(list, expr)
 	}
 	p.tokenizer.MustMatch(TRightParen)

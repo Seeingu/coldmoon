@@ -7,16 +7,13 @@ import (
 	"strconv"
 )
 
-type evaluateContext struct {
-	reference *ReferenceRecord
-}
 type VM struct {
 	agent                    *Agent
 	stack                    pkg.Stack[Value]
 	result                   Value
 	ip                       int
 	reference                *ReferenceRecord
-	evaluateContextStack     pkg.Stack[*evaluateContext]
+	referenceStack           pkg.Stack[*ReferenceRecord]
 	exceptionJumpTargetStack pkg.Stack[int]
 	exception                Value
 }
@@ -33,10 +30,6 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		vm.stack.Push(vm.result)
 	case *ILoadConstant:
 		vm.stack.Push(ins.Value)
-	case *ISetEvaluationContextReference:
-		vm.evaluateContextStack.Push(&evaluateContext{
-			reference: vm.reference,
-		})
 	case *IStore:
 		vm.result = vm.stack.Pop()
 	case *IStoreConstant:
@@ -57,9 +50,8 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		realm := vm.agent.CurrentRealm()
 		eval := realm.Intrinsics.Eval
 
-		evaluateContext := vm.evaluateContextStack.Pop()
-		if evaluateContext.reference != nil {
-			ref := evaluateContext.reference
+		ref := vm.referenceStack.Peek()
+		if ref != nil {
 			refName, ok :=
 				ref.ReferencedName.(*ReferencedNameString)
 			if ref.IsPropertyReference() &&
@@ -78,7 +70,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			arguments,
 		)
 	case *ILoadThisValue:
-		this := evaluateCallGetThisValue(vm.evaluateContextStack.Peek())
+		this := evaluateCallGetThisValue(vm.referenceStack.Peek())
 		vm.stack.Push(this)
 	case *IResolveThisBinding:
 		vm.result = vm.agent.ResolveThisBinding()
@@ -315,6 +307,10 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			vm.agent.exception = vm.exception
 			panic("Throw")
 		}
+	case *IPushReference:
+		vm.referenceStack.Push(vm.reference)
+	case *IPopReference:
+		vm.referenceStack.Pop()
 	}
 }
 
@@ -341,8 +337,7 @@ func evaluateCall(agent *Agent, function Value, this Value, arguments []Value) V
 	return function.CallAssumeCallable(this, arguments)
 }
 
-func evaluateCallGetThisValue(ctx *evaluateContext) Value {
-	reference := ctx.reference
+func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
 	if reference == nil {
 		return nil
 	}

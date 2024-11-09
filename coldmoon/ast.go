@@ -1169,7 +1169,7 @@ func (c *CallExpression) Analyze(a AnalyzeQuery) bool {
 func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 	c.Callee.Bytecode(e, bc)
 
-	e.AddInstruction(&ISetEvaluationContextReference{})
+	e.AddInstruction(&IPushReference{})
 	isReference := c.Callee.Analyze(AnalyzeQueryIsReference)
 	if isReference {
 		e.AddInstruction(InsGetValue)
@@ -1187,6 +1187,8 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 	strict := bc.containedInStrictCode
 
 	e.AddInstruction(&ICall{ArgumentCount: len(c.Arguments), Strict: strict})
+
+	e.AddInstruction(&IPopReference{})
 }
 
 func (c *CallExpression) String() string {

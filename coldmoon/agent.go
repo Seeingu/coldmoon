@@ -86,6 +86,11 @@ func (a *Agent) ResolveThisBinding() Value {
 	return NewValueFromObject(envRec.GetThisBinding())
 }
 
+// 9.4.6
+func (a *Agent) GetGlobalObject() *Object {
+	return a.CurrentRealm().GlobalObject
+}
+
 // MARK: - Well-known Symbols
 
 type WellKnownSymbolsKey string

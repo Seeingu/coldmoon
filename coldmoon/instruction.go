@@ -72,8 +72,20 @@ func (i *IResolveBinding) String() string {
 	return "IResolveBinding " + string(i.Name)
 }
 
-type ISetEvaluationContextReference struct {
+type IPushReference struct {
 	Instruction
+}
+
+func (i *IPushReference) String() string {
+	return "IPushReference"
+}
+
+type IPopReference struct {
+	Instruction
+}
+
+func (i *IPopReference) String() string {
+	return "IPopReference"
 }
 
 // MARK: - Exception
