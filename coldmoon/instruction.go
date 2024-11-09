@@ -76,6 +76,33 @@ type ISetEvaluationContextReference struct {
 	Instruction
 }
 
+// MARK: - Exception
+
+type IPopExceptionJumpTarget struct {
+	Instruction
+}
+
+func (i *IPopExceptionJumpTarget) String() string {
+	return "IPopExceptionJumpTarget"
+}
+
+type IPushExceptionJumpTarget struct {
+	Instruction
+	Target int
+}
+
+func (i *IPushExceptionJumpTarget) String() string {
+	return "IPushExceptionJumpTarget"
+}
+
+type IRethrowExceptionIfAny struct {
+	Instruction
+}
+
+func (i *IRethrowExceptionIfAny) String() string {
+	return "IRethrowExceptionIfAny"
+}
+
 // MARK: - Jump, JumpIfTrue
 
 type IJump struct {

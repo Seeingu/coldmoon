@@ -4,8 +4,8 @@ type ObjectPrototype struct {
 	*Object
 }
 
-func NewObjectPrototype(agent *Agent) *ObjectPrototype {
-	o := NewObject(agent, nil)
+func NewObjectPrototype(realm *Realm) *ObjectPrototype {
+	o := NewObject(realm.Agent, nil)
 	o.InternalMethods().SetPrototypeOf = ImmutableSetPrototypeOf
 	return &ObjectPrototype{o}
 }

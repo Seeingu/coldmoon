@@ -285,6 +285,8 @@ func (p *Parser) statement() Statement {
 		return p.breakableStatement()
 	case TThrow:
 		return p.throwStatement()
+	case TTry:
+		return p.tryStatement()
 	case TRightBrace:
 		return nil
 	case TReturn:
@@ -300,6 +302,35 @@ func (p *Parser) throwStatement() *StatementThrow {
 	expr := p.expression(p.acceptContextLowest())
 	return &StatementThrow{
 		Expression: expr,
+	}
+}
+
+func (p *Parser) tryStatement() *StatementTry {
+	p.tokenizer.MustMatch(TTry)
+	block := p.block()
+	var catch *Block
+	var finally *Block
+	var catchParameter CatchParameter
+	if p.tokenizer.CurrentToken.Type == TCatch {
+		p.tokenizer.Next()
+		if p.tokenizer.CurrentToken.Type == TLeftParen {
+			p.tokenizer.Next()
+			catchParameter = CatchParameter(p.bindingIdentifier())
+			p.tokenizer.MustMatch(TRightParen)
+		}
+		catch = p.block()
+	}
+	if p.tokenizer.CurrentToken.Type == TFinally {
+		finally = p.block()
+	}
+	if catch == nil && finally == nil {
+		panic("tryStatement: expected catch or finally")
+	}
+	return &StatementTry{
+		CatchParameter: catchParameter,
+		TryBlock:       block,
+		CatchBlock:     catch,
+		FinallyBlock:   finally,
 	}
 }
 
@@ -992,9 +1023,7 @@ func (p *Parser) blockStatement() *BlockStatementBlock {
 
 func (p *Parser) block() *Block {
 	p.tokenizer.MustMatch(TLeftBrace)
-
 	list := p.statementList()
-
 	p.tokenizer.MustMatch(TRightBrace)
 
 	return &Block{

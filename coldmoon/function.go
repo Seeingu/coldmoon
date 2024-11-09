@@ -21,6 +21,10 @@ func NewFunctionPrototype(realm *Realm) ObjectType {
 		isConstructor: false,
 	})
 
+	return f
+}
+
+func InitFunctionMethods(f ObjectType, realm *Realm) {
 	// 20.2.3.5 toString
 	var toString = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		o, ok := this.(*ObjectValue)
@@ -55,8 +59,6 @@ func NewFunctionPrototype(realm *Realm) ObjectType {
 		return fun.CallAssumeCallable(thisArg, args)
 	}
 	DefineBuiltinFunction(f, "call", call, 1, realm)
-
-	return f
 }
 
 type FunctionConstructor struct {

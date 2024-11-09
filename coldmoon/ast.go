@@ -1227,6 +1227,8 @@ func (s *StatementBlock) String() string {
 	return s.BlockStatement.String()
 }
 
+// MARK: - StatementEmpty
+
 type StatementEmpty struct {
 	Statement
 }
@@ -1238,6 +1240,90 @@ func (s *StatementEmpty) Bytecode(e *Executable, c *BytecodeContext) {
 }
 func (s *StatementEmpty) String() string {
 	return ""
+}
+
+// MARK: - TryStatement
+
+type CatchParameter IdentifierName
+type StatementTry struct {
+	Statement
+	CatchParameter CatchParameter
+	TryBlock       *Block
+	CatchBlock     *Block
+	FinallyBlock   *Block
+}
+
+func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
+	if t.FinallyBlock == nil {
+		exceptionJumpToCatch := &IPushExceptionJumpTarget{}
+		e.AddInstruction(exceptionJumpToCatch)
+
+		e.AddInstruction(&IStoreConstant{
+			Value: UndefinedValue,
+		})
+		t.TryBlock.Bytecode(e, c)
+		e.AddInstruction(&IPopExceptionJumpTarget{})
+		exceptionJumpToEnd := &IJump{}
+		e.AddInstruction(exceptionJumpToEnd)
+
+		exceptionJumpToCatch.Target = len(e.Instructions) - 1
+		e.AddInstruction(&IPopExceptionJumpTarget{})
+		e.AddInstruction(&IStoreConstant{
+			Value: UndefinedValue,
+		})
+		t.CatchBlock.Bytecode(e, c)
+
+		exceptionJumpToEnd.Target = len(e.Instructions) - 1
+	} else if t.CatchBlock == nil {
+		exceptionJumpToFinally := &IPushExceptionJumpTarget{}
+		e.AddInstruction(exceptionJumpToFinally)
+
+		e.AddInstruction(&IStoreConstant{
+			Value: UndefinedValue,
+		})
+		t.TryBlock.Bytecode(e, c)
+
+		exceptionJumpToFinally.Target = len(e.Instructions) - 1
+		e.AddInstruction(&IPopExceptionJumpTarget{})
+		e.AddInstruction(&IStoreConstant{
+			Value: UndefinedValue,
+		})
+		t.FinallyBlock.Bytecode(e, c)
+		e.AddInstruction(&IRethrowExceptionIfAny{})
+
+	} else {
+		exceptionJumpToCatch := &IPushExceptionJumpTarget{}
+		e.AddInstruction(exceptionJumpToCatch)
+
+		e.AddInstruction(&IStoreConstant{
+			Value: UndefinedValue,
+		})
+		t.TryBlock.Bytecode(e, c)
+		jumpToFinally := &IJump{}
+		e.AddInstruction(jumpToFinally)
+
+		exceptionJumpToCatch.Target = len(e.Instructions) - 1
+		e.AddInstruction(&IPopExceptionJumpTarget{})
+		exceptionJumpToFinally := &IPushExceptionJumpTarget{}
+		e.AddInstruction(exceptionJumpToFinally)
+		e.AddInstruction(&IStoreConstant{
+			Value: UndefinedValue,
+		})
+		t.CatchBlock.Bytecode(e, c)
+
+		jumpToFinally.Target = len(e.Instructions) - 1
+		exceptionJumpToFinally.Target = len(e.Instructions) - 1
+		e.AddInstruction(&IPopExceptionJumpTarget{})
+		e.AddInstruction(&IStoreConstant{
+			Value: UndefinedValue,
+		})
+		t.FinallyBlock.Bytecode(e, c)
+		e.AddInstruction(&IRethrowExceptionIfAny{})
+	}
+}
+
+func (t *StatementTry) String() string {
+	return "try"
 }
 
 // MARK: - DebuggerStatement

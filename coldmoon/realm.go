@@ -25,8 +25,10 @@ func CreateRealm(agent *Agent) *Realm {
 
 // 9.3.2
 func (r *Realm) CreateIntrinsics() {
-	r.Intrinsics.ObjectPrototype = NewObjectPrototype(r.Agent)
-	r.Intrinsics.FunctionPrototype = NewFunctionPrototype(r)
+	r.Intrinsics.ObjectPrototype = NewObjectPrototype(r)
+	f := NewFunctionPrototype(r)
+	r.Intrinsics.FunctionPrototype = f
+	InitFunctionMethods(f, r)
 	r.Intrinsics.BooleanPrototype = NewBooleanPrototype(r)
 	r.Intrinsics.BooleanConstructor = NewBooleanConstructor(r)
 	r.Intrinsics.ThrowTypeError = NewThrowTypeError(r)

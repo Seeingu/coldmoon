@@ -11,12 +11,14 @@ type evaluateContext struct {
 	reference *ReferenceRecord
 }
 type VM struct {
-	agent                *Agent
-	stack                pkg.Stack[Value]
-	result               Value
-	ip                   int
-	reference            *ReferenceRecord
-	evaluateContextStack pkg.Stack[*evaluateContext]
+	agent                    *Agent
+	stack                    pkg.Stack[Value]
+	result                   Value
+	ip                       int
+	reference                *ReferenceRecord
+	evaluateContextStack     pkg.Stack[*evaluateContext]
+	exceptionJumpTargetStack pkg.Stack[int]
+	exception                Value
 }
 
 func NewVM(agent *Agent) *VM {
@@ -25,286 +27,303 @@ func NewVM(agent *Agent) *VM {
 	}
 }
 
+func (vm *VM) execute(executable *Executable, i Instruction) {
+	switch ins := i.(type) {
+	case *ILoad:
+		vm.stack.Push(vm.result)
+	case *ILoadConstant:
+		vm.stack.Push(ins.Value)
+	case *ISetEvaluationContextReference:
+		vm.evaluateContextStack.Push(&evaluateContext{
+			reference: vm.reference,
+		})
+	case *IStore:
+		vm.result = vm.stack.Pop()
+	case *IStoreConstant:
+		vm.result = ins.Value
+	case *IResolveBinding:
+		// TODO: maybe ins.Name can pass to ResolveBinding directly
+		vm.reference = vm.agent.ResolveBinding(string(ins.Name), nil, ins.Strict)
+	case *ICall:
+		argumentCount := ins.ArgumentCount
+		arguments := make([]Value, argumentCount)
+		strict := ins.Strict
+		for i := argumentCount - 1; i >= 0; i-- {
+			arguments[i] = vm.stack.Pop()
+		}
+		this := vm.stack.Pop()
+		function := vm.stack.Pop()
+
+		realm := vm.agent.CurrentRealm()
+		eval := realm.Intrinsics.Eval
+
+		evaluateContext := vm.evaluateContextStack.Pop()
+		if evaluateContext.reference != nil {
+			ref := evaluateContext.reference
+			refName, ok :=
+				ref.ReferencedName.(*ReferencedNameString)
+			if ref.IsPropertyReference() &&
+				ok &&
+				refName.String == "eval" &&
+				pkg.FuncEqual(function.(*ObjectValue).Object, eval) {
+				vm.result = directEval(vm.agent, arguments, strict)
+				return
+			}
+		}
+
+		vm.result = evaluateCall(
+			vm.agent,
+			function,
+			this,
+			arguments,
+		)
+	case *ILoadThisValue:
+		this := evaluateCallGetThisValue(vm.evaluateContextStack.Peek())
+		vm.stack.Push(this)
+	case *IResolveThisBinding:
+		vm.result = vm.agent.ResolveThisBinding()
+	case *IReturn:
+		return
+	case *IJump:
+		vm.ip = ins.Target
+	case *IJumpIfTrue:
+		value := vm.result
+		if value.ToBoolean() {
+			vm.ip = ins.Target
+		} else {
+			vm.ip = ins.TargetElse
+		}
+	case *IThrow:
+		value := vm.result
+		vm.agent.exception = value
+		panic("Throw")
+	case *IInstantiateOrdinaryFunctionExpression:
+		functionExpression := ins.FunctionExpression
+		closure := InstantiateOrdinaryFunctionExpression(
+			vm.agent,
+			functionExpression,
+			"",
+		)
+		vm.result = NewValueFromObject(closure)
+	case *ITypeof:
+		if vm.reference != nil {
+			if vm.reference.IsUnresolvableReference() {
+				vm.result = NewStringValue("undefined")
+				return
+			}
+		}
+		var value = vm.result
+		if vm.reference != nil {
+			value = vm.reference.GetValue()
+		}
+
+		switch v := value.(type) {
+		case *undefinedValue:
+			vm.result = NewStringValue("undefined")
+		case *nullValue:
+			vm.result = NewStringValue("object")
+		case *BooleanValue:
+			vm.result = NewStringValue("boolean")
+		case *NumberValue:
+			vm.result = NewStringValue("number")
+		case *StringValue:
+			vm.result = NewStringValue("string")
+		case *SymbolValue:
+			vm.result = NewStringValue("symbol")
+		case *BigIntValue:
+			vm.result = NewStringValue("bigint")
+		case *ObjectValue:
+			if v.Object.InternalMethods().Call != nil {
+				vm.result = NewStringValue("function")
+			} else {
+				vm.result = NewStringValue("object")
+			}
+		default:
+			panic("unreachable")
+		}
+
+	case *IToNumber:
+		value := vm.result
+		vm.result = ToNumber(vm.agent, value)
+	case *IToNumeric:
+		value := vm.result
+		vm.result = ToNumeric(vm.agent, value)
+	case *IUnaryMinus:
+		value := vm.result
+		switch v := value.(type) {
+		case *BigIntValue:
+			vm.result = v.UnaryMinus()
+		case *NumberValue:
+			vm.result = v.UnaryMinus()
+		default:
+			panic("unreachable")
+		}
+	case *ILogicalNot:
+		value := vm.result
+		vm.result = NewBooleanValue(!value.ToBoolean())
+	case *IObjectCreate:
+		object := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
+		vm.result = NewValueFromObject(object)
+	case *IObjectSetProperty:
+		value := vm.stack.Pop()
+		propertyKey := ToPropertyKey(vm.agent, vm.stack.Pop())
+		object := vm.stack.Pop().(*ObjectValue).Object
+		object.CreateDataPropertyOrThrow(propertyKey, value)
+		vm.result = NewValueFromObject(object)
+	case *IBitwiseNot:
+		value := vm.result
+		switch v := value.(type) {
+		case *BigIntValue:
+			vm.result = v.BitwiseNot()
+		case *NumberValue:
+			vm.result = v.BitwiseNot()
+		default:
+			panic("unreachable")
+		}
+	case *IEvaluatePropertyAccessWithExpressionKey:
+		// 13.3.3
+		propertyNameValue := vm.stack.Pop()
+		strict := ins.Strict
+		baseValue := vm.stack.Pop()
+		propertyKey := ToPropertyKey(vm.agent, propertyNameValue)
+
+		var referencedName ReferencedName
+		switch p := propertyKey.(type) {
+		case StringPropertyKey:
+			referencedName = &ReferencedNameString{
+				String: p.Value,
+			}
+		case SymbolPropertyKey:
+			referencedName = &ReferencedNameSymbol{
+				Symbol: p.Value,
+			}
+		case IntegerIndexPropertyKey:
+			referencedName = &ReferencedNameString{
+				String: strconv.Itoa(p.Value),
+			}
+		}
+		vm.reference = &ReferenceRecord{
+			Base: &ReferenceRecordBaseValue{
+				Value: baseValue,
+			},
+			ReferencedName: referencedName,
+			Strict:         strict,
+			ThisValue:      nil,
+		}
+	case *IEvaluatePropertyAccessWithIdentifierKey:
+		// 13.3.4
+		propertyNameString := ins.Name
+		strict := ins.Strict
+		baseValue := vm.stack.Pop()
+
+		referencedName := &ReferencedNameString{
+			String: string(propertyNameString),
+		}
+		vm.reference = &ReferenceRecord{
+			Base: &ReferenceRecordBaseValue{
+				Value: baseValue,
+			},
+			ReferencedName: referencedName,
+			Strict:         strict,
+			ThisValue:      nil,
+		}
+	case *IGetValue:
+		if vm.reference != nil {
+			vm.result = vm.reference.GetValue()
+		}
+		vm.reference = nil
+	case *IArrayCreate:
+		vm.result = NewValueFromObject(ArrayCreate(vm.agent, 0, nil))
+	case *IArraySetLength:
+		length := ins.Length
+		array := vm.result.(*ObjectValue).Object
+		array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
+	case *IArraySetValue:
+		index := ins.Index
+		initValue := vm.stack.Pop()
+		array := vm.stack.Pop().(*ObjectValue).Object
+		array.CreateDataPropertyOrThrow(
+			NewIntegerIndexPropertyKey(index),
+			initValue,
+		)
+		vm.result = NewValueFromObject(array)
+	case *IGreaterThan:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		r := IsLessThan(vm.agent, left, right, IsLessThanOrderRightFirst)
+		vm.result = NewBooleanValue(r)
+	case *IGreaterThanEquals:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		r := IsLessThan(vm.agent, left, right, IsLessThanOrderRightFirst)
+		vm.result = NewBooleanValue(!r)
+	case *ILessThan:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		r := IsLessThan(vm.agent, left, right, IsLessThanOrderLeftFirst)
+		vm.result = NewBooleanValue(r)
+	case *ILessThanEquals:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		r := IsLessThan(vm.agent, left, right, IsLessThanOrderLeftFirst)
+		vm.result = NewBooleanValue(!r)
+	case *IHasProperty:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		rightObject, ok := right.(*ObjectValue)
+		if !ok {
+			panic("TypeError: right is not an object")
+		}
+		vm.result = NewBooleanValue(
+			rightObject.Object.HasProperty(ToPropertyKey(vm.agent, left)))
+	case *IInstanceOf:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		vm.result = NewBooleanValue(
+			InstanceOfOperator(vm.agent, left, right),
+		)
+	case *ILooselyEqual:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		vm.result = NewBooleanValue(IsLooselyEqual(vm.agent, right, left))
+	case *IStrictlyEqual:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		vm.result = NewBooleanValue(IsStrictlyEqual(right, left))
+	case *IApplyStringOrNumericBinaryOperator:
+		right := vm.stack.Pop()
+		left := vm.stack.Pop()
+		operator := ins.Operator
+		vm.result = applyStringOrNumericBinaryOperator(
+			vm.agent, left, right, operator,
+		)
+	case *INew:
+		argumentCount := ins.ArgumentCount
+		arguments := make([]Value, argumentCount)
+		for i := argumentCount - 1; i >= 0; i-- {
+			arguments[i] = vm.stack.Pop()
+		}
+		constructor := vm.stack.Pop()
+		vm.result = evaluateNew(vm.agent, constructor, arguments)
+	case *IPushExceptionJumpTarget:
+		jumpTarget := ins.Target
+		vm.exceptionJumpTargetStack.Push(jumpTarget)
+	case *IPopExceptionJumpTarget:
+		vm.exceptionJumpTargetStack.Pop()
+	case *IRethrowExceptionIfAny:
+		if vm.exception != nil {
+			vm.agent.exception = vm.exception
+			panic("Throw")
+		}
+	}
+}
+
 func (vm *VM) Run(executable *Executable) *CompletionRecord {
 	for vm.ip < len(executable.Instructions) {
 		i := executable.Instructions[vm.ip]
-		switch ins := i.(type) {
-		case *ILoad:
-			vm.stack.Push(vm.result)
-		case *ILoadConstant:
-			vm.stack.Push(ins.Value)
-		case *ISetEvaluationContextReference:
-			vm.evaluateContextStack.Push(&evaluateContext{
-				reference: vm.reference,
-			})
-		case *IStore:
-			vm.result = vm.stack.Pop()
-		case *IStoreConstant:
-			vm.result = ins.Value
-		case *IResolveBinding:
-			// TODO: maybe ins.Name can pass to ResolveBinding directly
-			vm.reference = vm.agent.ResolveBinding(string(ins.Name), nil, ins.Strict)
-		case *ICall:
-			argumentCount := ins.ArgumentCount
-			arguments := make([]Value, argumentCount)
-			strict := ins.Strict
-			for i := argumentCount - 1; i >= 0; i-- {
-				arguments[i] = vm.stack.Pop()
-			}
-			this := vm.stack.Pop()
-			function := vm.stack.Pop()
-
-			realm := vm.agent.CurrentRealm()
-			eval := realm.Intrinsics.Eval
-
-			evaluateContext := vm.evaluateContextStack.Pop()
-			if evaluateContext.reference != nil {
-				ref := evaluateContext.reference
-				refName, ok :=
-					ref.ReferencedName.(*ReferencedNameString)
-				if ref.IsPropertyReference() &&
-					ok &&
-					refName.String == "eval" &&
-					pkg.FuncEqual(function.(*ObjectValue).Object, eval) {
-					vm.result = directEval(vm.agent, arguments, strict)
-					continue
-				}
-			}
-
-			vm.result = evaluateCall(
-				vm.agent,
-				function,
-				this,
-				arguments,
-			)
-		case *ILoadThisValue:
-			this := evaluateCallGetThisValue(vm.evaluateContextStack.Peek())
-			vm.stack.Push(this)
-		case *IResolveThisBinding:
-			vm.result = vm.agent.ResolveThisBinding()
-		case *IReturn:
+		vm.execute(executable, i)
+		if _, ok := i.(*IReturn); ok {
 			return NewNormalCompletion(vm.result)
-		case *IJump:
-			vm.ip = ins.Target
-		case *IJumpIfTrue:
-			value := vm.result
-			if value.ToBoolean() {
-				vm.ip = ins.Target
-			} else {
-				vm.ip = ins.TargetElse
-			}
-		case *IThrow:
-			value := vm.result
-			vm.agent.exception = value
-			panic("Throw")
-		case *IInstantiateOrdinaryFunctionExpression:
-			functionExpression := ins.FunctionExpression
-			closure := InstantiateOrdinaryFunctionExpression(
-				vm.agent,
-				functionExpression,
-				"",
-			)
-			vm.result = NewValueFromObject(closure)
-		case *ITypeof:
-			if vm.reference != nil {
-				if vm.reference.IsUnresolvableReference() {
-					vm.result = NewStringValue("undefined")
-					continue
-				}
-			}
-			var value = vm.result
-			if vm.reference != nil {
-				value = vm.reference.GetValue()
-			}
-
-			switch v := value.(type) {
-			case *undefinedValue:
-				vm.result = NewStringValue("undefined")
-			case *nullValue:
-				vm.result = NewStringValue("object")
-			case *BooleanValue:
-				vm.result = NewStringValue("boolean")
-			case *NumberValue:
-				vm.result = NewStringValue("number")
-			case *StringValue:
-				vm.result = NewStringValue("string")
-			case *SymbolValue:
-				vm.result = NewStringValue("symbol")
-			case *BigIntValue:
-				vm.result = NewStringValue("bigint")
-			case *ObjectValue:
-				if v.Object.InternalMethods().Call != nil {
-					vm.result = NewStringValue("function")
-				} else {
-					vm.result = NewStringValue("object")
-				}
-			default:
-				panic("unreachable")
-			}
-
-		case *IToNumber:
-			value := vm.result
-			vm.result = ToNumber(vm.agent, value)
-		case *IToNumeric:
-			value := vm.result
-			vm.result = ToNumeric(vm.agent, value)
-		case *IUnaryMinus:
-			value := vm.result
-			switch v := value.(type) {
-			case *BigIntValue:
-				vm.result = v.UnaryMinus()
-			case *NumberValue:
-				vm.result = v.UnaryMinus()
-			default:
-				panic("unreachable")
-			}
-		case *ILogicalNot:
-			value := vm.result
-			vm.result = NewBooleanValue(!value.ToBoolean())
-		case *IObjectCreate:
-			object := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
-			vm.result = NewValueFromObject(object)
-		case *IObjectSetProperty:
-			value := vm.stack.Pop()
-			propertyKey := ToPropertyKey(vm.agent, vm.stack.Pop())
-			object := vm.stack.Pop().(*ObjectValue).Object
-			object.CreateDataPropertyOrThrow(propertyKey, value)
-			vm.result = NewValueFromObject(object)
-		case *IBitwiseNot:
-			value := vm.result
-			switch v := value.(type) {
-			case *BigIntValue:
-				vm.result = v.BitwiseNot()
-			case *NumberValue:
-				vm.result = v.BitwiseNot()
-			default:
-				panic("unreachable")
-			}
-		case *IEvaluatePropertyAccessWithExpressionKey:
-			// 13.3.3
-			propertyNameValue := vm.stack.Pop()
-			strict := ins.Strict
-			baseValue := vm.stack.Pop()
-			propertyKey := ToPropertyKey(vm.agent, propertyNameValue)
-
-			var referencedName ReferencedName
-			switch p := propertyKey.(type) {
-			case StringPropertyKey:
-				referencedName = &ReferencedNameString{
-					String: p.Value,
-				}
-			case SymbolPropertyKey:
-				referencedName = &ReferencedNameSymbol{
-					Symbol: p.Value,
-				}
-			case IntegerIndexPropertyKey:
-				referencedName = &ReferencedNameString{
-					String: strconv.Itoa(p.Value),
-				}
-			}
-			vm.reference = &ReferenceRecord{
-				Base: &ReferenceRecordBaseValue{
-					Value: baseValue,
-				},
-				ReferencedName: referencedName,
-				Strict:         strict,
-				ThisValue:      nil,
-			}
-		case *IEvaluatePropertyAccessWithIdentifierKey:
-			// 13.3.4
-			propertyNameString := ins.Name
-			strict := ins.Strict
-			baseValue := vm.stack.Pop()
-
-			referencedName := &ReferencedNameString{
-				String: string(propertyNameString),
-			}
-			vm.reference = &ReferenceRecord{
-				Base: &ReferenceRecordBaseValue{
-					Value: baseValue,
-				},
-				ReferencedName: referencedName,
-				Strict:         strict,
-				ThisValue:      nil,
-			}
-		case *IGetValue:
-			if vm.reference != nil {
-				vm.result = vm.reference.GetValue()
-			}
-			vm.reference = nil
-		case *IArrayCreate:
-			vm.result = NewValueFromObject(ArrayCreate(vm.agent, 0, nil))
-		case *IArraySetLength:
-			length := ins.Length
-			array := vm.result.(*ObjectValue).Object
-			array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
-		case *IArraySetValue:
-			index := ins.Index
-			initValue := vm.stack.Pop()
-			array := vm.stack.Pop().(*ObjectValue).Object
-			array.CreateDataPropertyOrThrow(
-				NewIntegerIndexPropertyKey(index),
-				initValue,
-			)
-			vm.result = NewValueFromObject(array)
-		case *IGreaterThan:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			r := IsLessThan(vm.agent, left, right, IsLessThanOrderRightFirst)
-			vm.result = NewBooleanValue(r)
-		case *IGreaterThanEquals:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			r := IsLessThan(vm.agent, left, right, IsLessThanOrderRightFirst)
-			vm.result = NewBooleanValue(!r)
-		case *ILessThan:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			r := IsLessThan(vm.agent, left, right, IsLessThanOrderLeftFirst)
-			vm.result = NewBooleanValue(r)
-		case *ILessThanEquals:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			r := IsLessThan(vm.agent, left, right, IsLessThanOrderLeftFirst)
-			vm.result = NewBooleanValue(!r)
-		case *IHasProperty:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			rightObject, ok := right.(*ObjectValue)
-			if !ok {
-				panic("TypeError: right is not an object")
-			}
-			vm.result = NewBooleanValue(
-				rightObject.Object.HasProperty(ToPropertyKey(vm.agent, left)))
-		case *IInstanceOf:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			vm.result = NewBooleanValue(
-				InstanceOfOperator(vm.agent, left, right),
-			)
-		case *ILooselyEqual:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			vm.result = NewBooleanValue(IsLooselyEqual(vm.agent, right, left))
-		case *IStrictlyEqual:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			vm.result = NewBooleanValue(IsStrictlyEqual(right, left))
-		case *IApplyStringOrNumericBinaryOperator:
-			right := vm.stack.Pop()
-			left := vm.stack.Pop()
-			operator := ins.Operator
-			vm.result = applyStringOrNumericBinaryOperator(
-				vm.agent, left, right, operator,
-			)
-		case *INew:
-			argumentCount := ins.ArgumentCount
-			arguments := make([]Value, argumentCount)
-			for i := argumentCount - 1; i >= 0; i-- {
-				arguments[i] = vm.stack.Pop()
-			}
-			constructor := vm.stack.Pop()
-			vm.result = evaluateNew(vm.agent, constructor, arguments)
 		}
 		vm.ip += 1
 	}
