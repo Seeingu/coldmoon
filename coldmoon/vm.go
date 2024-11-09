@@ -297,6 +297,14 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 			vm.result = applyStringOrNumericBinaryOperator(
 				vm.agent, left, right, operator,
 			)
+		case *INew:
+			argumentCount := ins.ArgumentCount
+			arguments := make([]Value, argumentCount)
+			for i := argumentCount - 1; i >= 0; i-- {
+				arguments[i] = vm.stack.Pop()
+			}
+			constructor := vm.stack.Pop()
+			vm.result = evaluateNew(vm.agent, constructor, arguments)
 		}
 		vm.ip += 1
 	}
@@ -336,6 +344,16 @@ func directEval(agent *Agent, arguments []Value, strict bool) Value {
 	evalArg := arguments[0]
 	strictCaller := strict
 	return PerformEval(agent, evalArg, strictCaller, true)
+}
+
+// 13.3.5.1.1
+func evaluateNew(agent *Agent, constructor Value, arguments []Value) Value {
+	if !isConstructor(constructor) {
+		panic("TypeError: constructor is not a constructor")
+	}
+	return NewValueFromObject(
+		constructor.(*ObjectValue).Object.Construct(arguments, nil),
+	)
 }
 
 // 13.10.2

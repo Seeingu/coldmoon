@@ -599,7 +599,48 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
-// MARK: - ExpressionBinaryExpression
+// MARK: - NewExpression
+
+type ExpressionNewExpression struct {
+	Expression
+	Callee    Expression
+	Arguments Arguments
+}
+
+func (e *ExpressionNewExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (e *ExpressionNewExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.Callee.Bytecode(ex, c)
+	if e.Callee.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+	ex.AddInstruction(InsLoad)
+
+	for _, arg := range e.Arguments {
+		arg.Bytecode(ex, c)
+		if arg.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+		ex.AddInstruction(InsLoad)
+	}
+	ex.AddInstruction(&INew{ArgumentCount: len(e.Arguments)})
+}
+
+func (e *ExpressionNewExpression) String() string {
+	sb := "new " + e.Callee.String() + "("
+	for i, arg := range e.Arguments {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += arg.String()
+	}
+	sb += ")"
+	return sb
+}
+
+// MARK: - BinaryExpression
 
 type BinaryOperator int
 

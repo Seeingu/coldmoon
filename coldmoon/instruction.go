@@ -334,6 +334,17 @@ func (i *IApplyStringOrNumericBinaryOperator) String() string {
 	return "IApplyStringOrNumericBinaryOperator " + i.Operator.String()
 }
 
+// MARK: - New
+
+type INew struct {
+	Instruction
+	ArgumentCount int
+}
+
+func (i *INew) String() string {
+	return "INew " + fmt.Sprintf("%d", i.ArgumentCount)
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

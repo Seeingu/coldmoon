@@ -3,10 +3,11 @@ package coldmoon
 import "github.com/samber/lo"
 
 type Parser struct {
-	SourceText     string
-	tokenizer      *Tokenizer
-	inFunctionBody bool
-	ctx            ParserContext
+	SourceText              string
+	tokenizer               *Tokenizer
+	inFunctionBody          bool
+	callExpressionForbidden bool
+	ctx                     ParserContext
 }
 
 func NewParser(sourceText string, ctx ParserContext) *Parser {
@@ -490,9 +491,32 @@ func (p *Parser) expressionStatement() *StatementExpression {
 	}
 }
 
+func (p *Parser) newExpression() (*ExpressionNewExpression, bool) {
+	t := p.tokenizer.CurrentToken
+
+	previous := p.callExpressionForbidden
+	p.callExpressionForbidden = true
+	defer func() {
+		p.callExpressionForbidden = previous
+	}()
+
+	if t.Type != TNew {
+		return nil, false
+	}
+	p.tokenizer.Next()
+	accept := p.acceptContext(TNew)
+	expr := p.expression(accept)
+	p.callExpressionForbidden = previous
+	args := p.arguments()
+	return &ExpressionNewExpression{
+		Callee:    expr,
+		Arguments: args,
+	}, true
+}
+
 // unaryExpression accept unary token
 // if token is not unary, return nil
-func (p *Parser) unaryExpression() Expression {
+func (p *Parser) unaryExpression() (Expression, bool) {
 	t := p.tokenizer.CurrentToken
 	var operator UnaryOperator
 	unaryMap := map[TokenType]UnaryOperator{
@@ -508,7 +532,7 @@ func (p *Parser) unaryExpression() Expression {
 		p.tokenizer.Next()
 		operator = op
 	} else {
-		return nil
+		return nil, false
 	}
 	var accept *acceptContext
 	if t.Type == TPlus {
@@ -522,14 +546,17 @@ func (p *Parser) unaryExpression() Expression {
 	return &UnaryExpression{
 		Operator: operator,
 		Operand:  expr,
-	}
-
+	}, true
 }
 
 func (p *Parser) expression(accept *acceptContext) Expression {
-	unary := p.unaryExpression()
-	if unary != nil {
+	unary, ok := p.unaryExpression()
+	if ok {
 		return unary
+	}
+	newExpression, ok := p.newExpression()
+	if ok {
+		return newExpression
 	}
 
 	primary := p.primaryExpression()
@@ -574,7 +601,7 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 	case TAmpersandAmpersand, TPipePipe, TQuestionQuestion:
 		return p.logicalExpression(left, accept)
 	case TQuestion:
-		return p.conditionalExpression(left)
+		return p.conditionalExpression(left, accept)
 	case TComma:
 		return p.sequenceExpression(left)
 	case TStar,
@@ -624,9 +651,8 @@ func (p *Parser) sequenceExpression(left PrimaryExpression) *ExpressionSequenceE
 	}
 }
 
-func (p *Parser) conditionalExpression(left PrimaryExpression) *ExpressionConditionalExpression {
+func (p *Parser) conditionalExpression(left PrimaryExpression, accept *acceptContext) *ExpressionConditionalExpression {
 	p.tokenizer.MustMatch(TQuestion)
-	accept := p.acceptContext(TQuestion)
 	consequent := p.expression(accept)
 	p.tokenizer.MustMatch(TColon)
 	alternate := p.expression(accept)
@@ -729,6 +755,9 @@ func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
 }
 
 func (p *Parser) callExpression(left PrimaryExpression) *CallExpression {
+	if p.callExpressionForbidden {
+		panic("callExpression: call expression forbidden")
+	}
 	args := p.arguments()
 	return &CallExpression{
 		Callee:    left,
