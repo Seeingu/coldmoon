@@ -104,8 +104,49 @@ func (r *ReferenceRecord) GetValue() Value {
 }
 
 // 6.2.5.6
-func (r *ReferenceRecord) PutValue() {
+func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
+	if r.IsUnresolvableReference() {
+		if r.Strict {
+			panic("ReferenceError")
+		}
 
+		globalObj := agent.GetGlobalObject()
+
+		globalObj.Set(NewStringPropertyKey(r.ReferencedName.(*ReferencedNameString).String), value, setThrowTypeIgnore)
+		return
+	}
+
+	if r.IsPropertyReference() {
+		baseObj := ValueToObject(agent, r.Base.(*ReferenceRecordBaseValue).Value)
+
+		if r.IsPrivateReference() {
+			panic("implement me")
+		}
+
+		var referencedName PropertyKey
+		switch rn := r.ReferencedName.(type) {
+		case *ReferencedNameString:
+			referencedName = NewStringPropertyKey(rn.String)
+		case *ReferencedNameSymbol:
+			referencedName = NewSymbolPropertyKey(rn.Symbol)
+		case *ReferencedNamePrivateName:
+			panic("unreachable")
+		}
+
+		succeeded := baseObj.InternalMethods().Set(
+			baseObj,
+			referencedName,
+			value,
+			r.ThisValue)
+		if !succeeded && r.Strict {
+			panic("TypeError")
+		}
+		return
+	}
+
+	base := r.Base.(*ReferenceRecordBaseEnvironment)
+	referencedName := r.ReferencedName.(*ReferencedNameString).String
+	base.Environment.SetMutableBinding(referencedName, value, r.Strict)
 }
 
 // 6.2.5.7
