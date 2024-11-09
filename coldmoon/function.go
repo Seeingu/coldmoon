@@ -20,32 +20,43 @@ func NewFunctionPrototype(realm *Realm) ObjectType {
 		prefix:        "",
 		isConstructor: false,
 	})
+
+	// 20.2.3.5 toString
+	var toString = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		o, ok := this.(*ObjectValue)
+		if ok {
+			ecmascriptFunction, ok := o.Object.(*ECMAScriptFunction)
+			if ok {
+				return NewStringValue(ecmascriptFunction.SourceText)
+			}
+
+			builtinFunction, ok := o.Object.(*BuiltinFunction)
+			if ok {
+				name := builtinFunction.InitialName
+				sourceText := "function " + name + "() { [native code] }"
+				return NewStringValue(sourceText)
+			}
+		}
+		if IsCallable(this) {
+			return NewStringValue("function () { [native code] }")
+		}
+
+		panic("TypeError")
+	}
+	DefineBuiltinFunction(f, "toString", toString, 0, realm)
+
+	var call = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		thisArg := argumentsList[0]
+		args := argumentsList[1:]
+		fun := this
+		if !IsCallable(fun) {
+			panic("TypeError")
+		}
+		return fun.CallAssumeCallable(thisArg, args)
+	}
+	DefineBuiltinFunction(f, "call", call, 1, realm)
+
 	return f
-}
-
-// 20.2.3.5 toString
-func (f *FunctionPrototype) String(thisValue Value) Value {
-	f.Object.Agent()
-	fun := thisValue
-	o, ok := fun.(*ObjectValue)
-	if ok {
-		ecmascriptFunction, ok := o.Object.(*ECMAScriptFunction)
-		if ok {
-			return NewStringValue(ecmascriptFunction.SourceText)
-		}
-
-		builtinFunction, ok := o.Object.(*BuiltinFunction)
-		if ok {
-			name := builtinFunction.InitialName
-			sourceText := "function " + name + "() { [native code] }"
-			return NewStringValue(sourceText)
-		}
-	}
-	if IsCallable(fun) {
-		return NewStringValue("function () { [native code] }")
-	}
-
-	panic("TypeError")
 }
 
 type FunctionConstructor struct {
