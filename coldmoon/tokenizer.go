@@ -91,6 +91,7 @@ const (
 	TAwait
 	TFunction
 	TDelete
+	TComment
 	TIn
 	TInstanceof
 	TNew
@@ -209,7 +210,13 @@ func (t *Tokenizer) peek() Token {
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '/' {
 			t.Index++
-			return Token{Type: TSlashSlash, Value: "//"}
+			comment := t.comment("//")
+			return Token{Type: TComment, Value: comment}
+		}
+		if t.Index < t.Length && t.SourceText[t.Index] == '*' {
+			t.Index++
+			comment := t.comment("/*")
+			return Token{Type: TComment, Value: comment}
 		}
 		return Token{Type: TSlash, Value: "/"}
 	case '*':
@@ -375,6 +382,34 @@ func (t *Tokenizer) peek() Token {
 	}
 	panic("unhandled token: " + string(ch))
 
+}
+
+func (t *Tokenizer) comment(commentType string) string {
+	startIndex := t.Index
+	if commentType == "//" {
+		for t.Index < t.Length {
+			ch := t.SourceText[t.Index]
+			if lo.Contains(lineTerminators, ch) {
+				t.Index++
+				return string(t.SourceText[startIndex:t.Index])
+			}
+			t.Index++
+		}
+	}
+	if commentType == "/*" {
+		for t.Index < t.Length {
+			ch := t.SourceText[t.Index]
+			if ch == '*' {
+				t.Index++
+				if t.Index < t.Length && t.SourceText[t.Index] == '/' {
+					t.Index++
+					return string(t.SourceText[startIndex : t.Index-2])
+				}
+			}
+			t.Index++
+		}
+	}
+	return ""
 }
 
 // MARK: - String
