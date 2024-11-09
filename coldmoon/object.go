@@ -398,6 +398,46 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	// 20.1.3.1
 	DefineBuiltinProperty(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
 
+	// 20.1.3.6 toString
+	var toString = func(this Value, args []Value, newTarget ObjectType) Value {
+		if this == UndefinedValue {
+			return NewStringValue("[object Undefined]")
+		}
+		if this == NullValue {
+			return NewStringValue("[object Null]")
+		}
+		o := ValueToObject(agent, this)
+		_isArray := isArray(this)
+		var builtInTag string
+		if _isArray {
+			builtInTag = "Array"
+		} else if o.InternalMethods().Call != nil {
+			builtInTag = "Function"
+		} else if _, ok := o.(*BooleanObject); ok {
+			builtInTag = "Boolean"
+		} else {
+			builtInTag = "Object"
+		}
+
+		symbol := WellKnownSymbols[WellKnownSymbolsToStringTag]
+		tagValue := o.Get(NewSymbolPropertyKey(&symbol))
+
+		var tag string
+		if stringTag, ok := tagValue.(*StringValue); ok {
+			tag = stringTag.Data
+		} else {
+			tag = builtInTag
+		}
+		return NewStringValue("[object " + tag + "]")
+
+	}
+	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+
+	var valueOf = func(this Value, args []Value, newTarget ObjectType) Value {
+		return NewValueFromObject(ValueToObject(agent, this))
+	}
+	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+
 	return object
 
 }

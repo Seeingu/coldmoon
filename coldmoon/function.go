@@ -23,8 +23,8 @@ func NewFunctionPrototype(realm *Realm) ObjectType {
 	return f
 }
 
-// 20.2.3.5
-func (f *FunctionPrototype) ToString(thisValue Value) Value {
+// 20.2.3.5 toString
+func (f *FunctionPrototype) String(thisValue Value) Value {
 	f.Object.Agent()
 	fun := thisValue
 	o, ok := fun.(*ObjectValue)

@@ -343,7 +343,7 @@ func ToBigUint64(agent *Agent, value Value) uint64 {
 }
 
 // 7.1.18
-func ValueToObject(value Value, agent *Agent) ObjectType {
+func ValueToObject(agent *Agent, value Value) ObjectType {
 	switch v := value.(type) {
 	case *undefinedValue, *nullValue:
 		panic("TypeError")
@@ -623,7 +623,7 @@ func IsStrictlyEqual(x Value, y Value) bool {
 
 // 7.3.3
 func GetV(value Value, agent *Agent, key PropertyKey) Value {
-	object := ValueToObject(value, agent)
+	object := ValueToObject(agent, value)
 	return object.InternalMethods().Get(object, key, value)
 }
 
