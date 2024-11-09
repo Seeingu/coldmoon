@@ -599,6 +599,103 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - ExpressionBinaryExpression
+
+type BinaryOperator int
+
+func (b BinaryOperator) String() string {
+	switch b {
+	case BinaryOperatorMultiplication:
+		return "*"
+	case BinaryOperatorExponentiation:
+		return "**"
+	case BinaryOperatorDivision:
+		return "/"
+	case BinaryOperatorRemainder:
+		return "%"
+	case BinaryOperatorAddition:
+		return "+"
+	case BinaryOperatorSubtraction:
+		return "-"
+	case BinaryOperatorLeftShift:
+		return "<<"
+	case BinaryOperatorRightShift:
+		return ">>"
+	case BinaryOperatorUnsignedRightShift:
+		return ">>>"
+	case BinaryOperatorBitwiseAnd:
+		return "&"
+	case BinaryOperatorBitwiseXor:
+		return "^"
+	case BinaryOperatorBitwiseOr:
+		return "|"
+	}
+	return ""
+}
+
+const (
+	BinaryOperatorMultiplication BinaryOperator = iota
+	BinaryOperatorExponentiation
+	BinaryOperatorDivision
+	BinaryOperatorRemainder
+	BinaryOperatorAddition
+	BinaryOperatorSubtraction
+	BinaryOperatorLeftShift
+	BinaryOperatorRightShift
+	BinaryOperatorUnsignedRightShift
+	BinaryOperatorBitwiseAnd
+	BinaryOperatorBitwiseXor
+	BinaryOperatorBitwiseOr
+)
+
+var operatorBinaryMap = map[TokenType]BinaryOperator{
+	TStar:               BinaryOperatorMultiplication,
+	TStarStar:           BinaryOperatorExponentiation,
+	TSlash:              BinaryOperatorDivision,
+	TPercent:            BinaryOperatorRemainder,
+	TPlus:               BinaryOperatorAddition,
+	TMinus:              BinaryOperatorSubtraction,
+	TLeftShift:          BinaryOperatorLeftShift,
+	TRightShift:         BinaryOperatorRightShift,
+	TUnsignedRightShift: BinaryOperatorUnsignedRightShift,
+	TAmpersand:          BinaryOperatorBitwiseAnd,
+	TCaret:              BinaryOperatorBitwiseXor,
+	TPipe:               BinaryOperatorBitwiseOr,
+}
+
+type ExpressionBinaryExpression struct {
+	Expression
+	Left     Expression
+	Operator BinaryOperator
+	Right    Expression
+}
+
+func (b *ExpressionBinaryExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (b *ExpressionBinaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	b.Left.Bytecode(e, c)
+	if b.Left.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	e.AddInstruction(InsLoad)
+
+	b.Right.Bytecode(e, c)
+	if b.Right.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	e.AddInstruction(InsLoad)
+
+	e.AddInstruction(&IApplyStringOrNumericBinaryOperator{
+		Operator: b.Operator,
+	})
+}
+
+func (b *ExpressionBinaryExpression) String() string {
+	return b.Left.String() + " " + b.Operator.String() + " " + b.Right.String()
+}
+
 // MARK: - SequenceExpression
 
 type ExpressionSequenceExpression struct {

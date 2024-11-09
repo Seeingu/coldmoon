@@ -323,6 +323,17 @@ func (i *IStrictlyEqual) String() string {
 	return "IStrictlyEqual"
 }
 
+// MARK: - Numeric Binary
+
+type IApplyStringOrNumericBinaryOperator struct {
+	Instruction
+	Operator BinaryOperator
+}
+
+func (i *IApplyStringOrNumericBinaryOperator) String() string {
+	return "IApplyStringOrNumericBinaryOperator " + i.Operator.String()
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

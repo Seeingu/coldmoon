@@ -39,7 +39,7 @@ const (
 	TLeftShift
 	TRightShift
 	TUnsignedRightShift
-	TBitwiseAnd
+	TAmpersand
 	TNot
 	TQuestion
 	TQuestionQuestion
@@ -193,7 +193,7 @@ func (t *Tokenizer) peek() Token {
 			t.Index++
 			return Token{Type: TAmpersandEquals, Value: "&="}
 		}
-		return Token{Type: TBitwiseAnd, Value: "&"}
+		return Token{Type: TAmpersand, Value: "&"}
 	case '%':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {

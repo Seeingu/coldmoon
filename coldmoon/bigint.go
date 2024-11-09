@@ -54,7 +54,89 @@ func (b *BigIntValue) BitwiseNot() *BigIntValue {
 	}
 }
 
+// 6.1.6.2.3
+func (b *BigIntValue) Exponentiate(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Exp(b.Data, other.Data, nil),
+	}
+}
+
+// 6.1.6.2.4
+func (b *BigIntValue) Multiply(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Mul(b.Data, other.Data),
+	}
+}
+
+// 6.1.6.2.5
+func (b *BigIntValue) Divide(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Div(b.Data, other.Data),
+	}
+}
+
+// 6.1.6.2.6
+func (b *BigIntValue) Remainder(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Rem(b.Data, other.Data),
+	}
+}
+
+// 6.1.6.2.7
+func (b *BigIntValue) Add(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Add(b.Data, other.Data),
+	}
+}
+
+// 6.1.6.2.8
+func (b *BigIntValue) Subtract(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Sub(b.Data, other.Data),
+	}
+}
+
+// 6.1.6.2.9
+func (b *BigIntValue) LeftShift(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Lsh(b.Data, uint(other.Data.Int64())),
+	}
+}
+
+// 6.1.6.2.10
+func (b *BigIntValue) SignedRightShift(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Rsh(b.Data, uint(other.Data.Int64())),
+	}
+}
+
+// 6.1.6.2.11
+func (b *BigIntValue) UnsignedRightShift(other *BigIntValue) *BigIntValue {
+	panic("TypeError")
+}
+
 // 6.1.6.2.12
-func (b *BigIntValue) LessThan(other BigIntValue) bool {
+func (b *BigIntValue) LessThan(other *BigIntValue) bool {
 	return b.Data.Cmp(other.Data) == -1
+}
+
+// 6.1.6.2.18
+func (b *BigIntValue) BitwiseAnd(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).And(b.Data, other.Data),
+	}
+}
+
+// 6.1.6.2.19
+func (b *BigIntValue) BitwiseXor(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Xor(b.Data, other.Data),
+	}
+}
+
+// 6.1.6.2.20
+func (b *BigIntValue) BitwiseOr(other *BigIntValue) *BigIntValue {
+	return &BigIntValue{
+		Data: new(big.Int).Or(b.Data, other.Data),
+	}
 }

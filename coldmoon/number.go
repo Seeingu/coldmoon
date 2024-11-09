@@ -10,6 +10,8 @@ type NumberValue struct {
 	Data float64
 }
 
+var _ Value = (*NumberValue)(nil)
+
 func NewNumberValue(v float64) *NumberValue {
 	return &NumberValue{
 		Data: v,
@@ -83,6 +85,123 @@ func (n *NumberValue) BitwiseNot() *NumberValue {
 	}
 }
 
+// 6.1.6.1.3
+func (n *NumberValue) Exponentiate(exponent *NumberValue) *NumberValue {
+	if exponent.IsNaN() {
+		return NewNumberValue(math.NaN())
+	}
+	if exponent.IsZero() {
+		return NewNumberValue(1)
+	}
+	if n.IsPositiveInf() {
+		if exponent.Data > 0 {
+			return NewNumberValue(math.Inf(1))
+		} else {
+			return NewNumberValue(0)
+		}
+	}
+
+	if n.IsNegativeInf() {
+		if exponent.Data > 0 {
+			if exponent.Data > 0 && math.Mod(exponent.Data, 2) == 0 {
+				return NewNumberValue(math.Inf(1))
+			} else {
+				return NewNumberValue(math.Inf(-1))
+			}
+		} else {
+			if math.Mod(exponent.Data, 2) == 0 {
+				return NewNumberValue(0)
+			} else {
+				return NewNumberValue(-0)
+			}
+		}
+	}
+
+	if n.IsPositiveZero() {
+		if exponent.Data > 0 {
+			return NewNumberValue(0)
+		} else {
+			return NewNumberValue(math.Inf(1))
+		}
+	}
+
+	if n.IsNegativeZero() {
+		if exponent.Data > 0 {
+			if math.Mod(exponent.Data, 2) == 0 {
+				return NewNumberValue(0)
+			} else {
+				return NewNumberValue(-0)
+			}
+		} else {
+			return NewNumberValue(math.Inf(1))
+		}
+	}
+
+	Assert(n.IsFinite() && !n.IsZero())
+	if exponent.IsPositiveInf() {
+		if math.Abs(n.Data) == 1 {
+			return NewNumberValue(math.NaN())
+		}
+		if math.Abs(n.Data) > 1 {
+			return NewNumberValue(math.Inf(1))
+		}
+		return NewNumberValue(0)
+	}
+	if exponent.IsNegativeInf() {
+		if math.Abs(n.Data) == 1 {
+			return NewNumberValue(math.NaN())
+		}
+		if math.Abs(n.Data) > 1 {
+			return NewNumberValue(0)
+		}
+		return NewNumberValue(math.Inf(1))
+	}
+
+	Assert(exponent.IsFinite() && !exponent.IsZero())
+
+	return NewNumberValue(math.Pow(n.Data, exponent.Data))
+}
+
+// 6.1.6.1.4
+func (n *NumberValue) Multiply(other *NumberValue) *NumberValue {
+	return NewNumberValue(n.Data * other.Data)
+}
+
+// 6.1.6.1.5
+func (n *NumberValue) Divide(other *NumberValue) *NumberValue {
+	return NewNumberValue(n.Data / other.Data)
+}
+
+// 6.1.6.1.6
+func (n *NumberValue) Remainder(other *NumberValue) *NumberValue {
+	return NewNumberValue(math.Mod(n.Data, other.Data))
+}
+
+// 6.1.6.1.7
+func (n *NumberValue) Add(other *NumberValue) *NumberValue {
+	return NewNumberValue(n.Data + other.Data)
+}
+
+// 6.1.6.1.8
+func (n *NumberValue) Subtract(other *NumberValue) *NumberValue {
+	return NewNumberValue(n.Data - other.Data)
+}
+
+// 6.1.6.1.9
+func (n *NumberValue) LeftShift(other *NumberValue) *NumberValue {
+	return NewNumberValue(float64(int64(n.Data) << uint64(int64(other.Data))))
+}
+
+// 6.1.6.1.10
+func (n *NumberValue) SignedRightShift(other *NumberValue) *NumberValue {
+	return NewNumberValue(float64(int64(n.Data) >> uint64(int64(other.Data))))
+}
+
+// 6.1.6.1.11
+func (n *NumberValue) UnsignedRightShift(other *NumberValue) *NumberValue {
+	return NewNumberValue(float64(uint64(n.Data) >> uint64(int64(other.Data))))
+}
+
 // 6.1.6.1.12
 func (n *NumberValue) LessThan(other NumberValue) bool {
 	if n.IsNaN() || other.IsNaN() {
@@ -111,4 +230,44 @@ func (n *NumberValue) SameValueZero(other *NumberValue) bool {
 		return true
 	}
 	return n.Data == other.Data
+}
+
+// 6.1.6.1.16
+type numberBitwiseOp int
+
+const (
+	numberBitwiseAnd numberBitwiseOp = iota
+	numberBitwiseXor
+	numberBitwiseOr
+)
+
+func (n *NumberValue) NumberBitwiseOp(op numberBitwiseOp, other *NumberValue) *NumberValue {
+	switch op {
+	case numberBitwiseAnd:
+		return NewNumberValue(float64(int64(n.Data) & int64(other.Data)))
+	case numberBitwiseOr:
+		return NewNumberValue(float64(int64(n.Data) | int64(other.Data)))
+	case numberBitwiseXor:
+		return NewNumberValue(float64(int64(n.Data) ^ int64(other.Data)))
+	}
+	panic("unreachable")
+}
+
+// 6.1.6.1.17
+func (n *NumberValue) BitwiseAnd(other *NumberValue) *NumberValue {
+	return n.NumberBitwiseOp(numberBitwiseAnd, other)
+}
+
+// 6.1.6.1.18
+func (n *NumberValue) BitwiseXor(other *NumberValue) *NumberValue {
+	return n.NumberBitwiseOp(numberBitwiseXor, other)
+}
+
+// 6.1.6.1.19
+func (n *NumberValue) BitwiseOr(other *NumberValue) *NumberValue {
+	return n.NumberBitwiseOp(numberBitwiseOr, other)
+}
+
+func (n *NumberValue) IsZero() bool {
+	return n.Data == 0
 }

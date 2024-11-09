@@ -170,7 +170,7 @@ func ToNumber(agent *Agent, value Value) *NumberValue {
 }
 
 // 7.1.3
-func ToNumeric(value Value, agent *Agent) Value {
+func ToNumeric(agent *Agent, value Value) Value {
 	primValue := ToPrimitive(agent, value, PreferredTypeNumber)
 	if bigInt, ok := primValue.(*BigIntValue); ok {
 		return bigInt

@@ -113,7 +113,7 @@ func (p *Parser) acceptContext(t TokenType) *acceptContext {
 			precedence:    8,
 			associativity: associativeLeft,
 		}
-	case TBitwiseAnd:
+	case TAmpersand:
 		return &acceptContext{
 			precedence:    7,
 			associativity: associativeLeft,
@@ -577,10 +577,34 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 		return p.conditionalExpression(left)
 	case TComma:
 		return p.sequenceExpression(left)
+	case TStar,
+		TStarStar,
+		TSlash,
+		TPercent,
+		TPlus,
+		TMinus,
+		TLeftShift,
+		TRightShift,
+		TUnsignedRightShift,
+		TAmpersand,
+		TCaret,
+		TPipe:
+		return p.binaryExpression(left, accept)
 	default:
 		panic("secondaryExpression: unexpected token")
 	}
 	return left
+}
+
+func (p *Parser) binaryExpression(left PrimaryExpression, accept *acceptContext) *ExpressionBinaryExpression {
+	t := p.tokenizer.CurrentToken
+	p.tokenizer.Next()
+	right := p.expression(accept)
+	return &ExpressionBinaryExpression{
+		Operator: operatorBinaryMap[t.Type],
+		Left:     left,
+		Right:    right,
+	}
 }
 
 func (p *Parser) sequenceExpression(left PrimaryExpression) *ExpressionSequenceExpression {

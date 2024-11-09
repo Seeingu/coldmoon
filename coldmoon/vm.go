@@ -3,6 +3,7 @@ package coldmoon
 import "C"
 import (
 	"github.com/Seeingu/coldmoon/pkg"
+	"reflect"
 	"strconv"
 )
 
@@ -146,7 +147,7 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 			vm.result = ToNumber(vm.agent, value)
 		case *IToNumeric:
 			value := vm.result
-			vm.result = ToNumeric(value, vm.agent)
+			vm.result = ToNumeric(vm.agent, value)
 		case *IUnaryMinus:
 			value := vm.result
 			switch v := value.(type) {
@@ -289,6 +290,13 @@ func (vm *VM) Run(executable *Executable) *CompletionRecord {
 			right := vm.stack.Pop()
 			left := vm.stack.Pop()
 			vm.result = NewBooleanValue(IsStrictlyEqual(right, left))
+		case *IApplyStringOrNumericBinaryOperator:
+			right := vm.stack.Pop()
+			left := vm.stack.Pop()
+			operator := ins.Operator
+			vm.result = applyStringOrNumericBinaryOperator(
+				vm.agent, left, right, operator,
+			)
 		}
 		vm.ip += 1
 	}
@@ -348,6 +356,118 @@ func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
 		panic("TypeError: target is not callable")
 	}
 	return OrdinaryHasInstance(target, value)
+}
+
+// 13.15.3
+func applyStringOrNumericBinaryOperator(
+	agent *Agent,
+	lhs Value,
+	rhs Value,
+	op BinaryOperator,
+) Value {
+	var finalLval = lhs
+	var finalRval = rhs
+	if op == BinaryOperatorAddition {
+		lprim := ToPrimitive(agent, lhs, PreferredTypeDefault)
+		rprim := ToPrimitive(agent, rhs, PreferredTypeDefault)
+		_, lprimIsString := lprim.(*StringValue)
+		_, rprimIsString := rprim.(*StringValue)
+		if lprimIsString || rprimIsString {
+			lstr := lprim.String()
+			rstr := rprim.String()
+			return NewStringValue(lstr + rstr)
+		}
+
+		finalLval = lprim
+		finalRval = rprim
+	}
+
+	lnum := ToNumeric(agent, finalLval)
+	rnum := ToNumeric(agent, finalRval)
+	if reflect.TypeOf(lnum) != reflect.TypeOf(rnum) {
+		panic("TypeError: lnum and rnum are not the same type")
+	}
+
+	lNumber, isNumber := lnum.(*NumberValue)
+	lBigInt, _ := lnum.(*BigIntValue)
+	rNumber, _ := rnum.(*NumberValue)
+	rBigInt, _ := rnum.(*BigIntValue)
+
+	switch op {
+	case BinaryOperatorExponentiation:
+		if isNumber {
+			return lNumber.Exponentiate(rNumber)
+		} else {
+			return lBigInt.Exponentiate(rBigInt)
+		}
+	case BinaryOperatorMultiplication:
+		if isNumber {
+			return lNumber.Multiply(rNumber)
+		} else {
+			return lBigInt.Multiply(rBigInt)
+		}
+	case BinaryOperatorAddition:
+		if isNumber {
+			return lNumber.Add(rNumber)
+		} else {
+			return lBigInt.Add(rBigInt)
+		}
+	case BinaryOperatorSubtraction:
+		if isNumber {
+			return lNumber.Subtract(rNumber)
+		} else {
+			return lBigInt.Subtract(rBigInt)
+		}
+	case BinaryOperatorDivision:
+		if isNumber {
+			return lNumber.Divide(rNumber)
+		} else {
+			return lBigInt.Divide(rBigInt)
+		}
+	case BinaryOperatorRemainder:
+		if isNumber {
+			return lNumber.Remainder(rNumber)
+		} else {
+			return lBigInt.Remainder(rBigInt)
+		}
+	case BinaryOperatorLeftShift:
+		if isNumber {
+			return lNumber.LeftShift(rNumber)
+		} else {
+			return lBigInt.LeftShift(rBigInt)
+		}
+	case BinaryOperatorRightShift:
+		if isNumber {
+			return lNumber.SignedRightShift(rNumber)
+		} else {
+			return lBigInt.SignedRightShift(rBigInt)
+		}
+	case BinaryOperatorUnsignedRightShift:
+		if isNumber {
+			return lNumber.UnsignedRightShift(rNumber)
+		} else {
+			return lBigInt.UnsignedRightShift(rBigInt)
+		}
+	case BinaryOperatorBitwiseAnd:
+		if isNumber {
+			return lNumber.BitwiseAnd(rNumber)
+		} else {
+			return lBigInt.BitwiseAnd(rBigInt)
+		}
+	case BinaryOperatorBitwiseOr:
+		if isNumber {
+			return lNumber.BitwiseOr(rNumber)
+		} else {
+			return lBigInt.BitwiseOr(rBigInt)
+		}
+	case BinaryOperatorBitwiseXor:
+		if isNumber {
+			return lNumber.BitwiseXor(rNumber)
+		} else {
+			return lBigInt.BitwiseXor(rBigInt)
+		}
+	}
+	panic("unreachable")
 }
 
 // 15.2.5
