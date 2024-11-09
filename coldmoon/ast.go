@@ -599,6 +599,37 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - SequenceExpression
+
+type ExpressionSequenceExpression struct {
+	Expression
+	Expressions []Expression
+}
+
+func (e *ExpressionSequenceExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (e *ExpressionSequenceExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+	for _, expr := range e.Expressions {
+		expr.Bytecode(ex, c)
+		if expr.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+	}
+}
+
+func (e *ExpressionSequenceExpression) String() string {
+	var sb string
+	for i, expr := range e.Expressions {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += expr.String()
+	}
+	return sb
+}
+
 // MARK: - ConditionalExpression
 
 type ExpressionConditionalExpression struct {
@@ -630,14 +661,14 @@ func (e *ExpressionConditionalExpression) Bytecode(ex *Executable, c *BytecodeCo
 	jump := &IJump{Target: 0}
 	ex.AddInstruction(jump)
 
-	jumpIfTrue.TargetElse = len(ex.Instructions) - 1
+	jumpIfTrue.TargetElse = len(ex.Instructions)
 	e.Alternate.Bytecode(ex, c)
 
 	if e.Alternate.Analyze(AnalyzeQueryIsReference) {
 		ex.AddInstruction(InsGetValue)
 	}
 
-	jump.Target = len(ex.Instructions) - 1
+	jump.Target = len(ex.Instructions)
 }
 
 func (e *ExpressionConditionalExpression) String() string {

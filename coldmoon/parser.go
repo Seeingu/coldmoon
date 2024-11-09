@@ -575,10 +575,29 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 		return p.logicalExpression(left, accept)
 	case TQuestion:
 		return p.conditionalExpression(left)
+	case TComma:
+		return p.sequenceExpression(left)
 	default:
 		panic("secondaryExpression: unexpected token")
 	}
 	return left
+}
+
+func (p *Parser) sequenceExpression(left PrimaryExpression) *ExpressionSequenceExpression {
+	list := []Expression{left}
+	for {
+		t := p.tokenizer.CurrentToken
+		if t.Type != TComma {
+			break
+		}
+		p.tokenizer.Next()
+		accept := p.acceptContextLowest()
+		expr := p.expression(accept)
+		list = append(list, expr)
+	}
+	return &ExpressionSequenceExpression{
+		Expressions: list,
+	}
 }
 
 func (p *Parser) conditionalExpression(left PrimaryExpression) *ExpressionConditionalExpression {
