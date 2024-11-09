@@ -1,8 +1,16 @@
 package coldmoon
 
+type Binding struct {
+	Value     Value
+	Strict    bool
+	Mutable   bool
+	Deletable bool
+}
+
 type DeclarativeEnvironment struct {
 	EnvironmentRecord
 	outerEnv EnvironmentRecord
+	Bindings map[string]*Binding
 }
 
 // 9.1.2.2
@@ -19,7 +27,8 @@ func (d *DeclarativeEnvironment) HasThisBinding() bool {
 
 // 9.1.1.1.6
 func (d *DeclarativeEnvironment) GetBindingValue(name string, strict bool) Value {
-	panic("implement me")
+	binding, _ := d.Bindings[name]
+	return binding.Value
 }
 
 func (d *DeclarativeEnvironment) OuterEnv() EnvironmentRecord {
@@ -27,10 +36,58 @@ func (d *DeclarativeEnvironment) OuterEnv() EnvironmentRecord {
 }
 
 func (d *DeclarativeEnvironment) HasBinding(name string) bool {
-	return false
+	_, ok := d.Bindings[name]
+	return ok
 }
 
 // 9.1.1.1.10
 func (d *DeclarativeEnvironment) WithBaseObject() ObjectType {
 	return nil
+}
+
+// 9.1.1.2.2
+func (d *DeclarativeEnvironment) CreateMutableBinding(name string, deletable bool) {
+	d.Bindings[name] = &Binding{
+		Mutable:   true,
+		Deletable: deletable,
+	}
+}
+
+// 9.1.1.1.4
+func (d *DeclarativeEnvironment) InitializeBinding(name string, value Value) {
+	binding := d.Bindings[name]
+	Assert(binding.Value == nil)
+
+	binding.Value = value
+}
+
+// 9.1.1.1.5
+func (d *DeclarativeEnvironment) SetMutableBinding(name string, value Value, strict bool) {
+	binding, ok := d.Bindings[name]
+	if !ok {
+		if strict {
+			panic("ReferenceError")
+		}
+		d.CreateMutableBinding(name, true)
+		d.InitializeBinding(name, value)
+		return
+	}
+
+	var s = strict
+	if binding.Strict {
+		s = binding.Strict
+	}
+
+	if binding.Value == nil {
+		panic("ReferenceError")
+	}
+
+	if binding.Mutable {
+		binding.Value = value
+	} else {
+		if s {
+			panic("ReferenceError")
+		}
+	}
+
 }

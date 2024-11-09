@@ -37,6 +37,22 @@ func (o *ObjectEnvironment) HasBinding(name string) bool {
 	return true
 }
 
+// 9.1.1.2.5
+func (o *ObjectEnvironment) SetMutableBinding(name string, value Value, strict bool) {
+	bindingObject := o.BindingObject
+	stillExists := bindingObject.HasProperty(NewStringPropertyKey(name))
+	if !stillExists && strict {
+		panic("ReferenceError")
+	}
+
+	var throw = setThrowTypeIgnore
+	if strict {
+		throw = setThrowTypeThrow
+	}
+	bindingObject.Set(NewStringPropertyKey(name), value, throw)
+
+}
+
 // 9.1.1.2.6
 func (o *ObjectEnvironment) GetBindingValue(name string, strict bool) Value {
 	bindingObject := o.BindingObject
