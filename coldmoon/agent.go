@@ -6,6 +6,12 @@ type Agent struct {
 	symbolId              uint64
 	exception             Value
 	ExecutionContextStack pkg.Stack[*ExecutionContext]
+	HostHooks             *HostHooks
+}
+
+type HostHooks struct {
+	HostEnsureCanCompileStrings func(realm *Realm)
+	HostHasSourceTextAvailable  func(o ObjectType) bool
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]SymbolValue{}
@@ -25,6 +31,10 @@ const (
 func NewAgent() *Agent {
 	a := &Agent{}
 	initWellKnownSymbols(a)
+	a.HostHooks = &HostHooks{
+		HostEnsureCanCompileStrings: HostEnsureCanCompileStrings,
+		HostHasSourceTextAvailable:  HostHasSourceTextAvailable,
+	}
 	return a
 }
 

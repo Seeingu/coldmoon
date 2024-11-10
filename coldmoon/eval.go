@@ -12,6 +12,9 @@ func PerformEval(agent *Agent, x Value, strictCaller bool, direct bool) Value {
 	}
 
 	evalRealm := agent.CurrentRealm()
+
+	agent.HostHooks.HostEnsureCanCompileStrings(evalRealm)
+
 	script := ParseScript(stringValue.Data, evalRealm, nil)
 	if len(script.ECMAScriptCode.StatementList) == 0 {
 		return nil

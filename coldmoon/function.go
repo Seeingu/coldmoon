@@ -86,7 +86,8 @@ func CreateDynamicFunction(
 	realm := agent.CurrentRealm()
 
 	currentRealm := realm
-	_ = currentRealm
+
+	agent.HostHooks.HostEnsureCanCompileStrings(currentRealm)
 
 	if newTarget == nil {
 		newTarget = constructor
