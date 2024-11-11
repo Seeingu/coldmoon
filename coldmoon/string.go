@@ -68,18 +68,36 @@ func NewStringConstructor(realm *Realm) ObjectType {
 	return object
 }
 
-// MARK: - StringPrototype
-
-type StringPrototype struct {
-	*Object
-	Data string
-}
-
 func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype := &StringObject{
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
 		Data:   "",
 	}
 
+	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		s := thisStringValue(realm.Agent, thisArgument)
+		return NewStringValue(s)
+	}
+	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
+
+	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		return NewStringValue(thisStringValue(realm.Agent, thisArgument))
+	}
+	DefineBuiltinFunction(stringPrototype, "valueOf", valueOf, 0, realm)
+
 	return stringPrototype
+}
+
+func thisStringValue(agent *Agent, v Value) string {
+	switch v := v.(type) {
+	case *StringValue:
+		return v.Data
+	case *ObjectValue:
+		s, ok := v.Object.(*StringObject)
+		if ok {
+			return s.Data
+		}
+
+	}
+	panic("TypeError")
 }
