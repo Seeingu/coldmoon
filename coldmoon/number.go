@@ -3,6 +3,7 @@ package coldmoon
 import (
 	"fmt"
 	"math"
+	"strconv"
 )
 
 type NumberValue struct {
@@ -270,4 +271,91 @@ func (n *NumberValue) BitwiseOr(other *NumberValue) *NumberValue {
 
 func (n *NumberValue) IsZero() bool {
 	return n.Data == 0
+}
+
+// MARK: - Number Object
+
+type NumberConstructor struct {
+	*Object
+}
+
+func NewNumberConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		value := argumentsList[0]
+		n := NewNumberValue(0)
+		if len(argumentsList) > 0 {
+			prim := ToNumeric(agent, value)
+
+			bigintPrim, isBigInt := prim.(*BigIntValue)
+			if isBigInt {
+				data, _ := strconv.ParseFloat(bigintPrim.String(), 64)
+				n.Data = data
+			} else {
+				n = ToNumber(agent, prim)
+			}
+		}
+
+		if newTarget == nil {
+			return n
+		}
+
+		object := OrdinaryCreateFromConstructor(
+			agent,
+			newTarget,
+			"%Number.prototype", nil)
+		numberObject := &NumberObject{
+			Object: object,
+			Data:   n.Data,
+		}
+		return NewValueFromObject(numberObject)
+
+	}
+	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "Number", builtinFunctionArgs{
+		realm:     realm,
+		prototype: realm.Intrinsics.FunctionPrototype,
+	})
+
+	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+		Value:        NewValueFromObject(realm.Intrinsics.NumberPrototype),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(realm.Intrinsics.NumberPrototype, "constructor", NewValueFromObject(object))
+
+	return object
+}
+
+type NumberObject struct {
+	*Object
+	Data float64
+}
+
+func NewNumberObject(agent *Agent, value float64, prototype ObjectType) *NumberObject {
+	object := &NumberObject{
+		Object: NewObject(agent, prototype),
+		Data:   value,
+	}
+	return object
+}
+
+func NewNumberPrototype(realm *Realm) *NumberObject {
+	object := &NumberObject{
+		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
+	}
+	return object
+}
+
+func thisNumberValue(agent *Agent, this Value) *NumberValue {
+	switch v := this.(type) {
+	case *NumberValue:
+		return v
+	case *ObjectValue:
+		numberObject, ok := v.Object.(*NumberObject)
+		if ok {
+			return NewNumberValue(numberObject.Data)
+		}
+	}
+	panic("TypeError")
 }

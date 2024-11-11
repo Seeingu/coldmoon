@@ -354,6 +354,8 @@ func ValueToObject(agent *Agent, value Value) ObjectType {
 		return v.Object
 	case *StringValue:
 		return NewStringObject(agent, v.Data, realm.Intrinsics.StringPrototype)
+	case *NumberValue:
+		return NewNumberObject(agent, v.Data, realm.Intrinsics.NumberPrototype)
 	default:
 		panic("unimplemented")
 	}

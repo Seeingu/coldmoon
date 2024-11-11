@@ -41,6 +41,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.ArrayConstructor = NewArrayConstructor(r)
 	r.Intrinsics.StringPrototype = NewStringPrototype(r)
 	r.Intrinsics.StringConstructor = NewStringConstructor(r)
+	r.Intrinsics.NumberPrototype = NewNumberPrototype(r)
+	r.Intrinsics.NumberConstructor = NewNumberConstructor(r)
 
 	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
 }
