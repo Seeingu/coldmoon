@@ -27,14 +27,9 @@ func (b *BooleanValue) ToBoolean() bool {
 	return b.Data
 }
 
-type booleanType interface {
-	getData() bool
-}
-
 // MARK: - BooleanObject
 
 type BooleanObject struct {
-	booleanType
 	*Object
 	Data bool
 }
@@ -48,21 +43,6 @@ func NewBooleanObject(agent *Agent, b bool, prototype ObjectType) *BooleanObject
 		Object: NewObject(agent, prototype),
 		Data:   b,
 	}
-}
-
-type BooleanConstructor struct {
-	booleanType
-	*Object
-	// [[BooleanData]]
-	Data bool
-}
-
-func (b *BooleanConstructor) ToObject() *Object {
-	return b.Object
-}
-
-func (b *BooleanConstructor) getData() bool {
-	return b.Data
 }
 
 func NewBooleanConstructor(realm *Realm) ObjectType {
@@ -79,7 +59,7 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 			newTarget,
 			"%Boolean.prototype%",
 			[]string{})
-		booleanObject := &BooleanConstructor{
+		booleanObject := &BooleanObject{
 			Object: o,
 			Data:   b,
 		}
@@ -109,23 +89,9 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 
 // MARK: - BooleanPrototype
 
-type BooleanPrototype struct {
-	booleanType
-	*Object
-	Data bool
-}
-
-func (b *BooleanPrototype) ToObject() *Object {
-	return b.Object
-}
-
-func (b *BooleanPrototype) getData() bool {
-	return b.Data
-}
-
 // 20.3.3
-func NewBooleanPrototype(realm *Realm) *BooleanPrototype {
-	object := &BooleanPrototype{
+func NewBooleanPrototype(realm *Realm) *BooleanObject {
+	object := &BooleanObject{
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
 		Data:   false,
 	}
@@ -154,7 +120,7 @@ func thisBooleanValue(agent *Agent, value Value) bool {
 	case *BooleanValue:
 		return value.ToBoolean()
 	case *ObjectValue:
-		if o, ok := o.Object.(booleanType); ok {
+		if o, ok := o.Object.(*BooleanObject); ok {
 			b := o.getData()
 			return b
 		}
