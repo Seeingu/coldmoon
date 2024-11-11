@@ -1474,6 +1474,82 @@ type Statement interface {
 	Analyze(a AnalyzeQuery) bool
 }
 
+// MARK: - VariableStatement
+
+type StatementVariable struct {
+	Statement
+	DeclarationList *VariableDeclarationList
+}
+
+func (s *StatementVariable) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (s *StatementVariable) Bytecode(e *Executable, c *BytecodeContext) {
+	s.DeclarationList.Bytecode(e, c)
+}
+
+func (s *StatementVariable) String() string {
+	return "var " + s.DeclarationList.String()
+}
+
+type VariableDeclarationList struct {
+	ASTNode
+	Items []*VariableDeclaration
+}
+
+func (v *VariableDeclarationList) Bytecode(e *Executable, c *BytecodeContext) {
+	for _, item := range v.Items {
+		item.Bytecode(e, c)
+	}
+}
+
+func (v *VariableDeclarationList) String() string {
+	var sb string
+	for i, item := range v.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+type VariableDeclaration struct {
+	ASTNode
+	Identifier  IdentifierName
+	Initializer Expression
+}
+
+func (v *VariableDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
+	if v.Initializer == nil {
+		return
+	}
+
+	e.AddInstruction(&IResolveBinding{
+		Name: v.Identifier,
+	})
+	_ = c.containedInStrictCode
+	e.AddInstruction(InsPushReference)
+
+	v.Initializer.Bytecode(e, c)
+
+	if v.Initializer.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	e.AddInstruction(InsPutValue)
+	e.AddInstruction(InsPopReference)
+}
+
+func (v *VariableDeclaration) String() string {
+	if v.Initializer != nil {
+		return string(v.Identifier) + " = " + v.Initializer.String()
+	}
+	return string(v.Identifier)
+}
+
+// MARK: - BlockStatement
+
 type StatementBlock struct {
 	Statement
 	BlockStatement BlockStatement
@@ -1493,7 +1569,7 @@ func (s *StatementBlock) String() string {
 	return s.BlockStatement.String()
 }
 
-// MARK: - StatementEmpty
+// MARK: - EmptyStatement
 
 type StatementEmpty struct {
 	Statement

@@ -271,6 +271,8 @@ func (p *Parser) automaticSemicolonInsertion() {
 func (p *Parser) statement() Statement {
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
+	case TVar:
+		return p.variableStatement()
 	case TSemicolon:
 		p.tokenizer.Next()
 		return &StatementEmpty{}
@@ -1041,6 +1043,48 @@ func (p *Parser) stringLiteral() *LiteralString {
 	}
 	return &LiteralString{
 		Value: t.Value,
+	}
+}
+
+func (p *Parser) variableStatement() *StatementVariable {
+	p.tokenizer.MustMatch(TVar)
+	list := p.variableDeclarationList()
+	return &StatementVariable{
+		DeclarationList: list,
+	}
+}
+func (p *Parser) variableDeclarationList() *VariableDeclarationList {
+	var list []*VariableDeclaration
+	for {
+		declaration := p.variableDeclaration()
+		list = append(list, declaration)
+		if p.tokenizer.CurrentToken.Type == TComma {
+			p.tokenizer.Next()
+			continue
+		}
+		if p.tokenizer.CurrentToken.Type == TSemicolon {
+			p.tokenizer.Next()
+			break
+		}
+		if p.tokenizer.CurrentToken.Type == TEOF {
+			break
+		}
+	}
+	return &VariableDeclarationList{Items: list}
+
+}
+
+func (p *Parser) variableDeclaration() *VariableDeclaration {
+	identifier := p.bindingIdentifier()
+	var init Expression
+	if p.tokenizer.CurrentToken.Type == TEquals {
+		p.tokenizer.Next()
+		// Precedence greater than TComma
+		init = p.expression(p.acceptContext(TYield))
+	}
+	return &VariableDeclaration{
+		Identifier:  identifier,
+		Initializer: init,
 	}
 }
 
