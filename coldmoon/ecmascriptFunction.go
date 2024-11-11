@@ -136,6 +136,62 @@ const (
 	functionCreateThisModeNonLexical
 )
 
+// 10.2.2
+func ECMAScriptFunctionConstruct(
+	object ObjectType,
+	argumentsList []Value,
+	newTarget ObjectType,
+) ObjectType {
+	agent := object.Agent()
+	function := object.(*ECMAScriptFunction)
+
+	kind := function.ConstructorKind
+
+	var thisArgument Value
+	if kind == ConstructorKindBase {
+		thisArgument = NewValueFromObject(
+			OrdinaryCreateFromConstructor(
+				agent,
+				newTarget,
+				"%Object.prototype%",
+				nil,
+			))
+	}
+
+	calleeContext := PrepareForOrdinaryCall(agent, function, newTarget)
+	Assert(calleeContext == agent.runningExecutionContext())
+
+	if kind == ConstructorKindBase {
+		OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
+	}
+
+	constructorEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
+
+	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
+
+	agent.ExecutionContextStack.Pop()
+
+	if result.Type == Return {
+		if o, ok := result.Value.(*ObjectValue); ok {
+			return o.Object
+		}
+		if kind == ConstructorKindBase {
+			return thisArgument.(*ObjectValue).Object
+		}
+		if result.Value != UndefinedValue {
+			panic("TypeError")
+		}
+	} else {
+		panic("ReturnIfAbrupt")
+	}
+
+	thisBinding := constructorEnv.GetThisBinding()
+	thisBindingObject, ok := thisBinding.(*ObjectValue)
+	Assert(ok)
+
+	return thisBindingObject.Object
+}
+
 // 10.2.3
 func OrdinaryFunctionCreate(
 	agent *Agent,
@@ -204,6 +260,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 		Assert(fun.IsExtensible() &&
 			!F.PropertyStorage().Has(NewStringPropertyKey("prototype")),
 		)
+		F.InternalMethods().Construct = ECMAScriptFunctionConstruct
 	} else {
 		F.InternalMethods().Construct = BuiltinConstruct
 	}

@@ -51,12 +51,12 @@ func (f *FunctionEnvironment) HasThisBinding() bool {
 }
 
 // 9.1.1.3.4
-func (f *FunctionEnvironment) GetThisBinding() ObjectType {
+func (f *FunctionEnvironment) GetThisBinding() Value {
 	Assert(f.thisBindingStatus != ThisBindingStatusLexical)
 	if f.thisBindingStatus == ThisBindingStatusUninitialized {
 		panic("ReferenceError")
 	}
-	return f.thisValue.(ObjectType)
+	return f.thisValue
 }
 
 func (f *FunctionEnvironment) OuterEnv() EnvironmentRecord {

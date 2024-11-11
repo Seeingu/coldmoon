@@ -65,8 +65,8 @@ func (g *GlobalEnvironment) WithBaseObject() ObjectType {
 	return nil
 }
 
-func (g *GlobalEnvironment) GetThisBinding() ObjectType {
-	return g.GlobalThisValue
+func (g *GlobalEnvironment) GetThisBinding() Value {
+	return NewValueFromObject(g.GlobalThisValue)
 }
 
 func (g *GlobalEnvironment) OuterEnv() EnvironmentRecord {

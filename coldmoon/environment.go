@@ -13,7 +13,7 @@ type EnvironmentRecord interface {
 	HasThisBinding() bool
 	HasSuperBinding() bool
 	WithBaseObject() ObjectType
-	GetThisBinding() ObjectType
+	GetThisBinding() Value
 }
 
 // 9.1.2.1

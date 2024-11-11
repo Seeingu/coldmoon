@@ -93,7 +93,7 @@ func (a *Agent) GetThisEnvironment() EnvironmentRecord {
 // 9.4.4
 func (a *Agent) ResolveThisBinding() Value {
 	envRec := a.GetThisEnvironment()
-	return NewValueFromObject(envRec.GetThisBinding())
+	return envRec.GetThisBinding()
 }
 
 // 9.4.6
