@@ -178,6 +178,45 @@ func AddRestrictedFunctionProperties(F ObjectType, realm *Realm) {
 
 }
 
+// 10.2.5
+func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
+	agent := F.Agent()
+	realm := agent.CurrentRealm()
+	fun, isECMAScriptFunction := F.(*ECMAScriptFunction)
+	if isECMAScriptFunction {
+		Assert(!isConstructor(NewValueFromObject(fun)))
+
+		Assert(fun.IsExtensible() &&
+			!F.PropertyStorage().Has(NewStringPropertyKey("prototype")),
+		)
+	} else {
+		F.InternalMethods().Construct = BuiltinConstruct
+	}
+
+	if isECMAScriptFunction {
+		fun.ConstructorKind = ConstructorKindBase
+	}
+
+	proto := prototype
+	if proto == nil {
+		proto = OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, nil)
+
+		proto.DefinePropertyOrThrow(NewStringPropertyKey("constructor"), &PropertyDescriptor{
+			Value:        NewValueFromObject(F),
+			Writable:     writable,
+			Enumerable:   false,
+			Configurable: true,
+		})
+	}
+
+	F.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+		Value:        NewValueFromObject(proto),
+		Writable:     writable,
+		Enumerable:   false,
+		Configurable: false,
+	})
+}
+
 // 10.2.9
 func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 	Assert(function.IsExtensible())

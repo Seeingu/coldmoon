@@ -1946,6 +1946,7 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 	)
 
 	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	MakeConstructor(function, false, nil)
 	return function
 }
 

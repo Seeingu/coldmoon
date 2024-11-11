@@ -531,6 +531,7 @@ func InstantiateOrdinaryFunctionExpression(
 			privateEnv,
 		)
 		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		MakeConstructor(closure, false, nil)
 		return closure
 	} else {
 		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
@@ -548,6 +549,7 @@ func InstantiateOrdinaryFunctionExpression(
 		)
 
 		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		MakeConstructor(closure, false, nil)
 		return closure
 	}
 }

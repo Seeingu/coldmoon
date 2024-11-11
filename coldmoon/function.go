@@ -145,7 +145,7 @@ func CreateDynamicFunction(
 	SetFunctionName(function, NewStringPropertyKey("anonymous"), "")
 	switch kind {
 	case dynamicFunctionKindNormal:
-		// TODO
+		MakeConstructor(function, false, nil)
 	default:
 		panic("unimplemented")
 	}
