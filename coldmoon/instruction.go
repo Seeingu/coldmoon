@@ -384,6 +384,16 @@ func (i *INew) String() string {
 	return "INew " + fmt.Sprintf("%d", i.ArgumentCount)
 }
 
+// MARK: - Put Value
+
+type IPutValue struct {
+	Instruction
+}
+
+func (i *IPutValue) String() string {
+	return "IPutValue"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
@@ -405,3 +415,6 @@ var InsHasProperty = &IHasProperty{}
 var InsStrictlyEqual = &IStrictlyEqual{}
 var InsLooselyEqual = &ILooselyEqual{}
 var InsLogicalNot = &ILogicalNot{}
+var InsPushReference = &IPushReference{}
+var InsPopReference = &IPopReference{}
+var InsPutValue = &IPutValue{}

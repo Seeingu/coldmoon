@@ -1,6 +1,8 @@
 package coldmoon
 
-import "github.com/samber/lo"
+import (
+	"github.com/samber/lo"
+)
 
 type Parser struct {
 	SourceText              string
@@ -648,10 +650,37 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 		TCaret,
 		TPipe:
 		return p.binaryExpression(left, accept)
+	case TEquals,
+		TPlusEquals,
+		TMinusEquals,
+		TStarEquals,
+		TStarStarEquals,
+		TPercentEquals,
+		TLeftShiftEquals,
+		TRightShiftEquals,
+		TUnsignedRightShiftEquals,
+		TAmpersandEquals,
+		TCaretEquals,
+		TPipeEquals,
+		TAmpersandAmpersandEquals,
+		TPipePipeEquals,
+		TQuestionQuestionEquals:
+		return p.assignmentExpression(left, accept)
 	default:
 		panic("secondaryExpression: unexpected token")
 	}
 	return left
+}
+
+func (p *Parser) assignmentExpression(left PrimaryExpression, accept *acceptContext) *ExpressionAssignmentExpression {
+	t := p.tokenizer.CurrentToken
+	p.tokenizer.Next()
+	right := p.expression(accept)
+	return &ExpressionAssignmentExpression{
+		Operator: operatorAssignmentMap[t.Type],
+		Left:     left,
+		Right:    right,
+	}
 }
 
 func (p *Parser) binaryExpression(left PrimaryExpression, accept *acceptContext) *ExpressionBinaryExpression {
@@ -821,7 +850,7 @@ func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpres
 	}
 }
 
-func (p *Parser) identifierReference() *IdentifierReference {
+func (p *Parser) identifierReference() *PrimaryExpressionIdentifierReference {
 	t := p.tokenizer.CurrentToken
 	types := []TokenType{TIdentifier, TAwait, TYield}
 	if !lo.Contains(types, t.Type) {
@@ -829,7 +858,7 @@ func (p *Parser) identifierReference() *IdentifierReference {
 	}
 	name := t.Value
 	p.tokenizer.Next()
-	return &IdentifierReference{
+	return &PrimaryExpressionIdentifierReference{
 		Identifier: IdentifierName(name),
 	}
 }

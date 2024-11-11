@@ -311,6 +311,10 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		vm.referenceStack.Push(vm.reference)
 	case *IPopReference:
 		vm.referenceStack.Pop()
+	case *IPutValue:
+		lref := vm.referenceStack.Peek()
+		rval := vm.result
+		lref.PutValue(vm.agent, rval)
 	}
 }
 

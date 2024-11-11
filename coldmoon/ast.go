@@ -21,43 +21,28 @@ const (
 	AnalyzeQueryIsStringLiteral
 )
 
-// MARK: - IdentifierReference
-
-type IdentifierReference struct {
-	ASTNode
-	Identifier IdentifierName
-}
-
-func (i *IdentifierReference) Analyze(a AnalyzeQuery) bool {
-	return a == AnalyzeQueryIsReference
-}
-
-func (i *IdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IResolveBinding{Name: i.Identifier, Strict: c.containedInStrictCode})
-}
-
-func (i *IdentifierReference) String() string {
-	return string(i.Identifier)
-}
-
-type IdentifierName string
-
 // MARK: - PrimaryExpression
 
 type PrimaryExpression interface {
 	Expression
+	AssignmentTargetType() AssignmentTargetType
 }
 
+type IdentifierName string
 type PrimaryExpressionIdentifierReference struct {
 	PrimaryExpression
-	IdentifierReference *IdentifierReference
+	Identifier IdentifierName
+}
+
+func (p *PrimaryExpressionIdentifierReference) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
 }
 
 func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
-	p.IdentifierReference.Bytecode(e, c)
+	e.AddInstruction(&IResolveBinding{Name: p.Identifier, Strict: c.containedInStrictCode})
 }
 func (p *PrimaryExpressionIdentifierReference) String() string {
-	return p.IdentifierReference.String()
+	return string(p.Identifier)
 }
 
 func (p *PrimaryExpressionIdentifierReference) Analyze(a AnalyzeQuery) bool {
@@ -70,6 +55,10 @@ func (p *PrimaryExpressionIdentifierReference) Analyze(a AnalyzeQuery) bool {
 type PrimaryExpressionLiteral struct {
 	PrimaryExpression
 	Literal Literal
+}
+
+func (p *PrimaryExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
 }
 
 func (p *PrimaryExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
@@ -96,6 +85,10 @@ type PrimaryExpressionThis struct {
 	PrimaryExpression
 }
 
+func (p *PrimaryExpressionThis) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
 func (p *PrimaryExpressionThis) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IResolveThisBinding{})
 }
@@ -111,6 +104,10 @@ func (p *PrimaryExpressionThis) Analyze(a AnalyzeQuery) bool {
 type PrimaryExpressionParenthesizedExpression struct {
 	PrimaryExpression
 	Expression Expression
+}
+
+func (p *PrimaryExpressionParenthesizedExpression) AssignmentTargetType() AssignmentTargetType {
+	return p.Expression.AssignmentTargetType()
 }
 
 func (p *PrimaryExpressionParenthesizedExpression) Bytecode(e *Executable, c *BytecodeContext) {
@@ -249,7 +246,7 @@ type PropertyDefinition interface {
 
 type PropertyDefinitionIdentifierReference struct {
 	PropertyDefinition
-	IdentifierReference *IdentifierReference
+	IdentifierReference *PrimaryExpressionIdentifierReference
 }
 
 func (p *PropertyDefinitionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
@@ -363,6 +360,10 @@ type PrimaryExpressionFunctionExpression struct {
 	SourceText       string
 }
 
+func (p *PrimaryExpressionFunctionExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
 func (p *PrimaryExpressionFunctionExpression) Analyze(a AnalyzeQuery) bool {
 	return false
 }
@@ -403,6 +404,10 @@ type MemberExpression struct {
 	Expression
 	Member   Expression
 	Property ASTProperty
+}
+
+func (m *MemberExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
 }
 
 func (m *MemberExpression) Analyze(a AnalyzeQuery) bool {
@@ -570,14 +575,26 @@ func (l *LiteralString) Analyze(a AnalyzeQuery) bool {
 
 // MARK: - Expression
 
+type AssignmentTargetType int
+
+const (
+	AssignmentTargetTypeSimple AssignmentTargetType = iota
+	AssignmentTargetTypeInvalid
+)
+
 type Expression interface {
 	ASTNode
 	Analyze(a AnalyzeQuery) bool
+	AssignmentTargetType() AssignmentTargetType
 }
 
 type ExpressionPrimary struct {
 	Expression
 	PrimaryExpression PrimaryExpression
+}
+
+func (e *ExpressionPrimary) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
 }
 
 func (e *ExpressionPrimary) Bytecode(ex *Executable, c *BytecodeContext) {
@@ -599,12 +616,255 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - AssignmentExpression
+
+type AssignmentOperator int
+
+func (a AssignmentOperator) String() string {
+	switch a {
+	case AssignmentOperatorAssign:
+		return "="
+	case AssignmentOperatorAddition:
+		return "+="
+	case AssignmentOperatorSubtraction:
+		return "-="
+	case AssignmentOperatorMultiplication:
+		return "*="
+	case AssignmentOperatorDivision:
+		return "/="
+	case AssignmentOperatorRemainder:
+		return "%="
+	case AssignmentOperatorLeftShift:
+		return "<<="
+	case AssignmentOperatorRightShift:
+		return ">>="
+	case AssignmentOperatorUnsignedRightShift:
+		return ">>>="
+	case AssignmentOperatorBitwiseAnd:
+		return "&="
+	case AssignmentOperatorBitwiseXor:
+		return "^="
+	case AssignmentOperatorBitwiseOr:
+		return "|="
+	case AssignmentOperatorExponentiation:
+		return "**="
+	case AssignmentOperatorAnd:
+		return "&&="
+	case AssignmentOperatorOr:
+		return "||="
+	case AssignmentOperatorNullishCoalescing:
+		return "??="
+	}
+	return ""
+}
+
+const (
+	AssignmentOperatorAssign AssignmentOperator = iota
+	AssignmentOperatorAddition
+	AssignmentOperatorSubtraction
+	AssignmentOperatorMultiplication
+	AssignmentOperatorDivision
+	AssignmentOperatorRemainder
+	AssignmentOperatorLeftShift
+	AssignmentOperatorRightShift
+	AssignmentOperatorUnsignedRightShift
+	AssignmentOperatorBitwiseAnd
+	AssignmentOperatorBitwiseXor
+	AssignmentOperatorBitwiseOr
+	AssignmentOperatorExponentiation
+	AssignmentOperatorAnd
+	AssignmentOperatorOr
+	AssignmentOperatorNullishCoalescing
+)
+
+var operatorAssignmentMap = map[TokenType]AssignmentOperator{
+	TEquals:                   AssignmentOperatorAssign,
+	TPlusEquals:               AssignmentOperatorAddition,
+	TMinusEquals:              AssignmentOperatorSubtraction,
+	TStarEquals:               AssignmentOperatorMultiplication,
+	TDivideEquals:             AssignmentOperatorDivision,
+	TPercentEquals:            AssignmentOperatorRemainder,
+	TLeftShiftEquals:          AssignmentOperatorLeftShift,
+	TRightShiftEquals:         AssignmentOperatorRightShift,
+	TUnsignedRightShiftEquals: AssignmentOperatorUnsignedRightShift,
+	TBitwiseAndEquals:         AssignmentOperatorBitwiseAnd,
+	TBitwiseOrEquals:          AssignmentOperatorBitwiseOr,
+	TBitwiseXorEquals:         AssignmentOperatorBitwiseXor,
+	TStarStarEquals:           AssignmentOperatorExponentiation,
+	TAmpersandAmpersandEquals: AssignmentOperatorAnd,
+	TPipePipeEquals:           AssignmentOperatorOr,
+	TQuestionQuestionEquals:   AssignmentOperatorNullishCoalescing,
+}
+
+type ExpressionAssignmentExpression struct {
+	Expression
+	Left     Expression
+	Operator AssignmentOperator
+	Right    Expression
+}
+
+func (e *ExpressionAssignmentExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (e *ExpressionAssignmentExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (e *ExpressionAssignmentExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+	if e.Operator == AssignmentOperatorAssign {
+		e.Left.Bytecode(ex, c)
+		ex.AddInstruction(&IPushReference{})
+
+		e.Right.Bytecode(ex, c)
+		if e.Right.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+
+		ex.AddInstruction(&IPutValue{})
+		ex.AddInstruction(&IPopReference{})
+	} else if e.Operator != AssignmentOperatorAnd &&
+		e.Operator != AssignmentOperatorOr &&
+		e.Operator != AssignmentOperatorNullishCoalescing {
+		e.Left.Bytecode(ex, c)
+		ex.AddInstruction(&IPushReference{})
+
+		if e.Left.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+		ex.AddInstruction(InsLoad)
+
+		e.Right.Bytecode(ex, c)
+
+		if e.Right.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+		ex.AddInstruction(InsLoad)
+
+		var operatorMap = map[AssignmentOperator]BinaryOperator{
+			AssignmentOperatorAddition:           BinaryOperatorAddition,
+			AssignmentOperatorSubtraction:        BinaryOperatorSubtraction,
+			AssignmentOperatorMultiplication:     BinaryOperatorMultiplication,
+			AssignmentOperatorDivision:           BinaryOperatorDivision,
+			AssignmentOperatorRemainder:          BinaryOperatorRemainder,
+			AssignmentOperatorLeftShift:          BinaryOperatorLeftShift,
+			AssignmentOperatorRightShift:         BinaryOperatorRightShift,
+			AssignmentOperatorUnsignedRightShift: BinaryOperatorUnsignedRightShift,
+			AssignmentOperatorBitwiseAnd:         BinaryOperatorBitwiseAnd,
+			AssignmentOperatorBitwiseXor:         BinaryOperatorBitwiseXor,
+			AssignmentOperatorBitwiseOr:          BinaryOperatorBitwiseOr,
+			AssignmentOperatorExponentiation:     BinaryOperatorExponentiation,
+		}
+		op, _ := operatorMap[e.Operator]
+		ex.AddInstruction(&IApplyStringOrNumericBinaryOperator{
+			Operator: op,
+		})
+
+		ex.AddInstruction(InsPutValue)
+		ex.AddInstruction(InsPopReference)
+	} else if e.Operator == AssignmentOperatorAnd {
+		e.Left.Bytecode(ex, c)
+		ex.AddInstruction(InsPushReference)
+
+		if e.Left.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+		ex.AddInstruction(InsLoad)
+
+		jumpIfTrue := &IJumpIfTrue{}
+		ex.AddInstruction(jumpIfTrue)
+
+		jumpIfTrue.Target = len(ex.Instructions) - 1
+
+		e.Right.Bytecode(ex, c)
+		if e.Right.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+
+		ex.AddInstruction(InsPutValue)
+
+		endJump := &IJump{}
+		ex.AddInstruction(endJump)
+
+		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
+		ex.AddInstruction(InsStore)
+
+		endJump.Target = len(ex.Instructions) - 1
+		ex.AddInstruction(InsPopReference)
+	} else if e.Operator == AssignmentOperatorOr {
+		e.Left.Bytecode(ex, c)
+		ex.AddInstruction(InsPushReference)
+
+		if e.Left.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+
+		jumpIfTrue := &IJumpIfTrue{}
+		ex.AddInstruction(jumpIfTrue)
+
+		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
+
+		e.Right.Bytecode(ex, c)
+		if e.Right.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+
+		ex.AddInstruction(InsPutValue)
+
+		jumpIfTrue.Target = len(ex.Instructions) - 1
+
+		ex.AddInstruction(InsPopReference)
+	} else if e.Operator == AssignmentOperatorNullishCoalescing {
+		e.Left.Bytecode(ex, c)
+		ex.AddInstruction(InsPushReference)
+
+		if e.Left.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+		ex.AddInstruction(InsLoad)
+
+		ex.AddInstruction(InsLoad)
+		ex.AddInstruction(&ILoadConstant{
+			Value: UndefinedValue,
+		})
+		ex.AddInstruction(InsLooselyEqual)
+
+		jumpIfTrue := &IJumpIfTrue{}
+		ex.AddInstruction(jumpIfTrue)
+
+		jumpIfTrue.Target = len(ex.Instructions) - 1
+
+		e.Right.Bytecode(ex, c)
+		if e.Right.Analyze(AnalyzeQueryIsReference) {
+			ex.AddInstruction(InsGetValue)
+		}
+
+		ex.AddInstruction(InsPutValue)
+		endJump := &IJump{}
+		ex.AddInstruction(endJump)
+
+		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
+		ex.AddInstruction(InsStore)
+
+		endJump.Target = len(ex.Instructions) - 1
+		ex.AddInstruction(InsPopReference)
+	}
+}
+
+func (e *ExpressionAssignmentExpression) String() string {
+	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
+}
+
 // MARK: - NewExpression
 
 type ExpressionNewExpression struct {
 	Expression
 	Callee    Expression
 	Arguments Arguments
+}
+
+func (e *ExpressionNewExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
 }
 
 func (e *ExpressionNewExpression) Analyze(a AnalyzeQuery) bool {
@@ -709,6 +969,10 @@ type ExpressionBinaryExpression struct {
 	Left     Expression
 	Operator BinaryOperator
 	Right    Expression
+}
+
+func (b *ExpressionBinaryExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
 }
 
 func (b *ExpressionBinaryExpression) Analyze(a AnalyzeQuery) bool {
