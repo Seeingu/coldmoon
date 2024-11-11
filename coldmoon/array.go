@@ -120,6 +120,20 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 		return false
 	}
 
+	for k := oldLen - 1; k >= newLen; k-- {
+		deleteSucceeded := array.InternalMethods().Delete(array, NewIntegerIndexPropertyKey(int(k)))
+		if !deleteSucceeded {
+			newLenDesc.Value = NewNumberValue(float64(k) + 1)
+			if !newWritable {
+				succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), &PropertyDescriptor{
+					Writable: false,
+				})
+				Assert(succeeded)
+			}
+			return false
+		}
+	}
+
 	if !newWritable {
 		succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), &PropertyDescriptor{
 			Writable: false,

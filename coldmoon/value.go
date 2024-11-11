@@ -394,7 +394,7 @@ func ToLength(value Value, agent *Agent) uint64 {
 		return 0
 	}
 
-	return uint64(math.Min(length, math.Pow(2, 53)-1))
+	return uint64(math.Min(length, POW_2_53-1))
 }
 
 // 7.1.22
@@ -404,7 +404,7 @@ func ToIndex(value Value, agent *Agent) uint64 {
 	}
 
 	integer := ToIntegerOrInfinity(value, agent)
-	if integer < 0 || integer >= math.Pow(2, 53) {
+	if integer < 0 || integer >= POW_2_53 {
 		panic("RangeError")
 	}
 	return uint64(integer)
