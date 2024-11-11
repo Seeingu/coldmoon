@@ -17,6 +17,10 @@ type Intrinsics struct {
 	BooleanPrototype *BooleanPrototype
 	// %Boolean%
 	BooleanConstructor ObjectType
+	// %String.Prototype%
+	StringPrototype *StringObject
+	// %String%
+	StringConstructor ObjectType
 	// %IsFinite%
 	IsFinite ObjectType
 	// %isNaN%

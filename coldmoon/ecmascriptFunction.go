@@ -116,6 +116,16 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 
 // 10.2.1.4
 func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+	calleeContext := agent.runningExecutionContext()
+	calleeEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
+	env := NewDeclarativeEnvironment(calleeEnv)
+	calleeContext.ECMAScriptCode.LexicalEnvironment = env
+	for i, item := range function.FormalParameters.Items {
+		identifier := item.(*FormalParameter).BindingElement.Identifier
+		value := argumentsList[i]
+		env.CreateMutableBinding(string(identifier), false)
+		env.InitializeBinding(string(identifier), value)
+	}
 	return GenerateAndRunBytecode(agent, function.ECMAScriptCode)
 }
 
