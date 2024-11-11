@@ -255,6 +255,11 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 	return true
 }
 
+// 7.3.19
+func (o *Object) LengthOfArrayLike() uint64 {
+	return ToLength(o.Agent(), o.Get(NewStringPropertyKey("length")))
+}
+
 // 7.3.24
 func (o *Object) GetFunctionRealm() *Realm {
 	return o.Agent().CurrentRealm()

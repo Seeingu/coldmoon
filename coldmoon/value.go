@@ -387,7 +387,7 @@ func ToPropertyKey(agent *Agent, value Value) PropertyKey {
 }
 
 // 7.1.20
-func ToLength(value Value, agent *Agent) uint64 {
+func ToLength(agent *Agent, value Value) uint64 {
 	length := ToIntegerOrInfinity(value, agent)
 
 	if length <= 0 {
@@ -648,6 +648,26 @@ func ValueCall(self Value, value Value, argumentsList []Value) Value {
 	}
 
 	return value.(*ObjectValue).Object.ToObject().InternalMethods().Call(value.(*ObjectValue).Object, self, argumentsList)
+}
+
+// 7.3.20
+func CreateListFromArrayLike(agent *Agent, self Value) []Value {
+	// TODO: element types
+	objectValue, ok := self.(*ObjectValue)
+	if !ok {
+		panic("TypeError")
+	}
+
+	length := objectValue.Object.LengthOfArrayLike()
+
+	var list []Value
+	for i := uint64(0); i < length; i++ {
+		index := NewIntegerIndexPropertyKey(int(i))
+		next := GetV(self, agent, index)
+		list = append(list, next)
+	}
+
+	return list
 }
 
 // 7.3.21

@@ -9,6 +9,7 @@ const (
 
 type ObjectType interface {
 	IsExtensible() bool
+	LengthOfArrayLike() uint64
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
