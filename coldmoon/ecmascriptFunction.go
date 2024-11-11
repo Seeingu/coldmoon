@@ -33,6 +33,11 @@ type ECMAScriptFunction struct {
 	IsClassConstructor bool
 }
 
+// 7.3.24
+func (e *ECMAScriptFunction) GetFunctionRealm() *Realm {
+	return e.Realm
+}
+
 // 10.2.1
 func Call(object ObjectType, thisArgument Value, argumentsList []Value) Value {
 	agent := object.Agent()
@@ -238,10 +243,13 @@ func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 		panic("unimplemented")
 	}
 
-	function.(*BuiltinFunction).InitialName = name
+	builtinFunction, isBuiltinFunction := function.(*BuiltinFunction)
+	if isBuiltinFunction {
+		builtinFunction.InitialName = name
+	}
 	if prefix != "" {
 		name = prefix + " " + name
-		function.(*BuiltinFunction).InitialName = name
+		builtinFunction.InitialName = name
 	}
 
 	function.DefinePropertyOrThrow(NewStringPropertyKey("name"), &PropertyDescriptor{

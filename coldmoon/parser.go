@@ -834,7 +834,8 @@ func (p *Parser) arguments() Arguments {
 			p.tokenizer.Next()
 			break
 		}
-		expr := p.expression(p.acceptContextLowest())
+		// Precedence greater than TComma
+		expr := p.expression(p.acceptContext(TYield))
 		list = append(list, expr)
 	}
 	p.tokenizer.MustMatch(TRightParen)

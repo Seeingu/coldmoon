@@ -410,7 +410,7 @@ func GetPrototypeFromConstructor(constructor ObjectType, intrinsicDefaultProto s
 	case *ObjectValue:
 		return p.Object
 	default:
-		realm := constructor.ToObject().GetFunctionRealm()
+		realm := constructor.GetFunctionRealm()
 		return realm.Intrinsics.Get(intrinsicDefaultProto)
 	}
 

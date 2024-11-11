@@ -12,6 +12,11 @@ func (b *BuiltinFunction) ToObject() *Object {
 	return b.Object
 }
 
+// 7.3.24
+func (b *BuiltinFunction) GetFunctionRealm() *Realm {
+	return b.Realm
+}
+
 // 10.3.1
 func BuiltinCall(o ObjectType, thisArgument Value, argumentsList []Value) Value {
 	return o.(*BuiltinFunction).BuiltinCallOrConstruct(thisArgument, argumentsList, nil)

@@ -18,6 +18,7 @@ type ObjectType interface {
 	Set(key PropertyKey, value Value, throw setThrowType)
 	Agent() *Agent
 	HasProperty(key PropertyKey) bool
+	GetFunctionRealm() *Realm
 	Construct(
 		argumentLists []Value,
 		newTarget *Object,
