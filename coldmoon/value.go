@@ -344,13 +344,16 @@ func ToBigUint64(agent *Agent, value Value) uint64 {
 
 // 7.1.18
 func ValueToObject(agent *Agent, value Value) ObjectType {
+	realm := agent.CurrentRealm()
 	switch v := value.(type) {
 	case *undefinedValue, *nullValue:
 		panic("TypeError")
 	case *BooleanValue:
-		return NewBooleanObject(agent, v.Data)
+		return NewBooleanObject(agent, v.Data, realm.Intrinsics.BooleanPrototype)
 	case *ObjectValue:
 		return v.Object
+	case *StringValue:
+		return NewStringObject(agent, v.Data, realm.Intrinsics.StringPrototype)
 	default:
 		panic("unimplemented")
 	}

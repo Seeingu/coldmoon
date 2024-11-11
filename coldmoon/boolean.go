@@ -43,15 +43,10 @@ func (b *BooleanObject) getData() bool {
 	return b.Data
 }
 
-func NewBooleanObject(agent *Agent, b bool) *BooleanObject {
+func NewBooleanObject(agent *Agent, b bool, prototype ObjectType) *BooleanObject {
 	return &BooleanObject{
-		Object: &Object{
-			data: &Data{
-				agent:     agent,
-				prototype: agent.CurrentRealm().Intrinsics.BooleanPrototype,
-			},
-		},
-		Data: b,
+		Object: NewObject(agent, prototype),
+		Data:   b,
 	}
 }
 
