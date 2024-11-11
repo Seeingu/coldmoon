@@ -59,6 +59,23 @@ func InitFunctionMethods(f ObjectType, realm *Realm) {
 		return fun.CallAssumeCallable(thisArg, args)
 	}
 	DefineBuiltinFunction(f, "call", call, 1, realm)
+
+	var apply = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		thisArg := argumentsList[0]
+		argArray := argumentsList[1]
+		fun := this
+		if !IsCallable(fun) {
+			panic("TypeError")
+		}
+
+		if argArray == UndefinedValue || argArray == NullValue {
+			return fun.CallAssumeCallable(thisArg, []Value{})
+		}
+
+		argList := CreateListFromArrayLike(realm.Agent, argArray)
+		return fun.CallAssumeCallable(thisArg, argList)
+	}
+	DefineBuiltinFunction(f, "apply", apply, 2, realm)
 }
 
 type FunctionConstructor struct {
