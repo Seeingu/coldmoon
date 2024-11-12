@@ -77,6 +77,20 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 
 func NewSymbolPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+
+	var toString = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		symbol := thisSymbolValue(this)
+
+		return NewStringValue(symbol.SymbolDescriptiveString())
+	}
+	var valueOf = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		symbol := thisSymbolValue(this)
+		return symbol
+	}
+
+	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+
 	return object
 }
 
