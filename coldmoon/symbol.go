@@ -87,9 +87,19 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 		symbol := thisSymbolValue(this)
 		return symbol
 	}
+	var toPrimitive = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return this
+	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	DefineBuiltinFunction(object, "@@toPrimitive", toPrimitive, 0, realm)
+	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+		Value:        NewStringValue("String"),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
 
 	return object
 }

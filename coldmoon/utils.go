@@ -1,16 +1,22 @@
 package coldmoon
 
+import "strings"
+
 func DefineBuiltinFunction(object ObjectType,
 	name string,
 	fn BehaviorFn,
 	length float64,
 	realm *Realm,
 ) {
+	var functionName = name
+	if strings.HasPrefix(name, "@@") {
+		functionName = name[2:]
+	}
 	f := CreateBuiltinFunction(
 		realm.Agent,
 		fn,
 		length,
-		name,
+		functionName,
 		builtinFunctionArgs{realm: realm},
 	)
 	DefineBuiltinProperty(object, name, NewValueFromObject(f))
