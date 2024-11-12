@@ -177,7 +177,7 @@ func ToNumeric(agent *Agent, value Value) Value {
 	}
 	return ToNumber(agent, primValue)
 }
-func ToIntegerOrInfinity(value Value, agent *Agent) float64 {
+func ToIntegerOrInfinity(agent *Agent, value Value) float64 {
 	number := ToNumber(agent, value)
 	if number.IsNaN() {
 		return 0
@@ -397,7 +397,7 @@ func ToPropertyKey(agent *Agent, value Value) PropertyKey {
 
 // 7.1.20
 func ToLength(agent *Agent, value Value) uint64 {
-	length := ToIntegerOrInfinity(value, agent)
+	length := ToIntegerOrInfinity(agent, value)
 
 	if length <= 0 {
 		return 0
@@ -412,7 +412,7 @@ func ToIndex(value Value, agent *Agent) uint64 {
 		return 0
 	}
 
-	integer := ToIntegerOrInfinity(value, agent)
+	integer := ToIntegerOrInfinity(agent, value)
 	if integer < 0 || integer >= POW_2_53 {
 		panic("RangeError")
 	}

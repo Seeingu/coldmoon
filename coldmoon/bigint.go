@@ -195,7 +195,41 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 }
 
 func NewBigIntPrototype(realm *Realm) ObjectType {
+	agent := realm.Agent
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+
+	var toString = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		radix := arguments[0]
+
+		x := thisBigIntValue(this)
+
+		var radixMV float64
+		if radix == nil {
+			radixMV = 10
+		} else {
+			radixMV = ToIntegerOrInfinity(agent, radix)
+		}
+
+		if radixMV < 2 || radixMV > 36 {
+			panic("RangeError")
+		}
+
+		return NewStringValue(x.String())
+	}
+	var valueOf = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return thisBigIntValue(this)
+	}
+
+	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+
+	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+		Value:        NewStringValue("BigInt"),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
+
 	return object
 }
 
