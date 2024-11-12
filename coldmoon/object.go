@@ -425,7 +425,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 
 		symbol := WellKnownSymbols[WellKnownSymbolsToStringTag]
-		tagValue := o.Get(NewSymbolPropertyKey(&symbol))
+		tagValue := o.Get(NewSymbolPropertyKey(symbol))
 
 		var tag string
 		if stringTag, ok := tagValue.(*StringValue); ok {

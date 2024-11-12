@@ -125,6 +125,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"Symbol",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.SymbolConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

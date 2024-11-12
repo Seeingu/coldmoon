@@ -383,7 +383,7 @@ func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
 	instOfHandler := GetMethod(
 		agent,
 		target,
-		NewSymbolPropertyKey(&symbol))
+		NewSymbolPropertyKey(symbol))
 	if instOfHandler != nil {
 		return Call(instOfHandler, target, []Value{value}).ToBoolean()
 	}

@@ -118,7 +118,7 @@ func NewValueFromObject(object ObjectType) Value {
 func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
 	if objectValue, isObject := value.(*ObjectValue); isObject {
 		symbol := WellKnownSymbols[WellKnownSymbolsToPrimitive]
-		exoticToPrim := GetMethod(agent, value, NewSymbolPropertyKey(&symbol))
+		exoticToPrim := GetMethod(agent, value, NewSymbolPropertyKey(symbol))
 		if exoticToPrim != nil {
 			hintString := hint.String()
 
@@ -356,6 +356,8 @@ func ValueToObject(agent *Agent, value Value) ObjectType {
 		return NewStringObject(agent, v.Data, realm.Intrinsics.StringPrototype)
 	case *NumberValue:
 		return NewNumberObject(agent, v.Data, realm.Intrinsics.NumberPrototype)
+	case *SymbolValue:
+		return NewSymbolObject(agent, v, realm.Intrinsics.SymbolPrototype)
 	default:
 		panic("unimplemented")
 	}

@@ -25,6 +25,10 @@ type Intrinsics struct {
 	NumberPrototype *NumberObject
 	// %Number%
 	NumberConstructor ObjectType
+	// &Symbol.Prototype%
+	SymbolPrototype ObjectType
+	// %Symbol%
+	SymbolConstructor ObjectType
 	// %IsFinite%
 	IsFinite ObjectType
 	// %isNaN%

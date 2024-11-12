@@ -25,7 +25,7 @@ func (o *ObjectEnvironment) HasBinding(name string) bool {
 
 	symbol := WellKnownSymbols[WellKnownSymbolsUnscopables]
 	unscopables := bindingObject.Get(
-		NewSymbolPropertyKey(&symbol),
+		NewSymbolPropertyKey(symbol),
 	)
 
 	if obj, ok := unscopables.(*ObjectValue); ok {

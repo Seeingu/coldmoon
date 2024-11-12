@@ -14,7 +14,7 @@ type HostHooks struct {
 	HostHasSourceTextAvailable  func(o ObjectType) bool
 }
 
-var WellKnownSymbols = map[WellKnownSymbolsKey]SymbolValue{}
+var WellKnownSymbols = map[WellKnownSymbolsKey]*SymbolValue{}
 
 //go:generate stringer -type=ExceptionType
 type ExceptionType int
@@ -137,8 +137,8 @@ func initWellKnownSymbols(agent *Agent) {
 	WellKnownSymbols[WellKnownSymbolsUnscopables] = agent.CreateSymbol("SymbolValue.unscopables")
 }
 
-func (a *Agent) CreateSymbol(desc string) SymbolValue {
-	s := SymbolValue{
+func (a *Agent) CreateSymbol(desc string) *SymbolValue {
+	s := &SymbolValue{
 		Id:          a.symbolId,
 		Description: desc,
 	}
