@@ -29,6 +29,10 @@ type Intrinsics struct {
 	SymbolPrototype ObjectType
 	// %Symbol%
 	SymbolConstructor ObjectType
+	// %BigInt.Prototype%
+	BigIntPrototype ObjectType
+	// %BigInt%
+	BigIntConstructor ObjectType
 	// %IsFinite%
 	IsFinite ObjectType
 	// %isNaN%

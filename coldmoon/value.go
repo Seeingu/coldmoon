@@ -358,6 +358,8 @@ func ValueToObject(agent *Agent, value Value) ObjectType {
 		return NewNumberObject(agent, v.Data, realm.Intrinsics.NumberPrototype)
 	case *SymbolValue:
 		return NewSymbolObject(agent, v, realm.Intrinsics.SymbolPrototype)
+	case *BigIntValue:
+		return NewBigIntObject(agent, v, realm.Intrinsics.BigIntPrototype)
 	default:
 		panic("unimplemented")
 	}

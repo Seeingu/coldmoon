@@ -134,6 +134,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"BigInt",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.BigIntConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

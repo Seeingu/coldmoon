@@ -140,3 +140,86 @@ func (b *BigIntValue) BitwiseOr(other *BigIntValue) *BigIntValue {
 		Data: new(big.Int).Or(b.Data, other.Data),
 	}
 }
+
+// MARK: - BigInt Object
+
+type BigIntObject struct {
+	*Object
+	Data *BigIntValue
+}
+
+func NewBigIntObject(agent *Agent, v *BigIntValue, prototype ObjectType) *BigIntObject {
+	object := &BigIntObject{
+		Object: NewObject(agent, prototype),
+		Data:   v,
+	}
+	return object
+}
+
+func NewBigIntConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		value := argumentsList[0]
+
+		if newTarget != nil {
+			panic("TypeError")
+		}
+
+		prim := ToPrimitive(agent, value, PreferredTypeNumber)
+
+		if num, ok := prim.(*NumberValue); ok {
+			return NumberToBigInt(agent, num)
+		}
+
+		return ToBigInt(agent, prim)
+	}
+
+	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "BigInt", builtinFunctionArgs{
+		realm:         realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		isConstructor: true,
+	})
+
+	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+		Value:        NewValueFromObject(realm.Intrinsics.BigIntPrototype),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+
+	DefineBuiltinProperty(realm.Intrinsics.BigIntPrototype, "constructor",
+		NewValueFromObject(object),
+	)
+
+	return object
+}
+
+func NewBigIntPrototype(realm *Realm) ObjectType {
+	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+	return object
+}
+
+func thisBigIntValue(value Value) *BigIntValue {
+	if bigint, ok := value.(*BigIntValue); ok {
+		return bigint
+	}
+	if object, ok := value.(*ObjectValue); ok {
+		bigInt, ok := object.Object.(*BigIntObject)
+		if ok {
+			return bigInt.Data
+		}
+	}
+
+	panic("TypeError")
+}
+
+// 21.2.1.1.1
+func NumberToBigInt(agent *Agent, number *NumberValue) *BigIntValue {
+	if !IsIntegralNumber(number) {
+		panic("RangeError")
+	}
+
+	return &BigIntValue{
+		Data: big.NewInt(int64(number.Data)),
+	}
+}
