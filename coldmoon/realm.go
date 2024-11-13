@@ -48,6 +48,18 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.BigIntConstructor = NewBigIntConstructor(r)
 	r.Intrinsics.ErrorPrototype = NewErrorPrototype(r)
 	r.Intrinsics.ErrorConstructor = NewErrorConstructor(r)
+	r.Intrinsics.SyntaxErrorPrototype = NewNativeErrorPrototype(r, "SyntaxError")
+	r.Intrinsics.SyntaxErrorConstructor = NewNativeErrorConstructor(r, "SyntaxError")
+	r.Intrinsics.TypeErrorPrototype = NewNativeErrorPrototype(r, "TypeError")
+	r.Intrinsics.TypeErrorConstructor = NewNativeErrorConstructor(r, "TypeError")
+	r.Intrinsics.RangeErrorPrototype = NewNativeErrorPrototype(r, "RangeError")
+	r.Intrinsics.RangeErrorConstructor = NewNativeErrorConstructor(r, "RangeError")
+	r.Intrinsics.ReferenceErrorPrototype = NewNativeErrorPrototype(r, "ReferenceError")
+	r.Intrinsics.ReferenceErrorConstructor = NewNativeErrorConstructor(r, "ReferenceError")
+	r.Intrinsics.URIErrorPrototype = NewNativeErrorPrototype(r, "URIError")
+	r.Intrinsics.URIErrorConstructor = NewNativeErrorConstructor(r, "URIError")
+	r.Intrinsics.EvalErrorPrototype = NewNativeErrorPrototype(r, "EvalError")
+	r.Intrinsics.EvalErrorConstructor = NewNativeErrorConstructor(r, "EvalError")
 
 	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
 }

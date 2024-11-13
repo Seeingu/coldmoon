@@ -152,6 +152,60 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"EvalError",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.EvalErrorConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
+		{
+			"RangeError",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.RangeErrorConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
+		{
+			"ReferenceError",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.ReferenceErrorConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
+		{
+			"SyntaxError",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.SyntaxErrorConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
+		{
+			"TypeError",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.TypeErrorConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
+		{
+			"URIError",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.URIErrorConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

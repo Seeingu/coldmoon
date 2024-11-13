@@ -39,6 +39,30 @@ type Intrinsics struct {
 	IsNaN ObjectType
 	// %eval%
 	Eval ObjectType
+	// %EvalError%
+	EvalErrorConstructor ObjectType
+	// %EvalError.prototype%
+	EvalErrorPrototype ObjectType
+	// %RangeError%
+	RangeErrorConstructor ObjectType
+	// %RangeError.prototype%
+	RangeErrorPrototype ObjectType
+	// %ReferenceError%
+	ReferenceErrorConstructor ObjectType
+	// %ReferenceError.prototype%
+	ReferenceErrorPrototype ObjectType
+	// %SyntaxError%
+	SyntaxErrorConstructor ObjectType
+	// %SyntaxError.prototype%
+	SyntaxErrorPrototype ObjectType
+	// %TypeError%
+	TypeErrorConstructor ObjectType
+	// %TypeError.prototype%
+	TypeErrorPrototype ObjectType
+	// %URIError%
+	URIErrorConstructor ObjectType
+	// %URIError.prototype%
+	URIErrorPrototype ObjectType
 	// %Error%
 	ErrorConstructor ObjectType
 	// %Error.prototype%
