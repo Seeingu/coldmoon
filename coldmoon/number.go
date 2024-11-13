@@ -376,7 +376,14 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		}
 		return NewStringValue(x.ToString(radixMV))
 	}
+
+	var valueOf BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		x := thisNumberValue(agent, this)
+		return x
+	}
+
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
 
 	return object
 }
