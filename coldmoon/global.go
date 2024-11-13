@@ -144,6 +144,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
+			"Math",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.Math),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
+		{
 			"Error",
 			&PropertyDescriptor{
 				Value:        NewValueFromObject(r.Intrinsics.ErrorConstructor),

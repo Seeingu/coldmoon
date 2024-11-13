@@ -42,6 +42,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.StringConstructor = NewStringConstructor(r)
 	r.Intrinsics.NumberPrototype = NewNumberPrototype(r)
 	r.Intrinsics.NumberConstructor = NewNumberConstructor(r)
+	r.Intrinsics.Math = NewMathObject(r)
 	r.Intrinsics.SymbolPrototype = NewSymbolPrototype(r)
 	r.Intrinsics.SymbolConstructor = NewSymbolConstructor(r)
 	r.Intrinsics.BigIntPrototype = NewBigIntPrototype(r)
