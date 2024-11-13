@@ -2,14 +2,6 @@ package coldmoon
 
 import "github.com/samber/lo"
 
-type FunctionPrototype struct {
-	*Object
-}
-
-func (f *FunctionPrototype) ToObject() *Object {
-	return f.Object
-}
-
 func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return UndefinedValue
@@ -80,10 +72,6 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		return fun.CallAssumeCallable(thisArg, argList)
 	}
 	DefineBuiltinFunction(f, "apply", apply, 2, realm)
-}
-
-type FunctionConstructor struct {
-	*Object
 }
 
 type dynamicFunctionKind int

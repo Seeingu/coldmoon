@@ -275,10 +275,6 @@ func (n *NumberValue) IsZero() bool {
 
 // MARK: - Number Object
 
-type NumberConstructor struct {
-	*Object
-}
-
 func NewNumberConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {

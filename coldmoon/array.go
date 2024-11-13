@@ -144,10 +144,6 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 	return true
 }
 
-type ArrayConstructor struct {
-	*Object
-}
-
 func NewArrayConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -211,12 +207,8 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	return object
 }
 
-type ArrayPrototype struct {
-	*Object
-}
-
-func NewArrayPrototype(realm *Realm) *ArrayPrototype {
-	object := &ArrayPrototype{
+func NewArrayPrototype(realm *Realm) *ArrayObject {
+	object := &ArrayObject{
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
 	}
 

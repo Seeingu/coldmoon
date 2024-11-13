@@ -27,10 +27,6 @@ var StringCreate = NewStringObject
 
 // MARK: - StringConstructor
 
-type StringConstructor struct {
-	*Object
-}
-
 func NewStringConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		value := argumentsList[0]

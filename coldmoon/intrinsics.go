@@ -12,7 +12,7 @@ type Intrinsics struct {
 	// %Array%
 	ArrayConstructor ObjectType
 	// %Array.Prototype%
-	ArrayPrototype *ArrayPrototype
+	ArrayPrototype *ArrayObject
 	// %Boolean.Prototype%
 	BooleanPrototype *BooleanObject
 	// %Boolean%
@@ -93,6 +93,56 @@ func (i *Intrinsics) Get(key string) ObjectType {
 		return i.Eval
 	case "%ThrowTypeError%":
 		return i.ThrowTypeError
+	case "%Array%":
+		return i.ArrayConstructor
+	case "%Array.Prototype%":
+		return i.ArrayPrototype
+	case "%String.Prototype%":
+		return i.StringPrototype
+	case "%String%":
+		return i.StringConstructor
+	case "%Number.Prototype%":
+		return i.NumberPrototype
+	case "%Number%":
+		return i.NumberConstructor
+	case "%Symbol.Prototype%":
+		return i.SymbolPrototype
+	case "%Symbol%":
+		return i.SymbolConstructor
+	case "%BigInt.Prototype%":
+		return i.BigIntPrototype
+	case "%BigInt%":
+		return i.BigIntConstructor
+
+	case "%EvalError%":
+		return i.EvalErrorConstructor
+	case "%EvalError.prototype%":
+		return i.EvalErrorPrototype
+	case "%RangeError%":
+		return i.RangeErrorConstructor
+	case "%RangeError.prototype%":
+		return i.RangeErrorPrototype
+	case "%ReferenceError%":
+		return i.ReferenceErrorConstructor
+	case "%ReferenceError.prototype%":
+		return i.ReferenceErrorPrototype
+	case "%SyntaxError%":
+		return i.SyntaxErrorConstructor
+	case "%SyntaxError.prototype%":
+		return i.SyntaxErrorPrototype
+	case "%TypeError%":
+		return i.TypeErrorConstructor
+	case "%TypeError.prototype%":
+		return i.TypeErrorPrototype
+	case "%URIError%":
+		return i.URIErrorConstructor
+	case "%URIError.prototype%":
+		return i.URIErrorPrototype
+	case "%Error%":
+		return i.ErrorConstructor
+	case "%Error.prototype%":
+		return i.ErrorPrototype
+
 	}
 	panic("unknown intrinsic")
 }
