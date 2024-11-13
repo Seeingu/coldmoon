@@ -13,10 +13,10 @@ func _() {
 	_ = x[ReferenceError-2]
 	_ = x[SyntaxError-3]
 	_ = x[TypeError-4]
-	_ = x[UriError-5]
+	_ = x[URIError-5]
 }
 
-const _ExceptionType_name = "EvalErrorRangeErrorReferenceErrorSyntaxErrorTypeErrorUriError"
+const _ExceptionType_name = "EvalErrorRangeErrorReferenceErrorSyntaxErrorTypeErrorURIError"
 
 var _ExceptionType_index = [...]uint8{0, 9, 19, 33, 44, 53, 61}
 

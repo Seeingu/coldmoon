@@ -25,7 +25,7 @@ const (
 	ReferenceError
 	SyntaxError
 	TypeError
-	UriError
+	URIError
 )
 
 func NewAgent() *Agent {
@@ -148,8 +148,9 @@ func (a *Agent) CreateSymbol(desc string) *SymbolValue {
 
 // 5.2.3.2
 func (a *Agent) ThrowException(exceptionType ExceptionType, message string) ObjectType {
-	m := exceptionType.String() + " " + message
-	a.exception = NewStringValue(m)
-	// TODO
-	return &ErrorObject{}
+	realm := a.CurrentRealm()
+	constructor := realm.Intrinsics.Get("%" + exceptionType.String() + "%")
+	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
+	a.exception = NewValueFromObject(errorObject)
+	return errorObject
 }
