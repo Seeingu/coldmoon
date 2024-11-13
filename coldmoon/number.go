@@ -25,6 +25,26 @@ func (n *NumberValue) String() string {
 	return fmt.Sprintf("%f", n.Data)
 }
 
+func (n *NumberValue) ToString(radix float64) string {
+	if math.IsNaN(n.Data) {
+		return "NaN"
+	}
+	if n.IsPositiveInf() {
+		return "Infinity"
+	}
+	if n.IsNegativeInf() {
+		return "-Infinity"
+	}
+	if n.IsZero() {
+		if math.Signbit(n.Data) {
+			return "-0"
+		}
+		return "0"
+	}
+	return strconv.FormatFloat(n.Data, 'f', -1, 64)
+
+}
+
 func (n *NumberValue) ToBoolean() bool {
 	if n.Data == 0 || math.IsNaN(n.Data) {
 		return false
@@ -340,6 +360,24 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 	object := &NumberObject{
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
 	}
+
+	agent := realm.Agent
+	var toString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		radix := arguments[0]
+
+		x := thisNumberValue(agent, this)
+		var radixMV float64 = 10
+		if radix != nil {
+			radixMV = ToIntegerOrInfinity(agent, radix)
+		}
+
+		if radixMV < 2 || radixMV > 36 {
+			panic("RangeError")
+		}
+		return NewStringValue(x.ToString(radixMV))
+	}
+	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+
 	return object
 }
 

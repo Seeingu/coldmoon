@@ -791,8 +791,7 @@ func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
 	var property ASTProperty
 	if token.Type == TLeftBracket {
 		p.tokenizer.Next()
-		accept := p.acceptContext(TLeftBracket)
-		propertyExpression := p.expression(accept)
+		propertyExpression := p.expression(p.acceptContextLowest())
 		p.tokenizer.MustMatch(TRightBracket)
 		property = &ASTPropertyExpression{
 			Expression: propertyExpression,
@@ -962,8 +961,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		}
 	case TLeftBracket:
 		p.tokenizer.Next()
-		computedPropertyName := p.expression(
-			p.acceptContext(TLeftBracket))
+		computedPropertyName := p.expression(p.acceptContextLowest())
 		propertyName = &PropertyNameComputed{
 			Expression: computedPropertyName,
 		}
