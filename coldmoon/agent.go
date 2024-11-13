@@ -146,10 +146,6 @@ func (a *Agent) CreateSymbol(desc string) *SymbolValue {
 	return s
 }
 
-type ErrorObject struct {
-	ObjectType
-}
-
 // 5.2.3.2
 func (a *Agent) ThrowException(exceptionType ExceptionType, message string) ObjectType {
 	m := exceptionType.String() + " " + message

@@ -425,6 +425,9 @@ func (m *MemberExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	switch prop := m.Property.(type) {
 	case *ASTPropertyExpression:
 		prop.Expression.Bytecode(e, c)
+		if prop.Expression.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
 		e.AddInstruction(InsLoad)
 		e.AddInstruction(&IEvaluatePropertyAccessWithExpressionKey{
 			Strict: strict,

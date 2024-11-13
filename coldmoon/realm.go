@@ -47,6 +47,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.SymbolConstructor = NewSymbolConstructor(r)
 	r.Intrinsics.BigIntPrototype = NewBigIntPrototype(r)
 	r.Intrinsics.BigIntConstructor = NewBigIntConstructor(r)
+	r.Intrinsics.ErrorPrototype = NewErrorPrototype(r)
+	r.Intrinsics.ErrorConstructor = NewErrorConstructor(r)
 
 	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
 }

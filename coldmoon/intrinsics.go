@@ -39,6 +39,10 @@ type Intrinsics struct {
 	IsNaN ObjectType
 	// %eval%
 	Eval ObjectType
+	// %Error%
+	ErrorConstructor ObjectType
+	// %Error.prototype%
+	ErrorPrototype ObjectType
 	// %ThrowTypeError%
 	ThrowTypeError ObjectType
 }

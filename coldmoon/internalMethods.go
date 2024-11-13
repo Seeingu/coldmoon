@@ -28,6 +28,7 @@ type ObjectType interface {
 	Prototype() ObjectType
 	Extensible() bool
 }
+type SetFn = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool
 type InternalMethods struct {
 	GetPrototypeOf    func(o ObjectType) ObjectType
 	SetPrototypeOf    func(o ObjectType, v ObjectType) bool
@@ -37,7 +38,7 @@ type InternalMethods struct {
 	DefineOwnProperty func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool
 	HasProperty       func(o ObjectType, p PropertyKey) bool
 	Get               func(o ObjectType, p PropertyKey, receiver Value) Value
-	Set               func(o ObjectType, p PropertyKey, v Value, receiver Value) bool
+	Set               SetFn
 	Delete            func(o ObjectType, p PropertyKey) bool
 	OwnPropertyKeys   func(o ObjectType) []PropertyKey
 	Call              func(o ObjectType, this Value, arguments []Value) Value
