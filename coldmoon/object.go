@@ -268,10 +268,6 @@ func (o *Object) GetFunctionRealm() *Realm {
 // MARK: - Object Constructor
 
 // 20.1.1
-type ObjectConstructor struct {
-	*Object
-}
-
 func NewObjectConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
@@ -403,6 +399,27 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	// 20.1.3.1
 	DefineBuiltinProperty(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
 
+	return object
+
+}
+
+// NewObjectPrototypeSkeleton init %Object.prototype% at first
+func NewObjectPrototypeSkeleton(realm *Realm) ObjectType {
+	object := NewObject(realm.Agent, nil)
+	return object
+}
+
+func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
+	agent := realm.Agent
+	object.InternalMethods().SetPrototypeOf =
+		ImmutableSetPrototypeOf
+	realm.Intrinsics.ObjectPrototype = object
+
+	var valueOf = func(this Value, args []Value, newTarget ObjectType) Value {
+		return NewValueFromObject(ValueToObject(agent, this))
+	}
+	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+
 	// 20.1.3.6 toString
 	var toString = func(this Value, args []Value, newTarget ObjectType) Value {
 		if this == UndefinedValue {
@@ -420,6 +437,12 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			builtInTag = "Function"
 		} else if _, ok := o.(*BooleanObject); ok {
 			builtInTag = "Boolean"
+		} else if _, ok := o.(*ErrorObject); ok {
+			builtInTag = "Error"
+		} else if _, ok := o.(*NumberObject); ok {
+			builtInTag = "Number"
+		} else if _, ok := o.(*StringObject); ok {
+			builtInTag = "String"
 		} else {
 			builtInTag = "Object"
 		}
@@ -434,15 +457,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			tag = builtInTag
 		}
 		return NewStringValue("[object " + tag + "]")
-
 	}
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
-
-	var valueOf = func(this Value, args []Value, newTarget ObjectType) Value {
-		return NewValueFromObject(ValueToObject(agent, this))
-	}
-	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
-
 	return object
-
 }

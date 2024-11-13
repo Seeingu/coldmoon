@@ -10,7 +10,7 @@ func (f *FunctionPrototype) ToObject() *Object {
 	return f.Object
 }
 
-func NewFunctionPrototype(realm *Realm) ObjectType {
+func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return UndefinedValue
 	}
@@ -21,10 +21,14 @@ func NewFunctionPrototype(realm *Realm) ObjectType {
 		isConstructor: false,
 	})
 
+	realm.Intrinsics.FunctionPrototype = f
+	initFunctionMethods(f, realm)
+
 	return f
 }
 
-func InitFunctionMethods(f ObjectType, realm *Realm) {
+// initFunctionMethods depends on %Function.prototype% being defined
+func initFunctionMethods(f ObjectType, realm *Realm) {
 	// 20.2.3.5 toString
 	var toString = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		o, ok := this.(*ObjectValue)

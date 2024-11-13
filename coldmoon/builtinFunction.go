@@ -72,6 +72,9 @@ func CreateBuiltinFunction(
 	if prototype == nil {
 		prototype = realm.Intrinsics.FunctionPrototype
 	}
+	if prototype == nil {
+		panic("FunctionPrototype is nil")
+	}
 
 	object := NewObject(agent, prototype.ToObject())
 	object.SetExtensible(true)
