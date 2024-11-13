@@ -9,8 +9,8 @@ type constructorProperties struct {
 func GlobalObjectProperties(r *Realm) []constructorProperties {
 	properties := []constructorProperties{
 		{
-			Name: "globalThis",
-			PropertyDescriptor: &PropertyDescriptor{
+			"globalThis",
+			&PropertyDescriptor{
 				Value:        NewValueFromObject(r.GlobalEnv.GlobalThisValue),
 				Writable:     true,
 				Enumerable:   false,
@@ -18,8 +18,8 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
-			Name: "Infinity",
-			PropertyDescriptor: &PropertyDescriptor{
+			"Infinity",
+			&PropertyDescriptor{
 				Value:        InfinityValue,
 				Writable:     false,
 				Enumerable:   false,
@@ -27,8 +27,8 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
-			Name: "NaN",
-			PropertyDescriptor: &PropertyDescriptor{
+			"NaN",
+			&PropertyDescriptor{
 				Value:        NaNValue,
 				Writable:     false,
 				Enumerable:   false,
@@ -36,8 +36,8 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
-			Name: "undefined",
-			PropertyDescriptor: &PropertyDescriptor{
+			"undefined",
+			&PropertyDescriptor{
 				Value:        UndefinedValue,
 				Writable:     false,
 				Enumerable:   false,
@@ -45,8 +45,8 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
-			Name: "Boolean",
-			PropertyDescriptor: &PropertyDescriptor{
+			"Boolean",
+			&PropertyDescriptor{
 				Value:        NewValueFromObject(r.Intrinsics.BooleanConstructor),
 				Writable:     true,
 				Enumerable:   false,
@@ -54,8 +54,8 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
-			Name: "isFinite",
-			PropertyDescriptor: &PropertyDescriptor{
+			"isFinite",
+			&PropertyDescriptor{
 				Value:        NewValueFromObject(r.Intrinsics.IsFinite),
 				Writable:     true,
 				Enumerable:   false,
@@ -63,8 +63,8 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
-			Name: "isNaN",
-			PropertyDescriptor: &PropertyDescriptor{
+			"isNaN",
+			&PropertyDescriptor{
 				Value:        NewValueFromObject(r.Intrinsics.IsNaN),
 				Writable:     true,
 				Enumerable:   false,
@@ -72,8 +72,8 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
-			Name: "eval",
-			PropertyDescriptor: &PropertyDescriptor{
+			"eval",
+			&PropertyDescriptor{
 				Value:        NewValueFromObject(r.Intrinsics.Eval),
 				Writable:     true,
 				Enumerable:   false,
@@ -81,8 +81,8 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 			},
 		},
 		{
-			Name: "Object",
-			PropertyDescriptor: &PropertyDescriptor{
+			"Object",
+			&PropertyDescriptor{
 				Value:        NewValueFromObject(r.Intrinsics.ObjectConstructor),
 				Writable:     true,
 				Enumerable:   false,
