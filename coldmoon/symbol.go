@@ -152,6 +152,30 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 		NewValueFromObject(object),
 	)
 
+	var symbolFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		key := arguments[0]
+		stringKey := key.String()
+		if agent.GlobalSymbolRegistry[stringKey] != nil {
+			return agent.GlobalSymbolRegistry[stringKey]
+		}
+
+		newSymbol := agent.CreateSymbol(stringKey)
+		agent.GlobalSymbolRegistry[stringKey] = newSymbol
+
+		return newSymbol
+	}
+	var keyFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		symbol := arguments[0]
+		s, ok := symbol.(*SymbolValue)
+		if !ok {
+			panic("TypeError")
+		}
+		return NewStringValue(keyForSymbol(agent, s))
+	}
+
+	DefineBuiltinFunction(object, "for", symbolFor, 1, realm)
+	DefineBuiltinFunction(object, "keyFor", keyFor, 1, realm)
+
 	return object
 }
 
@@ -196,4 +220,13 @@ func thisSymbolValue(v Value) *SymbolValue {
 	}
 
 	panic("TypeError")
+}
+
+func keyForSymbol(agent *Agent, symbol *SymbolValue) string {
+	for _, value := range agent.GlobalSymbolRegistry {
+		if value.Id == symbol.Id {
+			return value.Description
+		}
+	}
+	return ""
 }

@@ -7,6 +7,7 @@ type Agent struct {
 	exception             Value
 	ExecutionContextStack pkg.Stack[*ExecutionContext]
 	HostHooks             *HostHooks
+	GlobalSymbolRegistry  map[string]*SymbolValue
 }
 
 type HostHooks struct {
