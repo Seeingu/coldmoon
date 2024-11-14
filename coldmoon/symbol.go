@@ -61,8 +61,88 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
+	// 20.4.2.1
+	DefineBuiltinProperty(object, "asyncIterator", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsAsyncIterator],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "hasInstance", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsHasInstance],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "isConcatSpreadable", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "iterator", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsIterator],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "match", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsMatch],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "matchAll", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsMatchAll],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.SymbolPrototype),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "replace", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsReplace],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "search", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsSearch],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "species", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsSpecies],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "split", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsSplit],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "toPrimitive", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsToPrimitive],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "toStringTag", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsToStringTag],
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(object, "unscopables", &PropertyDescriptor{
+		Value:        WellKnownSymbols[WellKnownSymbolsUnscopables],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
