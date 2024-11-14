@@ -64,5 +64,10 @@ func NewMathObject(realm *Realm) ObjectType {
 		Configurable: true,
 	})
 
+	var random BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		return NewNumberValue(realm.Rng.Float64())
+	}
+	DefineBuiltinFunction(object, "random", random, 0, realm)
+
 	return object
 }

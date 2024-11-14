@@ -1,5 +1,9 @@
 package coldmoon
 
+import (
+	"math/rand"
+)
+
 type Realm struct {
 	AgentSignifier interface{}
 	Intrinsics     *Intrinsics
@@ -9,6 +13,7 @@ type Realm struct {
 	LoadedModules  interface{}
 	HostDefined    interface{}
 	Agent          *Agent
+	Rng            rand.Rand
 }
 
 // CreateRealm creates a new realm.
