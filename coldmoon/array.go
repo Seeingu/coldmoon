@@ -193,13 +193,35 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		arg := args[0]
 		return NewBooleanValue(IsArray(arg))
 	}
+	var of BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		length := len(args)
+		lenNumber := NewNumberValue(float64(length))
+
+		constructor := this
+		var array ObjectType
+		if IsConstructor(constructor) {
+			array = MustGetObject(constructor).Construct(args, nil)
+		} else {
+			array = ArrayCreate(realm.Agent, float64(length), nil)
+		}
+
+		for k := range args {
+			propertyKey := NewIntegerIndexPropertyKey(k)
+			array.CreateDataPropertyOrThrow(propertyKey, args[k])
+		}
+
+		array.Set(NewStringPropertyKey("length"), lenNumber, setThrowTypeThrow)
+		return NewValueFromObject(array)
+	}
 
 	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "Array", builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		isConstructor: true,
 	})
+
 	DefineBuiltinFunction(object, "isArray", isArray, 1, realm)
+	DefineBuiltinFunction(object, "of", of, 0, realm)
 
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.ArrayPrototype),
