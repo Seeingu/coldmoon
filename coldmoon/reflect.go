@@ -107,7 +107,43 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return NewValueFromObject(desc.FromPropertyDescriptor(agent, desc))
 		}
 
-		return nil
+		panic("return undefined")
+	}
+	var getPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		targetObject := MustGetObject(target)
+
+		return NewValueFromObject(targetObject.InternalMethods().GetPrototypeOf(targetObject))
+	}
+	var has BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+		propertyKey := arguments[1]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		key := ToPropertyKey(agent, propertyKey)
+
+		targetObject := MustGetObject(target)
+
+		return NewBooleanValue(targetObject.InternalMethods().HasProperty(targetObject, key))
+	}
+	var isExtensible BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		targetObject := MustGetObject(target)
+
+		return NewBooleanValue(targetObject.InternalMethods().IsExtensible(targetObject))
 	}
 
 	DefineBuiltinFunction(object, "apply", apply, 3, realm)
@@ -116,6 +152,9 @@ func NewReflectObject(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm)
 	DefineBuiltinFunction(object, "get", get, 1, realm)
 	DefineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 3, realm)
+	DefineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm)
+	DefineBuiltinFunction(object, "has", has, 2, realm)
+	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
 
 	return object
 }
