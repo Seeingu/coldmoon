@@ -60,10 +60,42 @@ func NewReflectObject(realm *Realm) ObjectType {
 		)
 		return NewBooleanValue(ret)
 	}
+	var deleteProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+		propertyKey := arguments[1]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		key := ToPropertyKey(agent, propertyKey)
+
+		targetObject := MustGetObject(target)
+
+		ret := targetObject.InternalMethods().Delete(targetObject, key)
+		return NewBooleanValue(ret)
+	}
+	var get BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+		propertyKey := arguments[1]
+		receiver := arguments[2]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		key := ToPropertyKey(agent, propertyKey)
+
+		targetObject := MustGetObject(target)
+
+		return targetObject.InternalMethods().Get(targetObject, key, receiver)
+	}
 
 	DefineBuiltinFunction(object, "apply", apply, 3, realm)
 	DefineBuiltinFunction(object, "construct", construct, 3, realm)
 	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
+	DefineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm)
+	DefineBuiltinFunction(object, "get", get, 1, realm)
 
 	return object
 }
