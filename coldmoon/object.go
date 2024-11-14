@@ -299,6 +299,23 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		},
 	)
 
+	var create BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		o := arguments[0]
+		properties := arguments[1]
+		if !ValueIsObject(o) {
+			panic("TypeError")
+		}
+
+		obj := OrdinaryObjectCreate(agent, MustGetObject(o), []string{})
+
+		if properties != nil {
+			return NewValueFromObject(objectDefineProperties(agent, obj, properties))
+		}
+
+		return NewValueFromObject(obj)
+	}
+	DefineBuiltinFunction(object, "create", create, 2, realm)
+
 	// 20.1.2.6
 	var freeze BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
@@ -459,5 +476,22 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		return NewStringValue("[object " + tag + "]")
 	}
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	return object
+}
+
+// 20.1.2.3.1
+func objectDefineProperties(agent *Agent, object ObjectType, properties Value) ObjectType {
+	props := ValueToObject(agent, properties)
+
+	keys := props.InternalMethods().OwnPropertyKeys(props)
+
+	for _, key := range keys {
+		descValue := props.Get(key)
+		desc := ToPropertyDescriptor(agent, descValue)
+		if desc != nil {
+			object.DefinePropertyOrThrow(key, desc)
+		}
+	}
+
 	return object
 }
