@@ -90,12 +90,32 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return targetObject.InternalMethods().Get(targetObject, key, receiver)
 	}
+	var getOwnPropertyDescriptor BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+		propertyKey := arguments[1]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		key := ToPropertyKey(agent, propertyKey)
+
+		targetObject := MustGetObject(target)
+		desc := targetObject.InternalMethods().GetOwnProperty(targetObject, key)
+
+		if desc != nil {
+			return NewValueFromObject(desc.FromPropertyDescriptor(agent, desc))
+		}
+
+		return nil
+	}
 
 	DefineBuiltinFunction(object, "apply", apply, 3, realm)
 	DefineBuiltinFunction(object, "construct", construct, 3, realm)
 	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
 	DefineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm)
 	DefineBuiltinFunction(object, "get", get, 1, realm)
+	DefineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 3, realm)
 
 	return object
 }
