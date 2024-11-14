@@ -170,6 +170,56 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return NewValueFromObject(CreateArrayFromList(agent, keys))
 	}
+	var preventExtensions BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		targetObject := MustGetObject(target)
+
+		ret := targetObject.InternalMethods().PreventExtensions(targetObject)
+		return NewBooleanValue(ret)
+	}
+	var set BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+		propertyKey := arguments[1]
+		value := arguments[2]
+		receiver := arguments[3]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		key := ToPropertyKey(agent, propertyKey)
+
+		targetObject := MustGetObject(target)
+
+		if receiver == nil {
+			receiver = target
+		}
+
+		ret := targetObject.InternalMethods().Set(targetObject, key, value, receiver)
+		return NewBooleanValue(ret)
+	}
+	var setPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+		proto := arguments[1]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		targetObject := MustGetObject(target)
+
+		if proto != nil && !ValueIsObject(proto) {
+			panic("TypeError")
+		}
+
+		ret := targetObject.InternalMethods().SetPrototypeOf(targetObject, MustGetObject(proto))
+		return NewBooleanValue(ret)
+	}
 
 	DefineBuiltinFunction(object, "apply", apply, 3, realm)
 	DefineBuiltinFunction(object, "construct", construct, 3, realm)
@@ -181,6 +231,16 @@ func NewReflectObject(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "has", has, 2, realm)
 	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
 	DefineBuiltinFunction(object, "ownKeys", ownKeys, 1, realm)
+	DefineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm)
+	DefineBuiltinFunction(object, "set", set, 3, realm)
+	DefineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm)
+
+	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+		Value:        NewStringValue("Reflect"),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
 
 	return object
 }
