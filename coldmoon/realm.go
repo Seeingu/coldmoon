@@ -47,6 +47,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.SymbolConstructor = NewSymbolConstructor(r)
 	r.Intrinsics.BigIntPrototype = NewBigIntPrototype(r)
 	r.Intrinsics.BigIntConstructor = NewBigIntConstructor(r)
+	r.Intrinsics.Reflect = NewReflectObject(r)
 	r.Intrinsics.ErrorPrototype = NewErrorPrototype(r)
 	r.Intrinsics.ErrorConstructor = NewErrorConstructor(r)
 	r.Intrinsics.SyntaxErrorPrototype = NewNativeErrorPrototype(r, "SyntaxError")

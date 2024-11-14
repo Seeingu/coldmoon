@@ -446,7 +446,7 @@ func IsCallable(value Value) bool {
 }
 
 // 7.2.4
-func isConstructor(value Value) bool {
+func IsConstructor(value Value) bool {
 	objectValue, isObject := value.(*ObjectValue)
 
 	if !isObject {

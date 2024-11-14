@@ -366,7 +366,7 @@ func directEval(agent *Agent, arguments []Value, strict bool) Value {
 
 // 13.3.5.1.1
 func evaluateNew(agent *Agent, constructor Value, arguments []Value) Value {
-	if !isConstructor(constructor) {
+	if !IsConstructor(constructor) {
 		panic("TypeError: constructor is not a constructor")
 	}
 	return NewValueFromObject(

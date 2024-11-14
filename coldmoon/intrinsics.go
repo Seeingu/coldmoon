@@ -33,6 +33,8 @@ type Intrinsics struct {
 	BigIntPrototype ObjectType
 	// %BigInt%
 	BigIntConstructor ObjectType
+	// %Reflect%
+	Reflect ObjectType
 	// %Math%
 	Math ObjectType
 	// %IsFinite%

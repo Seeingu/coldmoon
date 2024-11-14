@@ -255,7 +255,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 	realm := agent.CurrentRealm()
 	fun, isECMAScriptFunction := F.(*ECMAScriptFunction)
 	if isECMAScriptFunction {
-		Assert(!isConstructor(NewValueFromObject(fun)))
+		Assert(!IsConstructor(NewValueFromObject(fun)))
 
 		Assert(fun.IsExtensible() &&
 			!F.PropertyStorage().Has(NewStringPropertyKey("prototype")),
