@@ -14,10 +14,6 @@ func (o *ObjectEnvironment) OuterEnv() EnvironmentRecord {
 	return o.outerEnv
 }
 
-func (o *ObjectEnvironment) CreateMutableBinding(name string, deletable bool) {
-	panic("Not supported")
-}
-
 // 9.1.1.2.1
 func (o *ObjectEnvironment) HasBinding(name string) bool {
 	bindingObject := o.BindingObject
@@ -41,6 +37,22 @@ func (o *ObjectEnvironment) HasBinding(name string) bool {
 		}
 	}
 	return true
+}
+
+// 9.1.1.2.2
+func (o *ObjectEnvironment) CreateMutableBinding(name string, deletable bool) {
+	o.BindingObject.DefinePropertyOrThrow(NewStringPropertyKey(name), &PropertyDescriptor{
+		Value:        UndefinedValue,
+		Writable:     true,
+		Enumerable:   true,
+		Configurable: deletable,
+	})
+
+}
+
+// 9.1.1.2.4
+func (o *ObjectEnvironment) InitializeBinding(name string, value Value) {
+	o.SetMutableBinding(name, value, false)
 }
 
 // 9.1.1.2.5

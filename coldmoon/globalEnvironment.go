@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/samber/lo"
+
 // 9.1.1.4
 type GlobalEnvironment struct {
 	EnvironmentRecord
@@ -11,6 +13,22 @@ type GlobalEnvironment struct {
 }
 
 var _ EnvironmentRecord = (*GlobalEnvironment)(nil)
+
+func (g *GlobalEnvironment) CreateGlobalVarBinding(name string, deletable bool) {
+	objRec := g.ObjectRecord
+	globalObject := objRec.BindingObject
+	hasProperty := ObjectHasOwnProperty(globalObject, NewStringPropertyKey(name))
+	extensible := globalObject.IsExtensible()
+
+	if !hasProperty && extensible {
+		objRec.CreateMutableBinding(name, deletable)
+		objRec.InitializeBinding(name, UndefinedValue)
+	}
+
+	if !lo.Contains(g.VarNames, name) {
+		g.VarNames = append(g.VarNames, name)
+	}
+}
 
 func (g *GlobalEnvironment) CreateMutableBinding(name string, deletable bool) {
 	if g.DeclarativeRecord.HasBinding(name) {
