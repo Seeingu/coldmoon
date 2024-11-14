@@ -314,7 +314,30 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 		return NewValueFromObject(obj)
 	}
-	DefineBuiltinFunction(object, "create", create, 2, realm)
+
+	var defineProperties BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		o := arguments[0]
+		properties := arguments[1]
+		if !ValueIsObject(o) {
+			panic("TypeError")
+		}
+		return NewValueFromObject(objectDefineProperties(agent, MustGetObject(o), properties))
+	}
+
+	var defineProperty = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		o := arguments[0]
+		property := arguments[1]
+		attributes := arguments[2]
+		if !ValueIsObject(o) {
+			panic("TypeError")
+		}
+
+		key := ToPropertyKey(agent, property)
+		desc := ToPropertyDescriptor(agent, attributes)
+		MustGetObject(o).DefinePropertyOrThrow(key, desc)
+
+		return o
+	}
 
 	// 20.1.2.6
 	var freeze BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -330,15 +353,12 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return obj
 	}
-	DefineBuiltinFunction(object, "freeze", freeze, 1, realm)
-
 	// 20.1.2.15
 	var ObjectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		arg1 := args[0]
 		arg2 := args[1]
 		return NewBooleanValue(SameValue(arg1, arg2))
 	}
-	DefineBuiltinFunction(object, "is", ObjectIs, 2, realm)
 
 	// 20.1.2.16
 	var isExtensible BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -349,7 +369,6 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return NewBooleanValue(obj.Object.IsExtensible())
 	}
-	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
 
 	// 20.1.2.17
 	var isFrozen BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -360,7 +379,6 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return NewBooleanValue(TestIntegrityLevel(obj.Object, IntegrityLevelFrozen))
 	}
-	DefineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm)
 
 	// 20.1.2.18
 	var isSealed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -371,7 +389,6 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return NewBooleanValue(TestIntegrityLevel(obj.Object, IntegrityLevelSealed))
 	}
-	DefineBuiltinFunction(object, "isSealed", isSealed, 1, realm)
 
 	// 20.1.2.20
 	var preventExtensions BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -387,7 +404,6 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return obj
 	}
-	DefineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm)
 
 	// 20.1.2.21
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
@@ -411,6 +427,16 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return obj
 	}
+
+	DefineBuiltinFunction(object, "create", create, 2, realm)
+	DefineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm)
+	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
+	DefineBuiltinFunction(object, "freeze", freeze, 1, realm)
+	DefineBuiltinFunction(object, "is", ObjectIs, 2, realm)
+	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
+	DefineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm)
+	DefineBuiltinFunction(object, "isSealed", isSealed, 1, realm)
+	DefineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm)
 	DefineBuiltinFunction(object, "seal", seal, 1, realm)
 
 	// 20.1.3.1
