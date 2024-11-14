@@ -37,12 +37,23 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 		}
 		return StringGetOwnProperty(o.(*StringObject), p)
 	}
+	var defineOwnProperty DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
+		s := o.(*StringObject)
+		stringDesc := StringGetOwnProperty(s, p)
+		if stringDesc != nil {
+			extensible := s.Extensible()
+			return IsCompatiblePropertyDescriptor(extensible, desc, stringDesc)
+		}
+
+		return OrdinaryDefineOwnProperty(o, p, desc)
+	}
 
 	stringObject := &StringObject{
 		Object: NewObject(agent, prototype),
 		Data:   s,
 	}
 	stringObject.InternalMethods().GetOwnProperty = getOwnProperty
+	stringObject.InternalMethods().DefineOwnProperty = defineOwnProperty
 
 	length := uint64(len(s))
 	stringObject.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{

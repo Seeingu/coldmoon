@@ -30,13 +30,14 @@ type ObjectType interface {
 }
 type SetFn = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool
 type GetOwnPropertyFn = func(o ObjectType, p PropertyKey) *PropertyDescriptor
+type DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool
 type InternalMethods struct {
 	GetPrototypeOf    func(o ObjectType) ObjectType
 	SetPrototypeOf    func(o ObjectType, v ObjectType) bool
 	IsExtensible      func(o ObjectType) bool
 	PreventExtensions func(o ObjectType) bool
 	GetOwnProperty    GetOwnPropertyFn
-	DefineOwnProperty func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool
+	DefineOwnProperty DefineOwnPropertyFn
 	HasProperty       func(o ObjectType, p PropertyKey) bool
 	Get               func(o ObjectType, p PropertyKey, receiver Value) Value
 	Set               SetFn
