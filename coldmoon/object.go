@@ -353,6 +353,38 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return obj
 	}
+
+	// 20.1.2.8
+	var getOwnPropertyDescriptor BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := args[0]
+		p := args[1]
+		obj := ValueToObject(agent, o)
+		key := ToPropertyKey(agent, p)
+		desc := obj.InternalMethods().GetOwnProperty(obj, key)
+
+		if desc == nil {
+			return UndefinedValue
+		}
+		return NewValueFromObject(desc.FromPropertyDescriptor(agent, desc))
+	}
+	// 20.1.2.9
+	var getOwnPropertyDescriptors BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := args[0]
+		obj := ValueToObject(agent, o)
+
+		ownKeys := obj.InternalMethods().OwnPropertyKeys(obj)
+
+		descriptors := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
+		for _, key := range ownKeys {
+			desc := obj.InternalMethods().GetOwnProperty(obj, key)
+			if desc != nil {
+				descValue := NewValueFromObject(desc.FromPropertyDescriptor(agent, desc))
+				descriptors.CreateDataPropertyOrThrow(key, descValue)
+			}
+		}
+		return NewValueFromObject(descriptors)
+	}
+
 	// 20.1.2.15
 	var ObjectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		arg1 := args[0]
@@ -431,6 +463,8 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "create", create, 2, realm)
 	DefineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm)
 	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
+	DefineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm)
+	DefineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm)
 	DefineBuiltinFunction(object, "freeze", freeze, 1, realm)
 	DefineBuiltinFunction(object, "is", ObjectIs, 2, realm)
 	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
