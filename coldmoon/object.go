@@ -385,6 +385,15 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return NewValueFromObject(descriptors)
 	}
 
+	// 20.1.2.12
+	var getPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := args[0]
+
+		obj := ValueToObject(agent, o)
+		proto := obj.InternalMethods().GetPrototypeOf(obj)
+		return NewValueFromObject(proto)
+	}
+
 	// 20.1.2.15
 	var ObjectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		arg1 := args[0]
@@ -460,7 +469,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return obj
 	}
 
-	// 20.1.2.22
+	// 20.1.2.23
 	var setPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
 		proto := args[1]
@@ -487,6 +496,17 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return obj
 	}
 
+	var hasOwn BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		key := args[1]
+
+		obj := ValueToObject(agent, objectValue)
+		p := ToPropertyKey(agent, key)
+		return NewBooleanValue(ObjectHasOwnProperty(obj, p))
+	}
+
+	DefineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm)
+	DefineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm)
 	DefineBuiltinFunction(object, "create", create, 2, realm)
 	DefineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm)
 	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
