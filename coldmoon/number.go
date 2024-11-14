@@ -332,6 +332,33 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
 
+	var isFinite BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		value := arguments[0]
+		numberValue, ok := value.(*NumberValue)
+		if !ok {
+			return NewBooleanValue(false)
+		}
+		if !numberValue.IsFinite() {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(true)
+	}
+	var isInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		value := arguments[0]
+		return NewBooleanValue(IsIntegralNumber(value))
+	}
+	var isNaN BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		value := arguments[0]
+		numberValue, ok := value.(*NumberValue)
+		if !ok {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(numberValue.IsNaN())
+	}
+
+	DefineBuiltinFunction(object, "isFinite", isFinite, 1, realm)
+	DefineBuiltinFunction(object, "isInteger", isInteger, 1, realm)
+	DefineBuiltinFunction(object, "isNaN", isNaN, 1, realm)
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.NumberPrototype),
 		Writable:     false,
