@@ -483,7 +483,7 @@ func ToIndex(value Value, agent *Agent) uint64 {
 }
 
 // 7.2.2
-func isArray(value Value) bool {
+func IsArray(value Value) bool {
 	o, ok := value.(*ObjectValue)
 	if !ok {
 		return false

@@ -506,7 +506,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 			return NewStringValue("[object Null]")
 		}
 		o := ValueToObject(agent, this)
-		_isArray := isArray(this)
+		_isArray := IsArray(this)
 		var builtInTag string
 		if _isArray {
 			builtInTag = "Array"
