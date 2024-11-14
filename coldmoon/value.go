@@ -482,6 +482,13 @@ func ToIndex(value Value, agent *Agent) uint64 {
 	return uint64(integer)
 }
 
+// 7.2.1
+func RequireObjectCoercible(agent *Agent, value Value) {
+	if value == UndefinedValue || value == NullValue {
+		panic("TypeError")
+	}
+}
+
 // 7.2.2
 func IsArray(value Value) bool {
 	o, ok := value.(*ObjectValue)

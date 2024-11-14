@@ -315,6 +315,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		lref := vm.referenceStack.Peek()
 		rval := vm.result
 		lref.PutValue(vm.agent, rval)
+		vm.reference = nil
 	}
 }
 

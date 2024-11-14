@@ -460,6 +460,33 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return obj
 	}
 
+	// 20.1.2.22
+	var setPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		proto := args[1]
+
+		RequireObjectCoercible(agent, objectValue)
+
+		obj, ok := objectValue.(*ObjectValue)
+		if !ok && proto != nil {
+			panic("TypeError")
+		}
+		if !ok {
+			return obj
+		}
+
+		var protoObj ObjectType
+		if po, ok := proto.(*ObjectValue); ok {
+			protoObj = po.Object
+		}
+		status := obj.Object.InternalMethods().SetPrototypeOf(obj.Object, protoObj)
+		if !status {
+			panic("TypeError")
+		}
+
+		return obj
+	}
+
 	DefineBuiltinFunction(object, "create", create, 2, realm)
 	DefineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm)
 	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
@@ -472,6 +499,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "isSealed", isSealed, 1, realm)
 	DefineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm)
 	DefineBuiltinFunction(object, "seal", seal, 1, realm)
+	DefineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm)
 
 	// 20.1.3.1
 	DefineBuiltinProperty(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
