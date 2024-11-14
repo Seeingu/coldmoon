@@ -518,6 +518,7 @@ func InstantiateOrdinaryFunctionExpression(
 		name = string(functionExpression.Identifier)
 		outerEnv := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(name, false)
 		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
@@ -532,6 +533,8 @@ func InstantiateOrdinaryFunctionExpression(
 		)
 		SetFunctionName(closure, NewStringPropertyKey(name), "")
 		MakeConstructor(closure, false, nil)
+
+		funcEnv.InitializeBinding(name, NewValueFromObject(closure))
 		return closure
 	} else {
 		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment

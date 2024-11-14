@@ -5,11 +5,44 @@ type StringObject struct {
 	Data string
 }
 
+func StringGetOwnProperty(s *StringObject, p PropertyKey) *PropertyDescriptor {
+	intIndex, ok := p.(*IntegerIndexPropertyKey)
+	if !ok {
+		return nil
+	}
+	index := intIndex.Value
+
+	str := s.Data
+	l := len(str)
+	if l <= index {
+		return nil
+	}
+
+	resultStr := str[index : index+1]
+	return &PropertyDescriptor{
+		Value:        NewStringValue(resultStr),
+		Writable:     false,
+		Enumerable:   true,
+		Configurable: false,
+	}
+}
+
 func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject {
+	// 10.4.3.1
+	var getOwnProperty GetOwnPropertyFn = func(o ObjectType, p PropertyKey) *PropertyDescriptor {
+		desc := OrdinaryGetOwnProperty(o, p)
+
+		if desc != nil {
+			return desc
+		}
+		return StringGetOwnProperty(o.(*StringObject), p)
+	}
+
 	stringObject := &StringObject{
 		Object: NewObject(agent, prototype),
 		Data:   s,
 	}
+	stringObject.InternalMethods().GetOwnProperty = getOwnProperty
 
 	length := uint64(len(s))
 	stringObject.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
