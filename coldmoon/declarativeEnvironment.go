@@ -13,6 +13,8 @@ type DeclarativeEnvironment struct {
 	Bindings map[string]*Binding
 }
 
+var _ EnvironmentRecord = (*DeclarativeEnvironment)(nil)
+
 // 9.1.2.2
 func NewDeclarativeEnvironment(outerEnv EnvironmentRecord) *DeclarativeEnvironment {
 	return &DeclarativeEnvironment{
@@ -43,6 +45,15 @@ func (d *DeclarativeEnvironment) HasBinding(name string) bool {
 // 9.1.1.1.10
 func (d *DeclarativeEnvironment) WithBaseObject() ObjectType {
 	return nil
+}
+
+// 9.1.1.1.3
+func (d *DeclarativeEnvironment) CreateImmutableBinding(name string, strict bool) {
+	d.Bindings[name] = &Binding{
+		Strict:    strict,
+		Mutable:   false,
+		Deletable: false,
+	}
 }
 
 // 9.1.1.2.2

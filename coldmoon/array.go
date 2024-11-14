@@ -10,7 +10,6 @@ func getArrayLength(array ObjectType) float64 {
 	lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
 	Assert(lengthDesc.IsDataDescriptor())
 	return lengthDesc.Value.(*NumberValue).Data
-
 }
 
 // 10.4.2.2

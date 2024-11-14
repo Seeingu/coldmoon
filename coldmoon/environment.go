@@ -5,7 +5,7 @@ type EnvironmentRecord interface {
 	OuterEnv() EnvironmentRecord
 	HasBinding(name string) bool
 	CreateMutableBinding(name string, deletable bool)
-	CreateImmutableBinding(name string)
+	CreateImmutableBinding(name string, strict bool)
 	InitializeBinding(name string, value Value)
 	SetMutableBinding(name string, value Value, strict bool)
 	GetBindingValue(name string, strict bool) Value

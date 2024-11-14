@@ -10,6 +10,16 @@ type GlobalEnvironment struct {
 	outerEnv          EnvironmentRecord
 }
 
+var _ EnvironmentRecord = (*GlobalEnvironment)(nil)
+
+func (g *GlobalEnvironment) CreateMutableBinding(name string, deletable bool) {
+	if g.DeclarativeRecord.HasBinding(name) {
+		panic("TypeError: Binding already exists")
+	}
+
+	g.DeclarativeRecord.CreateMutableBinding(name, deletable)
+}
+
 // 9.1.2.5
 func NewGlobalEnvironment(globalObj *Object, thisValue ObjectType) *GlobalEnvironment {
 	objRec := NewObjectEnvironment(globalObj, false, nil)

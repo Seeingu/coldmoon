@@ -8,8 +8,14 @@ type ObjectEnvironment struct {
 	outerEnv          EnvironmentRecord
 }
 
+var _ EnvironmentRecord = (*ObjectEnvironment)(nil)
+
 func (o *ObjectEnvironment) OuterEnv() EnvironmentRecord {
 	return o.outerEnv
+}
+
+func (o *ObjectEnvironment) CreateMutableBinding(name string, deletable bool) {
+	panic("Not supported")
 }
 
 // 9.1.1.2.1
