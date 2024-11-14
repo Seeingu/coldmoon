@@ -1,5 +1,7 @@
 package coldmoon
 
+import "fmt"
+
 type ReflectObject struct {
 	*Object
 }
@@ -145,6 +147,29 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return NewBooleanValue(targetObject.InternalMethods().IsExtensible(targetObject))
 	}
+	var ownKeys BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+		target := arguments[0]
+
+		if !ValueIsObject(target) {
+			panic("TypeError")
+		}
+
+		targetObject := MustGetObject(target)
+		propKeys := targetObject.InternalMethods().OwnPropertyKeys(targetObject)
+		var keys []Value
+		for _, key := range propKeys {
+			switch k := key.(type) {
+			case StringPropertyKey:
+				keys = append(keys, NewStringValue(k.Value))
+			case SymbolPropertyKey:
+				keys = append(keys, k.Value)
+			case IntegerIndexPropertyKey:
+				keys = append(keys, NewStringValue(fmt.Sprintf("%d", k.Value)))
+			}
+		}
+
+		return NewValueFromObject(CreateArrayFromList(agent, keys))
+	}
 
 	DefineBuiltinFunction(object, "apply", apply, 3, realm)
 	DefineBuiltinFunction(object, "construct", construct, 3, realm)
@@ -155,6 +180,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm)
 	DefineBuiltinFunction(object, "has", has, 2, realm)
 	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
+	DefineBuiltinFunction(object, "ownKeys", ownKeys, 1, realm)
 
 	return object
 }

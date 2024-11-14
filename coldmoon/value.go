@@ -722,6 +722,24 @@ func ValueCall(self Value, value Value, argumentsList []Value) Value {
 	return value.(*ObjectValue).Object.ToObject().InternalMethods().Call(value.(*ObjectValue).Object, self, argumentsList)
 }
 
+// 7.3.18
+func CreateArrayFromList(agent *Agent, elements []Value) ObjectType {
+	array := ArrayCreate(agent, float64(len(elements)), nil)
+
+	for i, element := range elements {
+		var propKey PropertyKey
+		if float64(i) <= POW_2_53 {
+			propKey = NewIntegerIndexPropertyKey(i)
+		} else {
+			propKey = NewStringPropertyKey(string(rune(i)))
+		}
+
+		array.CreateDataPropertyOrThrow(propKey, element)
+	}
+
+	return array
+}
+
 // 7.3.20
 func CreateListFromArrayLike(agent *Agent, self Value) []Value {
 	// TODO: element types
