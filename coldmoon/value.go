@@ -114,6 +114,69 @@ func NewValueFromObject(object ObjectType) Value {
 	return &ObjectValue{Object: object}
 }
 
+func ToPropertyDescriptor(agent *Agent, value Value) *PropertyDescriptor {
+	if value == UndefinedValue {
+		return nil
+	}
+	objectValue, ok := value.(*ObjectValue)
+	if !ok {
+		panic("TypeError")
+	}
+	object := objectValue.Object
+
+	desc := &PropertyDescriptor{}
+
+	hasEnumerable := object.HasProperty(NewStringPropertyKey("enumerable"))
+
+	if hasEnumerable {
+		enumerable := object.Get(NewStringPropertyKey("enumerable")).ToBoolean()
+		desc.Enumerable = enumerable
+	}
+
+	hasConfigurable := object.HasProperty(NewStringPropertyKey("configurable"))
+	if hasConfigurable {
+		configurable := object.Get(NewStringPropertyKey("configurable")).ToBoolean()
+		desc.Configurable = configurable
+	}
+
+	hasValue := object.HasProperty(NewStringPropertyKey("value"))
+	if hasValue {
+		desc.Value = object.Get(NewStringPropertyKey("value"))
+	}
+
+	hasWritable := object.HasProperty(NewStringPropertyKey("writable"))
+	if hasWritable {
+		writable := object.Get(NewStringPropertyKey("writable")).ToBoolean()
+		desc.Writable = writable
+	}
+
+	hasGet := object.HasProperty(NewStringPropertyKey("get"))
+	if hasGet {
+		get := object.Get(NewStringPropertyKey("get"))
+		if !IsCallable(get) && get != UndefinedValue {
+			panic("TypeError")
+		}
+		desc.Get = MustGetObject(get)
+	}
+
+	hasSet := object.HasProperty(NewStringPropertyKey("set"))
+	if hasSet {
+		set := object.Get(NewStringPropertyKey("set"))
+		if !IsCallable(set) && set != UndefinedValue {
+			panic("TypeError")
+		}
+		desc.Set = MustGetObject(set)
+	}
+
+	if hasGet || hasSet {
+		if hasValue || hasWritable {
+			panic("TypeError")
+		}
+	}
+
+	return desc
+}
+
 // 7.1.1
 func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
 	if objectValue, isObject := value.(*ObjectValue); isObject {
@@ -739,4 +802,13 @@ func ValueType(value Value) string {
 	default:
 		panic("unreachable")
 	}
+}
+
+func MustGetObject(value Value) ObjectType {
+	return value.(*ObjectValue).Object
+}
+
+func ValueIsObject(value Value) bool {
+	_, ok := value.(*ObjectValue)
+	return ok
 }
