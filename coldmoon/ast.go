@@ -1369,7 +1369,14 @@ func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	u.Operand.Bytecode(e, c)
 	switch u.Operator {
 	case UnaryOperatorDelete:
-		panic("unimplemented")
+		u.Expression.Bytecode(e, c)
+		if !u.Expression.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(&IStoreConstant{
+				Value: NewBooleanValue(true),
+			})
+		} else {
+			e.AddInstruction(&IDelete{})
+		}
 	case UnaryOperatorVoid:
 		u.Operand.Bytecode(e, c)
 		if u.Operand.Analyze(AnalyzeQueryIsReference) {

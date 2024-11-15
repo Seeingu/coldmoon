@@ -405,6 +405,16 @@ func (i *ICreateCatchBinding) String() string {
 	return "ICreateCatchBinding " + string(i.IdentifierName)
 }
 
+// MARK: - Delete
+
+type IDelete struct {
+	Instruction
+}
+
+func (i *IDelete) String() string {
+	return "IDelete"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

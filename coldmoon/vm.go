@@ -25,6 +25,7 @@ func NewVM(agent *Agent) *VM {
 }
 
 func (vm *VM) execute(executable *Executable, i Instruction) {
+	agent := vm.agent
 	switch ins := i.(type) {
 	case *ILoad:
 		vm.stack.Push(vm.result)
@@ -323,6 +324,41 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		catchEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		catchEnv.CreateMutableBinding(string(name), false)
 		catchEnv.InitializeBinding(string(name), thrownValue)
+	case *IDelete:
+		ref := vm.reference
+		if ref.IsUnresolvableReference() {
+			Assert(!ref.Strict)
+			vm.result = NewBooleanValue(true)
+			return
+		}
+		if ref.IsPropertyReference() {
+			Assert(!ref.IsPrivateReference())
+
+			if ref.IsSuperReference() {
+				panic("ReferenceError: cannot delete super")
+			}
+
+			baseObj := ValueToObject(agent, ref.Base.(*ReferenceRecordBaseValue).Value)
+			var referencedName PropertyKey
+			switch refName := ref.ReferencedName.(type) {
+			case *ReferencedNameString:
+				referencedName = NewStringPropertyKey(refName.String)
+			case *ReferencedNameSymbol:
+				referencedName = NewSymbolPropertyKey(refName.Symbol)
+			default:
+				panic("unreachable")
+			}
+			deleteStatus := baseObj.InternalMethods().Delete(baseObj, referencedName)
+			if !deleteStatus && ref.Strict {
+				panic("TypeError: cannot delete property")
+			}
+			vm.result = NewBooleanValue(deleteStatus)
+		} else {
+			base := ref.Base.(*ReferenceRecordBaseEnvironment)
+			referencedName := ref.ReferencedName.(*ReferencedNameString).String
+			deleteStatus := base.Environment.DeleteBinding(referencedName)
+			vm.result = NewBooleanValue(deleteStatus)
+		}
 	}
 }
 
