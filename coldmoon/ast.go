@@ -376,6 +376,30 @@ func (p *PrimaryExpressionFunctionExpression) String() string {
 	return "FunctionExpression " + string(p.Identifier)
 }
 
+// MARK: - ArrowFunction
+type PrimaryExpressionArrowFunction struct {
+	PrimaryExpression
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (p *PrimaryExpressionArrowFunction) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *PrimaryExpressionArrowFunction) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (p *PrimaryExpressionArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IInstantiateArrowFunctionExpression{FunctionExpression: p})
+}
+
+func (p *PrimaryExpressionArrowFunction) String() string {
+	return "ArrowFunction"
+}
+
 // MARK: - MemberExpression
 
 type ASTProperty interface {
@@ -1972,6 +1996,10 @@ func (s *StatementDoWhile) String() string {
 type StatementReturn struct {
 	Statement
 	Expression Expression
+}
+
+func (s *StatementReturn) Analyze(a AnalyzeQuery) bool {
+	return false
 }
 
 func (s *StatementReturn) Bytecode(e *Executable, c *BytecodeContext) {

@@ -98,6 +98,14 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			"",
 		)
 		vm.result = NewValueFromObject(closure)
+	case *IInstantiateArrowFunctionExpression:
+		arrowFunction := ins.FunctionExpression
+		closure := InstantiateArrowFunctionExpression(
+			vm.agent,
+			arrowFunction,
+			"",
+		)
+		vm.result = NewValueFromObject(closure)
 	case *ITypeof:
 		if vm.reference != nil {
 			if vm.reference.IsUnresolvableReference() {
@@ -599,4 +607,29 @@ func InstantiateOrdinaryFunctionExpression(
 		MakeConstructor(closure, false, nil)
 		return closure
 	}
+}
+
+// 15.3.4
+func InstantiateArrowFunctionExpression(agent *Agent, arrowFunction *PrimaryExpressionArrowFunction, name string) ObjectType {
+	realm := agent.CurrentRealm()
+
+	env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+
+	privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+
+	sourceText := arrowFunction.SourceText
+
+	closure := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		arrowFunction.FormalParameters,
+		arrowFunction.Body,
+		functionCreateThisModeLexical,
+		env,
+		privateEnv,
+	)
+
+	SetFunctionName(closure, NewStringPropertyKey(name), "")
+	return closure
 }

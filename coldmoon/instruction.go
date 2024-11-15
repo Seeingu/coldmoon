@@ -248,6 +248,19 @@ type IInstantiateOrdinaryFunctionExpression struct {
 	FunctionExpression *PrimaryExpressionFunctionExpression
 }
 
+func (i *IInstantiateOrdinaryFunctionExpression) String() string {
+	return "IInstantiateOrdinaryFunctionExpression"
+}
+
+type IInstantiateArrowFunctionExpression struct {
+	Instruction
+	FunctionExpression *PrimaryExpressionArrowFunction
+}
+
+func (i *IInstantiateArrowFunctionExpression) String() string {
+	return "IInstantiateArrowFunctionExpression"
+}
+
 // MARK: - Array
 
 type IArrayCreate struct {

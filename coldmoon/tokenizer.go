@@ -5,10 +5,13 @@ import lo "github.com/samber/lo"
 type TokenType int
 
 const (
+	// TLeftBrace {
 	TLeftBrace TokenType = iota
 	TRightBrace
+	// TLeftBracket [
 	TLeftBracket
 	TRightBracket
+	// TLeftParen (
 	TLeftParen
 	TRightParen
 	TPeriod
@@ -544,11 +547,18 @@ func (t *Tokenizer) Next() Token {
 	return token
 }
 
+func (t *Tokenizer) Match(tokenType TokenType) bool {
+	if t.CurrentToken.Type == tokenType {
+		t.Next()
+		return true
+	}
+	return false
+}
+
 // MustMatch consumes the current token if it matches the given type.
 // Will throw an error if the current token does not match the given type.
 func (t *Tokenizer) MustMatch(tokenType TokenType) {
-	if t.CurrentToken.Type == tokenType {
-		t.Next()
+	if t.Match(tokenType) {
 		return
 	}
 	panic("unexpected token: " + t.CurrentToken.Value)

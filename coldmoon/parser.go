@@ -843,6 +843,35 @@ func (p *Parser) arguments() Arguments {
 	return list
 }
 
+func (p *Parser) tryArrowFunction() *PrimaryExpressionArrowFunction {
+	// FIXME: Rollback tokenizer state when not matched
+	startOffset := p.tokenizer.Index
+	p.tokenizer.Next()
+	params := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TEqualsGreaterThan)
+	p.noLineTerminatorHere()
+	var body *FunctionBody
+	if p.tokenizer.Match(TLeftBrace) {
+		body = p.functionBody()
+		p.tokenizer.MustMatch(TRightBrace)
+	} else {
+		expression := p.expression(p.acceptContextLowest())
+		body = &FunctionBody{
+			StatementList: StatementList{
+				&StatementReturn{
+					Expression: expression,
+				},
+			},
+		}
+	}
+	return &PrimaryExpressionArrowFunction{
+		FormalParameters: params,
+		Body:             body,
+		SourceText:       p.SourceText[startOffset:p.tokenizer.Index],
+	}
+}
+
 func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpression {
 	p.tokenizer.MustMatch(TLeftParen)
 	expr := p.expression(p.acceptContextLowest())
@@ -891,6 +920,10 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 	case TIdentifier:
 		return p.identifierReference()
 	case TLeftParen:
+		e := p.tryArrowFunction()
+		if e != nil {
+			return e
+		}
 		return p.parenthesizedExpression()
 	case TFunction:
 		return p.functionExpression()
