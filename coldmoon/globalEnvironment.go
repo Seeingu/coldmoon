@@ -30,12 +30,27 @@ func (g *GlobalEnvironment) CreateGlobalVarBinding(name string, deletable bool) 
 	}
 }
 
+func (g *GlobalEnvironment) InitializeBinding(name string, value Value) {
+	if g.DeclarativeRecord.HasBinding(name) {
+		g.DeclarativeRecord.InitializeBinding(name, value)
+		return
+	}
+	g.ObjectRecord.InitializeBinding(name, value)
+}
+
 func (g *GlobalEnvironment) CreateMutableBinding(name string, deletable bool) {
 	if g.DeclarativeRecord.HasBinding(name) {
 		panic("TypeError: Binding already exists")
 	}
-
 	g.DeclarativeRecord.CreateMutableBinding(name, deletable)
+}
+
+func (g *GlobalEnvironment) CreateImmutableBinding(name string, deletable bool) {
+	if g.DeclarativeRecord.HasBinding(name) {
+		panic("TypeError: Binding already exists")
+	}
+
+	g.DeclarativeRecord.CreateImmutableBinding(name, deletable)
 }
 
 // 9.1.2.5
