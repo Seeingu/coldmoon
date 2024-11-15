@@ -1590,6 +1590,11 @@ func (s *StatementEmpty) String() string {
 // MARK: - TryStatement
 
 type CatchParameter IdentifierName
+
+func (c CatchParameter) ToIdentifier() IdentifierName {
+	return IdentifierName(c)
+}
+
 type StatementTry struct {
 	Statement
 	CatchParameter CatchParameter
@@ -1613,6 +1618,11 @@ func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
 
 		exceptionJumpToCatch.Target = len(e.Instructions) - 1
 		e.AddInstruction(&IPopExceptionJumpTarget{})
+		if t.CatchParameter != "" {
+			e.AddInstruction(&ICreateCatchBinding{
+				IdentifierName: t.CatchParameter.ToIdentifier(),
+			})
+		}
 		e.AddInstruction(&IStoreConstant{
 			Value: UndefinedValue,
 		})
@@ -1651,6 +1661,11 @@ func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
 		e.AddInstruction(&IPopExceptionJumpTarget{})
 		exceptionJumpToFinally := &IPushExceptionJumpTarget{}
 		e.AddInstruction(exceptionJumpToFinally)
+		if t.CatchParameter != "" {
+			e.AddInstruction(&ICreateCatchBinding{
+				IdentifierName: t.CatchParameter.ToIdentifier(),
+			})
+		}
 		e.AddInstruction(&IStoreConstant{
 			Value: UndefinedValue,
 		})

@@ -316,6 +316,13 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		rval := vm.result
 		lref.PutValue(vm.agent, rval)
 		vm.reference = nil
+	case *ICreateCatchBinding:
+		name := ins.IdentifierName
+		thrownValue := vm.exception
+		vm.exception = nil
+		catchEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		catchEnv.CreateMutableBinding(string(name), false)
+		catchEnv.InitializeBinding(string(name), thrownValue)
 	}
 }
 

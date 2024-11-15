@@ -394,6 +394,17 @@ func (i *IPutValue) String() string {
 	return "IPutValue"
 }
 
+// MARK: - Catch
+
+type ICreateCatchBinding struct {
+	Instruction
+	IdentifierName IdentifierName
+}
+
+func (i *ICreateCatchBinding) String() string {
+	return "ICreateCatchBinding " + string(i.IdentifierName)
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
