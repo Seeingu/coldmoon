@@ -2074,6 +2074,21 @@ func (b *Block) String() string {
 
 type StatementList []StatementListItem
 
+func (s StatementList) varScopedDeclarations() []*VariableDeclaration {
+	var vars []*VariableDeclaration
+	for _, item := range s {
+		if stmt, ok := item.(*StatementListItemStatement); ok {
+			if v, ok := stmt.Statement.(*StatementVariable); ok {
+				for _, varDeclaration := range v.DeclarationList.Items {
+					vars = append(vars, varDeclaration)
+				}
+			}
+
+		}
+	}
+	return vars
+}
+
 func (s StatementList) ContainsDirective(directive string) bool {
 	for _, item := range s {
 		if !item.Analyze(AnalyzeQueryIsStringLiteral) {

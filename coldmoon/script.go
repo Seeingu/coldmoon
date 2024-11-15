@@ -42,5 +42,17 @@ func (s *ScriptRecord) Evaluate() Value {
 	agent.ExecutionContextStack.Push(scriptContext)
 	defer agent.ExecutionContextStack.Pop()
 
+	script := s.ECMAScriptCode
+
+	varScopedDeclarations := script.StatementList.varScopedDeclarations()
+	seen := make(map[IdentifierName]bool)
+	for _, decl := range varScopedDeclarations {
+		varName := decl.Identifier
+		if _, ok := seen[varName]; !ok {
+			globalEnv.CreateGlobalVarBinding(string(varName), true)
+			seen[varName] = true
+		}
+	}
+
 	return GenerateAndRunBytecode(agent, s.ECMAScriptCode).Value
 }
