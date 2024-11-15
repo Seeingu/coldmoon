@@ -4,6 +4,8 @@ import (
 	"math"
 	"math/big"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"lukechampine.com/uint128"
 )
@@ -430,9 +432,16 @@ func ValueToObject(agent *Agent, value Value) ObjectType {
 
 // 7.1.4.1.1
 func StringToNumber(value *StringValue) *NumberValue {
-	return &NumberValue{
-		Data: 0,
+	if value.Data == "" {
+		return &NumberValue{Data: 0}
 	}
+
+	n, err := strconv.ParseFloat(strings.Trim(value.Data, " "), 64)
+	if err != nil {
+		return NaNValue
+	}
+
+	return &NumberValue{Data: n}
 }
 
 // 7.1.14

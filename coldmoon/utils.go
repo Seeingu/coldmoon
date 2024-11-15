@@ -39,3 +39,22 @@ func DefineBuiltinProperty(object ObjectType, name string, value interface{}) {
 	}
 	object.DefinePropertyOrThrow(NewStringPropertyKey(name), descriptor)
 }
+
+func DefineBuiltinAccessor(realm *Realm, object ObjectType, name string, getter, setter BehaviorFn) {
+	var get ObjectType
+	if getter != nil {
+		funName := "get " + name
+		get = CreateBuiltinFunction(realm.Agent, getter, 0, funName, builtinFunctionArgs{realm: realm})
+	}
+	var set ObjectType
+	if setter != nil {
+		funName := "set " + name
+		set = CreateBuiltinFunction(realm.Agent, setter, 1, funName, builtinFunctionArgs{realm: realm})
+	}
+	object.DefinePropertyOrThrow(NewStringPropertyKey(name), &PropertyDescriptor{
+		Get:          get,
+		Set:          set,
+		Enumerable:   false,
+		Configurable: true,
+	})
+}

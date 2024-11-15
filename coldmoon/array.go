@@ -229,6 +229,11 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		Configurable: false,
 	})
 
+	// 23.1.2.5
+	var getter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		return this
+	}
+	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 	DefineBuiltinProperty(realm.Intrinsics.ArrayPrototype, "constructor", NewValueFromObject(object))
 
 	return object
