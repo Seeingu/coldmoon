@@ -33,6 +33,18 @@ func (d *DeclarativeEnvironment) GetBindingValue(name string, strict bool) Value
 	return binding.Value
 }
 
+func (d *DeclarativeEnvironment) DeleteBinding(name string) bool {
+	binding, ok := d.Bindings[name]
+	Assert(ok)
+
+	if !binding.Deletable {
+		return false
+	}
+
+	delete(d.Bindings, name)
+	return true
+}
+
 func (d *DeclarativeEnvironment) OuterEnv() EnvironmentRecord {
 	return d.outerEnv
 }

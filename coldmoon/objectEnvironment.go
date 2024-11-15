@@ -84,6 +84,11 @@ func (o *ObjectEnvironment) GetBindingValue(name string, strict bool) Value {
 	return bindingObject.Get(NewStringPropertyKey(name))
 }
 
+func (o *ObjectEnvironment) DeleteBinding(name string) bool {
+	bindingObject := o.BindingObject
+	return bindingObject.InternalMethods().Delete(bindingObject, NewStringPropertyKey(name))
+}
+
 // 9.1.1.2.8
 func (o *ObjectEnvironment) HasThisBinding() bool {
 	return false

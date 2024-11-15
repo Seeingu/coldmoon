@@ -98,6 +98,27 @@ func (g *GlobalEnvironment) GetBindingValue(name string, strict bool) Value {
 	return ObjRec.GetBindingValue(name, strict)
 }
 
+func (g *GlobalEnvironment) DeleteBinding(name string) bool {
+	DclRec := g.DeclarativeRecord
+	if DclRec.HasBinding(name) {
+		return DclRec.DeleteBinding(name)
+	}
+	ObjRec := g.ObjectRecord
+	globalObject := ObjRec.BindingObject
+	existingProp := ObjectHasOwnProperty(globalObject, NewStringPropertyKey(name))
+	if existingProp {
+		status := ObjRec.DeleteBinding(name)
+
+		if status && lo.Contains(g.VarNames, name) {
+			g.VarNames = lo.Filter(g.VarNames, func(v string, _ int) bool {
+				return v != name
+			})
+		}
+		return status
+	}
+	return true
+}
+
 // 9.1.1.4.8
 func (g *GlobalEnvironment) HasThisBinding() bool {
 	return true
