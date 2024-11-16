@@ -1,7 +1,5 @@
 package coldmoon
 
-import "strconv"
-
 type IntegrityLevel int
 
 const (
@@ -275,29 +273,18 @@ func (o *Object) EnumerableOwnProperties(kind objectOwnPropertiesKind) (results 
 	ownKeys := o.InternalMethods().OwnPropertyKeys(o)
 
 	for _, key := range ownKeys {
-		keyString, isString := key.(StringPropertyKey)
-		keyIndex, isIndex := key.(IntegerIndexPropertyKey)
+		_, isString := key.(StringPropertyKey)
+		_, isIndex := key.(IntegerIndexPropertyKey)
 		if isString || isIndex {
 			desc := o.InternalMethods().GetOwnProperty(o, key)
 			if desc != nil && desc.Enumerable {
 				switch kind {
 				case objectOwnPropertiesKindKey:
-					if isString {
-						results = append(results, NewStringValue(keyString.Value))
-					}
-					if isIndex {
-						results = append(results, NewStringValue(strconv.Itoa(keyIndex.Value)))
-					}
+					results = append(results, key.ToValue())
 				case objectOwnPropertiesKindValue:
 					results = append(results, o.Get(key))
 				case objectOwnPropertiesKindKeyAndValue:
-					var keyValue Value
-					if isString {
-						keyValue = NewStringValue(keyString.Value)
-					} else {
-						keyValue = NewStringValue(strconv.Itoa(keyIndex.Value))
-					}
-
+					keyValue := key.ToValue()
 					entry := CreateArrayFromList(o.Agent(), []Value{
 						keyValue,
 						o.Get(key),

@@ -6,6 +6,7 @@ import (
 
 type PropertyKey interface {
 	Hash() string
+	ToValue() Value
 }
 
 func NewStringPropertyKey(value string) StringPropertyKey {
@@ -23,6 +24,10 @@ type StringPropertyKey struct {
 	Value string
 }
 
+func (s StringPropertyKey) ToValue() Value {
+	return NewStringValue(s.Value)
+}
+
 func (s StringPropertyKey) Hash() string {
 	return s.Value
 }
@@ -35,6 +40,9 @@ type SymbolPropertyKey struct {
 func (s SymbolPropertyKey) Hash() string {
 	return fmt.Sprintf("%d", s.Value.Id)
 }
+func (s SymbolPropertyKey) ToValue() Value {
+	return s.Value
+}
 
 type IntegerIndexPropertyKey struct {
 	PropertyKey
@@ -43,4 +51,8 @@ type IntegerIndexPropertyKey struct {
 
 func (i IntegerIndexPropertyKey) Hash() string {
 	return fmt.Sprintf("%d", i.Value)
+}
+
+func (i IntegerIndexPropertyKey) ToValue() Value {
+	return NewNumberValue(float64(i.Value))
 }

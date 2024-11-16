@@ -1,7 +1,5 @@
 package coldmoon
 
-import "fmt"
-
 type ReflectObject struct {
 	*Object
 }
@@ -158,14 +156,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		propKeys := targetObject.InternalMethods().OwnPropertyKeys(targetObject)
 		var keys []Value
 		for _, key := range propKeys {
-			switch k := key.(type) {
-			case StringPropertyKey:
-				keys = append(keys, NewStringValue(k.Value))
-			case SymbolPropertyKey:
-				keys = append(keys, k.Value)
-			case IntegerIndexPropertyKey:
-				keys = append(keys, NewStringValue(fmt.Sprintf("%d", k.Value)))
-			}
+			keys = append(keys, key.ToValue())
 		}
 
 		return NewValueFromObject(CreateArrayFromList(agent, keys))

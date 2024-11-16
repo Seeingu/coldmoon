@@ -856,7 +856,7 @@ func (p *Parser) tryArrowFunction() *PrimaryExpressionArrowFunction {
 		body = p.functionBody()
 		p.tokenizer.MustMatch(TRightBrace)
 	} else {
-		expression := p.expression(p.acceptContextLowest())
+		expression := p.expression(p.acceptContext(TComma))
 		body = &FunctionBody{
 			StatementList: StatementList{
 				&StatementReturn{
