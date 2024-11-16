@@ -1,5 +1,7 @@
 package coldmoon
 
+import "strconv"
+
 type IntegrityLevel int
 
 const (
@@ -258,6 +260,54 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 // 7.3.19
 func (o *Object) LengthOfArrayLike() uint64 {
 	return ToLength(o.Agent(), o.Get(NewStringPropertyKey("length")))
+}
+
+// 7.3.23
+type objectOwnPropertiesKind int
+
+const (
+	objectOwnPropertiesKindKey objectOwnPropertiesKind = iota
+	objectOwnPropertiesKindValue
+	objectOwnPropertiesKindKeyAndValue
+)
+
+func (o *Object) EnumerableOwnProperties(kind objectOwnPropertiesKind) (results []Value) {
+	ownKeys := o.InternalMethods().OwnPropertyKeys(o)
+
+	for _, key := range ownKeys {
+		keyString, isString := key.(StringPropertyKey)
+		keyIndex, isIndex := key.(IntegerIndexPropertyKey)
+		if isString || isIndex {
+			desc := o.InternalMethods().GetOwnProperty(o, key)
+			if desc != nil && desc.Enumerable {
+				switch kind {
+				case objectOwnPropertiesKindKey:
+					if isString {
+						results = append(results, NewStringValue(keyString.Value))
+					}
+					if isIndex {
+						results = append(results, NewStringValue(strconv.Itoa(keyIndex.Value)))
+					}
+				case objectOwnPropertiesKindValue:
+					results = append(results, o.Get(key))
+				case objectOwnPropertiesKindKeyAndValue:
+					var keyValue Value
+					if isString {
+						keyValue = NewStringValue(keyString.Value)
+					} else {
+						keyValue = NewStringValue(strconv.Itoa(keyIndex.Value))
+					}
+
+					entry := CreateArrayFromList(o.Agent(), []Value{
+						keyValue,
+						o.Get(key),
+					})
+					results = append(results, NewValueFromObject(entry))
+				}
+			}
+		}
+	}
+	return
 }
 
 // 7.3.24
