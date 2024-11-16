@@ -489,6 +489,62 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionAscending, predicate, thisArg)
 		return findRec.value
 	}
+	var findIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		predicate := args[0]
+		thisArg := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionAscending, predicate, thisArg)
+		return NewNumberValue(float64(findRec.index))
+	}
+	var findLast BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		predicate := args[0]
+		thisArg := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionDescending, predicate, thisArg)
+		return findRec.value
+	}
+	var findLastIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		predicate := args[0]
+		thisArg := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionDescending, predicate, thisArg)
+		return NewNumberValue(float64(findRec.index))
+	}
+	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		searchElement := args[0]
+		fromIndex := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		if length == 0 {
+			return NewNumberValue(-1)
+		}
+		var n float64
+		if len(args) > 1 {
+			n = ToIntegerOrInfinity(agent, fromIndex)
+		} else {
+			n = float64(length - 1)
+		}
+
+		if n == math.Inf(-1) {
+			return NewNumberValue(-1)
+		}
+
+		k := int(math.Min(math.Max(n, 0), float64(length-1)))
+		for k >= 0 {
+			kPresent := o.HasProperty(NewIntegerIndexPropertyKey(k))
+			if kPresent {
+				elementK := o.Get(NewIntegerIndexPropertyKey(k))
+				if IsStrictlyEqual(searchElement, elementK) {
+					return NewNumberValue(float64(k))
+				}
+			}
+			k--
+		}
+		return NewNumberValue(-1)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -500,6 +556,10 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "includes", includes, 1, realm)
 	DefineBuiltinFunction(object, "indexOf", indexOf, 1, realm)
 	DefineBuiltinFunction(object, "find", find, 1, realm)
+	DefineBuiltinFunction(object, "findIndex", findIndex, 1, realm)
+	DefineBuiltinFunction(object, "findLast", findLast, 1, realm)
+	DefineBuiltinFunction(object, "findLastIndex", findLastIndex, 1, realm)
+	DefineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
