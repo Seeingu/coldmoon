@@ -710,14 +710,14 @@ func IsStrictlyEqual(x Value, y Value) bool {
 }
 
 // 7.3.3
-func GetV(value Value, agent *Agent, key PropertyKey) Value {
+func GetV(agent *Agent, value Value, key PropertyKey) Value {
 	object := ValueToObject(agent, value)
 	return object.InternalMethods().Get(object, key, value)
 }
 
 // 7.3.11
 func GetMethod(agent *Agent, value Value, key PropertyKey) ObjectType {
-	fun := GetV(value, agent, key)
+	fun := GetV(agent, value, key)
 	if fun == UndefinedValue || fun == NullValue {
 		return nil
 	}
@@ -769,7 +769,7 @@ func CreateListFromArrayLike(agent *Agent, self Value) []Value {
 	var list []Value
 	for i := uint64(0); i < length; i++ {
 		index := NewIntegerIndexPropertyKey(int(i))
-		next := GetV(self, agent, index)
+		next := GetV(agent, self, index)
 		list = append(list, next)
 	}
 

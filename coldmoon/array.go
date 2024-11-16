@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"github.com/Seeingu/coldmoon/pkg"
 	"math"
 	"strings"
 )
@@ -76,6 +77,41 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 		Configurable: false,
 	})
 	return arr
+}
+
+// 10.4.2.3
+func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length float64) ObjectType {
+	isArray := IsArray(NewValueFromObject(originalArray))
+	if !isArray {
+		return ArrayCreate(agent, length, nil)
+	}
+
+	c := originalArray.Get(NewStringPropertyKey("constructor"))
+	constructorObject, isObject := c.(*ObjectValue)
+	if IsConstructor(c) {
+		thisRealm := agent.CurrentRealm()
+		realmC := constructorObject.Object.GetFunctionRealm()
+		if thisRealm != realmC {
+			if pkg.FuncEqual(constructorObject.Object, realmC.Intrinsics.ArrayConstructor) {
+				c = UndefinedValue
+			}
+		}
+	}
+
+	if isObject {
+		c = constructorObject.Object.Get(NewStringPropertyKey("Symbol.species"))
+		if c == NullValue {
+			c = UndefinedValue
+		}
+	}
+	if c == UndefinedValue {
+		return ArrayCreate(agent, length, nil)
+	}
+	if !IsConstructor(c) {
+		panic("TypeError")
+	}
+
+	return constructorObject.Object.Construct([]Value{NewNumberValue(length)}, nil)
 }
 
 // 10.4.2.4
