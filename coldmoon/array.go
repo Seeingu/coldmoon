@@ -414,6 +414,38 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		}
 		return NewStringValue(strings.Join(elements, separator))
 	}
+	var includes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		searchElement := args[0]
+		fromIndex := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		if length == 0 {
+			return FalseValue
+		}
+		n := ToIntegerOrInfinity(agent, fromIndex)
+		if fromIndex == UndefinedValue {
+			Assert(n == 0)
+		}
+		if n == math.Inf(1) {
+			return FalseValue
+		} else if n == math.Inf(-1) {
+			n = 0
+		}
+
+		k := int(n)
+		if k < 0 {
+			k = int(math.Max(float64(length)+float64(k), 0))
+		}
+
+		for k < int(length) {
+			elementK := o.Get(NewIntegerIndexPropertyKey(k))
+			if SameValueZero(searchElement, elementK) {
+				return TrueValue
+			}
+			k++
+		}
+		return FalseValue
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -422,10 +454,11 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "pop", pop, 0, realm)
 	DefineBuiltinFunction(object, "map", arrayMap, 1, realm)
 	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
+	DefineBuiltinFunction(object, "includes", includes, 1, realm)
 
 	var unscopablesValue Value
-	unscopableList := OrdinaryObjectCreate(agent, nil, nil)
-	unscopableProps := []string{
+	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
+	unscopablesProps := []string{
 		"at",
 		"copyWithin",
 		"entries",
@@ -443,8 +476,8 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		"toSorted",
 		"toSpliced",
 	}
-	for _, prop := range unscopableProps {
-		unscopableList.CreateDataPropertyOrThrow(NewStringPropertyKey(prop), NewBooleanValue(true))
+	for _, prop := range unscopablesProps {
+		unscopablesList.CreateDataPropertyOrThrow(NewStringPropertyKey(prop), NewBooleanValue(true))
 	}
 
 	DefineBuiltinProperty(object, "@@unscopables", &PropertyDescriptor{

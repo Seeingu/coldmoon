@@ -572,6 +572,18 @@ func SameValue(x Value, y Value) bool {
 	return SameValueNonNumber(x, y)
 }
 
+// 7.2.11
+func SameValueZero(x Value, y Value) bool {
+	if ValueType(x) != ValueType(y) {
+		return false
+	}
+	if number, ok := x.(*NumberValue); ok {
+		return number.SameValueZero(y.(*NumberValue))
+	}
+
+	return SameValueNonNumber(x, y)
+}
+
 // 7.2.12
 func SameValueNonNumber(x Value, y Value) bool {
 	Assert(ValueType(x) == ValueType(y))

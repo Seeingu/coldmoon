@@ -7,6 +7,9 @@ type BooleanValue struct {
 	Data bool
 }
 
+var FalseValue = NewBooleanValue(false)
+var TrueValue = NewBooleanValue(true)
+
 func NewBooleanValue(data bool) *BooleanValue {
 	return &BooleanValue{
 		Data: data,
