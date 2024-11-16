@@ -1,6 +1,9 @@
 package coldmoon
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 type ArrayObject struct {
 	*Object
@@ -240,6 +243,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 }
 
 func NewArrayPrototype(realm *Realm) *ArrayObject {
+	agent := realm.Agent
 	object := &ArrayObject{
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
 	}
@@ -250,6 +254,96 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		Enumerable:   false,
 		Configurable: false,
 	})
+
+	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		array := MustGetObject(this)
+		length := array.LengthOfArrayLike()
+		var sep = ","
+		if args[0] != nil {
+			sep = args[0].String()
+		}
+
+		var elements []string
+		for k := range length {
+			element := array.Get(NewIntegerIndexPropertyKey(int(k)))
+
+			var next string
+			if element == nil || element == UndefinedValue || element == NullValue {
+			} else {
+				next = element.String()
+			}
+			elements = append(elements, next)
+		}
+		return NewStringValue(strings.Join(elements, sep))
+	}
+
+	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		array := ValueToObject(agent, this)
+		fun := array.Get(NewStringPropertyKey("join"))
+		if !IsCallable(fun) {
+			fun = realm.Intrinsics.ObjectPrototype.Get(NewStringPropertyKey("toString"))
+		}
+		return CallAssumeCallableNoArgs(fun, this)
+	}
+
+	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		callbackFn := args[0]
+		thisArg := args[1]
+
+		array := MustGetObject(this)
+		length := array.LengthOfArrayLike()
+
+		if !IsCallable(callbackFn) {
+			panic("TypeError")
+		}
+
+		for k := range length {
+			pk := NewIntegerIndexPropertyKey(int(k))
+			kPresent := array.HasProperty(pk)
+			if kPresent {
+				kValue := array.Get(pk)
+				callbackFn.CallAssumeCallable(
+					thisArg,
+					[]Value{kValue, NewNumberValue(float64(k)), this},
+				)
+			}
+		}
+		return UndefinedValue
+	}
+	var push BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		array := MustGetObject(this)
+		length := array.LengthOfArrayLike()
+		argCount := len(args)
+		for i := 0; i < argCount; i++ {
+			array.Set(NewIntegerIndexPropertyKey(int(length)), args[i], setThrowTypeThrow)
+			length++
+		}
+
+		array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
+		return NewNumberValue(float64(length))
+	}
+	var pop BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		array := MustGetObject(this)
+		length := array.LengthOfArrayLike()
+		if length == 0 {
+			array.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow)
+			return UndefinedValue
+		}
+		length--
+		element := array.Get(NewIntegerIndexPropertyKey(int(length)))
+		deleteSucceeded := array.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(int(length)))
+		if !deleteSucceeded {
+			panic("TypeError")
+		}
+		array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
+		return element
+	}
+
+	DefineBuiltinFunction(object, "join", join, 1, realm)
+	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
+	DefineBuiltinFunction(object, "push", push, 1, realm)
+	DefineBuiltinFunction(object, "pop", pop, 0, realm)
 
 	return object
 

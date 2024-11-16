@@ -12,6 +12,7 @@ type ObjectType interface {
 	LengthOfArrayLike() uint64
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
+	DeletePropertyOrThrow(key PropertyKey) bool
 	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
 	OrdinaryToPrimitive(hint PreferredType) Value
 	ToObject() *Object
