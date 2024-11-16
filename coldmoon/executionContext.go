@@ -17,6 +17,6 @@ type ExecutionContextAdditionalState struct {
 type ExecutionContext struct {
 	Realm          *Realm
 	ScriptOrModule ScriptOrModule
-	Function       *Object
+	Function       ObjectType
 	ECMAScriptCode *ExecutionContextAdditionalState
 }

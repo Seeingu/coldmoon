@@ -48,7 +48,7 @@ func (a *Agent) CurrentRealm() *Realm {
 	return a.runningExecutionContext().Realm
 }
 
-func (a *Agent) ActiveFunctionObject() *Object {
+func (a *Agent) ActiveFunctionObject() ObjectType {
 	return a.runningExecutionContext().Function
 }
 

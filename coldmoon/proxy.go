@@ -490,6 +490,35 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
+
+	var revocable BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		target := argumentsList[0]
+		handler := argumentsList[1]
+
+		proxy := ProxyCreate(agent, target, handler)
+
+		var revokerClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			f := agent.ActiveFunctionObject().(*BuiltinFunction)
+			p := f.RevocableProxy.(*ProxyObject)
+			if p == nil {
+				return UndefinedValue
+			}
+			f.RevocableProxy = nil
+			p.Target = nil
+			p.Handler = nil
+			return UndefinedValue
+		}
+		revoker := CreateBuiltinFunction(agent, revokerClosure, 0, "", builtinFunctionArgs{
+			revocableProxy: proxy,
+		})
+
+		result := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, nil)
+		result.CreateDataPropertyOrThrow(NewStringPropertyKey("proxy"), NewValueFromObject(proxy))
+		result.CreateDataPropertyOrThrow(NewStringPropertyKey("revoke"), NewValueFromObject(revoker))
+		return NewValueFromObject(result)
+	}
+	DefineBuiltinFunction(obj, "revocable", revocable, 2, realm)
+
 	return obj
 }
 

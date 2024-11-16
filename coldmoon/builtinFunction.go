@@ -3,9 +3,10 @@ package coldmoon
 type BehaviorFn func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value
 type BuiltinFunction struct {
 	*Object
-	Realm       *Realm
-	InitialName string
-	Behavior    BehaviorFn
+	Realm          *Realm
+	InitialName    string
+	Behavior       BehaviorFn
+	RevocableProxy ObjectType
 }
 
 func (b *BuiltinFunction) ToObject() *Object {
@@ -49,10 +50,11 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 }
 
 type builtinFunctionArgs struct {
-	realm         *Realm
-	prototype     ObjectType
-	prefix        string
-	isConstructor bool
+	realm          *Realm
+	prototype      ObjectType
+	prefix         string
+	isConstructor  bool
+	revocableProxy ObjectType
 }
 
 // 10.3.4
