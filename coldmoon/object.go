@@ -625,7 +625,6 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	var valueOf = func(this Value, args []Value, newTarget ObjectType) Value {
 		return NewValueFromObject(ValueToObject(agent, this))
 	}
-	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
 
 	// 20.1.3.6 toString
 	var toString = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -665,7 +664,44 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 		return NewStringValue("[object " + tag + "]")
 	}
+	var hasOwnProperty = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := ValueToObject(agent, this)
+		p := ToPropertyKey(agent, args[0])
+		return NewBooleanValue(ObjectHasOwnProperty(o, p))
+	}
+	var isPrototypeOf = func(this Value, args []Value, newTarget ObjectType) Value {
+		v := args[0]
+		if !ValueIsObject(v) {
+			return NewBooleanValue(false)
+		}
+		o := ValueToObject(agent, this)
+		target := ValueToObject(agent, v)
+		for {
+			target = target.InternalMethods().GetPrototypeOf(target)
+			if target == nil {
+				return NewBooleanValue(false)
+			}
+			if ObjectSameValue(target, o) {
+				return NewBooleanValue(true)
+			}
+		}
+	}
+	var propertyIsEnumerable = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := ValueToObject(agent, this)
+		p := ToPropertyKey(agent, args[0])
+		desc := o.InternalMethods().GetOwnProperty(o, p)
+		if desc == nil {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(desc.Enumerable)
+	}
+
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	DefineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm)
+	DefineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm)
+	DefineBuiltinFunction(object, "propertyIsEnumerable", propertyIsEnumerable, 1, realm)
+
 	return object
 }
 
