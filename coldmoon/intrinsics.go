@@ -35,6 +35,8 @@ type Intrinsics struct {
 	BigIntConstructor ObjectType
 	// %Reflect%
 	Reflect ObjectType
+	// %Proxy%
+	Proxy ObjectType
 	// %Math%
 	Math ObjectType
 	// %IsFinite%

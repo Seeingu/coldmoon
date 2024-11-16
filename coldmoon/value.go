@@ -508,6 +508,11 @@ func IsArray(value Value) bool {
 	if _, ok = o.Object.(*ArrayObject); ok {
 		return true
 	}
+	if proxy, ok := o.Object.(*ProxyObject); ok {
+		proxy.validateNonRevokedProxy()
+		proxyTarget := proxy.Target
+		return IsArray(NewValueFromObject(proxyTarget))
+	}
 	return false
 }
 

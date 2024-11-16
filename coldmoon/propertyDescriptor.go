@@ -65,6 +65,36 @@ func (p *PropertyDescriptor) FromPropertyDescriptor(agent *Agent, desc *Property
 	return obj
 }
 
+// 6.2.6.6
+func (p *PropertyDescriptor) CompletePropertyDescriptor() {
+	like := &PropertyDescriptor{
+		Value: UndefinedValue,
+	}
+	if p.IsGenericDescriptor() || p.IsDataDescriptor() {
+		if p.Value == nil {
+			p.Value = like.Value
+		}
+		if p.Writable == false {
+			p.Writable = like.Writable
+		}
+	} else {
+		if p.Get == nil {
+			p.Get = like.Get
+		}
+		if p.Set == nil {
+			p.Set = like.Set
+		}
+	}
+
+	if p.Enumerable == false {
+		p.Enumerable = like.Enumerable
+	}
+	if p.Configurable == false {
+		p.Configurable = like.Configurable
+	}
+
+}
+
 func (p *PropertyDescriptor) IsFullyPopulated() bool {
 	return p.Value != nil && p.Get != EmptyObject && p.Set != EmptyObject
 }

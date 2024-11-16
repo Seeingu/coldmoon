@@ -224,6 +224,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"Proxy",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.Proxy),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

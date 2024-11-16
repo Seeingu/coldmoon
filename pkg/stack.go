@@ -4,6 +4,10 @@ type Stack[T any] struct {
 	data []T
 }
 
+func (s *Stack[T]) Data() []T {
+	return s.data
+}
+
 // Push a value onto the stack
 func (s *Stack[T]) Push(v T) {
 	s.data = append(s.data, v)
