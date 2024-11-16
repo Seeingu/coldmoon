@@ -545,6 +545,64 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		}
 		return NewNumberValue(-1)
 	}
+	var at BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		index := args[0]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		relativeIndex := ToIntegerOrInfinity(agent, index)
+		k := int(relativeIndex)
+		if k < 0 {
+			k += int(length)
+		}
+		return o.Get(NewIntegerIndexPropertyKey(k))
+	}
+	var every BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		callbackFn := args[0]
+		thisArg := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+
+		if !IsCallable(callbackFn) {
+			panic("TypeError")
+		}
+
+		for k := 0; k < int(length); k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				testResult := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k)), this})
+				if !testResult.ToBoolean() {
+					return FalseValue
+				}
+			}
+		}
+		return TrueValue
+	}
+	var some BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		callbackFn := args[0]
+		thisArg := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+
+		if !IsCallable(callbackFn) {
+			panic("TypeError")
+		}
+
+		for k := 0; k < int(length); k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				testResult := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k)), this})
+				if testResult.ToBoolean() {
+					return TrueValue
+				}
+			}
+		}
+		return FalseValue
+
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -560,6 +618,9 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "findLast", findLast, 1, realm)
 	DefineBuiltinFunction(object, "findLastIndex", findLastIndex, 1, realm)
 	DefineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm)
+	DefineBuiltinFunction(object, "at", at, 1, realm)
+	DefineBuiltinFunction(object, "every", every, 1, realm)
+	DefineBuiltinFunction(object, "some", some, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
