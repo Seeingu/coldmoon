@@ -469,9 +469,13 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		x := thisNumberValue(agent, this)
 		return x
 	}
+	var toLocaleString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return toString(thisNumberValue(agent, this), nil, nil)
+	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
 
 	return object
 }

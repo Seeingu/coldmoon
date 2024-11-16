@@ -219,9 +219,13 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 	var valueOf = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return thisBigIntValue(this)
 	}
+	var toLocaleString = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return toString(thisBigIntValue(this), nil, nil)
+	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
 
 	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("BigInt"),
