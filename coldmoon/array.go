@@ -601,7 +601,29 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 			}
 		}
 		return FalseValue
+	}
+	var with BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		index := args[0]
+		value := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		relativeIndex := ToIntegerOrInfinity(agent, index)
 
+		actualIndex := int(relativeIndex)
+		if actualIndex < 0 {
+			actualIndex += int(length)
+		}
+
+		array := ArrayCreate(agent, float64(length), nil)
+		for k := 0; k < int(length); k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			if k == actualIndex {
+				array.CreateDataPropertyOrThrow(pk, value)
+			} else {
+				array.CreateDataPropertyOrThrow(pk, o.Get(pk))
+			}
+		}
+		return NewValueFromObject(array)
 	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
@@ -621,6 +643,7 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "at", at, 1, realm)
 	DefineBuiltinFunction(object, "every", every, 1, realm)
 	DefineBuiltinFunction(object, "some", some, 1, realm)
+	DefineBuiltinFunction(object, "with", with, 2, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
