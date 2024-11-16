@@ -492,10 +492,11 @@ func ToIndex(value Value, agent *Agent) uint64 {
 }
 
 // 7.2.1
-func RequireObjectCoercible(agent *Agent, value Value) {
+func RequireObjectCoercible(agent *Agent, value Value) Value {
 	if value == UndefinedValue || value == NullValue {
 		panic("TypeError")
 	}
+	return value
 }
 
 // 7.2.2

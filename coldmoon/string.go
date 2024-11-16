@@ -1,5 +1,7 @@
 package coldmoon
 
+import "math"
+
 type StringObject struct {
 	*Object
 	Data string
@@ -114,16 +116,39 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		Data:   "",
 	}
 
+	agent := realm.Agent
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := thisStringValue(realm.Agent, thisArgument)
+		s := thisStringValue(agent, thisArgument)
 		return NewStringValue(s)
 	}
-	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
-
 	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		return NewStringValue(thisStringValue(realm.Agent, thisArgument))
+		return NewStringValue(thisStringValue(agent, thisArgument))
 	}
+	var charAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		position := int(ToIntegerOrInfinity(agent, argumentsList[0]))
+		size := len(s)
+		if position < 0 || position >= size {
+			return NewStringValue("")
+		}
+		return NewStringValue(string(s[position]))
+	}
+	var charCodeAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		position := int(ToIntegerOrInfinity(agent, argumentsList[0]))
+		size := len(s)
+		if position < 0 || position >= size {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(float64(s[position]))
+	}
+
+	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "valueOf", valueOf, 0, realm)
+	DefineBuiltinFunction(stringPrototype, "charAt", charAt, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "charCodeAt", charCodeAt, 1, realm)
 
 	return stringPrototype
 }
