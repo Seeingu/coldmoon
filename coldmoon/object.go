@@ -555,6 +555,47 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return NewBooleanValue(ObjectHasOwnProperty(obj, p))
 	}
 
+	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj := ValueToObject(agent, objectValue)
+		entryList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKeyAndValue)
+		return NewValueFromObject(CreateArrayFromList(agent, entryList))
+	}
+	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj := ValueToObject(agent, objectValue)
+		keyList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKey)
+		return NewValueFromObject(CreateArrayFromList(agent, keyList))
+	}
+	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj := ValueToObject(agent, objectValue)
+		valueList := obj.EnumerableOwnProperties(objectOwnPropertiesKindValue)
+		return NewValueFromObject(CreateArrayFromList(agent, valueList))
+	}
+	var assign BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		target := args[0]
+		to := ValueToObject(agent, target)
+		sources := args[1:]
+		if len(sources) == 0 {
+			return NewValueFromObject(to)
+		}
+		for _, nextSource := range sources {
+			if nextSource != UndefinedValue && nextSource != NullValue {
+				from := ValueToObject(agent, nextSource)
+				pKeys := from.InternalMethods().OwnPropertyKeys(from)
+				for _, nextKey := range pKeys {
+					desc := from.InternalMethods().GetOwnProperty(from, nextKey)
+					if desc != nil && desc.Enumerable {
+						propValue := from.Get(nextKey)
+						to.Set(nextKey, propValue, setThrowTypeThrow)
+					}
+				}
+			}
+		}
+		return NewValueFromObject(to)
+	}
+
 	DefineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm)
 	DefineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm)
 	DefineBuiltinFunction(object, "create", create, 2, realm)
@@ -570,6 +611,10 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm)
 	DefineBuiltinFunction(object, "seal", seal, 1, realm)
 	DefineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm)
+	DefineBuiltinFunction(object, "entries", entries, 1, realm)
+	DefineBuiltinFunction(object, "keys", keys, 1, realm)
+	DefineBuiltinFunction(object, "values", values, 1, realm)
+	DefineBuiltinFunction(object, "assign", assign, 2, realm)
 
 	// 20.1.3.1
 	DefineBuiltinProperty(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))

@@ -14,6 +14,7 @@ type ObjectType interface {
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	DeletePropertyOrThrow(key PropertyKey) bool
 	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
+	EnumerableOwnProperties(kind objectOwnPropertiesKind) []Value
 	OrdinaryToPrimitive(hint PreferredType) Value
 	ToObject() *Object
 	Get(key PropertyKey) Value
