@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/samber/lo"
+
 type IntegrityLevel int
 
 const (
@@ -582,6 +584,32 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(to)
 	}
+	var getOwnPropertyNames BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj := ValueToObject(agent, objectValue)
+		keys := obj.InternalMethods().OwnPropertyKeys(obj)
+		keyNames := lo.Filter(keys, func(key PropertyKey, _ int) bool {
+			_, ok := key.(SymbolPropertyKey)
+			return !ok
+		})
+		keyValues := lo.Map(keyNames, func(key PropertyKey, _ int) Value {
+			return key.ToValue()
+		})
+		return NewValueFromObject(CreateArrayFromList(agent, keyValues))
+	}
+	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		objectValue := args[0]
+		obj := ValueToObject(agent, objectValue)
+		keys := obj.InternalMethods().OwnPropertyKeys(obj)
+		symbols := lo.Filter(keys, func(key PropertyKey, _ int) bool {
+			_, ok := key.(SymbolPropertyKey)
+			return ok
+		})
+		symbolValues := lo.Map(symbols, func(key PropertyKey, _ int) Value {
+			return key.ToValue()
+		})
+		return NewValueFromObject(CreateArrayFromList(agent, symbolValues))
+	}
 
 	DefineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm)
 	DefineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm)
@@ -590,6 +618,8 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
 	DefineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm)
 	DefineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm)
+	DefineBuiltinFunction(object, "getOwnPropertyNames", getOwnPropertyNames, 1, realm)
+	DefineBuiltinFunction(object, "getOwnPropertySymbols", getOwnPropertySymbols, 1, realm)
 	DefineBuiltinFunction(object, "freeze", freeze, 1, realm)
 	DefineBuiltinFunction(object, "is", ObjectIs, 2, realm)
 	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
