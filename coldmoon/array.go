@@ -481,6 +481,14 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		}
 		return NewNumberValue(-1)
 	}
+	var find BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		predicate := args[0]
+		thisArg := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionAscending, predicate, thisArg)
+		return findRec.value
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -491,6 +499,7 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
 	DefineBuiltinFunction(object, "includes", includes, 1, realm)
 	DefineBuiltinFunction(object, "indexOf", indexOf, 1, realm)
+	DefineBuiltinFunction(object, "find", find, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
@@ -525,4 +534,58 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 
 	return object
 
+}
+
+type direction int
+
+const (
+	DirectionAscending direction = iota
+	DirectionDescending
+)
+
+type FoundResult struct {
+	index int
+	value Value
+}
+
+func (a *ArrayObject) findViaPredicate(
+	len int,
+	direction direction,
+	predicate Value,
+	thisArg Value,
+) FoundResult {
+	if !IsCallable(predicate) {
+		panic("TypeError")
+	}
+
+	var k int
+	if direction == DirectionAscending {
+		k = 0
+	} else {
+		k = len - 1
+	}
+
+	for {
+		if direction == DirectionAscending && k >= len {
+			break
+		}
+		if direction == DirectionDescending && k < 0 {
+			break
+		}
+		pk := NewIntegerIndexPropertyKey(k)
+		kValue := a.Get(pk)
+		testResult := predicate.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k)), NewValueFromObject(a)})
+
+		if testResult.ToBoolean() {
+			return FoundResult{
+				index: k,
+				value: kValue,
+			}
+		}
+	}
+
+	return FoundResult{
+		index: -1,
+		value: UndefinedValue,
+	}
 }
