@@ -695,12 +695,17 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 		return NewBooleanValue(desc.Enumerable)
 	}
+	var toLocaleString = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := ValueToObject(agent, this)
+		return ValueInvoke(agent, NewValueFromObject(o), NewStringPropertyKey("toString"), []Value{})
+	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
 	DefineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm)
 	DefineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm)
 	DefineBuiltinFunction(object, "propertyIsEnumerable", propertyIsEnumerable, 1, realm)
+	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
 
 	return object
 }

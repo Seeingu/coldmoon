@@ -783,6 +783,12 @@ func CreateListFromArrayLike(agent *Agent, self Value) []Value {
 }
 
 // 7.3.21
+func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsList []Value) Value {
+	fun := GetV(agent, self, propertyKey)
+	return ValueCall(fun, self, argumentsList)
+}
+
+// 7.3.21
 func OrdinaryHasInstance(self Value, value Value) bool {
 	if IsCallable(self) {
 		return false
