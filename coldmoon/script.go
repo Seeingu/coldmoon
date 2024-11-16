@@ -44,7 +44,7 @@ func (s *ScriptRecord) Evaluate() Value {
 
 	script := s.ECMAScriptCode
 
-	varScopedDeclarations := script.StatementList.varScopedDeclarations()
+	varScopedDeclarations := script.StatementList.VarScopedDeclarations()
 	seen := make(map[IdentifierName]bool)
 	for _, decl := range varScopedDeclarations {
 		varName := decl.Identifier

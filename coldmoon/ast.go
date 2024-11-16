@@ -1506,6 +1506,7 @@ func (c *CallExpression) String() string {
 type Statement interface {
 	ASTNode
 	Analyze(a AnalyzeQuery) bool
+	VarScopedDeclarations() []*VariableDeclaration
 }
 
 // MARK: - VariableStatement
@@ -1513,6 +1514,12 @@ type Statement interface {
 type StatementVariable struct {
 	Statement
 	DeclarationList *VariableDeclarationList
+}
+
+var _ Statement = (*StatementVariable)(nil)
+
+func (s *StatementVariable) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return s.DeclarationList.VarScopedDeclarations()
 }
 
 func (s *StatementVariable) Analyze(a AnalyzeQuery) bool {
@@ -1530,6 +1537,10 @@ func (s *StatementVariable) String() string {
 type VariableDeclarationList struct {
 	ASTNode
 	Items []*VariableDeclaration
+}
+
+func (v *VariableDeclarationList) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return v.Items
 }
 
 func (v *VariableDeclarationList) Bytecode(e *Executable, c *BytecodeContext) {
@@ -1611,6 +1622,14 @@ type StatementEmpty struct {
 
 var _ Statement = (*StatementEmpty)(nil)
 
+func (s *StatementEmpty) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (s *StatementEmpty) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return l
+}
+
 func (s *StatementEmpty) Bytecode(e *Executable, c *BytecodeContext) {
 	// empty
 }
@@ -1632,6 +1651,23 @@ type StatementTry struct {
 	TryBlock       *Block
 	CatchBlock     *Block
 	FinallyBlock   *Block
+}
+
+var _ Statement = (*StatementTry)(nil)
+
+func (t *StatementTry) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (t *StatementTry) VarScopedDeclarations() (l []*VariableDeclaration) {
+	l = append(l, t.TryBlock.StatementList.VarScopedDeclarations()...)
+	if t.CatchBlock != nil {
+		l = append(l, t.CatchBlock.StatementList.VarScopedDeclarations()...)
+	}
+	if t.FinallyBlock != nil {
+		l = append(l, t.FinallyBlock.StatementList.VarScopedDeclarations()...)
+	}
+	return
 }
 
 func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
@@ -1767,6 +1803,14 @@ type BreakableStatement struct {
 	IterationStatement IterationStatement
 }
 
+func (b *BreakableStatement) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (b *BreakableStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return b.IterationStatement.VarScopedDeclarations()
+}
+
 func (b *BreakableStatement) Bytecode(e *Executable, c *BytecodeContext) {
 	b.IterationStatement.Bytecode(e, c)
 }
@@ -1870,6 +1914,17 @@ type StatementIf struct {
 	Alternate  Statement
 }
 
+var _ Statement = (*StatementIf)(nil)
+
+func (s *StatementIf) VarScopedDeclarations() (l []*VariableDeclaration) {
+	l = append(l, s.Consequent.VarScopedDeclarations()...)
+	if s.Alternate != nil {
+		l = append(l, s.Alternate.VarScopedDeclarations()...)
+		return
+	}
+	return
+}
+
 func (s *StatementIf) Analyze(a AnalyzeQuery) bool {
 	return false
 }
@@ -1914,6 +1969,7 @@ func (s *StatementIf) String() string {
 // MARK: - IterationStatement
 
 type IterationStatement interface {
+	VarScopedDeclarations() []*VariableDeclaration
 	ASTNode
 }
 
@@ -1923,6 +1979,16 @@ type StatementWhile struct {
 	IterationStatement
 	Condition Expression
 	Body      Statement
+}
+
+var _ IterationStatement = (*StatementWhile)(nil)
+
+func (s *StatementWhile) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (s *StatementWhile) VarScopedDeclarations() []*VariableDeclaration {
+	return s.Body.VarScopedDeclarations()
 }
 
 func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
@@ -1961,6 +2027,14 @@ type StatementDoWhile struct {
 	IterationStatement
 	Condition Expression
 	Body      Statement
+}
+
+func (s *StatementDoWhile) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (s *StatementDoWhile) VarScopedDeclarations() []*VariableDeclaration {
+	return s.Body.VarScopedDeclarations()
 }
 
 func (s *StatementDoWhile) Bytecode(e *Executable, c *BytecodeContext) {
@@ -2101,6 +2175,14 @@ type BlockStatementBlock struct {
 	Block *Block
 }
 
+func (b *BlockStatementBlock) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (b *BlockStatementBlock) VarScopedDeclarations() []*VariableDeclaration {
+	return b.Block.StatementList.VarScopedDeclarations()
+}
+
 func (b *BlockStatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
 	b.Block.Bytecode(e, c)
 }
@@ -2124,7 +2206,7 @@ func (b *Block) String() string {
 
 type StatementList []StatementListItem
 
-func (s StatementList) varScopedDeclarations() []*VariableDeclaration {
+func (s StatementList) VarScopedDeclarations() []*VariableDeclaration {
 	var vars []*VariableDeclaration
 	for _, item := range s {
 		if stmt, ok := item.(*StatementListItemStatement); ok {
@@ -2133,7 +2215,6 @@ func (s StatementList) varScopedDeclarations() []*VariableDeclaration {
 					vars = append(vars, varDeclaration)
 				}
 			}
-
 		}
 	}
 	return vars
@@ -2185,6 +2266,10 @@ type StatementListItemStatement struct {
 
 var _ ASTNode = (*StatementListItemStatement)(nil)
 
+func (s *StatementListItemStatement) VarScopedDeclarations() []*VariableDeclaration {
+	return s.Statement.VarScopedDeclarations()
+}
+
 func (s *StatementListItemStatement) Analyze(a AnalyzeQuery) bool {
 	return s.Statement.Analyze(a)
 }
@@ -2203,6 +2288,10 @@ type StatementListItemDeclaration struct {
 }
 
 var _ ASTNode = (*StatementListItemDeclaration)(nil)
+
+func (s *StatementListItemDeclaration) VarScopedDeclarations() []*VariableDeclaration {
+	return nil
+}
 
 func (s *StatementListItemDeclaration) Analyze(a AnalyzeQuery) bool {
 	return s.Declaration.Analyze(a)
