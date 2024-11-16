@@ -423,6 +423,37 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "map", arrayMap, 1, realm)
 	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
 
+	var unscopablesValue Value
+	unscopableList := OrdinaryObjectCreate(agent, nil, nil)
+	unscopableProps := []string{
+		"at",
+		"copyWithin",
+		"entries",
+		"fill",
+		"find",
+		"findIndex",
+		"findLast",
+		"findLastIndex",
+		"flat",
+		"flatMap",
+		"includes",
+		"keys",
+		"values",
+		"toReversed",
+		"toSorted",
+		"toSpliced",
+	}
+	for _, prop := range unscopableProps {
+		unscopableList.CreateDataPropertyOrThrow(NewStringPropertyKey(prop), NewBooleanValue(true))
+	}
+
+	DefineBuiltinProperty(object, "@@unscopables", &PropertyDescriptor{
+		Value:        unscopablesValue,
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
+
 	return object
 
 }
