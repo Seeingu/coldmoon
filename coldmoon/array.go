@@ -398,6 +398,22 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
 		return element
 	}
+	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		array := MustGetObject(this)
+		length := array.LengthOfArrayLike()
+		separator := ", "
+		var elements []string
+		for k := range length {
+			nextElement := array.Get(NewIntegerIndexPropertyKey(int(k)))
+			if nextElement == nil || nextElement == UndefinedValue {
+				elements = append(elements, "")
+			} else {
+				s := ValueInvoke(agent, nextElement, NewStringPropertyKey("toLocaleString"), nil).String()
+				elements = append(elements, s)
+			}
+		}
+		return NewStringValue(strings.Join(elements, separator))
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -405,6 +421,7 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "push", push, 1, realm)
 	DefineBuiltinFunction(object, "pop", pop, 0, realm)
 	DefineBuiltinFunction(object, "map", arrayMap, 1, realm)
+	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
 
 	return object
 
