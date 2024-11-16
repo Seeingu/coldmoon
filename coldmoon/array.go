@@ -291,6 +291,30 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		Configurable: false,
 	})
 
+	var arrayMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		callbackFn := args[0]
+		thisArg := args[1]
+
+		array := MustGetObject(this)
+		length := array.LengthOfArrayLike()
+
+		if !IsCallable(callbackFn) {
+			panic("TypeError")
+		}
+
+		A := ArraySpeciesCreate(agent, array, float64(length))
+		for k := range length {
+			pk := NewIntegerIndexPropertyKey(int(k))
+			mappedValue := callbackFn.CallAssumeCallable(
+				thisArg,
+				[]Value{array.Get(pk), NewNumberValue(float64(k)), this},
+			)
+
+			A.CreateDataPropertyOrThrow(pk, mappedValue)
+		}
+		return NewValueFromObject(A)
+	}
+
 	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		array := MustGetObject(this)
 		length := array.LengthOfArrayLike()
@@ -380,6 +404,7 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
 	DefineBuiltinFunction(object, "push", push, 1, realm)
 	DefineBuiltinFunction(object, "pop", pop, 0, realm)
+	DefineBuiltinFunction(object, "map", arrayMap, 1, realm)
 
 	return object
 
