@@ -625,6 +625,74 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		}
 		return NewValueFromObject(array)
 	}
+	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		items := args[0]
+		mapFn := args[1]
+		thisArg := args[2]
+
+		c := this
+		var mapping bool
+		if mapFn == nil || mapFn == UndefinedValue {
+			mapping = false
+		} else {
+			if !IsCallable(mapFn) {
+				panic("TypeError")
+			}
+			mapping = true
+		}
+		usingIterator := GetMethod(agent, items, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
+		if usingIterator != nil {
+			var a ObjectType
+			if IsConstructor(c) {
+				a = MustGetObject(c).Construct([]Value{NewNumberValue(0)}, nil)
+			} else {
+				a = ArrayCreate(agent, 0, nil)
+			}
+
+			iteratorRecord := GetIteratorFromMethod(agent, items, usingIterator)
+
+			for k := 0; ; k++ {
+				pk := NewIntegerIndexPropertyKey(k)
+				next := iteratorRecord.IteratorStep()
+				if next == nil {
+					a.Set(NewStringPropertyKey("length"), NewNumberValue(float64(k)), setThrowTypeThrow)
+					return NewValueFromObject(a)
+				}
+
+				nextValue := IteratorValue(next)
+				var mappedValue Value
+				if mapping {
+					mappedValue = mapFn.CallAssumeCallable(thisArg, []Value{nextValue, NewNumberValue(float64(k))})
+				} else {
+					mappedValue = nextValue
+				}
+				a.CreateDataPropertyOrThrow(pk, mappedValue)
+			}
+
+		}
+		arrayLike := ValueToObject(agent, items)
+		length := arrayLike.LengthOfArrayLike()
+		var a ObjectType
+		if IsConstructor(c) {
+			a = MustGetObject(c).Construct([]Value{NewNumberValue(float64(length))}, nil)
+		} else {
+			a = ArrayCreate(agent, float64(length), nil)
+		}
+
+		for k := 0; k < int(length); k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			kValue := arrayLike.Get(pk)
+			var mappedValue Value
+			if mapping {
+				mappedValue = mapFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k))})
+			} else {
+				mappedValue = kValue
+			}
+			a.CreateDataPropertyOrThrow(pk, mappedValue)
+		}
+		a.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
+		return NewValueFromObject(a)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -644,6 +712,7 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "every", every, 1, realm)
 	DefineBuiltinFunction(object, "some", some, 1, realm)
 	DefineBuiltinFunction(object, "with", with, 2, realm)
+	DefineBuiltinFunction(object, "from", from, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
