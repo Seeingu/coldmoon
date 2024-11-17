@@ -46,6 +46,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.ArrayIteratorPrototype = NewArrayIteratorPrototype(r)
 	r.Intrinsics.StringPrototype = NewStringPrototype(r)
 	r.Intrinsics.StringConstructor = NewStringConstructor(r)
+	r.Intrinsics.StringIteratorPrototype = NewStringIteratorPrototype(r)
 	r.Intrinsics.NumberPrototype = NewNumberPrototype(r)
 	r.Intrinsics.NumberConstructor = NewNumberConstructor(r)
 	r.Intrinsics.Math = NewMathObject(r)

@@ -23,6 +23,8 @@ type Intrinsics struct {
 	StringPrototype *StringObject
 	// %String%
 	StringConstructor ObjectType
+	// %StringIteratorPrototype%
+	StringIteratorPrototype ObjectType
 	// %Number.Prototype%
 	NumberPrototype *NumberObject
 	// %Number%
