@@ -2134,6 +2134,8 @@ type Declaration interface {
 	Analyze(a AnalyzeQuery) bool
 }
 
+// MARK: - HoistableDeclaration
+
 type DeclarationHoistable struct {
 	Declaration
 	FunctionDeclaration *FunctionDeclaration
@@ -2150,6 +2152,74 @@ func (d *DeclarationHoistable) Bytecode(e *Executable, c *BytecodeContext) {
 func (d *DeclarationHoistable) String() string {
 	return d.FunctionDeclaration.String()
 }
+
+// MARK: - LexicalDeclaration
+
+type LexicalDeclarationType int
+
+const (
+	LexicalDeclarationTypeLet LexicalDeclarationType = iota
+	LexicalDeclarationTypeConst
+)
+
+type DeclarationLexical struct {
+	Declaration
+	Type        LexicalDeclarationType
+	BindingList *BindingList
+}
+
+func (d *DeclarationLexical) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (d *DeclarationLexical) Bytecode(e *Executable, c *BytecodeContext) {
+	d.BindingList.Bytecode(e, c)
+}
+func (d *DeclarationLexical) String() string {
+	return "LexicalDeclaration " + d.BindingList.String()
+}
+
+type BindingList struct {
+	ASTNode
+	Items []*LexicalBinding
+}
+
+func (b *BindingList) Bytecode(e *Executable, c *BytecodeContext) {
+	for _, item := range b.Items {
+		item.Bytecode(e, c)
+	}
+}
+func (b *BindingList) String() string {
+	var sb string
+	for i, item := range b.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+type LexicalBinding struct {
+	ASTNode
+	Identifier  IdentifierName
+	Initializer Expression
+}
+
+func (l *LexicalBinding) Bytecode(e *Executable, c *BytecodeContext) {
+	variableDecl := &VariableDeclaration{
+		Identifier:  l.Identifier,
+		Initializer: l.Initializer,
+	}
+	variableDecl.Bytecode(e, c)
+}
+func (l *LexicalBinding) String() string {
+	if l.Initializer != nil {
+		return string(l.Identifier) + " = " + l.Initializer.String()
+	}
+	return string(l.Identifier)
+}
+
+// MARK: - FunctionDeclaration
 
 type FunctionDeclaration struct {
 	ASTNode
@@ -2241,10 +2311,21 @@ type StatementList []StatementListItem
 func (s StatementList) VarScopedDeclarations() []*VariableDeclaration {
 	var vars []*VariableDeclaration
 	for _, item := range s {
-		if stmt, ok := item.(*StatementListItemStatement); ok {
+		switch stmt := item.(type) {
+		case *StatementListItemStatement:
 			if v, ok := stmt.Statement.(*StatementVariable); ok {
 				for _, varDeclaration := range v.DeclarationList.Items {
 					vars = append(vars, varDeclaration)
+				}
+			}
+		case *StatementListItemDeclaration:
+			switch decl := item.(type) {
+			case *DeclarationLexical:
+				for _, bindingItem := range decl.BindingList.Items {
+					vars = append(vars, &VariableDeclaration{
+						Identifier:  bindingItem.Identifier,
+						Initializer: bindingItem.Initializer,
+					})
 				}
 			}
 		}

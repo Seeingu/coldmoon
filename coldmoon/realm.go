@@ -85,7 +85,8 @@ func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue ObjectType) {
 	}
 
 	r.GlobalObject = obj
-	r.GlobalEnv = NewGlobalEnvironment(globalObj, this)
+	r.GlobalEnv = NewGlobalEnvironment(obj, this)
+	Assert(r.GlobalEnv != nil)
 }
 
 // 9.3.4

@@ -216,8 +216,11 @@ func (p *Parser) statementList() (list StatementList) {
 		if item == nil {
 			break
 		}
-		if _, ok := item.(*StatementListItemStatement).Statement.(*StatementEmpty); ok {
-			break
+		switch stmt := item.(type) {
+		case *StatementListItemStatement:
+			if _, ok := stmt.Statement.(*StatementEmpty); ok {
+				break
+			}
 		}
 		list = append(list, item)
 	}
@@ -242,7 +245,7 @@ func (p *Parser) statementListItem() StatementListItem {
 	t := p.tokenizer.CurrentToken
 	var stmt Statement
 	switch t.Type {
-	case TFunction:
+	case TFunction, TLet, TConst:
 		d := p.declaration()
 		stmt = &StatementListItemDeclaration{
 			Declaration: d,
@@ -406,6 +409,52 @@ func (p *Parser) noLineTerminatorHere() {
 	// TODO
 }
 
+func (p *Parser) lexicalDeclaration() *DeclarationLexical {
+	t := p.tokenizer.CurrentToken
+	var lexicalType LexicalDeclarationType
+	if t.Type == TLet {
+		lexicalType = LexicalDeclarationTypeLet
+	} else if t.Type == TConst {
+		lexicalType = LexicalDeclarationTypeConst
+	} else {
+		panic("lexicalDeclaration: expected let or const")
+	}
+	p.tokenizer.Next()
+	list := p.bindingList()
+	p.automaticSemicolonInsertion()
+	return &DeclarationLexical{
+		Type:        lexicalType,
+		BindingList: list,
+	}
+}
+func (p *Parser) bindingList() *BindingList {
+	var items []*LexicalBinding
+	for {
+		item := p.lexicalBinding()
+		items = append(items, item)
+		if p.tokenizer.CurrentToken.Type == TComma {
+			p.tokenizer.Next()
+		} else {
+			break
+		}
+	}
+	return &BindingList{
+		Items: items,
+	}
+}
+func (p *Parser) lexicalBinding() *LexicalBinding {
+	identifier := p.bindingIdentifier()
+	var init Expression
+	if p.tokenizer.CurrentToken.Type == TEquals {
+		p.tokenizer.Next()
+		init = p.expression(p.acceptContext(TYield))
+	}
+	return &LexicalBinding{
+		Identifier:  identifier,
+		Initializer: init,
+	}
+}
+
 func (p *Parser) hoistableDeclaration() *DeclarationHoistable {
 	t := p.tokenizer.CurrentToken
 	if t.Type == TFunction {
@@ -420,6 +469,9 @@ func (p *Parser) declaration() Declaration {
 	t := p.tokenizer.CurrentToken
 	if t.Type == TFunction {
 		return p.hoistableDeclaration()
+	}
+	if t.Type == TLet || t.Type == TConst {
+		return p.lexicalDeclaration()
 	}
 	panic("unimplemented")
 }

@@ -19,6 +19,7 @@ true && 1;
 true ? 2 : 1;
 2 ** 3;
 () => 123;
+let a = 1;
 `
 	script := ParseScript(sourceText, realm, nil)
 	_ = script.Evaluate()
