@@ -68,6 +68,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.URIErrorConstructor = NewNativeErrorConstructor(r, "URIError")
 	r.Intrinsics.EvalErrorPrototype = NewNativeErrorPrototype(r, "EvalError")
 	r.Intrinsics.EvalErrorConstructor = NewNativeErrorConstructor(r, "EvalError")
+	r.Intrinsics.AggregateErrorPrototype = NewAggregateErrorPrototype(r)
+	r.Intrinsics.AggregateErrorConstructor = NewAggregateErrorConstructor(r)
 
 	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
 }

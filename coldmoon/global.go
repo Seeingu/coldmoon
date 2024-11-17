@@ -233,6 +233,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"AggregateError",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.AggregateErrorConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

@@ -75,6 +75,10 @@ type Intrinsics struct {
 	ErrorPrototype ObjectType
 	// %ThrowTypeError%
 	ThrowTypeError ObjectType
+	// %AggregateError%
+	AggregateErrorConstructor ObjectType
+	// %AggregateError.prototype%
+	AggregateErrorPrototype ObjectType
 }
 
 func (i *Intrinsics) Get(key string) ObjectType {
@@ -148,6 +152,10 @@ func (i *Intrinsics) Get(key string) ObjectType {
 		return i.ErrorConstructor
 	case "%Error.prototype%":
 		return i.ErrorPrototype
+	case "%AggregateError%":
+		return i.AggregateErrorConstructor
+	case "%AggregateError.prototype%":
+		return i.AggregateErrorPrototype
 
 	}
 	panic("unknown intrinsic")
