@@ -144,11 +144,33 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewNumberValue(float64(s[position]))
 	}
+	var iterator BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		return NewValueFromObject(&StringIteratorObject{
+			Object: NewObject(agent, realm.Intrinsics.StringIteratorPrototype),
+			Data:   s,
+		})
+	}
+	var at BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		index := argumentsList[0]
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		length := len(s)
+		relativeIndex := int(ToIntegerOrInfinity(agent, index))
+		if relativeIndex < 0 || relativeIndex >= length {
+			return UndefinedValue
+		}
+		k := relativeIndex
+		return NewStringValue(string(s[k]))
+	}
 
 	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "valueOf", valueOf, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "charAt", charAt, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "charCodeAt", charCodeAt, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "iterator", iterator, 0, realm)
+	DefineBuiltinFunction(stringPrototype, "at", at, 1, realm)
 
 	return stringPrototype
 }
