@@ -731,6 +731,34 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		o.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length-1)), setThrowTypeThrow)
 		return first
 	}
+	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		argCount := len(args)
+		if argCount == 0 {
+			return NewNumberValue(float64(length))
+		}
+
+		k := int(length)
+		for k > 0 {
+			k--
+			from := NewIntegerIndexPropertyKey(k - 1)
+			to := NewIntegerIndexPropertyKey(k + argCount - 1)
+			fromPresent := o.HasProperty(from)
+			if fromPresent {
+				fromValue := o.Get(from)
+				o.Set(to, fromValue, setThrowTypeThrow)
+			} else {
+				o.DeletePropertyOrThrow(to)
+			}
+		}
+		for j, arg := range args {
+			key := NewIntegerIndexPropertyKey(j)
+			o.Set(key, arg, setThrowTypeThrow)
+		}
+		o.Set(NewStringPropertyKey("length"), NewNumberValue(float64(int(length)+argCount)), setThrowTypeThrow)
+		return NewNumberValue(float64(int(length) + argCount))
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -755,6 +783,7 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "keys", keys, 0, realm)
 	DefineBuiltinFunction(object, "values", values, 0, realm)
 	DefineBuiltinFunction(object, "shift", shift, 0, realm)
+	DefineBuiltinFunction(object, "unshift", unshift, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
