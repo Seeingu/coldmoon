@@ -1,11 +1,10 @@
 package tests
 
 import (
+	. "github.com/Seeingu/coldmoon/coldmoon"
 	"os"
 	"path"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func makeTest262Path(p string) string {
@@ -13,9 +12,19 @@ func makeTest262Path(p string) string {
 	return path.Join(dir, "..", p)
 }
 
+func runTest(filePath string) {
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	sta, err := os.ReadFile(makeTest262Path("./test262/harness/sta.js"))
+	if err != nil {
+		panic(err)
+	}
+	assertJs, err := os.ReadFile(makeTest262Path("./test262/harness/assert.js"))
+
+	ParseScript(string(sta), realm, nil).Evaluate()
+	ParseScript(string(assertJs), realm, nil).Evaluate()
+}
+
 func TestParseSta(t *testing.T) {
-	t.Skip()
-	filePath := makeTest262Path("./test262/harness/sta.js")
-	_, err := os.ReadFile(filePath)
-	assert.Nil(t, err)
 }
