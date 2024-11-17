@@ -1,6 +1,9 @@
 package coldmoon
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/samber/lo"
+)
 
 type ConstructorKind int
 
@@ -116,17 +119,142 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 
 // 10.2.1.4
 func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
-	calleeContext := agent.runningExecutionContext()
-	calleeEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
-	env := NewDeclarativeEnvironment(calleeEnv)
-	calleeContext.ECMAScriptCode.LexicalEnvironment = env
-	for i, item := range function.FormalParameters.Items {
-		identifier := item.(*FormalParameter).BindingElement.Identifier
-		value := argumentsList[i]
-		env.CreateMutableBinding(string(identifier), false)
-		env.InitializeBinding(string(identifier), value)
-	}
+	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	return GenerateAndRunBytecode(agent, function.ECMAScriptCode)
+}
+
+// 10.2.11
+func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) {
+	calleeContext := agent.runningExecutionContext()
+	code := function.ECMAScriptCode
+	strict := function.Strict
+	formals := function.FormalParameters
+	parameterNames := formals.BoundNames()
+	var hasDuplicates bool
+	uniqueNames := make(map[IdentifierName]bool)
+loop:
+	for _, name := range parameterNames {
+		if _, exists := uniqueNames[name]; exists {
+			hasDuplicates = true
+			break loop
+		}
+		uniqueNames[name] = true
+	}
+
+	simpleParameterList := formals.IsSimpleParameterList()
+	hasParameterExpressions := formals.ContainsExpression()
+
+	//var varNames []IdentifierName
+	varDeclarations := code.VarScopedDeclarations()
+	var lexicalNames []IdentifierName
+	var functionNames []IdentifierName
+
+	argumentsObjectNeeded := true
+	if function.ThisMode == ThisModeLexical {
+		argumentsObjectNeeded = false
+	} else if lo.Contains(parameterNames, "arguments") {
+		argumentsObjectNeeded = false
+	} else if !hasParameterExpressions {
+		if lo.Contains(functionNames, "arguments") || lo.Contains(lexicalNames, "arguments") {
+			argumentsObjectNeeded = false
+		}
+	}
+	var env EnvironmentRecord
+	if strict || !hasParameterExpressions {
+		env = calleeContext.ECMAScriptCode.LexicalEnvironment
+	} else {
+		calleeEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
+		Assert(calleeContext.ECMAScriptCode.LexicalEnvironment == calleeEnv)
+		env = NewDeclarativeEnvironment(calleeEnv)
+	}
+
+	for _, paramName := range parameterNames {
+		alreadyDeclared := env.HasBinding(string(paramName))
+		if !alreadyDeclared {
+			env.CreateMutableBinding(string(paramName), false)
+			if hasDuplicates {
+				env.InitializeBinding(string(paramName), UndefinedValue)
+			}
+		}
+	}
+	var parameterBindings []string
+	if argumentsObjectNeeded {
+		var argumentsObject ObjectType
+		if strict || !simpleParameterList {
+			argumentsObject = CreateUnmappedArgumentsObject(agent, argumentsList)
+		} else {
+			argumentsObject = CreateMappedArgumentsObject(agent, formals, argumentsList, env)
+		}
+		if strict {
+			env.CreateImmutableBinding("arguments", false)
+		} else {
+			env.CreateMutableBinding("arguments", false)
+		}
+		env.InitializeBinding("arguments", NewValueFromObject(argumentsObject))
+
+		for _, parameterName := range parameterNames {
+			parameterBindings = append(parameterBindings, string(parameterName))
+		}
+		parameterBindings = append(parameterBindings, "arguments")
+	} else {
+		for _, parameterName := range parameterNames {
+			parameterBindings = append(parameterBindings, string(parameterName))
+		}
+	}
+
+	for i, parameterName := range parameterNames {
+		e := env
+		if hasDuplicates {
+			e = nil
+		}
+		value := argumentsList[i]
+		ref := agent.ResolveBinding(string(parameterName), e, strict)
+		if e == nil {
+			ref.PutValue(agent, value)
+		} else {
+			ref.InitializeReferencedBinding(value)
+		}
+	}
+
+	var varEnv EnvironmentRecord
+	if !hasParameterExpressions {
+		instantiatedVarNames := make(map[IdentifierName]bool)
+		for _, paramBinding := range parameterBindings {
+			instantiatedVarNames[IdentifierName(paramBinding)] = true
+		}
+		for _, declaration := range varDeclarations {
+			varName := declaration.Identifier
+			if _, exists := instantiatedVarNames[varName]; !exists {
+				instantiatedVarNames[varName] = true
+				env.CreateMutableBinding(string(varName), false)
+				env.InitializeBinding(string(varName), UndefinedValue)
+			}
+		}
+		varEnv = env
+	} else {
+		varEnv = NewDeclarativeEnvironment(env)
+		calleeContext.ECMAScriptCode.VariableEnvironment = varEnv
+		instantiatedVarNames := make(map[IdentifierName]bool)
+		for _, declaration := range varDeclarations {
+			varName := declaration.Identifier
+			if _, exists := instantiatedVarNames[varName]; !exists {
+				instantiatedVarNames[varName] = true
+				varEnv.CreateMutableBinding(string(varName), false)
+				var initialValue Value
+				if !lo.Contains(parameterNames, varName) || lo.Contains(functionNames, varName) {
+				} else {
+					initialValue = env.GetBindingValue(string(varName), false)
+				}
+				varEnv.InitializeBinding(string(varName), initialValue)
+			}
+		}
+	}
+
+	lexEnv := varEnv
+	if !strict {
+		lexEnv = NewDeclarativeEnvironment(varEnv)
+	}
+	calleeContext.ECMAScriptCode.LexicalEnvironment = lexEnv
 }
 
 type functionCreateThisMode int

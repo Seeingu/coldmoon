@@ -158,3 +158,11 @@ func (r *ReferenceRecord) GetThisValue() Value {
 	}
 	return r.Base.(*ReferenceRecordBaseValue).Value
 }
+
+// 6.2.5.8
+func (r *ReferenceRecord) InitializeReferencedBinding(value Value) {
+	Assert(!r.IsUnresolvableReference())
+
+	base := r.Base.(*ReferenceRecordBaseEnvironment).Environment
+	base.InitializeBinding(r.ReferencedName.(*ReferencedNameString).String, value)
+}

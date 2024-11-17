@@ -30,6 +30,7 @@ func (hint PreferredType) String() string {
 }
 
 type ArgumentsList []Value
+
 type Value interface {
 	String() string
 	ToBoolean() bool

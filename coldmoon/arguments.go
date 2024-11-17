@@ -35,3 +35,8 @@ func CreateUnmappedArgumentsObject(agent *Agent, argumentsList []Value) ObjectTy
 
 	return obj
 }
+
+// TODO
+func CreateMappedArgumentsObject(agent *Agent, formals *FormalParameters, argumentsList []Value, env EnvironmentRecord) ObjectType {
+	panic("implement me")
+}

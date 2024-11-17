@@ -119,6 +119,7 @@ const (
 	TCase
 	TDefaultCase
 	TContinue
+	TEnum
 	TEOF
 )
 
@@ -508,6 +509,7 @@ var keywordsMap = map[string]TokenType{
 	"with":       TWith,
 	"switch":     TSwitch,
 	"case":       TCase,
+	"enum":       TEnum,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {

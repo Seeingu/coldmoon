@@ -1845,6 +1845,10 @@ type FunctionBody struct {
 	StatementList StatementList
 }
 
+func (f *FunctionBody) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return f.StatementList.VarScopedDeclarations()
+}
+
 func (f *FunctionBody) Bytecode(e *Executable, c *BytecodeContext) {
 	strictBefore := c.containedInStrictCode
 	c.containedInStrictCode = c.containedInStrictCode || f.FunctionBodyContainsUseStrict()
@@ -1866,6 +1870,30 @@ func (f *FunctionBody) FunctionBodyContainsUseStrict() bool {
 
 type FormalParameters struct {
 	Items []FormalParametersItem
+}
+
+func (f *FormalParameters) IsSimpleParameterList() bool {
+	for _, item := range f.Items {
+		if _, ok := item.(*FormalParameter); !ok {
+			return false
+		}
+	}
+	return true
+}
+func (f *FormalParameters) ContainsExpression() bool {
+	for _, item := range f.Items {
+		if _, ok := item.(Expression); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *FormalParameters) BoundNames() (l []IdentifierName) {
+	for _, item := range f.Items {
+		l = append(l, item.(*FormalParameter).BindingElement.Identifier)
+	}
+	return
 }
 
 // 15.1.5
