@@ -618,6 +618,8 @@ type Expression interface {
 	AssignmentTargetType() AssignmentTargetType
 }
 
+// MARK: - PrimaryExpression
+
 type ExpressionPrimary struct {
 	Expression
 	PrimaryExpression PrimaryExpression
@@ -644,6 +646,95 @@ func (e *ExpressionPrimary) Analyze(a AnalyzeQuery) bool {
 	default:
 		panic("unreachable")
 	}
+}
+
+// MARK: - UpdateExpression
+
+type UpdateOperator int
+
+const (
+	UpdateOperatorIncrement UpdateOperator = iota
+	UpdateOperatorDecrement
+)
+
+func (u UpdateOperator) String() string {
+	switch u {
+	case UpdateOperatorIncrement:
+		return "++"
+	case UpdateOperatorDecrement:
+		return "--"
+	}
+	return ""
+}
+
+var UpdateOperatorMap = map[TokenType]UpdateOperator{
+	TPlusPlus:   UpdateOperatorIncrement,
+	TMinusMinus: UpdateOperatorDecrement,
+}
+
+type UpdateExpressionType int
+
+const (
+	UpdateExpressionTypePrefix UpdateExpressionType = iota
+	UpdateExpressionTypePostfix
+)
+
+func (u UpdateExpressionType) String() string {
+	switch u {
+	case UpdateExpressionTypePrefix:
+		return "prefix"
+	case UpdateExpressionTypePostfix:
+		return "postfix"
+	}
+	return ""
+}
+
+type ExpressionUpdate struct {
+	Expression
+	Type     UpdateExpressionType
+	Operator UpdateOperator
+	Operand  Expression
+}
+
+func (e *ExpressionUpdate) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
+}
+func (e *ExpressionUpdate) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (e *ExpressionUpdate) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.Operand.Bytecode(ex, c)
+	ex.AddInstruction(InsPushReference)
+	if e.Operand.Analyze(AnalyzeQueryIsReference) {
+		ex.AddInstruction(InsGetValue)
+	}
+	ex.AddInstruction(InsToNumber)
+	if e.Type == UpdateExpressionTypePrefix {
+		if e.Operator == UpdateOperatorIncrement {
+			ex.AddInstruction(&IIncrement{})
+		} else {
+			ex.AddInstruction(&IDecrement{})
+		}
+
+		ex.AddInstruction(InsPutValue)
+		ex.AddInstruction(InsPopReference)
+	} else {
+		ex.AddInstruction(InsLoad)
+		if e.Operator == UpdateOperatorIncrement {
+			ex.AddInstruction(&IIncrement{})
+		} else {
+			ex.AddInstruction(&IDecrement{})
+		}
+		ex.AddInstruction(InsPutValue)
+		ex.AddInstruction(InsPopReference)
+		ex.AddInstruction(InsStore)
+	}
+}
+func (e *ExpressionUpdate) String() string {
+	if e.Type == UpdateExpressionTypePrefix {
+		return e.Operator.String() + e.Operand.String()
+	}
+	return e.Operand.String() + e.Operator.String()
 }
 
 // MARK: - AssignmentExpression

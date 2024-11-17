@@ -6,21 +6,12 @@ import (
 	"testing"
 )
 
-func TestBaseline(t *testing.T) {
+func testSource(t *testing.T, s string) {
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
-	sourceText := `
-2 == 1;
-2 > 1;
-false || 1;
-true && 1;
-true ? 2 : 1;
-2 ** 3;
-() => 123;
-let a = 1;
-`
+	sourceText := s
 	script := ParseScript(sourceText, realm, nil)
 	_ = script.Evaluate()
 
@@ -50,4 +41,23 @@ let a = 1;
 	valueOf := booleanObject.ToObject().Get(NewStringPropertyKey("valueOf"))
 	value := CallAssumeCallableNoArgs(valueOf, NewValueFromObject(booleanObject))
 	fmt.Println("new Boolean(true).valueOf() = ", value.String())
+}
+
+func TestBaseline(t *testing.T) {
+	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
+	sourceText := `
+let a = 1;
+`
+	testSource(t, sourceText)
+
+	sourceText = `
+2 == 1;
+2 > 1;
+false || 1;
+true && 1;
+true ? 2 : 1;
+2 ** 3;
+() => 123;
+`
+	testSource(t, sourceText)
 }

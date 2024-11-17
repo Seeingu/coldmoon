@@ -150,6 +150,10 @@ type IGetValue struct {
 	Instruction
 }
 
+func (i *IGetValue) String() string {
+	return "IGetValue"
+}
+
 type ILoadThisValue struct {
 	Instruction
 }
@@ -373,6 +377,24 @@ type IStrictlyEqual struct {
 
 func (i *IStrictlyEqual) String() string {
 	return "IStrictlyEqual"
+}
+
+// MARK: - Logical
+
+type IIncrement struct {
+	Instruction
+}
+
+func (i *IIncrement) String() string {
+	return "IIncrement"
+}
+
+type IDecrement struct {
+	Instruction
+}
+
+func (i *IDecrement) String() string {
+	return "IDecrement"
 }
 
 // MARK: - Numeric Binary

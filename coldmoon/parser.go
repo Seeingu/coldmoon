@@ -40,6 +40,8 @@ const (
 	precAssocPostfixDecrement
 	precAssocUnaryPlus
 	precAssocUnaryMinus
+	precAssocPrefixIncrement
+	precAssocPrefixDecrement
 )
 
 type associativity int
@@ -81,6 +83,10 @@ func (p *Parser) acceptContext(t TokenType) *acceptContext {
 	case TNew:
 		return &acceptContext{
 			precedence: 16,
+		}
+	case TPlusPlus, TMinusMinus:
+		return &acceptContext{
+			precedence: 15,
 		}
 	case TWave, TTypeof, TDelete, TNot:
 		return &acceptContext{
@@ -184,7 +190,7 @@ func (p *Parser) acceptContextAlt(flag precedenceAssociativityAlt) *acceptContex
 		return &acceptContext{
 			precedence: 15,
 		}
-	case precAssocUnaryPlus, precAssocUnaryMinus:
+	case precAssocPrefixIncrement, precAssocPrefixDecrement, precAssocUnaryPlus, precAssocUnaryMinus:
 		return &acceptContext{
 			precedence: 14,
 		}
@@ -643,9 +649,9 @@ func (p *Parser) newExpression() (*ExpressionNewExpression, bool) {
 	}, true
 }
 
-// unaryExpression accept unary token
+// tryUnaryExpression accept unary token
 // if token is not unary, return nil
-func (p *Parser) unaryExpression() (Expression, bool) {
+func (p *Parser) tryUnaryExpression() (Expression, bool) {
 	t := p.tokenizer.CurrentToken
 	var operator UnaryOperator
 	unaryMap := map[TokenType]UnaryOperator{
@@ -678,10 +684,47 @@ func (p *Parser) unaryExpression() (Expression, bool) {
 	}, true
 }
 
+func (p *Parser) updateExpression(primaryExpression Expression) (*ExpressionUpdate, bool) {
+	t := p.tokenizer.CurrentToken
+	var operator UpdateOperator
+	if op, ok := UpdateOperatorMap[t.Type]; ok {
+		operator = op
+	} else {
+		return nil, false
+	}
+	p.tokenizer.Next()
+	var expr Expression
+	var updateType UpdateExpressionType
+	if primaryExpression == nil {
+		expr = p.expression(p.acceptContextAlt(precAssocPrefixIncrement))
+		updateType = UpdateExpressionTypePrefix
+	} else {
+		expr = primaryExpression
+		updateType = UpdateExpressionTypePostfix
+	}
+
+	if updateType == UpdateExpressionTypePrefix && expr.AssignmentTargetType() != AssignmentTargetTypeSimple {
+		panic("updateExpression: invalid assignment target for prefix")
+	}
+	if updateType == UpdateExpressionTypePrefix && expr.AssignmentTargetType() != AssignmentTargetTypeSimple {
+		panic("updateExpression: invalid assignment target for postfix")
+	}
+
+	return &ExpressionUpdate{
+		Operator: operator,
+		Type:     updateType,
+		Operand:  expr,
+	}, true
+}
+
 func (p *Parser) expression(accept *acceptContext) Expression {
-	unary, ok := p.unaryExpression()
+	unary, ok := p.tryUnaryExpression()
 	if ok {
 		return unary
+	}
+	update, ok := p.updateExpression(nil)
+	if ok {
+		return update
 	}
 	newExpression, ok := p.newExpression()
 	if ok {
@@ -715,6 +758,12 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 		return p.callExpression(left)
 	case TLeftBracket, TPeriod:
 		return p.memberExpression(left)
+	case TPlusPlus, TMinusMinus:
+		update, ok := p.updateExpression(left)
+		if !ok {
+			panic("secondaryExpression: expected update expression")
+		}
+		return update
 	case TLessThan,
 		TLessThanEquals,
 		TGreaterThan,

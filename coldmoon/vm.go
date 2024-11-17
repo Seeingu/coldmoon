@@ -3,6 +3,7 @@ package coldmoon
 import "C"
 import (
 	"github.com/Seeingu/coldmoon/pkg"
+	"math/big"
 	"reflect"
 	"strconv"
 )
@@ -366,6 +367,26 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			referencedName := ref.ReferencedName.(*ReferencedNameString).String
 			deleteStatus := base.Environment.DeleteBinding(referencedName)
 			vm.result = NewBooleanValue(deleteStatus)
+		}
+	case *IIncrement:
+		value := vm.result
+		switch v := value.(type) {
+		case *BigIntValue:
+			vm.result = v.Add(NewBigIntValue(big.NewInt(1)))
+		case *NumberValue:
+			vm.result = v.Add(NewNumberValue(1))
+		default:
+			panic("unreachable")
+		}
+	case *IDecrement:
+		value := vm.result
+		switch v := value.(type) {
+		case *BigIntValue:
+			vm.result = v.Subtract(NewBigIntValue(big.NewInt(1)))
+		case *NumberValue:
+			vm.result = v.Subtract(NewNumberValue(1))
+		default:
+			panic("unreachable")
 		}
 	}
 }
