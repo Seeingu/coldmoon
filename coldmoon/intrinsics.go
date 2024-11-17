@@ -37,6 +37,8 @@ type Intrinsics struct {
 	Reflect ObjectType
 	// %Proxy%
 	Proxy ObjectType
+	// %IteratorPrototype%
+	IteratorPrototype ObjectType
 	// %Math%
 	Math ObjectType
 	// %IsFinite%

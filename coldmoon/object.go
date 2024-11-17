@@ -740,6 +740,16 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	return object
 }
 
+// 9.2.12
+func CoerceOptionsToObject(agent *Agent, options Value) ObjectType {
+	if options == UndefinedValue {
+		return nil
+	}
+	return ValueToObject(agent, options)
+}
+
+// 9.2.13
+
 // 20.1.2.3.1
 func objectDefineProperties(agent *Agent, object ObjectType, properties Value) ObjectType {
 	props := ValueToObject(agent, properties)

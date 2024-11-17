@@ -6,6 +6,16 @@ type IteratorRecord struct {
 	Done       bool
 }
 
+func NewIteratorPrototype(realm *Realm) ObjectType {
+	agent := realm.Agent
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	var iterator BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		return thisValue
+	}
+	DefineBuiltinFunction(object, "@@iterator", iterator, 0, realm)
+	return object
+}
+
 // 7.4.2
 func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *IteratorRecord {
 	iterator := CallNoArgs(NewValueFromObject(method), object)
