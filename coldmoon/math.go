@@ -1,6 +1,9 @@
 package coldmoon
 
-import "math"
+import (
+	"math"
+	"math/bits"
+)
 
 type MathObject struct {
 	*Object
@@ -64,10 +67,70 @@ func NewMathObject(realm *Realm) ObjectType {
 		Configurable: true,
 	})
 
+	agent := realm.Agent
 	var random BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return NewNumberValue(realm.Rng.Float64())
 	}
+	var abs BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := argumentsList[0]
+		n := ToNumber(agent, x)
+		return NewNumberValue(math.Abs(n.Data))
+	}
+	var ceil BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := argumentsList[0]
+		n := ToNumber(agent, x)
+		return NewNumberValue(math.Ceil(n.Data))
+	}
+	var floor BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := argumentsList[0]
+		n := ToNumber(agent, x)
+		return NewNumberValue(math.Floor(n.Data))
+	}
+	var pow BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := argumentsList[0]
+		y := argumentsList[1]
+		base := ToNumber(agent, x)
+		exponent := ToNumber(agent, y)
+		return NewNumberValue(math.Pow(base.Data, exponent.Data))
+	}
+	var round BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := argumentsList[0]
+		n := ToNumber(agent, x)
+		return NewNumberValue(math.Round(n.Data))
+	}
+	var trunc BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := argumentsList[0]
+		n := ToNumber(agent, x)
+		return NewNumberValue(math.Trunc(n.Data))
+	}
+	var clz32 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := argumentsList[0]
+		n := ToUint32(agent, x)
+		return NewNumberValue(float64(bits.LeadingZeros32(n)))
+	}
+	var sign BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := argumentsList[0]
+		n := ToNumber(agent, x)
+		if math.IsNaN(n.Data) {
+			return NewNumberValue(n.Data)
+		}
+		if n.Data == 0 {
+			return NewNumberValue(n.Data)
+		}
+		if n.Data < 0 {
+			return NewNumberValue(-1)
+		}
+		return NewNumberValue(1)
+	}
 	DefineBuiltinFunction(object, "random", random, 0, realm)
+	DefineBuiltinFunction(object, "abs", abs, 1, realm)
+	DefineBuiltinFunction(object, "ceil", ceil, 1, realm)
+	DefineBuiltinFunction(object, "floor", floor, 1, realm)
+	DefineBuiltinFunction(object, "pow", pow, 2, realm)
+	DefineBuiltinFunction(object, "round", round, 1, realm)
+	DefineBuiltinFunction(object, "trunc", trunc, 1, realm)
+	DefineBuiltinFunction(object, "clz32", clz32, 1, realm)
+	DefineBuiltinFunction(object, "sign", sign, 1, realm)
 
 	return object
 }

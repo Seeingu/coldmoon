@@ -377,6 +377,7 @@ func (p *PrimaryExpressionFunctionExpression) String() string {
 }
 
 // MARK: - ArrowFunction
+
 type PrimaryExpressionArrowFunction struct {
 	PrimaryExpression
 	FormalParameters *FormalParameters
@@ -393,6 +394,8 @@ func (p *PrimaryExpressionArrowFunction) Analyze(a AnalyzeQuery) bool {
 }
 
 func (p *PrimaryExpressionArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
+	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
+	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateArrowFunctionExpression{FunctionExpression: p})
 }
 
@@ -1843,6 +1846,7 @@ func (s *StatementThrow) String() string {
 type FunctionBody struct {
 	ASTNode
 	StatementList StatementList
+	Strict        bool
 }
 
 func (f *FunctionBody) VarScopedDeclarations() (l []*VariableDeclaration) {
