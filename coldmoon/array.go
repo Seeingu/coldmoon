@@ -759,6 +759,7 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		Enumerable:   false,
 		Configurable: true,
 	})
+	DefineBuiltinProperty(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
 
 	return object
 
