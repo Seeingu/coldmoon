@@ -2097,6 +2097,124 @@ func (s *StatementDoWhile) String() string {
 	return sb
 }
 
+// MARK: - ForStatement
+
+type ForStatementInitializer interface {
+	ASTNode
+}
+type ForStatementInitializerExpression struct {
+	ForStatementInitializer
+	Expression Expression
+}
+
+func (f *ForStatementInitializerExpression) String() string {
+	return f.Expression.String()
+}
+
+type ForStatementInitializerVariable struct {
+	ForStatementInitializer
+	VariableStatement *StatementVariable
+}
+
+func (f *ForStatementInitializerVariable) String() string {
+	return f.VariableStatement.String()
+}
+
+type ForStatementInitializerLexicalDeclaration struct {
+	ForStatementInitializer
+	LexicalDeclaration *DeclarationLexical
+}
+
+func (f *ForStatementInitializerLexicalDeclaration) String() string {
+	return f.LexicalDeclaration.String()
+}
+
+type StatementFor struct {
+	IterationStatement
+	Initializer ForStatementInitializer
+	Condition   Expression
+	Increment   Expression
+	Body        Statement
+}
+
+func (s *StatementFor) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (s *StatementFor) VarScopedDeclarations() (l []*VariableDeclaration) {
+	if s.Initializer != nil {
+		if varStatement, ok := s.Initializer.(*ForStatementInitializerVariable); ok {
+			l = append(l, varStatement.VariableStatement.DeclarationList.VarScopedDeclarations()...)
+		}
+	}
+	l = append(l, s.Body.VarScopedDeclarations()...)
+	return
+}
+func (s *StatementFor) Bytecode(e *Executable, c *BytecodeContext) {
+	if s.Initializer != nil {
+		switch initializer := s.Initializer.(type) {
+		case *ForStatementInitializerExpression:
+			initializer.Expression.Bytecode(e, c)
+			if initializer.Expression.Analyze(AnalyzeQueryIsReference) {
+				e.AddInstruction(InsGetValue)
+			}
+		case *ForStatementInitializerVariable:
+			initializer.VariableStatement.Bytecode(e, c)
+		case *ForStatementInitializerLexicalDeclaration:
+			initializer.LexicalDeclaration.Bytecode(e, c)
+		}
+	}
+
+	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
+
+	conditionIndex := len(e.Instructions) - 1
+	var endJump *IJumpIfTrue
+	if s.Condition != nil {
+		s.Condition.Bytecode(e, c)
+		if s.Condition.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+
+		jumpIfTrue := &IJumpIfTrue{}
+		e.AddInstruction(jumpIfTrue)
+		jumpIfTrue.Target = len(e.Instructions) - 1
+		jumpIfTrue.TargetElse = len(e.Instructions) - 1
+		endJump = jumpIfTrue
+	}
+
+	e.AddInstruction(InsStore)
+	s.Body.Bytecode(e, c)
+	e.AddInstruction(&ILoad{})
+
+	if s.Increment != nil {
+		s.Increment.Bytecode(e, c)
+		if s.Increment.Analyze(AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+	}
+
+	e.AddInstruction(&IJump{Target: conditionIndex})
+	if endJump != nil {
+		endJump.TargetElse = len(e.Instructions) - 1
+	}
+	e.AddInstruction(InsStore)
+}
+
+func (s *StatementFor) String() string {
+	sb := "For"
+	if s.Initializer != nil {
+		sb += " " + s.Initializer.String()
+	}
+	if s.Condition != nil {
+		sb += " " + s.Condition.String()
+	}
+	if s.Increment != nil {
+		sb += " " + s.Increment.String()
+	}
+	sb += " \n"
+	sb += s.Body.String()
+	return sb
+}
+
 // MARK: - ReturnStatement
 
 type StatementReturn struct {

@@ -488,8 +488,50 @@ func (p *Parser) iterationStatement() IterationStatement {
 	t := p.tokenizer.CurrentToken
 	if t.Type == TDo {
 		return p.doWhileStatement()
+	} else if t.Type == TWhile {
+		return p.whileStatement()
 	}
-	return p.whileStatement()
+	return p.forStatement()
+}
+
+func (p *Parser) forStatement() *StatementFor {
+	p.tokenizer.MustMatch(TFor)
+	p.tokenizer.MustMatch(TLeftParen)
+	var init ForStatementInitializer
+	t := p.tokenizer.CurrentToken
+	if t.Type == TVar {
+		init = &ForStatementInitializerVariable{
+			VariableStatement: p.variableStatement(),
+		}
+	} else if t.Type == TLet || t.Type == TConst {
+		init = &ForStatementInitializerLexicalDeclaration{
+			LexicalDeclaration: p.lexicalDeclaration(),
+		}
+	} else {
+		init = &ForStatementInitializerExpression{
+			Expression: p.expression(p.acceptContextLowest()),
+		}
+	}
+	p.tokenizer.MustMatch(TSemicolon)
+	var condition Expression
+	if p.tokenizer.CurrentToken.Type != TSemicolon {
+		condition = p.expression(p.acceptContextLowest())
+	}
+	p.tokenizer.MustMatch(TSemicolon)
+	var increment Expression
+	if p.tokenizer.CurrentToken.Type != TRightParen {
+		increment = p.expression(p.acceptContextLowest())
+	}
+	p.tokenizer.MustMatch(TRightParen)
+	body := p.statement()
+
+	return &StatementFor{
+		Initializer: init,
+		Condition:   condition,
+		Increment:   increment,
+		Body:        body,
+	}
+
 }
 
 func (p *Parser) doWhileStatement() *StatementDoWhile {

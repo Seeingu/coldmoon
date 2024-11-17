@@ -133,6 +133,7 @@ func CreateDynamicFunction(
 	body := NewParser(bodyString, ParserContext{
 		FileName: "Function",
 	}).functionBody()
+	body.Strict = body.FunctionBodyContainsUseStrict()
 
 	proto := GetPrototypeFromConstructor(newTarget, fallbackPrototype)
 
