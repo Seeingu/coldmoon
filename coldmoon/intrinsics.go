@@ -12,7 +12,7 @@ type Intrinsics struct {
 	// %Array%
 	ArrayConstructor ObjectType
 	// %Array.Prototype%
-	ArrayPrototype *ArrayObject
+	ArrayPrototype ObjectType
 	// %ArrayIteratorPrototype%
 	ArrayIteratorPrototype ObjectType
 	// %Boolean.Prototype%

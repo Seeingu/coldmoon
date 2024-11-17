@@ -18,6 +18,7 @@ func getArrayLength(array ObjectType) float64 {
 
 // 10.4.2.2
 func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
+	realm := agent.CurrentRealm()
 	// 10.4.2.1
 	var defineOwnProperty = func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
 		propertyKeyString, ok := p.(*StringPropertyKey)
@@ -55,8 +56,6 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 		}
 		return true
 	}
-
-	realm := agent.CurrentRealm()
 
 	if length > POW_2_32-1 {
 		panic("RangeError")
@@ -278,7 +277,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	return object
 }
 
-func NewArrayPrototype(realm *Realm) *ArrayObject {
+func NewArrayPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := &ArrayObject{
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
@@ -759,6 +758,32 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 		o.Set(NewStringPropertyKey("length"), NewNumberValue(float64(int(length)+argCount)), setThrowTypeThrow)
 		return NewNumberValue(float64(int(length) + argCount))
 	}
+	var filter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		callbackFn := args[0]
+		thisArg := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		if !IsCallable(callbackFn) {
+			panic("TypeError")
+		}
+		A := ArraySpeciesCreate(agent, o, 0)
+		k := 0
+		to := 0
+		for k < int(length) {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				selected := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k)), this})
+				if selected.ToBoolean() {
+					A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(to), kValue)
+					to++
+				}
+			}
+			k++
+		}
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -784,6 +809,7 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinFunction(object, "values", values, 0, realm)
 	DefineBuiltinFunction(object, "shift", shift, 0, realm)
 	DefineBuiltinFunction(object, "unshift", unshift, 1, realm)
+	DefineBuiltinFunction(object, "filter", filter, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
@@ -818,7 +844,6 @@ func NewArrayPrototype(realm *Realm) *ArrayObject {
 	DefineBuiltinProperty(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
 
 	return object
-
 }
 
 type direction int

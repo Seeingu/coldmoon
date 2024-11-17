@@ -24,6 +24,7 @@ func CreateRealm(agent *Agent) *Realm {
 		Intrinsics: &Intrinsics{},
 	}
 	r.CreateIntrinsics()
+	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
 
 	return r
 }
@@ -74,7 +75,6 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.AggregateErrorPrototype = NewAggregateErrorPrototype(r)
 	r.Intrinsics.AggregateErrorConstructor = NewAggregateErrorConstructor(r)
 
-	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
 }
 
 // 9.3.3
