@@ -957,6 +957,40 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		A.Set(NewStringPropertyKey("length"), NewNumberValue(float64(n)), setThrowTypeThrow)
 		return NewValueFromObject(A)
 	}
+	var fill BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		value := args[0]
+		start := args[1]
+		end := args[2]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+
+		relativeStart := ToIntegerOrInfinity(agent, start)
+		k := math.Max(relativeStart, 0)
+		if end == UndefinedValue {
+			end = NewNumberValue(float64(length))
+		}
+		var relativeEnd float64
+		if end == UndefinedValue {
+			relativeEnd = float64(length)
+		} else {
+			relativeEnd = ToIntegerOrInfinity(agent, end)
+		}
+
+		var final float64
+		if relativeEnd == math.Inf(-1) {
+			final = 0
+		} else if relativeEnd < 0 {
+			final = math.Max(float64(length)+relativeEnd, 0)
+		} else {
+			final = math.Min(relativeEnd, float64(length))
+		}
+		for k < final {
+			pk := NewIntegerIndexPropertyKey(int(k))
+			o.Set(pk, value, setThrowTypeThrow)
+			k++
+		}
+		return NewValueFromObject(o)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -987,6 +1021,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm)
 	DefineBuiltinFunction(object, "concat", concat, 1, realm)
 	DefineBuiltinFunction(object, "slice", slice, 2, realm)
+	DefineBuiltinFunction(object, "fill", fill, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
