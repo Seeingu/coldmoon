@@ -908,6 +908,55 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		A.Set(NewStringPropertyKey("length"), NewNumberValue(float64(n)), setThrowTypeThrow)
 		return NewValueFromObject(A)
 	}
+	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		start := args[0]
+		end := args[1]
+
+		relativeStart := ToIntegerOrInfinity(agent, start)
+
+		var k float64
+		if relativeStart == math.Inf(-1) {
+			k = 0
+		} else if relativeStart < 0 {
+			k = math.Max(float64(length)+relativeStart, 0)
+		} else {
+			k = math.Min(relativeStart, float64(length))
+		}
+
+		var relativeEnd float64
+		if end == UndefinedValue {
+			relativeEnd = float64(length)
+		} else {
+			relativeEnd = ToIntegerOrInfinity(agent, end)
+		}
+
+		var final float64
+		if relativeEnd == math.Inf(-1) {
+			final = 0
+		} else if relativeEnd < 0 {
+			final = math.Max(float64(length)+relativeEnd, 0)
+		} else {
+			final = math.Min(relativeEnd, float64(length))
+		}
+		count := math.Max(final-k, 0)
+
+		n := 0
+		A := ArraySpeciesCreate(agent, o, count)
+		for k < final {
+			pk := NewIntegerIndexPropertyKey(int(k))
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(n), kValue)
+			}
+			k++
+			n++
+		}
+		A.Set(NewStringPropertyKey("length"), NewNumberValue(float64(n)), setThrowTypeThrow)
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -937,6 +986,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "reduce", reduce, 1, realm)
 	DefineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm)
 	DefineBuiltinFunction(object, "concat", concat, 1, realm)
+	DefineBuiltinFunction(object, "slice", slice, 2, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
