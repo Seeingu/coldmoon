@@ -991,6 +991,76 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(o)
 	}
+	var copyWithin BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		target := args[0]
+		start := args[1]
+		end := args[2]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+
+		relativeTarget := ToIntegerOrInfinity(agent, target)
+		var to float64
+		if relativeTarget == math.Inf(-1) {
+			to = 0
+		} else if relativeTarget < 0 {
+			to = math.Max(float64(length)+relativeTarget, 0)
+		} else {
+			to = math.Min(relativeTarget, float64(length))
+		}
+
+		relativeStart := ToIntegerOrInfinity(agent, start)
+		var from float64
+		if relativeStart == math.Inf(-1) {
+			from = 0
+		} else if relativeStart < 0 {
+			from = math.Max(float64(length)+relativeStart, 0)
+		} else {
+			from = math.Min(relativeStart, float64(length))
+		}
+
+		var relativeEnd float64
+		if end == UndefinedValue {
+			relativeEnd = float64(length)
+		} else {
+			relativeEnd = ToIntegerOrInfinity(agent, end)
+		}
+
+		var final float64
+		if relativeEnd == math.Inf(-1) {
+			final = 0
+		} else if relativeEnd < 0 {
+			final = math.Max(float64(length)+relativeEnd, 0)
+		} else {
+			final = math.Min(relativeEnd, float64(length))
+		}
+
+		count := math.Min(final-from, float64(length)-to)
+
+		var direction int
+		if from < to && to < from+count {
+			direction = -1
+			from += count - 1
+			to += count - 1
+		} else {
+			direction = 1
+		}
+
+		for count > 0 {
+			fromKey := NewIntegerIndexPropertyKey(int(from))
+			toKey := NewIntegerIndexPropertyKey(int(to))
+			fromPresent := o.HasProperty(fromKey)
+			if fromPresent {
+				fromValue := o.Get(fromKey)
+				o.Set(toKey, fromValue, setThrowTypeThrow)
+			} else {
+				o.DeletePropertyOrThrow(toKey)
+			}
+			from += float64(direction)
+			to += float64(direction)
+			count--
+		}
+		return NewValueFromObject(o)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -1022,6 +1092,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "concat", concat, 1, realm)
 	DefineBuiltinFunction(object, "slice", slice, 2, realm)
 	DefineBuiltinFunction(object, "fill", fill, 1, realm)
+	DefineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
