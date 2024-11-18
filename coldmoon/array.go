@@ -1095,6 +1095,18 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(o)
 	}
+	var toReversed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		A := ArrayCreate(agent, float64(length), nil)
+		for k := 0; k < int(length); k++ {
+			from := NewIntegerIndexPropertyKey(int(length) - k - 1)
+			fromValue := o.Get(from)
+			pk := NewIntegerIndexPropertyKey(k)
+			A.CreateDataPropertyOrThrow(pk, fromValue)
+		}
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -1128,6 +1140,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "fill", fill, 1, realm)
 	DefineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm)
 	DefineBuiltinFunction(object, "reverse", reverse, 0, realm)
+	DefineBuiltinFunction(object, "toReversed", toReversed, 0, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
