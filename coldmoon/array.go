@@ -868,6 +868,46 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return accumulator
 	}
+	var concat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := ValueToObject(agent, this)
+		A := ArraySpeciesCreate(agent, o, 0)
+		n := 0
+
+		for index := range len(args) + 1 {
+			var element Value
+			if index == 0 {
+				element = NewValueFromObject(o)
+			} else {
+				element = args[index-1]
+			}
+
+			spreadable := IsConcatSpreadable(agent, element)
+			if spreadable {
+				length := MustGetObject(element).LengthOfArrayLike()
+				if float64(n)+float64(length) > POW_2_53-1 {
+					panic("TypeError")
+				}
+
+				k := 0
+				for k < int(length) {
+					pk := NewIntegerIndexPropertyKey(k)
+					kPresent := MustGetObject(element).HasProperty(pk)
+					if kPresent {
+						kValue := MustGetObject(element).Get(pk)
+						A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(n), kValue)
+					}
+					k++
+					n++
+				}
+			} else {
+				A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(n), element)
+				n++
+			}
+		}
+
+		A.Set(NewStringPropertyKey("length"), NewNumberValue(float64(n)), setThrowTypeThrow)
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -896,6 +936,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "filter", filter, 1, realm)
 	DefineBuiltinFunction(object, "reduce", reduce, 1, realm)
 	DefineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm)
+	DefineBuiltinFunction(object, "concat", concat, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
@@ -984,4 +1025,16 @@ func (a *ArrayObject) findViaPredicate(
 		index: -1,
 		value: UndefinedValue,
 	}
+}
+
+// 23.1.3.2.1
+func IsConcatSpreadable(agent *Agent, value Value) bool {
+	if !ValueIsObject(value) {
+		return false
+	}
+	spreadable := MustGetObject(value).Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable]))
+	if spreadable != UndefinedValue {
+		return spreadable.ToBoolean()
+	}
+	return IsArray(value)
 }
