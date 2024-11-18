@@ -1061,6 +1061,40 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(o)
 	}
+	var reverse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		middle := int(length / 2)
+		lower := 0
+		for lower < middle {
+			upper := int(length) - lower - 1
+			lowerP := NewIntegerIndexPropertyKey(lower)
+			upperP := NewIntegerIndexPropertyKey(upper)
+			lowerExists := o.HasProperty(lowerP)
+			upperExists := o.HasProperty(upperP)
+
+			var lowerValue Value = UndefinedValue
+			if lowerExists {
+				lowerValue = o.Get(lowerP)
+			}
+			var upperValue Value = UndefinedValue
+			if upperExists {
+				upperValue = o.Get(upperP)
+			}
+			if lowerExists && upperExists {
+				o.Set(lowerP, upperValue, setThrowTypeThrow)
+				o.Set(upperP, lowerValue, setThrowTypeThrow)
+			} else if !lowerExists && upperExists {
+				o.Set(lowerP, o.Get(upperP), setThrowTypeThrow)
+				o.DeletePropertyOrThrow(upperP)
+			} else if lowerExists && !upperExists {
+				o.Set(upperP, o.Get(lowerP), setThrowTypeThrow)
+				o.DeletePropertyOrThrow(lowerP)
+			}
+			lower++
+		}
+		return NewValueFromObject(o)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -1093,6 +1127,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "slice", slice, 2, realm)
 	DefineBuiltinFunction(object, "fill", fill, 1, realm)
 	DefineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm)
+	DefineBuiltinFunction(object, "reverse", reverse, 0, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
