@@ -1,7 +1,9 @@
 package coldmoon
 
 import (
+	"github.com/samber/lo"
 	"math"
+	"sort"
 	"strings"
 )
 
@@ -49,8 +51,41 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 			extensible := s.Extensible()
 			return IsCompatiblePropertyDescriptor(extensible, desc, stringDesc)
 		}
-
 		return OrdinaryDefineOwnProperty(o, p, desc)
+	}
+	// 10.4.3.3
+	var ownPropertyKeys = func(o ObjectType) []PropertyKey {
+		propertiesMap := o.PropertyStorage().Properties
+		str := o.(*StringObject).Data
+		length := len(str)
+		keys := make([]PropertyKey, length+len(propertiesMap))
+		for i := range length {
+			keys[i] = NewIntegerIndexPropertyKey(i)
+		}
+
+		keysGreaterThanLength :=
+			lo.Filter(lo.Keys(propertiesMap), func(pk PropertyKey, index int) bool {
+				if index, ok := pk.(IntegerIndexPropertyKey); ok {
+					return index.Value >= length
+				}
+				return false
+			})
+		sort.Slice(keysGreaterThanLength, func(i, j int) bool {
+			return keysGreaterThanLength[i].(IntegerIndexPropertyKey).Value < keysGreaterThanLength[j].(IntegerIndexPropertyKey).Value
+		})
+		copy(keys[length:], keysGreaterThanLength)
+
+		for pk, _ := range propertiesMap {
+			if _, ok := pk.(StringPropertyKey); ok {
+				keys = append(keys, pk)
+			}
+		}
+		for pk, _ := range propertiesMap {
+			if _, ok := pk.(SymbolPropertyKey); ok {
+				keys = append(keys, pk)
+			}
+		}
+		return keys
 	}
 
 	stringObject := &StringObject{
@@ -59,6 +94,7 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 	}
 	stringObject.InternalMethods().GetOwnProperty = getOwnProperty
 	stringObject.InternalMethods().DefineOwnProperty = defineOwnProperty
+	stringObject.InternalMethods().OwnPropertyKeys = ownPropertyKeys
 
 	length := uint64(len(s))
 	stringObject.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
