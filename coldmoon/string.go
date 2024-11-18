@@ -1,6 +1,9 @@
 package coldmoon
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 type StringObject struct {
 	*Object
@@ -164,6 +167,56 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		k := relativeIndex
 		return NewStringValue(string(s[k]))
 	}
+	var slice BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		intStart := ToIntegerOrInfinity(agent, argumentsList[0])
+		intEnd := ToIntegerOrInfinity(agent, argumentsList[1])
+
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		length := len(s)
+
+		var from float64
+		if intStart == math.Inf(-1) {
+			from = 0
+		} else if intStart < 0 {
+			from = math.Max(float64(length)+intStart, 0)
+		} else {
+			from = math.Min(intStart, float64(length))
+		}
+
+		var to float64
+		if intEnd == math.Inf(-1) {
+			to = 0
+		} else if intEnd < 0 {
+			to = math.Max(float64(length)+intEnd, 0)
+		} else {
+			to = math.Min(intEnd, float64(length))
+		}
+		if from >= to {
+			return NewStringValue("")
+		}
+		return NewStringValue(s[int(from):int(to)])
+	}
+	var repeat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		n := ToIntegerOrInfinity(agent, argumentsList[0])
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		if n < 0 || n == math.Inf(1) {
+			panic("RangeError")
+		}
+		if n == 0 {
+			return NewStringValue("")
+		}
+		return NewStringValue(strings.Repeat(s, int(n)))
+	}
+	var concat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		for _, arg := range argumentsList {
+			s += arg.String()
+		}
+		return NewStringValue(s)
+	}
 
 	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "valueOf", valueOf, 0, realm)
@@ -171,6 +224,9 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	DefineBuiltinFunction(stringPrototype, "charCodeAt", charCodeAt, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "iterator", iterator, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "at", at, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "slice", slice, 2, realm)
+	DefineBuiltinFunction(stringPrototype, "repeat", repeat, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "concat", concat, 1, realm)
 
 	return stringPrototype
 }
