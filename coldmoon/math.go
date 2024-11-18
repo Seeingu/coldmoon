@@ -240,6 +240,48 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(math.Log2(n.Data))
 	}
+	var mathMax BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		coerced := make([]*NumberValue, len(argumentsList))
+		for i, arg := range argumentsList {
+			coerced[i] = ToNumber(agent, arg)
+		}
+
+		highest := NewNumberValue(math.Inf(-1))
+		for _, number := range coerced {
+			if number.IsNaN() {
+				return NewNumberValue(math.NaN())
+			}
+			if number.IsPositiveZero() && highest.IsNegativeZero() {
+				highest = number
+				continue
+			}
+			if number.Data > highest.Data {
+				highest = number
+			}
+		}
+		return highest
+	}
+	var mathMin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		coerced := make([]*NumberValue, len(argumentsList))
+		for i, arg := range argumentsList {
+			coerced[i] = ToNumber(agent, arg)
+		}
+
+		lowest := NewNumberValue(math.Inf(1))
+		for _, number := range coerced {
+			if number.IsNaN() {
+				return NewNumberValue(math.NaN())
+			}
+			if number.IsNegativeZero() && lowest.IsPositiveZero() {
+				lowest = number
+				continue
+			}
+			if number.Data < lowest.Data {
+				lowest = number
+			}
+		}
+		return lowest
+	}
 
 	DefineBuiltinFunction(object, "random", random, 0, realm)
 	DefineBuiltinFunction(object, "abs", abs, 1, realm)
@@ -270,6 +312,8 @@ func NewMathObject(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "log1p", log1p, 1, realm)
 	DefineBuiltinFunction(object, "log10", log10, 1, realm)
 	DefineBuiltinFunction(object, "log2", log2, 1, realm)
+	DefineBuiltinFunction(object, "max", mathMax, 2, realm)
+	DefineBuiltinFunction(object, "min", mathMin, 2, realm)
 
 	return object
 }
