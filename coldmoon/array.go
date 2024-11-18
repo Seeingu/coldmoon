@@ -1107,6 +1107,55 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(A)
 	}
+	var sort BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		compareFn := args[0]
+		if compareFn != UndefinedValue && !IsCallable(compareFn) {
+			panic("TypeError")
+		}
+		obj := ValueToObject(agent, this)
+		length := obj.LengthOfArrayLike()
+
+		sortCompare := SortCompare{
+			compareFn: MustGetObject(compareFn),
+			impl: func(agent *Agent, x Value, y Value, objectType ObjectType) int {
+				return CompareArrayElements(agent, x, y, objectType)
+			},
+		}
+
+		sortedList := SortIndexedProperties(agent, obj, float64(length), sortCompare, sortHolesTypeSkipHoles)
+		itemCount := len(sortedList)
+
+		j := 0
+		for ; j < itemCount; j++ {
+			obj.Set(NewIntegerIndexPropertyKey(j), sortedList[j], setThrowTypeThrow)
+		}
+		for ; j < int(length); j++ {
+			obj.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(j))
+		}
+		return NewValueFromObject(obj)
+	}
+	var toSorted BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		compareFn := args[0]
+		if compareFn != UndefinedValue && !IsCallable(compareFn) {
+			panic("TypeError")
+		}
+		obj := ValueToObject(agent, this)
+		length := obj.LengthOfArrayLike()
+
+		sortCompare := SortCompare{
+			compareFn: MustGetObject(compareFn),
+			impl: func(agent *Agent, x Value, y Value, objectType ObjectType) int {
+				return CompareArrayElements(agent, x, y, objectType)
+			},
+		}
+
+		sortedList := SortIndexedProperties(agent, obj, float64(length), sortCompare, sortHolesTypeReadThroughHoles)
+		A := ArrayCreate(agent, float64(length), nil)
+		for k, v := range sortedList {
+			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(k), v)
+		}
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -1141,6 +1190,8 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm)
 	DefineBuiltinFunction(object, "reverse", reverse, 0, realm)
 	DefineBuiltinFunction(object, "toReversed", toReversed, 0, realm)
+	DefineBuiltinFunction(object, "sort", sort, 1, realm)
+	DefineBuiltinFunction(object, "toSorted", toSorted, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
@@ -1241,4 +1292,94 @@ func IsConcatSpreadable(agent *Agent, value Value) bool {
 		return spreadable.ToBoolean()
 	}
 	return IsArray(value)
+}
+
+type SortCompare struct {
+	compareFn ObjectType
+	impl      func(*Agent, Value, Value, ObjectType) int
+}
+
+type sortHolesType int
+
+const (
+	sortHolesTypeSkipHoles sortHolesType = iota
+	sortHolesTypeReadThroughHoles
+)
+
+func InsertionSort(agent *Agent, items []Value, sortCompare SortCompare) {
+	if len(items) == 0 {
+		return
+	}
+	for i := 1; i < len(items); i++ {
+		x := items[i]
+		j := i
+		for j > 0 {
+			y := items[j-1]
+			if sortCompare.impl(agent, x, y, sortCompare.compareFn) >= 0 {
+				break
+			}
+			items[j] = y
+			j--
+		}
+		items[j] = x
+	}
+}
+
+// 23.1.3.30.1
+func SortIndexedProperties(agent *Agent, obj ObjectType, length float64, sortCompare SortCompare, holes sortHolesType) (items []Value) {
+	k := 0
+	for k < int(length) {
+		pk := NewIntegerIndexPropertyKey(k)
+		var kRead bool
+		if holes == sortHolesTypeSkipHoles {
+			kRead = obj.HasProperty(pk)
+		} else {
+			kRead = true
+		}
+		if kRead {
+			kValue := obj.Get(pk)
+			items = append(items, kValue)
+		}
+		k++
+	}
+	InsertionSort(agent, items, sortCompare)
+
+	return
+}
+
+// 23.1.3.30.2
+func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) int {
+	if x == UndefinedValue && y == UndefinedValue {
+		return 0
+	}
+	if x == UndefinedValue {
+		return 1
+	}
+	if y == UndefinedValue {
+		return -1
+	}
+	if compareFn != nil {
+		v := ToNumber(agent,
+			NewValueFromObject(compareFn).CallAssumeCallable(
+				UndefinedValue,
+				[]Value{x, y}),
+		)
+		if v.IsNaN() {
+			return 0
+		}
+		return int(v.Data)
+	}
+
+	xString := x.String()
+	yString := y.String()
+	xSmaller := IsLessThan(agent, NewStringValue(xString), NewStringValue(yString), IsLessThanOrderLeftFirst)
+	if xSmaller {
+		return -1
+	}
+
+	ySmaller := IsLessThan(agent, NewStringValue(yString), NewStringValue(xString), IsLessThanOrderLeftFirst)
+	if ySmaller {
+		return 1
+	}
+	return 0
 }
