@@ -784,6 +784,48 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(A)
 	}
+	var reduce BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		callbackFn := args[0]
+		initialValue := args[1]
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+		if !IsCallable(callbackFn) {
+			panic("TypeError")
+		}
+		if length == 0 && initialValue == UndefinedValue {
+			panic("TypeError")
+		}
+		k := 0
+		var accumulator Value
+		if initialValue == UndefinedValue {
+			kPresent := false
+			for {
+				pk := NewIntegerIndexPropertyKey(k)
+				kPresent = o.HasProperty(pk)
+				if kPresent {
+					accumulator = o.Get(pk)
+					k++
+					break
+				}
+				k++
+				if k >= int(length) {
+					panic("TypeError")
+				}
+			}
+		} else {
+			accumulator = initialValue
+		}
+		for k < int(length) {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				accumulator = callbackFn.CallAssumeCallable(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(float64(k)), this})
+			}
+			k++
+		}
+		return accumulator
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -810,6 +852,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "shift", shift, 0, realm)
 	DefineBuiltinFunction(object, "unshift", unshift, 1, realm)
 	DefineBuiltinFunction(object, "filter", filter, 1, realm)
+	DefineBuiltinFunction(object, "reduce", reduce, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
