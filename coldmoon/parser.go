@@ -1117,7 +1117,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 	switch t.Type {
 	case TIdentifier:
 		identifierRef := p.identifierReference()
-		if p.tokenizer.CurrentToken.Type != TColon {
+		if p.tokenizer.CurrentToken.Type != TColon && p.tokenizer.CurrentToken.Type != TLeftParen {
 			return &PropertyDefinitionIdentifierReference{
 				IdentifierReference: identifierRef,
 			}
@@ -1145,8 +1145,26 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 	default:
 		panic("propertyDefinition: unexpected token")
 	}
-	p.tokenizer.MustMatch(TColon)
-	value := p.expression(p.acceptContext(TComma))
+	var value Expression
+	if p.tokenizer.Match(TColon) {
+		value = p.expression(p.acceptContext(TComma))
+	} else if p.tokenizer.Match(TLeftParen) {
+		start := p.tokenizer.Index
+		formalParameters := p.formalParameters()
+		p.tokenizer.MustMatch(TRightParen)
+		p.tokenizer.MustMatch(TLeftBrace)
+		body := p.functionBody()
+		p.tokenizer.MustMatch(TRightBrace)
+		sourceText := p.SourceText[start:p.tokenizer.Index]
+		value = &PrimaryExpressionFunctionExpression{
+			Identifier:       "",
+			FormalParameters: formalParameters,
+			SourceText:       sourceText,
+			Body:             body,
+		}
+	} else {
+		panic("propertyDefinition: expected colon or left paren")
+	}
 	return &PropertyDefinitionNameAndExpression{
 		Name:       propertyName,
 		Expression: value,
