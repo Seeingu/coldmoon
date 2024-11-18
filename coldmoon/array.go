@@ -1156,6 +1156,21 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(A)
 	}
+	var flat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		depth := args[0]
+		o := ValueToObject(agent, this)
+		sourceLen := o.LengthOfArrayLike()
+		var depthNum float64 = 1
+		if depth != UndefinedValue {
+			depthNum = ToIntegerOrInfinity(agent, depth)
+			if depthNum < 0 {
+				depthNum = 0
+			}
+		}
+		A := ArraySpeciesCreate(agent, o, 0)
+		FlattenIntoArray(agent, A, o, float64(sourceLen), 0, depthNum, nil, nil)
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -1192,6 +1207,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "toReversed", toReversed, 0, realm)
 	DefineBuiltinFunction(object, "sort", sort, 1, realm)
 	DefineBuiltinFunction(object, "toSorted", toSorted, 1, realm)
+	DefineBuiltinFunction(object, "flat", flat, 0, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
@@ -1382,4 +1398,50 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) int {
 		return 1
 	}
 	return 0
+}
+
+func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen float64, start, depth float64, mapperFunction ObjectType, thisArg Value) float64 {
+	if mapperFunction != nil {
+		Assert(IsCallable(NewValueFromObject(mapperFunction)))
+		Assert(thisArg != nil)
+		Assert(depth == 1)
+	}
+
+	targetIndex := start
+	sourceIndex := 0
+	for sourceIndex < int(sourceLen) {
+		p := NewIntegerIndexPropertyKey(sourceIndex)
+		exists := source.HasProperty(p)
+		if exists {
+			element := source.Get(p)
+			if mapperFunction != nil {
+				element = NewValueFromObject(mapperFunction).CallAssumeCallable(
+					thisArg,
+					[]Value{element, NewNumberValue(float64(sourceIndex)), NewValueFromObject(source)},
+				)
+			}
+
+			shouldFlatten := false
+			if depth > 0 {
+				shouldFlatten = IsArray(element)
+			}
+			if shouldFlatten {
+				var newDepth float64
+				if depth == math.Inf(1) {
+					newDepth = math.Inf(1)
+				} else {
+					newDepth = depth - 1
+				}
+				elementLen := MustGetObject(element).LengthOfArrayLike()
+				targetIndex = FlattenIntoArray(agent, target, MustGetObject(element), float64(elementLen), targetIndex, newDepth, mapperFunction, thisArg)
+			} else {
+				if targetIndex >= POW_2_53-1 {
+					panic("TypeError")
+				}
+				target.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(int(targetIndex)), element)
+				targetIndex++
+			}
+		}
+	}
+	return targetIndex
 }
