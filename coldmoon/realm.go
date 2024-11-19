@@ -53,6 +53,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.MapPrototype = NewMapPrototype(r)
 	r.Intrinsics.Map = NewMapConstructor(r)
 	r.Intrinsics.MapIteratorPrototype = NewMapIteratorPrototype(r)
+	r.Intrinsics.SetPrototype = NewSetPrototype(r)
+	r.Intrinsics.Set = NewSetConstructor(r)
 	r.Intrinsics.NumberPrototype = NewNumberPrototype(r)
 	r.Intrinsics.NumberConstructor = NewNumberConstructor(r)
 	r.Intrinsics.Math = NewMathObject(r)
