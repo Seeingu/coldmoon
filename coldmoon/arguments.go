@@ -26,6 +26,12 @@ func CreateUnmappedArgumentsObject(agent *Agent, argumentsList []Value) ObjectTy
 		obj.CreateDataPropertyOrThrow(pk, value)
 	}
 
+	obj.DefinePropertyOrThrow(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]), &PropertyDescriptor{
+		Value:        NewValueFromObject(realm.Intrinsics.ArrayPrototypeValues),
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: true,
+	})
 	obj.DefinePropertyOrThrow(NewStringPropertyKey("callee"), &PropertyDescriptor{
 		Get:          realm.Intrinsics.ThrowTypeError,
 		Set:          realm.Intrinsics.ThrowTypeError,

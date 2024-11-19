@@ -390,6 +390,27 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		default:
 			panic("unreachable")
 		}
+		// 15.4.5
+	case *IObjectDefineMethod:
+		functionExpression := ins.FunctionExpression
+		methodType := ins.MethodType
+		propertyName := vm.stack.Pop()
+		object := MustGetObject(vm.stack.Pop())
+		enumerable := true
+		switch methodType {
+		case MethodDefinitionTypeMethod:
+			methodDef := DefineMethod(
+				vm.agent,
+				functionExpression,
+				propertyName,
+				object,
+				nil,
+			)
+			SetFunctionName(methodDef.Closure, methodDef.Key, "")
+			DefineMethodProperty(object, methodDef.Key, methodDef.Closure, enumerable)
+		default:
+			panic("unreachable")
+		}
 	}
 }
 
@@ -655,4 +676,38 @@ func InstantiateArrowFunctionExpression(agent *Agent, arrowFunction *PrimaryExpr
 
 	SetFunctionName(closure, NewStringPropertyKey(name), "")
 	return closure
+}
+
+// 15.4.4
+type DefineMethodRecord struct {
+	Key     PropertyKey
+	Closure ObjectType
+}
+
+func DefineMethod(agent *Agent, functionExpression *PrimaryExpressionFunctionExpression, propertyName Value, object ObjectType, proto ObjectType) *DefineMethodRecord {
+	realm := agent.CurrentRealm()
+	propKey := ToPropertyKey(agent, propertyName)
+	env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	var prototype ObjectType
+	if proto == nil {
+		prototype = realm.Intrinsics.FunctionPrototype
+	} else {
+		prototype = proto
+	}
+	sourceText := functionExpression.SourceText
+	closure := OrdinaryFunctionCreate(agent,
+		prototype,
+		sourceText,
+		functionExpression.FormalParameters,
+		functionExpression.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+	MakeMethod(closure, object)
+	return &DefineMethodRecord{
+		Key:     propKey,
+		Closure: closure,
+	}
 }

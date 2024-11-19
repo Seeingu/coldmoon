@@ -204,11 +204,8 @@ func (p *PrimaryExpressionObjectLiteral) Bytecode(e *Executable, c *BytecodeCont
 	}
 
 	e.AddInstruction(&IObjectCreate{})
-	e.AddInstruction(InsLoad)
 
 	p.PropertyList.Bytecode(e, c)
-
-	e.AddInstruction(InsStore)
 }
 
 func (p *PrimaryExpressionObjectLiteral) String() string {
@@ -225,6 +222,7 @@ type PropertyDefinitionList struct {
 
 func (p *PropertyDefinitionList) Bytecode(e *Executable, c *BytecodeContext) {
 	for _, item := range p.Items {
+		e.AddInstruction(InsLoad)
 		item.Bytecode(e, c)
 	}
 }
@@ -239,6 +237,8 @@ func (p *PropertyDefinitionList) String() string {
 	}
 	return sb
 }
+
+// MARK: - PropertyDefinition
 
 type PropertyDefinition interface {
 	ASTNode
@@ -286,6 +286,34 @@ func (p *PropertyDefinitionNameAndExpression) Bytecode(e *Executable, c *Bytecod
 
 func (p *PropertyDefinitionNameAndExpression) String() string {
 	return p.Name.String() + ": " + p.Expression.String()
+}
+
+// MARK: - Method Definition
+
+type MethodDefinitionType int
+
+const (
+	MethodDefinitionTypeMethod MethodDefinitionType = iota
+	MethodDefinitionTypeGet
+	MethodDefinitionTypeSet
+)
+
+type PropertyDefinitionMethodDefinition struct {
+	PropertyDefinition
+	Type               MethodDefinitionType
+	Name               PropertyName
+	FunctionExpression *PrimaryExpressionFunctionExpression
+}
+
+func (p *PropertyDefinitionMethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
+	strict := c.containedInStrictCode || p.FunctionExpression.Body.FunctionBodyContainsUseStrict()
+	p.FunctionExpression.Body.Strict = strict
+	p.Name.Bytecode(e, c)
+	e.AddInstruction(InsLoad)
+	e.AddInstruction(&IObjectDefineMethod{
+		FunctionExpression: p.FunctionExpression,
+		MethodType:         p.Type,
+	})
 }
 
 // MARK: - PropertyName

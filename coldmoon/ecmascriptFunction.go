@@ -417,6 +417,47 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 	})
 }
 
+// 10.2.7
+func MakeMethod(F *ECMAScriptFunction, homeObject ObjectType) {
+	F.HomeObject = homeObject
+}
+
+type PropertyKeyOrPrivateName interface {
+}
+type PropertyKeyOrPrivateNameKey struct {
+	PropertyKeyOrPrivateName
+	PropertyKey PropertyKey
+}
+type PropertyKeyOrPrivateNameName struct {
+	PropertyKeyOrPrivateName
+	PrivateName PrivateName
+}
+
+// 10.2.8
+func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, closure ObjectType, enumerable bool) *PrivateElement {
+	Assert(homeObject.IsExtensible())
+	switch k := key.(type) {
+	case PropertyKeyOrPrivateNameName:
+		return &PrivateElement{
+			Key:   k.PrivateName,
+			Kind:  PrivateElementKindMethod,
+			Value: NewValueFromObject(closure),
+		}
+	case PropertyKeyOrPrivateNameKey:
+		desc := &PropertyDescriptor{
+			Value:        NewValueFromObject(closure),
+			Writable:     true,
+			Enumerable:   enumerable,
+			Configurable: true,
+		}
+		homeObject.DefinePropertyOrThrow(k.PropertyKey, desc)
+		// unused
+		return nil
+	}
+	panic("unreachable")
+	return nil
+}
+
 // 10.2.9
 func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 	Assert(function.IsExtensible())

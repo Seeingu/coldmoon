@@ -311,6 +311,16 @@ func (i *IObjectSetProperty) String() string {
 	return "IObjectSetProperty"
 }
 
+type IObjectDefineMethod struct {
+	Instruction
+	MethodType         MethodDefinitionType
+	FunctionExpression *PrimaryExpressionFunctionExpression
+}
+
+func (i *IObjectDefineMethod) String() string {
+	return "IObjectDefineMethod"
+}
+
 // MARK: - Relation
 
 type IGreaterThan struct {
