@@ -22,6 +22,32 @@ func DefineBuiltinFunction(object ObjectType,
 	DefineBuiltinProperty(object, name, NewValueFromObject(f))
 }
 
+func DefineBuiltinFunctionWithAttributes(object ObjectType,
+	name string,
+	fn BehaviorFn,
+	length float64,
+	realm *Realm,
+	attr PropertyDescriptorAttributes,
+) {
+	var functionName = name
+	if strings.HasPrefix(name, "@@") {
+		functionName = name[2:]
+	}
+	f := CreateBuiltinFunction(
+		realm.Agent,
+		fn,
+		length,
+		functionName,
+		builtinFunctionArgs{realm: realm},
+	)
+	DefineBuiltinProperty(object, name, &PropertyDescriptor{
+		Value:        NewValueFromObject(f),
+		Writable:     attr.Writable,
+		Configurable: attr.Configurable,
+		Enumerable:   attr.Enumerable,
+	})
+}
+
 func DefineBuiltinProperty(object ObjectType, name string, value interface{}) {
 	var descriptor *PropertyDescriptor
 	switch v := value.(type) {

@@ -11,6 +11,12 @@ type PropertyDescriptor struct {
 	Configurable bool
 }
 
+type PropertyDescriptorAttributes struct {
+	Writable     bool
+	Enumerable   bool
+	Configurable bool
+}
+
 // 6.2.6.1
 func (p *PropertyDescriptor) IsAccessorDescriptor() bool {
 	return p.Get != nil || p.Set != nil
