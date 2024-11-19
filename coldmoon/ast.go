@@ -293,7 +293,8 @@ func (p *PropertyDefinitionNameAndExpression) String() string {
 type MethodDefinitionType int
 
 const (
-	MethodDefinitionTypeMethod MethodDefinitionType = iota
+	MethodDefinitionTypeNil MethodDefinitionType = iota
+	MethodDefinitionTypeMethod
 	MethodDefinitionTypeGet
 	MethodDefinitionTypeSet
 )

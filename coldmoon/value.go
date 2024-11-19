@@ -458,6 +458,15 @@ func StringToBigInt(value *StringValue) (*BigIntValue, bool) {
 	}, true
 }
 
+func GetPrivateName(agent *Agent, value Value) (*PrivateName, bool) {
+	if symbol, ok := value.(*SymbolValue); ok && symbol.IsPrivate {
+		return &PrivateName{
+			Symbol: symbol,
+		}, true
+	}
+	return nil, false
+}
+
 // 7.1.19
 func ToPropertyKey(agent *Agent, value Value) PropertyKey {
 	key := ToPrimitive(agent, value, PreferredTypeString)

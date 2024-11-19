@@ -390,28 +390,104 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		default:
 			panic("unreachable")
 		}
-		// 15.4.5
 	case *IObjectDefineMethod:
-		functionExpression := ins.FunctionExpression
-		methodType := ins.MethodType
-		propertyName := vm.stack.Pop()
-		object := MustGetObject(vm.stack.Pop())
-		enumerable := true
-		switch methodType {
-		case MethodDefinitionTypeMethod:
-			methodDef := DefineMethod(
-				vm.agent,
-				functionExpression,
-				propertyName,
-				object,
-				nil,
-			)
-			SetFunctionName(methodDef.Closure, methodDef.Key, "")
-			DefineMethodProperty(object, methodDef.Key, methodDef.Closure, enumerable)
-		default:
-			panic("unreachable")
+		vm.MethodDefinitionEvaluation(ins)
+	}
+}
+
+// 15.4.5
+func (vm *VM) MethodDefinitionEvaluation(ins *IObjectDefineMethod) *PrivateElement {
+	agent := vm.agent
+	functionExpression := ins.FunctionExpression
+	methodType := ins.MethodType
+	propertyName := vm.stack.Pop()
+	object := MustGetObject(vm.stack.Pop())
+	defer func() {
+		vm.result = NewValueFromObject(object)
+	}()
+	enumerable := true
+	switch methodType {
+	case MethodDefinitionTypeMethod:
+		methodDef := DefineMethod(
+			vm.agent,
+			functionExpression,
+			propertyName,
+			object,
+			nil,
+		)
+		SetFunctionName(methodDef.Closure, methodDef.Key, "")
+		DefineMethodProperty(object, methodDef.Key, methodDef.Closure, enumerable)
+	case MethodDefinitionTypeGet:
+		propKeyOrPrivateName := propertyName
+		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := functionExpression.SourceText
+		formalParameterList := &FormalParameters{}
+		closure := OrdinaryFunctionCreate(
+			vm.agent,
+			vm.agent.CurrentRealm().Intrinsics.FunctionPrototype,
+			sourceText,
+			formalParameterList,
+			functionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(closure, object)
+
+		propKey := ToPropertyKey(vm.agent, propertyName)
+		SetFunctionName(closure, propKey, "get")
+		if _, ok := GetPrivateName(agent, propKeyOrPrivateName); ok {
+			return &PrivateElement{
+				Get:  closure,
+				Kind: PrivateElementKindAccessor,
+				Set:  nil,
+			}
+		} else {
+			desc := &PropertyDescriptor{
+				Get:          closure,
+				Enumerable:   enumerable,
+				Configurable: true,
+			}
+			object.DefinePropertyOrThrow(propKey, desc)
+
+			return nil
+		}
+	case MethodDefinitionTypeSet:
+		propKeyOrPrivateName := propertyName
+		propKey := ToPropertyKey(vm.agent, propertyName)
+		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := functionExpression.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			agent.CurrentRealm().Intrinsics.FunctionPrototype,
+			sourceText,
+			functionExpression.FormalParameters,
+			functionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(closure, object)
+		SetFunctionName(closure, propKey, "set")
+		if _, ok := GetPrivateName(agent, propKeyOrPrivateName); ok {
+			return &PrivateElement{
+				Get:  nil,
+				Kind: PrivateElementKindAccessor,
+				Set:  closure,
+			}
+		} else {
+			desc := &PropertyDescriptor{
+				Set:          closure,
+				Enumerable:   enumerable,
+				Configurable: true,
+			}
+			object.DefinePropertyOrThrow(propKey, desc)
+			return nil
 		}
 	}
+	panic("unreachable")
 }
 
 func (vm *VM) Run(executable *Executable) *CompletionRecord {

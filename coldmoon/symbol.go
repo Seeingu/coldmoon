@@ -6,6 +6,7 @@ type SymbolValue struct {
 	Value
 	Id          uint64
 	Description string
+	IsPrivate   bool
 }
 
 var _ Value = (*SymbolValue)(nil)

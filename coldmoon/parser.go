@@ -1100,7 +1100,7 @@ func (p *Parser) propertyDefinitionList() *PropertyDefinitionList {
 			p.tokenizer.Next()
 			continue
 		}
-		prop := p.propertyDefinition()
+		prop := p.propertyDefinition(MethodDefinitionTypeNil)
 		list = append(list, prop)
 		if p.tokenizer.CurrentToken.Type == TComma {
 			p.tokenizer.Next()
@@ -1111,12 +1111,22 @@ func (p *Parser) propertyDefinitionList() *PropertyDefinitionList {
 	}
 }
 
-func (p *Parser) propertyDefinition() PropertyDefinition {
+func (p *Parser) propertyDefinition(methodType MethodDefinitionType) PropertyDefinition {
 	t := p.tokenizer.CurrentToken
 	var propertyName PropertyName
 	switch t.Type {
 	case TIdentifier:
 		identifierRef := p.identifierReference()
+		if methodType == MethodDefinitionTypeNil {
+			isGet := identifierRef.Identifier == "get"
+			isSet := identifierRef.Identifier == "set"
+			if isGet {
+				return p.propertyDefinition(MethodDefinitionTypeGet)
+			}
+			if isSet {
+				return p.propertyDefinition(MethodDefinitionTypeSet)
+			}
+		}
 		if p.tokenizer.CurrentToken.Type != TColon && p.tokenizer.CurrentToken.Type != TLeftParen {
 			return &PropertyDefinitionIdentifierReference{
 				IdentifierReference: identifierRef,
@@ -1160,8 +1170,12 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		body := p.functionBody()
 		p.tokenizer.MustMatch(TRightBrace)
 		sourceText := p.SourceText[start:p.tokenizer.Index]
+		var m = MethodDefinitionTypeMethod
+		if methodType != MethodDefinitionTypeNil {
+			m = methodType
+		}
 		return &PropertyDefinitionMethodDefinition{
-			Type: MethodDefinitionTypeMethod,
+			Type: m,
 			Name: propertyName,
 			FunctionExpression: &PrimaryExpressionFunctionExpression{
 				Identifier:       "",
