@@ -16,7 +16,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		if newTarget == nil {
 			panic("TypeError")
 		}
-		o := OrdinaryCreateFromConstructor(agent, newTarget, "%Set.prototype%", nil)
+		o := OrdinaryCreateFromConstructor(agent, newTarget, "%SetObject.prototype%", nil)
 		s := &SetObject{
 			Object:   o,
 			SetValue: &SetValue{},
@@ -40,7 +40,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		return NewValueFromObject(s)
 
 	}
-	object := CreateBuiltinFunction(agent, behavior, 0, "Set", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 0, "SetObject", builtinFunctionArgs{
 		prototype: realm.Intrinsics.FunctionPrototype,
 		realm:     realm,
 	})
@@ -116,7 +116,7 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "size", setSize, 0, realm)
 
 	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("Set"),
+		Value:        NewStringValue("SetObject"),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,

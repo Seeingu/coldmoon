@@ -55,10 +55,12 @@ type Intrinsics struct {
 	MapPrototype ObjectType
 	// %MapIteratorPrototype%
 	MapIteratorPrototype ObjectType
-	// %Set%
+	// %SetObject%
 	Set ObjectType
-	// %Set.prototype%
+	// %SetObject.prototype%
 	SetPrototype ObjectType
+	// %SetIteratorPrototype%
+	SetIteratorPrototype ObjectType
 	// %IsFinite%
 	IsFinite ObjectType
 	// %isNaN%

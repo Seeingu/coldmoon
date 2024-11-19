@@ -106,7 +106,7 @@ func (o *Object) Get(key PropertyKey) Value {
 func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) {
 	success := o.InternalMethods().Set(o, key, value, NewValueFromObject(o))
 	if !success && throw == setThrowTypeThrow {
-		o.Agent().ThrowException(TypeError, "Set failed")
+		o.Agent().ThrowException(TypeError, "SetObject failed")
 	}
 }
 
