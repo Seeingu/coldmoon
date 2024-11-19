@@ -1567,6 +1567,7 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 		e.AddInstruction(InsGetValue)
 	}
 
+	e.AddInstruction(InsLoad)
 	e.AddInstruction(InsLoadThisValue)
 	for _, arg := range c.Arguments {
 		arg.Bytecode(e, bc)
@@ -1665,6 +1666,7 @@ func (v *VariableDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 		return
 	}
 
+	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IResolveBinding{
 		Name: v.Identifier,
 	})

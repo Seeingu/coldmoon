@@ -52,9 +52,9 @@ func NewReferenceRecord(base ReferenceRecordBase, referencedName ReferencedName,
 // 6.2.5.1
 func (r *ReferenceRecord) IsPropertyReference() bool {
 	switch r.Base.(type) {
-	case *ReferenceRecordBaseUnresolvable:
+	case *ReferenceRecordBaseUnresolvable, *ReferenceRecordBaseEnvironment:
 		return false
-	case *ReferenceRecordBaseValue, *ReferenceRecordBaseEnvironment:
+	case *ReferenceRecordBaseValue:
 		return true
 	}
 	panic("unreachable")

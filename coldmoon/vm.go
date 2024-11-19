@@ -29,7 +29,9 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	agent := vm.agent
 	switch ins := i.(type) {
 	case *ILoad:
-		vm.stack.Push(vm.result)
+		if vm.result != nil {
+			vm.stack.Push(vm.result)
+		}
 	case *ILoadConstant:
 		vm.stack.Push(ins.Value)
 	case *IStore:

@@ -743,7 +743,7 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 			return expr
 		}
 
-		secondary := p.secondaryExpression(primary, newAcceptContext)
+		secondary := p.secondaryExpression(expr, newAcceptContext)
 		if secondary == nil {
 			return expr
 		}
@@ -941,7 +941,8 @@ func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
 		}
 	} else if token.Type == TPeriod {
 		p.tokenizer.Next()
-		identifier := p.tokenizer.Next()
+		identifier := p.tokenizer.CurrentToken
+		p.tokenizer.Next()
 		if identifier.Type != TIdentifier {
 			panic("memberExpression: expected identifier")
 		}
@@ -973,9 +974,8 @@ func (p *Parser) arguments() Arguments {
 	p.tokenizer.MustMatch(TLeftParen)
 	var list Arguments
 	for {
-		t := p.tokenizer.Peek()
+		t := p.tokenizer.CurrentToken
 		if t.Type == TRightParen {
-			p.tokenizer.Next()
 			break
 		}
 		// Precedence greater than TComma
