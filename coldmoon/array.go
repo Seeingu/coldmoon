@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"github.com/Seeingu/coldmoon/pkg"
+	"github.com/samber/lo"
 	"math"
 	"strings"
 )
@@ -1271,6 +1272,62 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		o.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)-actualDeleteCount+float64(itemCount)), setThrowTypeThrow)
 		return NewValueFromObject(A)
 	}
+	var toSpliced BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		start := args[0]
+		skipCount := args[1]
+		var items []Value
+		if len(args) > 2 {
+			items = args[2:]
+		}
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+
+		var relativeStart float64 = 0
+		if start != nil {
+			relativeStart = ToIntegerOrInfinity(agent, start)
+		}
+		var actualStart float64
+		if relativeStart == math.Inf(-1) {
+			actualStart = 0
+		} else if relativeStart < 0 {
+			actualStart = math.Max(float64(length)+relativeStart, 0)
+		} else {
+			actualStart = math.Min(relativeStart, float64(length))
+		}
+		insertCount := len(items)
+		var actualSkipCount float64
+		if start == nil {
+			actualSkipCount = 0
+		} else if skipCount == nil {
+			actualSkipCount = float64(length) - actualStart
+		} else {
+			sc := ToIntegerOrInfinity(agent, skipCount)
+			actualSkipCount = lo.Clamp(sc, 0, float64(length)-actualStart)
+		}
+
+		newLen := float64(length) + float64(insertCount) - actualSkipCount
+
+		A := ArrayCreate(agent, newLen, nil)
+		i := 0
+		r := actualStart + actualSkipCount
+		for ; i < int(actualStart); i++ {
+			from := NewIntegerIndexPropertyKey(i)
+			fromValue := o.Get(from)
+			A.CreateDataPropertyOrThrow(from, fromValue)
+		}
+		for _, E := range items {
+			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), E)
+			i++
+		}
+		for ; i < int(newLen); i++ {
+			from := NewIntegerIndexPropertyKey(int(r))
+			fromValue := o.Get(from)
+			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), fromValue)
+			r++
+		}
+
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -1310,6 +1367,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "flat", flat, 0, realm)
 	DefineBuiltinFunction(object, "flatMap", flatMap, 1, realm)
 	DefineBuiltinFunction(object, "splice", splice, 2, realm)
+	DefineBuiltinFunction(object, "toSpliced", toSpliced, 2, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
