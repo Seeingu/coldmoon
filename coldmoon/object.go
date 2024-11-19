@@ -671,14 +671,16 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 			builtInTag = "Array"
 		} else if o.InternalMethods().Call != nil {
 			builtInTag = "Function"
-		} else if _, ok := o.(*BooleanObject); ok {
+		} else if ObjectIs[*BooleanObject](o) {
 			builtInTag = "Boolean"
-		} else if _, ok := o.(*ErrorObject); ok {
+		} else if ObjectIs[*ErrorObject](o) {
 			builtInTag = "Error"
-		} else if _, ok := o.(*NumberObject); ok {
+		} else if ObjectIs[*NumberObject](o) {
 			builtInTag = "Number"
-		} else if _, ok := o.(*StringObject); ok {
+		} else if ObjectIs[*StringObject](o) {
 			builtInTag = "String"
+		} else if ObjectIs[*DateObject](o) {
+			builtInTag = "Date"
 		} else {
 			builtInTag = "Object"
 		}
