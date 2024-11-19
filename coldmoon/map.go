@@ -115,14 +115,32 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		m := RequireInternalSlot[*MapObject](this)
 		return NewNumberValue(float64(len(m.MapValue.Data)))
 	}
-	var entries BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapEntries BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindKeyAndValue))
 	}
-	var keys BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapKeys BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindKey))
 	}
-	var values BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapValues BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindValue))
+	}
+	var forEach BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		m := RequireInternalSlot[*MapObject](this)
+		callbackFn := arguments[0]
+		thisArg := arguments[1]
+		if !IsCallable(callbackFn) {
+			panic("TypeError")
+		}
+		entries := m.MapValue.Data
+		numEntries := len(m.MapValue.Data)
+		index := 0
+		for ; index < numEntries; index++ {
+			if v, ok := entries[NewNumberValue(float64(index))]; ok {
+				callbackFn.CallAssumeCallable(thisArg, []Value{v, NewNumberValue(float64(index)), this})
+			}
+			numEntries = len(m.MapValue.Data)
+		}
+		return UndefinedValue
 	}
 
 	DefineBuiltinFunction(object, "clear", mapClear, 0, realm)
@@ -131,9 +149,10 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "has", mapHas, 1, realm)
 	DefineBuiltinFunction(object, "set", mapSet, 2, realm)
 	DefineBuiltinFunction(object, "size", size, 0, realm)
-	DefineBuiltinFunction(object, "entries", entries, 0, realm)
-	DefineBuiltinFunction(object, "keys", keys, 0, realm)
-	DefineBuiltinFunction(object, "values", values, 0, realm)
+	DefineBuiltinFunction(object, "entries", mapEntries, 0, realm)
+	DefineBuiltinFunction(object, "keys", mapKeys, 0, realm)
+	DefineBuiltinFunction(object, "values", mapValues, 0, realm)
+	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
 
 	DefineBuiltinProperty(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("entries")))
 	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
