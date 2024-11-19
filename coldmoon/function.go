@@ -83,32 +83,61 @@ const (
 	dynamicFunctionKindAsyncGenerator
 )
 
+type GrammarSymbol[T any] struct {
+	acceptFn func(*Parser) T
+}
+
 // 20.2.1.1.1
 func CreateDynamicFunction(
 	agent *Agent,
 	constructor ObjectType,
-	newTarget ObjectType,
+	_newTarget ObjectType,
 	kind dynamicFunctionKind,
 	parameterList ArgumentsList,
 	bodyArg Value,
 ) ObjectType {
 	realm := agent.CurrentRealm()
-
 	currentRealm := realm
-
 	agent.HostHooks.HostEnsureCanCompileStrings(currentRealm)
 
-	if newTarget == nil {
+	var newTarget = _newTarget
+	if _newTarget == nil {
 		newTarget = constructor
 	}
 
 	var prefix string
 	var fallbackPrototype string
+	exprSym := &GrammarSymbol[Expression]{}
+	bodySym := &GrammarSymbol[*FunctionBody]{}
+	parameterSym := &GrammarSymbol[*FormalParameters]{}
 	switch kind {
 	case dynamicFunctionKindNormal:
 		prefix = "function"
+		exprSym.acceptFn = func(p *Parser) Expression {
+			return p.functionExpression()
+		}
+		bodySym.acceptFn = func(p *Parser) *FunctionBody {
+			return p.functionBody()
+		}
+		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
+			return p.formalParameters()
+		}
 		fallbackPrototype = "%Function.prototype%"
+	case dynamicFunctionKindGenerator:
+		prefix = "function*"
 
+		exprSym.acceptFn = func(p *Parser) Expression {
+			return p.functionExpression()
+		}
+		bodySym.acceptFn = func(p *Parser) *FunctionBody {
+			return p.functionBody()
+		}
+		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
+			return p.formalParameters()
+		}
+		fallbackPrototype = "%GeneratorFunction.prototype%"
+	default:
+		panic("unimplemented")
 	}
 
 	argCount := len(parameterList)
@@ -121,19 +150,24 @@ func CreateDynamicFunction(
 	}
 
 	bodyString := bodyArg.String()
-
 	sourceString := prefix + " " + P + " " + bodyString
-
 	sourceText := sourceString
 
-	parameters := NewParser(P, ParserContext{
+	parser := NewParser(P, ParserContext{
 		FileName: "Function",
-	}).formalParameters()
+	})
+	parameters := parameterSym.acceptFn(parser)
 
-	body := NewParser(bodyString, ParserContext{
+	parser = NewParser(bodyString, ParserContext{
 		FileName: "Function",
-	}).functionBody()
+	})
+	body := bodySym.acceptFn(parser)
 	body.Strict = body.FunctionBodyContainsUseStrict()
+
+	parser = NewParser(sourceText, ParserContext{
+		FileName: "Function",
+	})
+	_ = exprSym.acceptFn(parser)
 
 	proto := GetPrototypeFromConstructor(newTarget, fallbackPrototype)
 
@@ -156,6 +190,14 @@ func CreateDynamicFunction(
 	switch kind {
 	case dynamicFunctionKindNormal:
 		MakeConstructor(function, false, nil)
+	case dynamicFunctionKindGenerator:
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+		DefineBuiltinProperty(function, "prototype", &PropertyDescriptor{
+			Value:        NewValueFromObject(prototype),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
 	default:
 		panic("unimplemented")
 	}

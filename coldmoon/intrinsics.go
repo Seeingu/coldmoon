@@ -25,6 +25,12 @@ type Intrinsics struct {
 	StringPrototype *StringObject
 	// %String%
 	StringConstructor ObjectType
+	// %GeneratorFunction%
+	GeneratorFunctionConstructor ObjectType
+	// %GeneratorFunction.prototype%
+	GeneratorFunctionPrototype ObjectType
+	// %GeneratorFunction.prototype.prototype%
+	GeneratorFunctionPrototypePrototype ObjectType
 	// %Date.Prototype%
 	DatePrototype ObjectType
 	// %Date%
