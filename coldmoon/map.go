@@ -56,6 +56,11 @@ func NewMapConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 		realm:     realm,
 	})
+	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return this
+	}
+	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.MapPrototype),
 		Writable:     false,
@@ -70,5 +75,59 @@ func NewMapConstructor(realm *Realm) ObjectType {
 func NewMapPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+
+	var mapClear BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		m := RequireInternalSlot[*MapObject](this)
+		m.MapValue.Data = make(map[Value]Value)
+		return UndefinedValue
+	}
+	var mapDelete BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		m := RequireInternalSlot[*MapObject](this)
+		key := arguments[0]
+		if _, ok := m.MapValue.Data[key]; !ok {
+			return FalseValue
+		}
+		delete(m.MapValue.Data, key)
+		return TrueValue
+	}
+	var mapGet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		m := RequireInternalSlot[*MapObject](this)
+		key := arguments[0]
+		if v, ok := m.MapValue.Data[key]; ok {
+			return v
+		}
+		return UndefinedValue
+	}
+	var mapHas BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		m := RequireInternalSlot[*MapObject](this)
+		key := arguments[0]
+		_, ok := m.MapValue.Data[key]
+		return NewBooleanValue(ok)
+	}
+	var mapSet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		m := RequireInternalSlot[*MapObject](this)
+		key := arguments[0]
+		value := arguments[1]
+		m.MapValue.Data[key] = value
+		return this
+	}
+	var size BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		m := RequireInternalSlot[*MapObject](this)
+		return NewNumberValue(float64(len(m.MapValue.Data)))
+	}
+
+	DefineBuiltinFunction(object, "clear", mapClear, 0, realm)
+	DefineBuiltinFunction(object, "delete", mapDelete, 1, realm)
+	DefineBuiltinFunction(object, "get", mapGet, 1, realm)
+	DefineBuiltinFunction(object, "has", mapHas, 1, realm)
+	DefineBuiltinFunction(object, "set", mapSet, 2, realm)
+	DefineBuiltinFunction(object, "size", size, 0, realm)
+
+	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+		Value:        NewStringValue("Map"),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
 	return object
 }
