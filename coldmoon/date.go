@@ -55,9 +55,34 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 	}
+	var toISOString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := MustGetObject(this)
+		tv := dateObject.(*DateObject).Data
+		if !math.IsInf(tv, 0) {
+			panic("RangeError")
+		}
+
+		// Use go standard formatter
+		//_ = YearFromTime(tv)
+		//_ = MonthFromTime(tv)
+		//_= DateFromTime(tv)
+		//_= HourFromTime(tv)
+		//_= MinFromTime(tv)
+		//_ = SecFromTime(tv)
+		//_= msFromTime(tv)
+
+		t, err := time.Parse(time.RFC3339, time.Unix(int64(tv), 0).Format(time.RFC3339))
+		if err != nil {
+			panic("RangeError")
+		}
+		return NewStringValue(
+			t.Format("2006-01-02T15:04:05.999Z"),
+		)
+	}
 
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	DefineBuiltinFunction(object, "toISOString", toISOString, 0, realm)
 	DefineBuiltinFunctionWithAttributes(object, "@@toPrimitive", toPrimitive, 1, realm, PropertyDescriptorAttributes{
 		Writable:     false,
 		Enumerable:   false,
@@ -66,11 +91,198 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	return object
 }
 
+const MS_PER_DAY = 86400000
+
 // 21.4.1.3
 func Day(t float64) float64 {
 	// FIXME: use time package
-	msPerDay := 86400000
+	msPerDay := MS_PER_DAY
 	return t / float64(msPerDay)
+}
+
+func DaysInYear(y float64) float64 {
+	if math.Mod(y, 4) != 0 {
+		return 365
+	}
+	if math.Mod(y, 100) != 0 {
+		return 366
+	}
+	if math.Mod(y, 400) != 0 {
+		return 365
+	}
+	return 366
+}
+
+func DayFromYear(y float64) float64 {
+	return 365*(y-1970) + math.Floor((y-1969)/4) - math.Floor((y-1901)/100) + math.Floor((y-1601)/400)
+}
+
+func TimeFromYear(y float64) float64 {
+	return MS_PER_DAY * DayFromYear(y)
+}
+
+func YearFromTime(t float64) float64 {
+	year := t / ((365.2425 * MS_PER_DAY) + 1970)
+	t2 := TimeFromYear(year)
+	if t2 > t {
+		return year - 1
+	}
+	if t2+(DaysInYear(year)*MS_PER_DAY) <= t {
+		return year + 1
+	}
+	return year
+}
+
+func DayWithinYear(t float64) float64 {
+	return Day(t) - DayFromYear(YearFromTime(t))
+}
+
+func InLeapYear(t float64) bool {
+	if DaysInYear(YearFromTime(t)) == 366 {
+		return true
+	}
+	return false
+}
+
+func MonthFromTime(t float64) float64 {
+	day := DayWithinYear(t)
+	if InLeapYear(t) {
+		if day < 31 {
+			return 0
+		}
+		if day < 60 {
+			return 1
+		}
+		if day < 91 {
+			return 2
+		}
+		if day < 121 {
+			return 3
+		}
+		if day < 152 {
+			return 4
+		}
+		if day < 182 {
+			return 5
+		}
+		if day < 213 {
+			return 6
+		}
+		if day < 244 {
+			return 7
+		}
+		if day < 274 {
+			return 8
+		}
+		if day < 305 {
+			return 9
+		}
+		if day < 335 {
+			return 10
+		}
+		return 11
+	}
+	if day < 31 {
+		return 0
+	}
+	if day < 59 {
+		return 1
+	}
+	if day < 90 {
+		return 2
+	}
+	if day < 120 {
+		return 3
+	}
+	if day < 151 {
+		return 4
+	}
+	if day < 181 {
+		return 5
+	}
+	if day < 212 {
+		return 6
+	}
+	if day < 243 {
+		return 7
+	}
+	if day < 273 {
+		return 8
+	}
+	if day < 304 {
+		return 9
+	}
+	if day < 334 {
+		return 10
+	}
+	return 11
+}
+
+func DateFromTime(t float64) float64 {
+	day := DayWithinYear(t)
+	month := MonthFromTime(t)
+
+	var inLeapYear float64 = 0
+	if InLeapYear(t) {
+		inLeapYear = 1
+	}
+	switch month {
+	case 0:
+		return day + 1
+	case 1:
+		return day - 30
+	case 2:
+		return day - 58 - inLeapYear
+	case 3:
+		return day - 89 - inLeapYear
+	case 4:
+		return day - 119 - inLeapYear
+	case 5:
+		return day - 150 - inLeapYear
+	case 6:
+		return day - 180 - inLeapYear
+	case 7:
+		return day - 211 - inLeapYear
+	case 8:
+		return day - 242 - inLeapYear
+	case 9:
+		return day - 272 - inLeapYear
+	case 10:
+		return day - 303 - inLeapYear
+	case 11:
+		return day - 333 - inLeapYear
+	}
+	return 0
+}
+
+func WeekDay(t float64) float64 {
+	return math.Mod(Day(t)+4, 7)
+}
+
+func HourFromTime(t float64) float64 {
+	return math.Mod(math.Floor(t/3600000), 24)
+}
+
+func MinFromTime(t float64) float64 {
+	return math.Mod(math.Floor(t/60000), 60)
+}
+
+func SecFromTime(t float64) float64 {
+	return math.Mod(math.Floor(t/1000), 60)
+}
+
+func msFromTime(t float64) float64 {
+	return math.Mod(t, 1000)
+}
+
+func GetNamedTimeZoneOffsetNanoseconds(tz string, t float64) int {
+	// TODO
+	return 0
+}
+
+func SystemTimeZoneIdentifier() string {
+	// TODO
+	return "UTC"
 }
 
 // 21.4.1.26
@@ -95,7 +307,7 @@ func MakeDay(year, month, date float64) float64 {
 
 // 21.4.1.29
 func MakeDate(day, time float64) float64 {
-	return day*86400000 + time
+	return day*MS_PER_DAY + time
 }
 
 // 21.4.1.30
