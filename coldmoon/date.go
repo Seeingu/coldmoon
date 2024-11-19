@@ -872,9 +872,18 @@ func NewDateConstructor(realm *Realm) ObjectType {
 	var now BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		return NewNumberValue(float64(time.Now().UnixNano()))
 	}
+	var parse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		s := args[0].String()
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(float64(t.UnixNano()) / 1e6)
+	}
 
 	DefineBuiltinFunction(object, "UTC", utc, 7, realm)
 	DefineBuiltinFunction(object, "now", now, 0, realm)
+	DefineBuiltinFunction(object, "parse", parse, 1, realm)
 
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.DatePrototype),
