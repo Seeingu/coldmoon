@@ -12,6 +12,57 @@ type DateObject struct {
 
 func NewDatePrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+
+	var valueOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		if o, ok := ValueGetObject(this); ok {
+			if date, ok := o.(*DateObject); ok {
+				return NewNumberValue(date.Data)
+			} else {
+				panic("TypeError")
+			}
+		} else {
+			panic("TypeError")
+		}
+	}
+	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		hintValue := args[0]
+		if !ValueIsObject(this) {
+			panic("TypeError")
+		}
+		o := MustGetObject(this)
+		if !ValueIs[*StringValue](hintValue) {
+			panic("TypeError")
+		}
+		hint := hintValue.(*StringValue).Data
+		var tryFirst PreferredType
+		if hint == "string" || hint == "default" {
+			tryFirst = PreferredTypeString
+		} else if hint == "number" {
+			tryFirst = PreferredTypeNumber
+		} else {
+			panic("TypeError")
+		}
+		return o.OrdinaryToPrimitive(tryFirst)
+	}
+	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		if o, ok := ValueGetObject(this); ok {
+			if date, ok := o.(*DateObject); ok {
+				return NewStringValue(ToDateString(date.Data))
+			} else {
+				panic("TypeError")
+			}
+		} else {
+			panic("TypeError")
+		}
+	}
+
+	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	DefineBuiltinFunctionWithAttributes(object, "@@toPrimitive", toPrimitive, 1, realm, PropertyDescriptorAttributes{
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
 	return object
 }
 
@@ -172,44 +223,6 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		dv := TimeClip(UTC(finalDate))
 		return NewNumberValue(dv)
 	}
-	var valueOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		if o, ok := ValueGetObject(this); ok {
-			if date, ok := o.(*DateObject); ok {
-				return NewNumberValue(date.Data)
-			} else {
-				panic("TypeError")
-			}
-		} else {
-			panic("TypeError")
-		}
-	}
-	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		hintValue := args[0]
-		if !ValueIsObject(this) {
-			panic("TypeError")
-		}
-		o := MustGetObject(this)
-		if !ValueIs[*StringValue](hintValue) {
-			panic("TypeError")
-		}
-		hint := hintValue.(*StringValue).Data
-		var tryFirst PreferredType
-		if hint == "string" || hint == "default" {
-			tryFirst = PreferredTypeString
-		} else if hint == "number" {
-			tryFirst = PreferredTypeNumber
-		} else {
-			panic("TypeError")
-		}
-		return o.OrdinaryToPrimitive(tryFirst)
-	}
-
-	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
-	DefineBuiltinFunctionWithAttributes(object, "@@toPrimitive", toPrimitive, 1, realm, PropertyDescriptorAttributes{
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
 	DefineBuiltinFunction(object, "UTC", utc, 7, realm)
 
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
@@ -234,12 +247,30 @@ func DateTimeStringFormat(s string) float64 {
 	return 0
 }
 
+func DateString(t float64) string {
+	// TODO
+	return ""
+}
+func TimeString(t float64) string {
+	// TODO
+	return ""
+}
+func TimeZoneString(tv float64) string {
+	// TODO
+	return ""
+}
+
 // 21.4.4.41.4
 func ToDateString(tv float64) string {
 	if math.IsNaN(tv) {
 		return "Invalid Date"
 	}
-	_ = LocalTime(tv)
-	// TODO
-	return ""
+	t := LocalTime(tv)
+
+	s, err := time.Parse(time.RFC3339, time.Unix(int64(t), 0).Format(time.RFC3339))
+	if err != nil {
+		return "Invalid Date"
+	}
+	// Use go standard formatter
+	return s.Format(time.UnixDate)
 }
