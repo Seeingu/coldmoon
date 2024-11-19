@@ -251,6 +251,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"Map",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.Map),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }
