@@ -183,8 +183,33 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 	}
+	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		hintValue := args[0]
+		if !ValueIsObject(this) {
+			panic("TypeError")
+		}
+		o := MustGetObject(this)
+		if !ValueIs[*StringValue](hintValue) {
+			panic("TypeError")
+		}
+		hint := hintValue.(*StringValue).Data
+		var tryFirst PreferredType
+		if hint == "string" || hint == "default" {
+			tryFirst = PreferredTypeString
+		} else if hint == "number" {
+			tryFirst = PreferredTypeNumber
+		} else {
+			panic("TypeError")
+		}
+		return o.OrdinaryToPrimitive(tryFirst)
+	}
 
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	DefineBuiltinFunctionWithAttributes(object, "@@toPrimitive", toPrimitive, 1, realm, PropertyDescriptorAttributes{
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
 	DefineBuiltinFunction(object, "UTC", utc, 7, realm)
 
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
