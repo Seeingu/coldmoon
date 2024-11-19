@@ -12,6 +12,7 @@ type DateObject struct {
 
 func NewDatePrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+	agent := realm.Agent
 
 	var valueOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		if o, ok := ValueGetObject(this); ok {
@@ -79,10 +80,70 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			t.Format("2006-01-02T15:04:05.999Z"),
 		)
 	}
+	var toJSON BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := MustGetObject(this)
+		tv := ToPrimitive(agent, NewValueFromObject(o), PreferredTypeNumber)
+		if n, ok := ValueGet[*NumberValue](tv); ok && !n.IsFinite() {
+			return NullValue
+		}
+		return ValueInvoke(agent, NewValueFromObject(o), NewStringPropertyKey("toISOString"), nil)
+	}
+	var toUTCString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		o := MustGetObject(this)
+		dateObject := o.(*DateObject)
+		tv := dateObject.Data
+		t, err := time.Parse(time.RFC3339, time.Unix(int64(tv), 0).Format(time.RFC3339))
+		if err != nil {
+			panic("RangeError")
+		}
+		return NewStringValue(t.Format(time.RFC1123))
+	}
+	var toDateString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := MustGetObject(this).(*DateObject)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewStringValue("Invalid Date")
+		}
+		return NewStringValue(DateString(LocalTime(tv)))
+	}
+	var toTimeString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := MustGetObject(this).(*DateObject)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewStringValue("Invalid Date")
+		}
+		return NewStringValue(TimeString(LocalTime(tv)) + TimeZoneString(tv))
+	}
+	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		return ValueInvoke(agent, this, NewStringPropertyKey("toString"), nil)
+	}
+	var toLocaleDateString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		return ValueInvoke(agent, this, NewStringPropertyKey("toDateString"), nil)
+	}
+	var toLocaleTimeString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		return ValueInvoke(agent, this, NewStringPropertyKey("toTimeString"), nil)
+	}
+	var getTimezoneOffset BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := MustGetObject(this).(*DateObject)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(tv - LocalTime(tv)/MS_PER_MIN)
+	}
 
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "toISOString", toISOString, 0, realm)
+	DefineBuiltinFunction(object, "toJSON", toJSON, 1, realm)
+	DefineBuiltinFunction(object, "toUTCString", toUTCString, 0, realm)
+	DefineBuiltinFunction(object, "toDateString", toDateString, 0, realm)
+	DefineBuiltinFunction(object, "toTimeString", toTimeString, 0, realm)
+	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
+	DefineBuiltinFunction(object, "toLocaleDateString", toLocaleDateString, 0, realm)
+	DefineBuiltinFunction(object, "toLocaleTimeString", toLocaleTimeString, 0, realm)
+	DefineBuiltinFunction(object, "getTimezoneOffset", getTimezoneOffset, 0, realm)
+
 	DefineBuiltinFunctionWithAttributes(object, "@@toPrimitive", toPrimitive, 1, realm, PropertyDescriptorAttributes{
 		Writable:     false,
 		Enumerable:   false,
@@ -92,6 +153,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 }
 
 const MS_PER_DAY = 86400000
+const MS_PER_MIN = 60000
 
 // 21.4.1.3
 func Day(t float64) float64 {
@@ -264,7 +326,7 @@ func HourFromTime(t float64) float64 {
 }
 
 func MinFromTime(t float64) float64 {
-	return math.Mod(math.Floor(t/60000), 60)
+	return math.Mod(math.Floor(t/MS_PER_MIN), 60)
 }
 
 func SecFromTime(t float64) float64 {
@@ -435,7 +497,12 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		dv := TimeClip(UTC(finalDate))
 		return NewNumberValue(dv)
 	}
+	var now BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		return NewNumberValue(float64(time.Now().UnixNano()))
+	}
+
 	DefineBuiltinFunction(object, "UTC", utc, 7, realm)
+	DefineBuiltinFunction(object, "now", now, 0, realm)
 
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.DatePrototype),
