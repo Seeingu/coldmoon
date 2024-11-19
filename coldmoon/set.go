@@ -51,6 +51,10 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: false,
 	})
+	var getter BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		return thisValue
+	}
+	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 
 	DefineBuiltinProperty(realm.Intrinsics.SetPrototype, "constructor", NewValueFromObject(object))
 
@@ -61,5 +65,61 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+
+	var setClear BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		set := RequireInternalSlot[*SetObject](thisValue)
+		if set.SetValue == nil {
+			panic("TypeError")
+		}
+		set.SetValue.Data = make(map[Value]Value)
+		return UndefinedValue
+	}
+	var setDelete BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		value := argumentsList[0]
+		set := RequireInternalSlot[*SetObject](thisValue)
+		if set.SetValue == nil {
+			panic("TypeError")
+		}
+		delete(set.SetValue.Data, value)
+		return TrueValue
+	}
+	var setHas BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		value := argumentsList[0]
+		set := RequireInternalSlot[*SetObject](thisValue)
+		if set.SetValue == nil {
+			panic("TypeError")
+		}
+		_, ok := set.SetValue.Data[value]
+		return NewBooleanValue(ok)
+	}
+	var setSize BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		set := RequireInternalSlot[*SetObject](thisValue)
+		if set.SetValue == nil {
+			panic("TypeError")
+		}
+		return NewNumberValue(float64(len(set.SetValue.Data)))
+	}
+	var setAdd BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		value := argumentsList[0]
+		set := RequireInternalSlot[*SetObject](thisValue)
+		if set.SetValue == nil {
+			panic("TypeError")
+		}
+		set.SetValue.Data[value] = value
+		return thisValue
+	}
+
+	DefineBuiltinFunction(object, "add", setAdd, 1, realm)
+	DefineBuiltinFunction(object, "clear", setClear, 0, realm)
+	DefineBuiltinFunction(object, "delete", setDelete, 1, realm)
+	DefineBuiltinFunction(object, "has", setHas, 1, realm)
+	DefineBuiltinFunction(object, "size", setSize, 0, realm)
+
+	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+		Value:        NewStringValue("Set"),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
 	return object
 }
