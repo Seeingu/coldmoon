@@ -68,3 +68,8 @@ func NewInternalMethods() InternalMethods {
 		Construct:         nil,
 	}
 }
+
+func ObjectIs[O ObjectType](o ObjectType) bool {
+	_, ok := o.(O)
+	return ok
+}

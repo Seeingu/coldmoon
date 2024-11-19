@@ -46,19 +46,12 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return o.OrdinaryToPrimitive(tryFirst)
 	}
 	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		if o, ok := ValueGetObject(this); ok {
-			if date, ok := o.(*DateObject); ok {
-				return NewStringValue(ToDateString(date.Data))
-			} else {
-				panic("TypeError")
-			}
-		} else {
-			panic("TypeError")
-		}
+		date := RequireInternalSlot[*DateObject](this)
+		return NewStringValue(ToDateString(date.Data))
 	}
 	var toISOString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		dateObject := MustGetObject(this)
-		tv := dateObject.(*DateObject).Data
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
 		if !math.IsInf(tv, 0) {
 			panic("RangeError")
 		}
@@ -89,8 +82,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return ValueInvoke(agent, NewValueFromObject(o), NewStringPropertyKey("toISOString"), nil)
 	}
 	var toUTCString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := MustGetObject(this)
-		dateObject := o.(*DateObject)
+		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		t, err := time.Parse(time.RFC3339, time.Unix(int64(tv), 0).Format(time.RFC3339))
 		if err != nil {

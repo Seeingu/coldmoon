@@ -833,6 +833,18 @@ func OrdinaryHasInstance(self Value, value Value) bool {
 
 }
 
+// 10.1.15
+func RequireInternalSlot[O ObjectType](value Value) O {
+	if !ValueIsObject(value) {
+		panic("TypeError")
+	}
+	o := MustGetObject(value)
+	if !ObjectIs[O](o) {
+		panic("TypeError")
+	}
+	return o.(O)
+}
+
 func CallNoArgs(self Value, value Value) Value {
 	return ValueCall(self, value, nil)
 }
