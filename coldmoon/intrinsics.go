@@ -53,6 +53,8 @@ type Intrinsics struct {
 	Map ObjectType
 	// %Map.prototype%
 	MapPrototype ObjectType
+	// %MapIteratorPrototype%
+	MapIteratorPrototype ObjectType
 	// %IsFinite%
 	IsFinite ObjectType
 	// %isNaN%
