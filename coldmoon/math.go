@@ -282,6 +282,21 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return lowest
 	}
+	var atan2 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		y := ToNumber(agent, argumentsList[0])
+		x := ToNumber(agent, argumentsList[1])
+		return NewNumberValue(math.Atan2(y.Data, x.Data))
+	}
+	var fround BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		x := ToNumber(agent, argumentsList[0])
+		return NewNumberValue(float64(float32(x.Data)))
+	}
+	var imul BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		a := ToUint32(agent, argumentsList[0])
+		b := ToUint32(agent, argumentsList[1])
+		product := a * b
+		return NewNumberValue(float64(int32(product)))
+	}
 
 	DefineBuiltinFunction(object, "random", random, 0, realm)
 	DefineBuiltinFunction(object, "abs", abs, 1, realm)
@@ -312,6 +327,9 @@ func NewMathObject(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "log1p", log1p, 1, realm)
 	DefineBuiltinFunction(object, "log10", log10, 1, realm)
 	DefineBuiltinFunction(object, "log2", log2, 1, realm)
+	DefineBuiltinFunction(object, "atan2", atan2, 2, realm)
+	DefineBuiltinFunction(object, "fround", fround, 1, realm)
+	DefineBuiltinFunction(object, "imul", imul, 2, realm)
 	DefineBuiltinFunction(object, "max", mathMax, 2, realm)
 	DefineBuiltinFunction(object, "min", mathMin, 2, realm)
 
