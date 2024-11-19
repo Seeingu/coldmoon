@@ -116,12 +116,357 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return ValueInvoke(agent, this, NewStringPropertyKey("toTimeString"), nil)
 	}
 	var getTimezoneOffset BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		dateObject := MustGetObject(this).(*DateObject)
+		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if math.IsNaN(tv) {
 			return NewNumberValue(math.NaN())
 		}
 		return NewNumberValue(tv - LocalTime(tv)/MS_PER_MIN)
+	}
+	var getDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(DateFromTime(tv))
+	}
+	var getDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(WeekDay(tv))
+	}
+	var getFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(YearFromTime(LocalTime(tv)))
+	}
+	var getHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(HourFromTime(LocalTime(tv)))
+	}
+	var getMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(msFromTime(LocalTime(tv)))
+	}
+	var getMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(MinFromTime(LocalTime(tv)))
+	}
+	var getMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(MonthFromTime(LocalTime(tv)))
+	}
+	var getSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(SecFromTime(LocalTime(tv)))
+	}
+	var getTime BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		return NewNumberValue(tv)
+	}
+	var getUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(DateFromTime(tv))
+	}
+	var getUTCDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(WeekDay(tv))
+	}
+	var getUTCFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(YearFromTime(tv))
+	}
+	var getUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(HourFromTime(tv))
+	}
+	var getUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(msFromTime(tv))
+	}
+	var getUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(MinFromTime(tv))
+	}
+	var getUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(MonthFromTime(tv))
+	}
+	var getUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		return NewNumberValue(SecFromTime(tv))
+	}
+	var setDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		date := ToNumber(agent, args[0]).Data
+		if math.IsNaN(tv) {
+			return NewNumberValue(math.NaN())
+		}
+		t := LocalTime(tv)
+		newDate := MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), date), TimeWithinDay(t))
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		year := ToNumber(agent, args[0]).Data
+		month := 0.0
+		date := 1.0
+		if len(args) >= 2 {
+			month = ToNumber(agent, args[1]).Data
+		}
+		if len(args) >= 3 {
+			date = ToNumber(agent, args[2]).Data
+		}
+		year = MakeFullYear(year)
+		day := MakeDay(year, month, date)
+		newDate := MakeDate(day, TimeWithinDay(tv))
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		hour := ToNumber(agent, args[0]).Data
+		minute := 0.0
+		sec := 0.0
+		ms := 0.0
+		if len(args) >= 2 {
+			minute = ToNumber(agent, args[1]).Data
+		}
+		if len(args) >= 3 {
+			sec = ToNumber(agent, args[2]).Data
+		}
+		if len(args) >= 4 {
+			ms = ToNumber(agent, args[3]).Data
+		}
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		newTime := MakeTime(hour, minute, sec, ms)
+		newDate := MakeDate(day, newTime)
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		ms := ToNumber(agent, args[0]).Data
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms)
+		newDate := MakeDate(day, newTime)
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setMinustes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		minute := ToNumber(agent, args[0]).Data
+		sec := 0.0
+		ms := 0.0
+		if len(args) >= 2 {
+			sec = ToNumber(agent, args[1]).Data
+		}
+		if len(args) >= 3 {
+			ms = ToNumber(agent, args[2]).Data
+		}
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		newTime := MakeTime(HourFromTime(tv), minute, sec, ms)
+		newDate := MakeDate(day, newTime)
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		month := ToNumber(agent, args[0]).Data
+		date := 1.0
+		if len(args) >= 2 {
+			date = ToNumber(agent, args[1]).Data
+		}
+		day := MakeDay(YearFromTime(tv), month, date)
+		newDate := MakeDate(day, TimeWithinDay(tv))
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		sec := ToNumber(agent, args[0]).Data
+		ms := 0.0
+		if len(args) >= 2 {
+			ms = ToNumber(agent, args[1]).Data
+		}
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), sec, ms)
+		newDate := MakeDate(day, newTime)
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setTime BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		t := ToNumber(agent, args[0]).Data
+		dateObject.Data = TimeClip(t)
+		return NewNumberValue(dateObject.Data)
+	}
+	var setUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		date := ToNumber(agent, args[0]).Data
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), date)
+		newDate := MakeDate(day, TimeWithinDay(tv))
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		hour := ToNumber(agent, args[0]).Data
+		minute := 0.0
+		sec := 0.0
+		ms := 0.0
+		if len(args) >= 2 {
+			minute = ToNumber(agent, args[1]).Data
+		}
+		if len(args) >= 3 {
+			sec = ToNumber(agent, args[2]).Data
+		}
+		if len(args) >= 4 {
+			ms = ToNumber(agent, args[3]).Data
+		}
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		newTime := MakeTime(hour, minute, sec, ms)
+		newDate := MakeDate(day, newTime)
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		ms := ToNumber(agent, args[0]).Data
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms)
+		newDate := MakeDate(day, newTime)
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		minute := ToNumber(agent, args[0]).Data
+		sec := 0.0
+		ms := 0.0
+		if len(args) >= 2 {
+			sec = ToNumber(agent, args[1]).Data
+		}
+		if len(args) >= 3 {
+			ms = ToNumber(agent, args[2]).Data
+		}
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		newTime := MakeTime(HourFromTime(tv), minute, sec, ms)
+		newDate := MakeDate(day, newTime)
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		month := ToNumber(agent, args[0]).Data
+		date := 1.0
+		if len(args) >= 2 {
+			date = ToNumber(agent, args[1]).Data
+		}
+		day := MakeDay(YearFromTime(tv), month, date)
+		newDate := MakeDate(day, TimeWithinDay(tv))
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
+	}
+	var setUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		dateObject := RequireInternalSlot[*DateObject](this)
+		tv := dateObject.Data
+		sec := ToNumber(agent, args[0]).Data
+		ms := 0.0
+		if len(args) >= 2 {
+			ms = ToNumber(agent, args[1]).Data
+		}
+		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), sec, ms)
+		newDate := MakeDate(day, newTime)
+		u := TimeClip(UTC(newDate))
+		dateObject.Data = u
+		return NewNumberValue(u)
 	}
 
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
@@ -135,6 +480,37 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "toLocaleDateString", toLocaleDateString, 0, realm)
 	DefineBuiltinFunction(object, "toLocaleTimeString", toLocaleTimeString, 0, realm)
 	DefineBuiltinFunction(object, "getTimezoneOffset", getTimezoneOffset, 0, realm)
+	DefineBuiltinFunction(object, "getDate", getDate, 0, realm)
+	DefineBuiltinFunction(object, "getDay", getDay, 0, realm)
+	DefineBuiltinFunction(object, "getFullYear", getFullYear, 0, realm)
+	DefineBuiltinFunction(object, "getHours", getHours, 0, realm)
+	DefineBuiltinFunction(object, "getMilliseconds", getMilliseconds, 0, realm)
+	DefineBuiltinFunction(object, "getMinutes", getMinutes, 0, realm)
+	DefineBuiltinFunction(object, "getMonth", getMonth, 0, realm)
+	DefineBuiltinFunction(object, "getSeconds", getSeconds, 0, realm)
+	DefineBuiltinFunction(object, "getTime", getTime, 0, realm)
+	DefineBuiltinFunction(object, "getUTCDate", getUTCDate, 0, realm)
+	DefineBuiltinFunction(object, "getUTCDay", getUTCDay, 0, realm)
+	DefineBuiltinFunction(object, "getUTCFullYear", getUTCFullYear, 0, realm)
+	DefineBuiltinFunction(object, "getUTCHours", getUTCHours, 0, realm)
+	DefineBuiltinFunction(object, "getUTCMilliseconds", getUTCMilliseconds, 0, realm)
+	DefineBuiltinFunction(object, "getUTCMinutes", getUTCMinutes, 0, realm)
+	DefineBuiltinFunction(object, "getUTCMonth", getUTCMonth, 0, realm)
+	DefineBuiltinFunction(object, "getUTCSeconds", getUTCSeconds, 0, realm)
+	DefineBuiltinFunction(object, "setDate", setDate, 1, realm)
+	DefineBuiltinFunction(object, "setFullYear", setFullYear, 3, realm)
+	DefineBuiltinFunction(object, "setHours", setHours, 4, realm)
+	DefineBuiltinFunction(object, "setMilliseconds", setMilliseconds, 1, realm)
+	DefineBuiltinFunction(object, "setMinutes", setMinustes, 3, realm)
+	DefineBuiltinFunction(object, "setMonth", setMonth, 2, realm)
+	DefineBuiltinFunction(object, "setSeconds", setSeconds, 2, realm)
+	DefineBuiltinFunction(object, "setTime", setTime, 1, realm)
+	DefineBuiltinFunction(object, "setUTCDate", setUTCDate, 1, realm)
+	DefineBuiltinFunction(object, "setUTCHours", setUTCHours, 4, realm)
+	DefineBuiltinFunction(object, "setUTCMilliseconds", setUTCMilliseconds, 1, realm)
+	DefineBuiltinFunction(object, "setUTCMinutes", setUTCMinutes, 3, realm)
+	DefineBuiltinFunction(object, "setUTCMonth", setUTCMonth, 2, realm)
+	DefineBuiltinFunction(object, "setUTCSeconds", setUTCSeconds, 2, realm)
 
 	DefineBuiltinFunctionWithAttributes(object, "@@toPrimitive", toPrimitive, 1, realm, PropertyDescriptorAttributes{
 		Writable:     false,
@@ -152,6 +528,10 @@ func Day(t float64) float64 {
 	// FIXME: use time package
 	msPerDay := MS_PER_DAY
 	return t / float64(msPerDay)
+}
+
+func TimeWithinDay(t float64) float64 {
+	return math.Mod(t, MS_PER_DAY)
 }
 
 func DaysInYear(y float64) float64 {
