@@ -134,6 +134,67 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
+
+	var utc BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		numberOfArgs := len(args)
+		if numberOfArgs < 1 {
+			return NewNumberValue(math.NaN())
+		}
+		year := ToNumber(agent, args[0]).Data
+		month := 0.0
+		date := 1.0
+		hour := 0.0
+		minute := 0.0
+		sec := 0.0
+		ms := 0.0
+		if numberOfArgs >= 2 {
+			month = ToNumber(agent, args[1]).Data
+		}
+		if numberOfArgs >= 3 {
+			date = ToNumber(agent, args[2]).Data
+		}
+		if numberOfArgs >= 4 {
+			hour = ToNumber(agent, args[3]).Data
+		}
+		if numberOfArgs >= 5 {
+			minute = ToNumber(agent, args[4]).Data
+		}
+		if numberOfArgs >= 6 {
+			sec = ToNumber(agent, args[5]).Data
+		}
+		if numberOfArgs >= 7 {
+			ms = ToNumber(agent, args[6]).Data
+		}
+		year = MakeFullYear(year)
+		day := MakeDay(year, month, date)
+		_time := MakeTime(hour, minute, sec, ms)
+		finalDate := MakeDate(day, _time)
+		dv := TimeClip(UTC(finalDate))
+		return NewNumberValue(dv)
+	}
+	var valueOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		if o, ok := ValueGetObject(this); ok {
+			if date, ok := o.(*DateObject); ok {
+				return NewNumberValue(date.Data)
+			} else {
+				panic("TypeError")
+			}
+		} else {
+			panic("TypeError")
+		}
+	}
+
+	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	DefineBuiltinFunction(object, "UTC", utc, 7, realm)
+
+	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+		Value:        NewValueFromObject(realm.Intrinsics.DatePrototype),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	DefineBuiltinProperty(realm.Intrinsics.DatePrototype, "constructor", NewValueFromObject(object))
+
 	return object
 }
 
