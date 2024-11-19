@@ -115,6 +115,15 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		m := RequireInternalSlot[*MapObject](this)
 		return NewNumberValue(float64(len(m.MapValue.Data)))
 	}
+	var entries BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindKeyAndValue))
+	}
+	var keys BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindKey))
+	}
+	var values BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindValue))
+	}
 
 	DefineBuiltinFunction(object, "clear", mapClear, 0, realm)
 	DefineBuiltinFunction(object, "delete", mapDelete, 1, realm)
@@ -122,7 +131,11 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "has", mapHas, 1, realm)
 	DefineBuiltinFunction(object, "set", mapSet, 2, realm)
 	DefineBuiltinFunction(object, "size", size, 0, realm)
+	DefineBuiltinFunction(object, "entries", entries, 0, realm)
+	DefineBuiltinFunction(object, "keys", keys, 0, realm)
+	DefineBuiltinFunction(object, "values", values, 0, realm)
 
+	DefineBuiltinProperty(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("entries")))
 	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("Map"),
 		Writable:     false,

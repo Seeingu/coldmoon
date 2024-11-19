@@ -7,6 +7,16 @@ type MapIteratorObject struct {
 	Index uint64
 }
 
+// 24.1.5.1
+func CreateMapIterator(agent *Agent, value Value, kind objectOwnPropertiesKind) *MapIteratorObject {
+	return &MapIteratorObject{
+		Object: NewObject(agent, agent.CurrentRealm().Intrinsics.MapIteratorPrototype),
+		Map:    RequireInternalSlot[*MapObject](value),
+		Kind:   kind,
+		Index:  0,
+	}
+}
+
 func NewMapIteratorPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype)
 	agent := realm.Agent
