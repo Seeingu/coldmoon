@@ -242,6 +242,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"Date",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.DateConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

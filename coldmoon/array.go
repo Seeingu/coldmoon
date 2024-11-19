@@ -1171,6 +1171,18 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		FlattenIntoArray(agent, A, o, float64(sourceLen), 0, depthNum, nil, nil)
 		return NewValueFromObject(A)
 	}
+	var flatMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		mapperFunction := args[0]
+		thisArg := args[1]
+		o := ValueToObject(agent, this)
+		sourceLen := o.LengthOfArrayLike()
+		if !IsCallable(mapperFunction) {
+			panic("TypeError")
+		}
+		A := ArraySpeciesCreate(agent, o, 0)
+		FlattenIntoArray(agent, A, o, float64(sourceLen), 0, 1, MustGetObject(mapperFunction), thisArg)
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -1208,6 +1220,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "sort", sort, 1, realm)
 	DefineBuiltinFunction(object, "toSorted", toSorted, 1, realm)
 	DefineBuiltinFunction(object, "flat", flat, 0, realm)
+	DefineBuiltinFunction(object, "flatMap", flatMap, 1, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)

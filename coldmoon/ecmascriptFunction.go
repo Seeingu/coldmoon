@@ -332,7 +332,7 @@ func OrdinaryFunctionCreate(
 	privateEnv *PrivateEnvironment,
 ) *ECMAScriptFunction {
 	var thisMode ThisMode = ThisModeLexical
-	strict := body.FunctionBodyContainsUseStrict()
+	strict := body.Strict
 
 	function := &ECMAScriptFunction{
 		Object:             NewObject(agent, functionPrototype),

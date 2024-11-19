@@ -243,6 +243,7 @@ func ToNumeric(agent *Agent, value Value) Value {
 	}
 	return ToNumber(agent, primValue)
 }
+
 func ToIntegerOrInfinity(agent *Agent, value Value) float64 {
 	number := ToNumber(agent, value)
 	if number.IsNaN() {
@@ -870,4 +871,21 @@ func MustGetObject(value Value) ObjectType {
 func ValueIsObject(value Value) bool {
 	_, ok := value.(*ObjectValue)
 	return ok
+}
+
+func ValueGetObject(value Value) (object ObjectType, ok bool) {
+	v, ok := ValueGet[*ObjectValue](value)
+	if ok {
+		return v.Object, true
+	}
+	return nil, false
+}
+
+func ValueIs[Type Value](value Value) bool {
+	_, ok := value.(Type)
+	return ok
+}
+func ValueGet[Type Value](value Value) (Type, bool) {
+	v, ok := value.(Type)
+	return v, ok
 }
