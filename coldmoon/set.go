@@ -108,13 +108,25 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		set.SetValue.Data[value] = value
 		return thisValue
 	}
+	var setEntries BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		iterator := CreateSetIterator(agent, thisValue, objectOwnPropertiesKindKeyAndValue)
+		return NewValueFromObject(iterator)
+	}
+	var setValues BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+		iterator := CreateSetIterator(agent, thisValue, objectOwnPropertiesKindValue)
+		return NewValueFromObject(iterator)
+	}
 
 	DefineBuiltinFunction(object, "add", setAdd, 1, realm)
 	DefineBuiltinFunction(object, "clear", setClear, 0, realm)
 	DefineBuiltinFunction(object, "delete", setDelete, 1, realm)
 	DefineBuiltinFunction(object, "has", setHas, 1, realm)
 	DefineBuiltinFunction(object, "size", setSize, 0, realm)
+	DefineBuiltinFunction(object, "entries", setEntries, 0, realm)
+	DefineBuiltinFunction(object, "values", setValues, 0, realm)
 
+	DefineBuiltinProperty(object, "keys", object.PropertyStorage().Get(NewStringPropertyKey("values")))
+	DefineBuiltinProperty(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
 	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("SetObject"),
 		Writable:     false,
