@@ -1183,6 +1183,94 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		FlattenIntoArray(agent, A, o, float64(sourceLen), 0, 1, MustGetObject(mapperFunction), thisArg)
 		return NewValueFromObject(A)
 	}
+	var splice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		start := args[0]
+		deleteCount := args[1]
+		var items []Value
+		if len(args) > 2 {
+			items = args[2:]
+		}
+		o := ValueToObject(agent, this)
+		length := o.LengthOfArrayLike()
+
+		var relativeStart float64 = 0
+		if start != nil {
+			relativeStart = ToIntegerOrInfinity(agent, start)
+		}
+		var actualStart float64
+		if relativeStart == math.Inf(-1) {
+			actualStart = 0
+		} else if relativeStart < 0 {
+			actualStart = math.Max(float64(length)+relativeStart, 0)
+		} else {
+			actualStart = math.Min(relativeStart, float64(length))
+		}
+		itemCount := len(items)
+		var actualDeleteCount float64
+		if start == nil {
+			actualDeleteCount = 0
+		} else if deleteCount == nil {
+			actualDeleteCount = float64(length) - actualStart
+		} else {
+			actualDeleteCount = ToIntegerOrInfinity(agent, deleteCount)
+		}
+
+		if float64(length)+float64(itemCount)-actualDeleteCount > POW_2_53-1 {
+			panic("TypeError")
+		}
+
+		A := ArraySpeciesCreate(agent, o, actualDeleteCount)
+		for k := 0; k < int(actualDeleteCount); k++ {
+			from := NewIntegerIndexPropertyKey(int(actualStart + float64(k)))
+			fromPresent := o.HasProperty(from)
+			if fromPresent {
+				fromValue := o.Get(from)
+				A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(k), fromValue)
+			}
+		}
+		A.Set(NewStringPropertyKey("length"), NewNumberValue(actualDeleteCount), setThrowTypeThrow)
+		if itemCount < int(actualDeleteCount) {
+			k := actualStart
+			for k < float64(length)-actualDeleteCount {
+				from := NewIntegerIndexPropertyKey(int(k + actualDeleteCount))
+				to := NewIntegerIndexPropertyKey(int(k + float64(itemCount)))
+				fromPresent := o.HasProperty(from)
+				if fromPresent {
+					fromValue := o.Get(from)
+					o.Set(to, fromValue, setThrowTypeThrow)
+				} else {
+					o.DeletePropertyOrThrow(to)
+				}
+				k++
+			}
+			k = float64(length)
+			for k > float64(length)-actualDeleteCount+float64(itemCount) {
+				k--
+				o.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(int(k)))
+			}
+		} else if itemCount > int(actualDeleteCount) {
+			k := float64(length) - actualDeleteCount
+			for k > actualStart {
+				from := NewIntegerIndexPropertyKey(int(k + actualDeleteCount - 1))
+				to := NewIntegerIndexPropertyKey(int(k + float64(itemCount) - 1))
+				fromPresent := o.HasProperty(from)
+				if fromPresent {
+					fromValue := o.Get(from)
+					o.Set(to, fromValue, setThrowTypeThrow)
+				} else {
+					o.DeletePropertyOrThrow(to)
+				}
+				k--
+			}
+		}
+		k := actualStart
+		for _, E := range items {
+			o.Set(NewIntegerIndexPropertyKey(int(k)), E, setThrowTypeThrow)
+			k++
+		}
+		o.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)-actualDeleteCount+float64(itemCount)), setThrowTypeThrow)
+		return NewValueFromObject(A)
+	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
@@ -1221,6 +1309,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "toSorted", toSorted, 1, realm)
 	DefineBuiltinFunction(object, "flat", flat, 0, realm)
 	DefineBuiltinFunction(object, "flatMap", flatMap, 1, realm)
+	DefineBuiltinFunction(object, "splice", splice, 2, realm)
 
 	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
