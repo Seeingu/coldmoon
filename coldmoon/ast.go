@@ -28,6 +28,8 @@ type PrimaryExpression interface {
 	AssignmentTargetType() AssignmentTargetType
 }
 
+// MARK: - IdentifierReference
+
 type IdentifierName string
 type PrimaryExpressionIdentifierReference struct {
 	PrimaryExpression
@@ -51,6 +53,8 @@ func (p *PrimaryExpressionIdentifierReference) Analyze(a AnalyzeQuery) bool {
 	}
 	return false
 }
+
+// MARK: - Literal
 
 type PrimaryExpressionLiteral struct {
 	PrimaryExpression
@@ -77,6 +81,34 @@ func (p *PrimaryExpressionLiteral) Analyze(a AnalyzeQuery) bool {
 	default:
 		panic("unreachable")
 	}
+}
+
+// MARK: - GeneratorExpression
+
+type PrimaryExpressionGeneratorExpression struct {
+	PrimaryExpression
+	IdentifierName   IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (p *PrimaryExpressionGeneratorExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *PrimaryExpressionGeneratorExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (p *PrimaryExpressionGeneratorExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
+	p.Body.Strict = strict
+	e.AddInstruction(&IInstantiateGeneratorFunctionExpression{FunctionExpression: p})
+}
+
+func (p *PrimaryExpressionGeneratorExpression) String() string {
+	return "GeneratorExpression"
 }
 
 // MARK: - ThisExpression

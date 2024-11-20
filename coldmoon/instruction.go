@@ -460,6 +460,13 @@ func (i *IDelete) String() string {
 	return "IDelete"
 }
 
+// MARK: - Generator
+
+type IInstantiateGeneratorFunctionExpression struct {
+	Instruction
+	FunctionExpression *PrimaryExpressionGeneratorExpression
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

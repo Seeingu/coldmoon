@@ -389,6 +389,26 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	}
 }
 
+func (p *Parser) generatorExpression() *PrimaryExpressionGeneratorExpression {
+	startOffset := p.tokenizer.Index
+	p.tokenizer.MustMatch(TFunction)
+	p.tokenizer.MustMatch(TStar)
+	identifier := p.bindingIdentifier()
+	p.tokenizer.MustMatch(TLeftParen)
+	params := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	body := p.functionBody(FunctionTypeGenerator)
+	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	return &PrimaryExpressionGeneratorExpression{
+		IdentifierName:   identifier,
+		FormalParameters: params,
+		SourceText:       sourceText,
+		Body:             body,
+	}
+}
+
 func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
 	startOffset := p.tokenizer.Index
 	p.tokenizer.MustMatch(TFunction)
@@ -1095,6 +1115,9 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		}
 		return p.parenthesizedExpression()
 	case TFunction:
+		if p.tokenizer.NextToken.Type == TStar {
+			return p.generatorExpression()
+		}
 		return p.functionExpression()
 	default:
 		literal := p.literal()

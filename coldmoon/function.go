@@ -127,7 +127,7 @@ func CreateDynamicFunction(
 		prefix = "function*"
 
 		exprSym.acceptFn = func(p *Parser) Expression {
-			return p.functionExpression()
+			return p.generatorExpression()
 		}
 		bodySym.acceptFn = func(p *Parser) *FunctionBody {
 			return p.functionBody(FunctionTypeGenerator)

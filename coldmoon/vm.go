@@ -392,7 +392,70 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		}
 	case *IObjectDefineMethod:
 		vm.MethodDefinitionEvaluation(ins)
+	case *IInstantiateGeneratorFunctionExpression:
+		functionExpression := ins.FunctionExpression
+		closure := vm.InstantiateGeneratorFunctionExpression(functionExpression)
+		vm.result = NewValueFromObject(closure)
 	}
+}
+
+func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *PrimaryExpressionGeneratorExpression) ObjectType {
+	realm := vm.agent.CurrentRealm()
+	if functionExpression.IdentifierName != "" {
+		name := string(functionExpression.IdentifierName)
+		outerEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(name, false)
+		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := functionExpression.SourceText
+		closure := OrdinaryFunctionCreate(
+			vm.agent,
+			realm.Intrinsics.GeneratorFunctionPrototype,
+			sourceText,
+			functionExpression.FormalParameters,
+			functionExpression.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		prototype := OrdinaryObjectCreate(vm.agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        NewValueFromObject(prototype),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+
+		funcEnv.InitializeBinding(name, NewValueFromObject(closure))
+		return closure
+	} else {
+		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := functionExpression.SourceText
+		closure := OrdinaryFunctionCreate(
+			vm.agent,
+			realm.Intrinsics.GeneratorFunctionPrototype,
+			sourceText,
+			functionExpression.FormalParameters,
+			functionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(""), "")
+		prototype := OrdinaryObjectCreate(vm.agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        NewValueFromObject(prototype),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+		return closure
+	}
+
 }
 
 // 15.4.5
