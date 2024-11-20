@@ -251,7 +251,7 @@ func (p *Parser) statementListItem() StatementListItem {
 	t := p.tokenizer.CurrentToken
 	var stmt Statement
 	switch t.Type {
-	case TFunction, TLet, TConst:
+	case TAsync, TFunction, TLet, TConst:
 		d := p.declaration()
 		stmt = &StatementListItemDeclaration{
 			Declaration: d,
@@ -515,18 +515,41 @@ func (p *Parser) hoistableDeclaration() DeclarationHoistable {
 			FunctionDeclaration: functionDeclaration,
 		}
 	} else if t.Type == TAsync {
-		d := p.asyncGeneratorDeclaration()
-		return &DeclarationHoistableAsyncGenerator{
-			AsyncGeneratorDeclaration: d,
+		startOffset := p.tokenizer.Index
+		p.tokenizer.MustMatch(TAsync)
+		p.tokenizer.MustMatch(TFunction)
+		if p.tokenizer.CurrentToken.Type == TStar {
+			d := p.asyncGeneratorDeclaration(startOffset)
+			return &DeclarationHoistableAsyncGenerator{
+				AsyncGeneratorDeclaration: d,
+			}
 		}
+		return &DeclarationHoistableAsyncFunction{
+			AsyncFunctionDeclaration: p.asyncFunctionDeclaration(startOffset),
+		}
+
 	}
 	panic("unimplemented")
 }
 
-func (p *Parser) asyncGeneratorDeclaration() *AsyncGeneratorDeclaration {
-	startOffset := p.tokenizer.Index
-	p.tokenizer.MustMatch(TAsync)
-	p.tokenizer.MustMatch(TFunction)
+func (p *Parser) asyncFunctionDeclaration(startOffset int) *AsyncFunctionDeclaration {
+	identifier := p.bindingIdentifier()
+	p.tokenizer.MustMatch(TLeftParen)
+	params := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	body := p.functionBody(FunctionTypeAsync)
+	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	return &AsyncFunctionDeclaration{
+		Identifier:       identifier,
+		FormalParameters: params,
+		SourceText:       sourceText,
+		Body:             body,
+	}
+}
+
+func (p *Parser) asyncGeneratorDeclaration(startOffset int) *AsyncGeneratorDeclaration {
 	p.tokenizer.MustMatch(TStar)
 	identifier := p.bindingIdentifier()
 	p.tokenizer.MustMatch(TLeftParen)
@@ -566,7 +589,7 @@ func (p *Parser) generatorDeclaration() *GeneratorDeclaration {
 
 func (p *Parser) declaration() Declaration {
 	t := p.tokenizer.CurrentToken
-	if t.Type == TFunction {
+	if t.Type == TFunction || t.Type == TAsync {
 		return p.hoistableDeclaration()
 	}
 	if t.Type == TLet || t.Type == TConst {

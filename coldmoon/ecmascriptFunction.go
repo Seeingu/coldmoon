@@ -127,9 +127,16 @@ func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argume
 		return EvaluateGeneratorBody(agent, function, argumentsList)
 	case FunctionTypeAsyncGenerator:
 		return EvaluateAsyncGeneratorBody(agent, function, argumentsList)
-	default:
-		panic("unimplemented")
+	case FunctionTypeAsync:
+		return EvaluateAsyncFunctionBody(agent, function, argumentsList)
 	}
+	panic("unreachable")
+}
+
+func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+	functionBody := function.ECMAScriptCode
+	FunctionDeclarationInstantiation(agent, function, argumentsList)
+	return GenerateAndRunBytecode(agent, functionBody)
 }
 
 func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {

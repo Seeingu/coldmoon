@@ -149,8 +149,19 @@ func CreateDynamicFunction(
 			return p.formalParameters()
 		}
 		fallbackPrototype = "%AsyncGeneratorFunction.prototype%"
-	default:
-		panic("unimplemented")
+	case dynamicFunctionKindAsync:
+		prefix = "async function"
+
+		exprSym.acceptFn = func(p *Parser) Expression {
+			return p.functionExpression()
+		}
+		bodySym.acceptFn = func(p *Parser) *FunctionBody {
+			return p.functionBody(FunctionTypeAsync)
+		}
+		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
+			return p.formalParameters()
+		}
+		fallbackPrototype = "%AsyncFunction.prototype%"
 	}
 
 	argCount := len(parameterList)
@@ -219,7 +230,7 @@ func CreateDynamicFunction(
 			Enumerable:   false,
 			Configurable: false,
 		})
-	default:
+	case dynamicFunctionKindAsync:
 		panic("unimplemented")
 	}
 	return function

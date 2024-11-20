@@ -52,6 +52,8 @@ function* b() {
 }
 async function* c() {
 }
+async function d() {
+}
 `
 	testSource(t, sourceText)
 

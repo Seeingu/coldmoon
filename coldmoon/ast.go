@@ -2466,6 +2466,58 @@ func (d *DeclarationHoistableFunction) String() string {
 	return d.FunctionDeclaration.String()
 }
 
+// MARK: - AsyncFunctionDeclaration
+
+type DeclarationHoistableAsyncFunction struct {
+	DeclarationHoistable
+	AsyncFunctionDeclaration *AsyncFunctionDeclaration
+}
+
+func (d *DeclarationHoistableAsyncFunction) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (d *DeclarationHoistableAsyncFunction) Bytecode(e *Executable, c *BytecodeContext) {
+	d.AsyncFunctionDeclaration.Bytecode(e, c)
+}
+func (d *DeclarationHoistableAsyncFunction) String() string {
+	return d.AsyncFunctionDeclaration.String()
+}
+
+type AsyncFunctionDeclaration struct {
+	ASTNode
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (d *AsyncFunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
+	realm := c.agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateAsyncFunctionObject(c.agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
+}
+func (d *AsyncFunctionDeclaration) instantiateAsyncFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+	realm := agent.CurrentRealm()
+	name := d.Identifier
+	sourceText := d.SourceText
+	function := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.AsyncFunctionPrototype,
+		sourceText,
+		d.FormalParameters,
+		d.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	return function
+}
+func (d *AsyncFunctionDeclaration) String() string {
+	return "AsyncFunctionDeclaration " + string(d.Identifier)
+}
+
 // MARK: - AsyncGeneratorDeclaration
 
 type DeclarationHoistableAsyncGenerator struct {

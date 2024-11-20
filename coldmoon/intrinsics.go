@@ -39,6 +39,10 @@ type Intrinsics struct {
 	AsyncGeneratorFunctionPrototypePrototype ObjectType
 	// %AsyncIteratorPrototype%
 	AsyncIteratorPrototype ObjectType
+	// %AsyncFunction%
+	AsyncFunctionConstructor ObjectType
+	// %AsyncFunction.prototype%
+	AsyncFunctionPrototype ObjectType
 	// %Date.Prototype%
 	DatePrototype ObjectType
 	// %Date%

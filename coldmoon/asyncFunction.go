@@ -1,6 +1,6 @@
 package coldmoon
 
-func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
+func NewAsyncFunctionConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		parameterArgs := argumentsList[0 : len(argumentsList)-1]
@@ -14,41 +14,38 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 				agent,
 				C,
 				newTarget,
-				dynamicFunctionKindGenerator,
+				dynamicFunctionKindAsync,
 				parameterArgs,
 				bodyArg,
 			))
-
 	}
-	object := CreateBuiltinFunction(agent, behavior, 1, "GeneratorFunction", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 1, "AsyncFunction", builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionConstructor,
 	})
+
 	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),
+		Value:        NewValueFromObject(realm.Intrinsics.AsyncFunctionPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
+	DefineBuiltinProperty(realm.Intrinsics.AsyncFunctionPrototype, "constructor", &PropertyDescriptor{
+		Value:        NewValueFromObject(object),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
+
 	return object
 }
 
-func NewGeneratorFunctionPrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype)
-	DefineBuiltinProperty(object, "constructor", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionConstructor),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototypePrototype),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
+	agent := realm.Agent
+	object := NewObject(agent, realm.Intrinsics.FunctionPrototype)
+
 	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("GeneratorFunction"),
+		Value:        NewStringValue("AsyncFunction"),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
