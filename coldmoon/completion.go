@@ -1,30 +1,30 @@
 package coldmoon
 
-type Type int
+type CompletionType int
 
 const (
-	Normal Type = iota
-	Break
-	Continue
-	Return
-	Throw
+	CompletionTypeNormal CompletionType = iota
+	CompletionTypeBreak
+	CompletionTypeContinue
+	CompletionTypeReturn
+	CompletionTypeThrow
 )
 
 // CompletionRecord
 // 6.2.4
 type CompletionRecord struct {
-	Type  Type
+	Type  CompletionType
 	Value Value
 	// Target is a string or empty
 	Target string
 }
 
 func NewNormalCompletion(value Value) *CompletionRecord {
-	return &CompletionRecord{Type: Normal, Value: value}
+	return &CompletionRecord{Type: CompletionTypeNormal, Value: value}
 }
 
 func NewThrowCompletion(value Value) *CompletionRecord {
-	return &CompletionRecord{Type: Throw, Value: value}
+	return &CompletionRecord{Type: CompletionTypeThrow, Value: value}
 }
 
 var TypeErrorCompletion = NewThrowCompletion(NewStringValue("TypeError"))

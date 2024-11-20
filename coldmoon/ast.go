@@ -1960,15 +1960,25 @@ func (s *StatementThrow) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 func (s *StatementThrow) String() string {
-	return "Throw " + s.Expression.String()
+	return "CompletionTypeThrow " + s.Expression.String()
 }
 
 // MARK: - Function
+
+type FunctionType int
+
+const (
+	FunctionTypeNormal FunctionType = iota
+	FunctionTypeGenerator
+	FunctionTypeAsync
+	FunctionTypeAsyncGenerator
+)
 
 type FunctionBody struct {
 	ASTNode
 	StatementList StatementList
 	Strict        bool
+	Type          FunctionType
 }
 
 func (f *FunctionBody) VarScopedDeclarations() (l []*VariableDeclaration) {
@@ -2362,9 +2372,9 @@ func (s *StatementReturn) Bytecode(e *Executable, c *BytecodeContext) {
 
 func (s *StatementReturn) String() string {
 	if s.Expression != nil {
-		return "Return " + s.Expression.String()
+		return "CompletionTypeReturn " + s.Expression.String()
 	}
-	return "Return"
+	return "CompletionTypeReturn"
 }
 
 // MARK: - Declaration
@@ -2376,21 +2386,91 @@ type Declaration interface {
 
 // MARK: - HoistableDeclaration
 
-type DeclarationHoistable struct {
+type DeclarationHoistable interface {
 	Declaration
+}
+
+// MARK: - FunctionDeclaration
+
+type DeclarationHoistableFunction struct {
+	DeclarationHoistable
 	FunctionDeclaration *FunctionDeclaration
 }
 
-func (d *DeclarationHoistable) Analyze(a AnalyzeQuery) bool {
+func (d *DeclarationHoistableFunction) Analyze(a AnalyzeQuery) bool {
 	return false
 }
 
-func (d *DeclarationHoistable) Bytecode(e *Executable, c *BytecodeContext) {
+func (d *DeclarationHoistableFunction) Bytecode(e *Executable, c *BytecodeContext) {
 	d.FunctionDeclaration.Bytecode(e, c)
 }
 
-func (d *DeclarationHoistable) String() string {
+func (d *DeclarationHoistableFunction) String() string {
 	return d.FunctionDeclaration.String()
+}
+
+// MARK: - GeneratorDeclaration
+
+type DeclarationHoistableGenerator struct {
+	DeclarationHoistable
+	GeneratorDeclaration *GeneratorDeclaration
+}
+
+func (d *DeclarationHoistableGenerator) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
+func (d *DeclarationHoistableGenerator) Bytecode(e *Executable, c *BytecodeContext) {
+	d.GeneratorDeclaration.Bytecode(e, c)
+}
+func (d *DeclarationHoistableGenerator) String() string {
+	return d.GeneratorDeclaration.String()
+}
+
+type GeneratorDeclaration struct {
+	ASTNode
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (d *GeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
+	realm := c.agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateOrdinaryFunctionObject(c.agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
+}
+
+// 15.5.3
+func (d *GeneratorDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+	realm := agent.CurrentRealm()
+	name := d.Identifier
+	sourceText := d.SourceText
+	function := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		d.FormalParameters,
+		d.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+
+	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototype, nil)
+	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+		Value:        NewValueFromObject(prototype),
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	return function
+}
+
+func (d *GeneratorDeclaration) String() string {
+	return "GeneratorDeclaration " + string(d.Identifier)
 }
 
 // MARK: - LexicalDeclaration

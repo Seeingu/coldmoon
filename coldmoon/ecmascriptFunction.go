@@ -59,7 +59,7 @@ func Call(object ObjectType, thisArgument Value, argumentsList []Value) Value {
 
 	agent.ExecutionContextStack.Pop()
 
-	if result.Type == Return {
+	if result.Type == CompletionTypeReturn {
 		return result.Value
 	}
 	return nil
@@ -119,8 +119,30 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 
 // 10.2.1.4
 func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+	functionBody := function.ECMAScriptCode
+	switch functionBody.Type {
+	case FunctionTypeNormal:
+		return EvaluateFunctionBody(agent, function, argumentsList)
+	case FunctionTypeGenerator:
+		return EvaluateGeneratorBody(agent, function, argumentsList)
+	default:
+		panic("unimplemented")
+	}
+}
+
+func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+	functionBody := function.ECMAScriptCode
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
-	return GenerateAndRunBytecode(agent, function.ECMAScriptCode)
+	return GenerateAndRunBytecode(agent, functionBody)
+}
+
+func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+	FunctionDeclarationInstantiation(agent, function, argumentsList)
+	G := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
+	return &CompletionRecord{
+		Type:  CompletionTypeReturn,
+		Value: NewValueFromObject(G),
+	}
 }
 
 // 10.2.11
@@ -299,7 +321,7 @@ func ECMAScriptFunctionConstruct(
 
 	agent.ExecutionContextStack.Pop()
 
-	if result.Type == Return {
+	if result.Type == CompletionTypeReturn {
 		if o, ok := result.Value.(*ObjectValue); ok {
 			return o.Object
 		}

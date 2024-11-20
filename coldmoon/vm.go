@@ -92,7 +92,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IThrow:
 		value := vm.result
 		vm.agent.exception = value
-		panic("Throw")
+		panic("CompletionTypeThrow")
 	case *IInstantiateOrdinaryFunctionExpression:
 		functionExpression := ins.FunctionExpression
 		closure := InstantiateOrdinaryFunctionExpression(
@@ -317,7 +317,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IRethrowExceptionIfAny:
 		if vm.exception != nil {
 			vm.agent.exception = vm.exception
-			panic("Throw")
+			panic("CompletionTypeThrow")
 		}
 	case *IPushReference:
 		vm.referenceStack.Push(vm.reference)

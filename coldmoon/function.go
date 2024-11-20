@@ -117,7 +117,7 @@ func CreateDynamicFunction(
 			return p.functionExpression()
 		}
 		bodySym.acceptFn = func(p *Parser) *FunctionBody {
-			return p.functionBody()
+			return p.functionBody(FunctionTypeNormal)
 		}
 		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
 			return p.formalParameters()
@@ -130,7 +130,7 @@ func CreateDynamicFunction(
 			return p.functionExpression()
 		}
 		bodySym.acceptFn = func(p *Parser) *FunctionBody {
-			return p.functionBody()
+			return p.functionBody(FunctionTypeGenerator)
 		}
 		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
 			return p.formalParameters()

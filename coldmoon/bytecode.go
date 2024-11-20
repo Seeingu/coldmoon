@@ -15,6 +15,10 @@ func GenerateAndRunBytecode(agent *Agent, node ASTNode) *CompletionRecord {
 	fmt.Println("Executable: ", exe.String())
 	result := vm.Run(exe)
 
-	fmt.Println("Result: ", result.Value.String())
+	if result.Value != nil {
+		fmt.Println("Result: ", result.Value.String())
+	} else {
+		fmt.Println("Result: nil")
+	}
 	return result
 }

@@ -46,7 +46,10 @@ func testSource(t *testing.T, s string) {
 func TestBaseline(t *testing.T) {
 	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
 	sourceText := `
-Date.UTC(2012);
+function a() {
+}
+function* b() {
+}
 `
 	testSource(t, sourceText)
 
@@ -58,6 +61,7 @@ true && 1;
 true ? 2 : 1;
 2 ** 3;
 () => 123;
+Date.UTC(2012);
 `
 	testSource(t, sourceText)
 }

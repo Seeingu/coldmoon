@@ -42,7 +42,7 @@ func (i *IStoreConstant) String() string {
 	return "IStoreConstant " + i.Value.String()
 }
 
-// MARK: - Return
+// MARK: - CompletionTypeReturn
 
 type IReturn struct {
 	Instruction
@@ -136,7 +136,7 @@ func (i *IJumpIfTrue) String() string {
 	return fmt.Sprintf("IJumpIfTrue %d %d", i.Target, i.TargetElse)
 }
 
-// MARK: - Throw
+// MARK: - CompletionTypeThrow
 
 type IThrow struct {
 	Instruction

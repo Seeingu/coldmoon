@@ -234,7 +234,7 @@ func (p *Parser) statementList() (list StatementList) {
 	return
 }
 
-func (p *Parser) functionBody() *FunctionBody {
+func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 	inFunctionBodyBefore := p.inFunctionBody
 	p.inFunctionBody = true
 	defer func() {
@@ -378,7 +378,7 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
-	functionBody := p.functionBody()
+	functionBody := p.functionBody(FunctionTypeNormal)
 	p.tokenizer.MustMatch(TRightBrace)
 	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
 	return &FunctionDeclaration{
@@ -400,7 +400,7 @@ func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
-	functionBody := p.functionBody()
+	functionBody := p.functionBody(FunctionTypeNormal)
 	p.tokenizer.MustMatch(TRightBrace)
 	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
 	return &PrimaryExpressionFunctionExpression{
@@ -461,14 +461,40 @@ func (p *Parser) lexicalBinding() *LexicalBinding {
 	}
 }
 
-func (p *Parser) hoistableDeclaration() *DeclarationHoistable {
+func (p *Parser) hoistableDeclaration() DeclarationHoistable {
 	t := p.tokenizer.CurrentToken
-	if t.Type == TFunction {
-		return &DeclarationHoistable{
-			FunctionDeclaration: p.functionDeclaration(),
+	if t.Type == TFunction && p.tokenizer.NextToken.Type == TStar {
+		d := p.generatorDeclaration()
+		return &DeclarationHoistableGenerator{
+			GeneratorDeclaration: d,
+		}
+	} else if t.Type == TFunction {
+		functionDeclaration := p.functionDeclaration()
+		return &DeclarationHoistableFunction{
+			FunctionDeclaration: functionDeclaration,
 		}
 	}
 	panic("unimplemented")
+}
+
+func (p *Parser) generatorDeclaration() *GeneratorDeclaration {
+	startOffset := p.tokenizer.Index
+	p.tokenizer.MustMatch(TFunction)
+	p.tokenizer.MustMatch(TStar)
+	identifier := p.bindingIdentifier()
+	p.tokenizer.MustMatch(TLeftParen)
+	formalParams := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	functionBody := p.functionBody(FunctionTypeGenerator)
+	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	return &GeneratorDeclaration{
+		Identifier:       identifier,
+		FormalParameters: formalParams,
+		SourceText:       sourceText,
+		Body:             functionBody,
+	}
 }
 
 func (p *Parser) declaration() Declaration {
@@ -568,7 +594,7 @@ func (p *Parser) whileStatement() *StatementWhile {
 	}
 }
 
-// MARK: - Return
+// MARK: - CompletionTypeReturn
 
 func (p *Parser) returnStatement() *StatementReturn {
 	p.tokenizer.MustMatch(TReturn)
@@ -996,7 +1022,7 @@ func (p *Parser) tryArrowFunction() *PrimaryExpressionArrowFunction {
 	p.noLineTerminatorHere()
 	var body *FunctionBody
 	if p.tokenizer.Match(TLeftBrace) {
-		body = p.functionBody()
+		body = p.functionBody(FunctionTypeNormal)
 		p.tokenizer.MustMatch(TRightBrace)
 	} else {
 		expression := p.expression(p.acceptContext(TComma))
@@ -1167,7 +1193,7 @@ func (p *Parser) propertyDefinition(methodType MethodDefinitionType) PropertyDef
 		formalParameters := p.formalParameters()
 		p.tokenizer.MustMatch(TRightParen)
 		p.tokenizer.MustMatch(TLeftBrace)
-		body := p.functionBody()
+		body := p.functionBody(FunctionTypeNormal)
 		p.tokenizer.MustMatch(TRightBrace)
 		sourceText := p.SourceText[start:p.tokenizer.Index]
 		var m = MethodDefinitionTypeMethod
