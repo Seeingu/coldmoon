@@ -110,6 +110,7 @@ const (
 	TImport
 	TExport
 	TDefault
+	TAsync
 	TFrom
 	TAs
 	TFor
@@ -510,6 +511,7 @@ var keywordsMap = map[string]TokenType{
 	"switch":     TSwitch,
 	"case":       TCase,
 	"enum":       TEnum,
+	"async":      TAsync,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {

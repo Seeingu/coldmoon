@@ -2441,6 +2441,67 @@ func (d *DeclarationHoistableFunction) String() string {
 	return d.FunctionDeclaration.String()
 }
 
+// MARK: - AsyncGeneratorDeclaration
+
+type DeclarationHoistableAsyncGenerator struct {
+	DeclarationHoistable
+	AsyncGeneratorDeclaration *AsyncGeneratorDeclaration
+}
+
+func (d *DeclarationHoistableAsyncGenerator) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (d *DeclarationHoistableAsyncGenerator) Bytecode(e *Executable, c *BytecodeContext) {
+	d.AsyncGeneratorDeclaration.Bytecode(e, c)
+}
+func (d *DeclarationHoistableAsyncGenerator) String() string {
+	return d.AsyncGeneratorDeclaration.String()
+}
+
+type AsyncGeneratorDeclaration struct {
+	ASTNode
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (d *AsyncGeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
+	realm := c.agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateAsyncGeneratorFunctionObject(c.agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
+}
+
+// 15.6.3
+func (d *AsyncGeneratorDeclaration) instantiateAsyncGeneratorFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+	realm := agent.CurrentRealm()
+	name := d.Identifier
+	sourceText := d.SourceText
+	function := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		d.FormalParameters,
+		d.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
+	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+		Value:        NewValueFromObject(prototype),
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	return function
+}
+func (d *AsyncGeneratorDeclaration) String() string {
+	return "AsyncGeneratorDeclaration " + string(d.Identifier)
+}
+
 // MARK: - GeneratorDeclaration
 
 type DeclarationHoistableGenerator struct {

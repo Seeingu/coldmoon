@@ -493,8 +493,34 @@ func (p *Parser) hoistableDeclaration() DeclarationHoistable {
 		return &DeclarationHoistableFunction{
 			FunctionDeclaration: functionDeclaration,
 		}
+	} else if t.Type == TAsync {
+		d := p.asyncGeneratorDeclaration()
+		return &DeclarationHoistableAsyncGenerator{
+			AsyncGeneratorDeclaration: d,
+		}
 	}
 	panic("unimplemented")
+}
+
+func (p *Parser) asyncGeneratorDeclaration() *AsyncGeneratorDeclaration {
+	startOffset := p.tokenizer.Index
+	p.tokenizer.MustMatch(TAsync)
+	p.tokenizer.MustMatch(TFunction)
+	p.tokenizer.MustMatch(TStar)
+	identifier := p.bindingIdentifier()
+	p.tokenizer.MustMatch(TLeftParen)
+	formalParams := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	body := p.functionBody(FunctionTypeAsyncGenerator)
+	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	return &AsyncGeneratorDeclaration{
+		Identifier:       identifier,
+		FormalParameters: formalParams,
+		SourceText:       sourceText,
+		Body:             body,
+	}
 }
 
 func (p *Parser) generatorDeclaration() *GeneratorDeclaration {

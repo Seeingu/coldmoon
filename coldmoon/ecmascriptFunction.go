@@ -125,6 +125,8 @@ func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argume
 		return EvaluateFunctionBody(agent, function, argumentsList)
 	case FunctionTypeGenerator:
 		return EvaluateGeneratorBody(agent, function, argumentsList)
+	case FunctionTypeAsyncGenerator:
+		return EvaluateAsyncGeneratorBody(agent, function, argumentsList)
 	default:
 		panic("unimplemented")
 	}
@@ -134,6 +136,15 @@ func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsL
 	functionBody := function.ECMAScriptCode
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	return GenerateAndRunBytecode(agent, functionBody)
+}
+
+func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+	FunctionDeclarationInstantiation(agent, function, argumentsList)
+	G := OrdinaryCreateFromConstructor(agent, function, "%AsyncGeneratorFunction.prototype.prototype%", nil)
+	return &CompletionRecord{
+		Type:  CompletionTypeReturn,
+		Value: NewValueFromObject(G),
+	}
 }
 
 func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {

@@ -55,6 +55,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.AsyncGeneratorFunction = NewAsyncGeneratorFunctionConstructor(r)
 	r.Intrinsics.AsyncGeneratorFunctionPrototype = NewAsyncGeneratorFunctionPrototype(r)
 	r.Intrinsics.AsyncGeneratorFunctionPrototypePrototype = NewAsyncGeneratorPrototype(r)
+	r.Intrinsics.AsyncIteratorPrototype = NewAsyncIteratorPrototype(r)
 	r.Intrinsics.DatePrototype = NewDatePrototype(r)
 	r.Intrinsics.DateConstructor = NewDateConstructor(r)
 	r.Intrinsics.MapPrototype = NewMapPrototype(r)
