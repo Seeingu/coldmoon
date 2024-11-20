@@ -389,6 +389,27 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	}
 }
 
+func (p *Parser) asyncGeneratorExpression() *PrimaryExpressionAsyncGeneratorExpression {
+	startOffset := p.tokenizer.Index
+	p.tokenizer.MustMatch(TAsync)
+	p.tokenizer.MustMatch(TFunction)
+	p.tokenizer.MustMatch(TStar)
+	identifier := p.bindingIdentifier()
+	p.tokenizer.MustMatch(TLeftParen)
+	params := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	body := p.functionBody(FunctionTypeAsyncGenerator)
+	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	return &PrimaryExpressionAsyncGeneratorExpression{
+		IdentifierName:   identifier,
+		FormalParameters: params,
+		SourceText:       sourceText,
+		Body:             body,
+	}
+}
+
 func (p *Parser) generatorExpression() *PrimaryExpressionGeneratorExpression {
 	startOffset := p.tokenizer.Index
 	p.tokenizer.MustMatch(TFunction)
@@ -1145,6 +1166,8 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 			return p.generatorExpression()
 		}
 		return p.functionExpression()
+	case TAsync:
+		return p.asyncGeneratorExpression()
 	default:
 		literal := p.literal()
 

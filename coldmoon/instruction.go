@@ -467,6 +467,19 @@ type IInstantiateGeneratorFunctionExpression struct {
 	FunctionExpression *PrimaryExpressionGeneratorExpression
 }
 
+func (i *IInstantiateGeneratorFunctionExpression) String() string {
+	return "IInstantiateGeneratorFunctionExpression " + i.FunctionExpression.String()
+}
+
+type IInstantiateAsyncGeneratorFunctionExpression struct {
+	Instruction
+	FunctionExpression *PrimaryExpressionAsyncGeneratorExpression
+}
+
+func (i *IInstantiateAsyncGeneratorFunctionExpression) String() string {
+	return "IInstantiateAsyncGeneratorFunctionExpression " + i.FunctionExpression.String()
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

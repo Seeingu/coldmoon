@@ -111,6 +111,31 @@ func (p *PrimaryExpressionGeneratorExpression) String() string {
 	return "GeneratorExpression"
 }
 
+// MARK: - AsyncGeneratorExpression
+
+type PrimaryExpressionAsyncGeneratorExpression struct {
+	PrimaryExpression
+	IdentifierName   IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (p *PrimaryExpressionAsyncGeneratorExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (p *PrimaryExpressionAsyncGeneratorExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (p *PrimaryExpressionAsyncGeneratorExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
+	p.Body.Strict = strict
+	e.AddInstruction(&IInstantiateAsyncGeneratorFunctionExpression{FunctionExpression: p})
+}
+func (p *PrimaryExpressionAsyncGeneratorExpression) String() string {
+	return "AsyncGeneratorExpression"
+}
+
 // MARK: - ThisExpression
 
 type PrimaryExpressionThis struct {

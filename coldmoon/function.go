@@ -140,7 +140,7 @@ func CreateDynamicFunction(
 		prefix = "async function*"
 
 		exprSym.acceptFn = func(p *Parser) Expression {
-			return p.generatorExpression()
+			return p.asyncGeneratorExpression()
 		}
 		bodySym.acceptFn = func(p *Parser) *FunctionBody {
 			return p.functionBody(FunctionTypeGenerator)

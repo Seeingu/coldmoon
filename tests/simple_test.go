@@ -50,6 +50,8 @@ function a() {
 }
 function* b() {
 }
+async function* c() {
+}
 `
 	testSource(t, sourceText)
 

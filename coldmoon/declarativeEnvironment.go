@@ -19,6 +19,7 @@ var _ EnvironmentRecord = (*DeclarativeEnvironment)(nil)
 func NewDeclarativeEnvironment(outerEnv EnvironmentRecord) *DeclarativeEnvironment {
 	return &DeclarativeEnvironment{
 		outerEnv: outerEnv,
+		Bindings: make(map[string]*Binding),
 	}
 }
 
