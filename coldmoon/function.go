@@ -136,6 +136,19 @@ func CreateDynamicFunction(
 			return p.formalParameters()
 		}
 		fallbackPrototype = "%GeneratorFunction.prototype%"
+	case dynamicFunctionKindAsyncGenerator:
+		prefix = "async function*"
+
+		exprSym.acceptFn = func(p *Parser) Expression {
+			return p.generatorExpression()
+		}
+		bodySym.acceptFn = func(p *Parser) *FunctionBody {
+			return p.functionBody(FunctionTypeGenerator)
+		}
+		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
+			return p.formalParameters()
+		}
+		fallbackPrototype = "%AsyncGeneratorFunction.prototype%"
 	default:
 		panic("unimplemented")
 	}
@@ -192,6 +205,14 @@ func CreateDynamicFunction(
 		MakeConstructor(function, false, nil)
 	case dynamicFunctionKindGenerator:
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+		DefineBuiltinProperty(function, "prototype", &PropertyDescriptor{
+			Value:        NewValueFromObject(prototype),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+	case dynamicFunctionKindAsyncGenerator:
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
 		DefineBuiltinProperty(function, "prototype", &PropertyDescriptor{
 			Value:        NewValueFromObject(prototype),
 			Writable:     true,

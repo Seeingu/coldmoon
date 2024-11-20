@@ -1,8 +1,15 @@
 package coldmoon
 
-func NewGeneratorPrototype(realm *Realm) ObjectType {
+type GeneratorObject struct {
+	*Object
+}
+
+func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.IteratorPrototype)
+	g := &GeneratorObject{
+		Object: object,
+	}
 
 	DefineBuiltinProperty(object, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),
@@ -17,5 +24,5 @@ func NewGeneratorPrototype(realm *Realm) ObjectType {
 		Configurable: true,
 	})
 
-	return object
+	return g
 }
