@@ -400,6 +400,51 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		functionExpression := ins.FunctionExpression
 		closure := vm.InstantiateAsyncGeneratorFunctionExpression(functionExpression)
 		vm.result = NewValueFromObject(closure)
+	case *IInstantiateAsyncFunctionExpression:
+		functionExpression := ins.FunctionExpression
+		closure := vm.InstantiateAsyncFunctionExpression(functionExpression)
+		vm.result = NewValueFromObject(closure)
+	}
+}
+
+func (vm *VM) InstantiateAsyncFunctionExpression(functionExpression *PrimaryExpressionAsyncFunctionExpression) ObjectType {
+	realm := vm.agent.CurrentRealm()
+	if functionExpression.Identifier != "" {
+		name := string(functionExpression.Identifier)
+		outerEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(name, false)
+		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := functionExpression.SourceText
+		closure := OrdinaryFunctionCreate(
+			vm.agent,
+			realm.Intrinsics.AsyncFunctionPrototype,
+			sourceText,
+			functionExpression.FormalParameters,
+			functionExpression.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		funcEnv.InitializeBinding(name, NewValueFromObject(closure))
+		return closure
+	} else {
+		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := functionExpression.SourceText
+		closure := OrdinaryFunctionCreate(
+			vm.agent,
+			realm.Intrinsics.AsyncFunctionPrototype,
+			sourceText,
+			functionExpression.FormalParameters,
+			functionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(""), "")
+		return closure
 	}
 }
 

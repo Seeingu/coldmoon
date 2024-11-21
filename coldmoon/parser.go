@@ -389,9 +389,29 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	}
 }
 
+func (p *Parser) asyncFunctionExpression() *PrimaryExpressionAsyncFunctionExpression {
+	startOffset := p.tokenizer.Index
+	p.tokenizer.Match(TAsync)
+	p.tokenizer.MustMatch(TFunction)
+	identifier := p.bindingIdentifier()
+	p.tokenizer.MustMatch(TLeftParen)
+	params := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	body := p.functionBody(FunctionTypeAsync)
+	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	return &PrimaryExpressionAsyncFunctionExpression{
+		Identifier:       identifier,
+		FormalParameters: params,
+		SourceText:       sourceText,
+		Body:             body,
+	}
+}
+
 func (p *Parser) asyncGeneratorExpression() *PrimaryExpressionAsyncGeneratorExpression {
 	startOffset := p.tokenizer.Index
-	p.tokenizer.MustMatch(TAsync)
+	p.tokenizer.Match(TAsync)
 	p.tokenizer.MustMatch(TFunction)
 	p.tokenizer.MustMatch(TStar)
 	identifier := p.bindingIdentifier()
@@ -1190,7 +1210,11 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		}
 		return p.functionExpression()
 	case TAsync:
-		return p.asyncGeneratorExpression()
+		p.tokenizer.MustMatch(TAsync)
+		if p.tokenizer.NextToken.Type == TStar {
+			return p.asyncGeneratorExpression()
+		}
+		return p.asyncFunctionExpression()
 	default:
 		literal := p.literal()
 

@@ -544,7 +544,6 @@ func (t *Tokenizer) Peek() Token {
 	return t.CurrentToken
 }
 
-// TODO: remove
 func (t *Tokenizer) Next() Token {
 	t.skipWhiteSpace()
 	token := t.Peek()

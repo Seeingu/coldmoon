@@ -83,6 +83,31 @@ func (p *PrimaryExpressionLiteral) Analyze(a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - AsyncFunctionExpression
+
+type PrimaryExpressionAsyncFunctionExpression struct {
+	PrimaryExpression
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (p *PrimaryExpressionAsyncFunctionExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (p *PrimaryExpressionAsyncFunctionExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (p *PrimaryExpressionAsyncFunctionExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
+	p.Body.Strict = strict
+	e.AddInstruction(&IInstantiateAsyncFunctionExpression{FunctionExpression: p})
+}
+func (p *PrimaryExpressionAsyncFunctionExpression) String() string {
+	return "AsyncFunctionExpression"
+}
+
 // MARK: - GeneratorExpression
 
 type PrimaryExpressionGeneratorExpression struct {
