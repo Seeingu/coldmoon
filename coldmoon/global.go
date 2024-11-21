@@ -1,6 +1,9 @@
 package coldmoon
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 type constructorProperties struct {
 	Name               string
@@ -298,6 +301,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"parseFloat",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.ParseFloat),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }
@@ -418,4 +430,23 @@ func NewParseInt(realm *Realm) ObjectType {
 	return CreateBuiltinFunction(agent, parseInt, 2, "parseInt", builtinFunctionArgs{
 		realm: realm,
 	})
+}
+
+func NewParseFloat(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var parseFloat BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		stringValue := arguments[0]
+		inputString := ToString(agent, stringValue)
+		trimmedString := inputString.TrimString()
+
+		f, err := strconv.ParseFloat(trimmedString, 64)
+		if err != nil {
+			return NaNValue
+		}
+		return NewNumberValue(f)
+	}
+	return CreateBuiltinFunction(agent, parseFloat, 1, "parseFloat", builtinFunctionArgs{
+		realm: realm,
+	})
+
 }

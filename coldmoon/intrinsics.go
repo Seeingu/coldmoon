@@ -97,6 +97,8 @@ type Intrinsics struct {
 	Eval ObjectType
 	// %parseInt%
 	ParseInt ObjectType
+	// %parseFloat%
+	ParseFloat ObjectType
 	// %EvalError%
 	EvalErrorConstructor ObjectType
 	// %EvalError.prototype%
