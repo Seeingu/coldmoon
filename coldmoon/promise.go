@@ -119,8 +119,85 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 		promise := this
 		return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{UndefinedValue, onRejected})
 	}
+	var finally BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		promise := this
+		onFinally := arguments[0]
+		if !ValueIsObject(promise) {
+			panic("TypeError")
+		}
+		C := MustGetObject(promise).SpeciesConstructor(realm.Intrinsics.Promise)
+		Assert(IsConstructor(C.Value))
+		var thenFinally Value
+		var catchFinally Value
+		if !IsCallable(onFinally) {
+			thenFinally = onFinally
+			catchFinally = onFinally
+		} else {
+			thenFinally = NewValueFromObject(realm.Intrinsics.FunctionPrototype)
+			catchFinally = NewValueFromObject(realm.Intrinsics.FunctionPrototype)
+			captures := &PromiseThenFinallyCaptures{
+				OnFinally:   onFinally,
+				Constructor: MustGetObject(C.Value),
+			}
+			var thenFinallyClosure = func(this Value, arguments []Value, newTarget ObjectType) Value {
+				function := agent.ActiveFunctionObject()
+				_captures := function.(*BuiltinFunction).AdditionalFields.PromiseThenFinallyCaptures
+				onFinally := _captures.OnFinally
+				result := CallAssumeCallableNoArgs(onFinally, UndefinedValue)
+				p := PromiseResolve(agent, _captures.Constructor, result)
+
+				var returnValue BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+					f := agent.ActiveFunctionObject()
+					return f.(*BuiltinFunction).AdditionalFields.Value
+				}
+
+				valueThunk := CreateBuiltinFunction(agent, returnValue, 0, "", builtinFunctionArgs{
+					additionalFields: &AdditionalFields{
+						Value: arguments[0],
+					}})
+				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{NewValueFromObject(valueThunk)})
+			}
+
+			thenFinally = NewValueFromObject(
+				CreateBuiltinFunction(agent, thenFinallyClosure, 1, "", builtinFunctionArgs{
+					additionalFields: &AdditionalFields{
+						PromiseThenFinallyCaptures: captures,
+					},
+				}))
+
+			var catchFinallyClosure = func(this Value, arguments []Value, newTarget ObjectType) Value {
+				function := agent.ActiveFunctionObject()
+				_captures := function.(*BuiltinFunction).AdditionalFields.PromiseThenFinallyCaptures
+				onFinally := _captures.OnFinally
+				result := CallAssumeCallableNoArgs(onFinally, UndefinedValue)
+				p := PromiseResolve(agent, _captures.Constructor, result)
+				reason := arguments[0]
+
+				var throwReason BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+					f := agent.ActiveFunctionObject()
+					_reason := f.(*BuiltinFunction).AdditionalFields.Value
+					agent.exception = _reason
+					return _reason
+				}
+
+				thrower := CreateBuiltinFunction(agent, throwReason, 0, "", builtinFunctionArgs{
+					additionalFields: &AdditionalFields{
+						Value: reason,
+					}})
+				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{NewValueFromObject(thrower)})
+			}
+			catchFinally = NewValueFromObject(
+				CreateBuiltinFunction(agent, catchFinallyClosure, 1, "", builtinFunctionArgs{
+					additionalFields: &AdditionalFields{
+						PromiseThenFinallyCaptures: captures,
+					},
+				}))
+		}
+		return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{thenFinally, catchFinally})
+	}
 	DefineBuiltinFunction(object, "then", then, 2, realm)
 	DefineBuiltinFunction(object, "catch", catch, 1, realm)
+	DefineBuiltinFunction(object, "finally", finally, 1, realm)
 
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("Promise"),
@@ -200,10 +277,14 @@ type ResolvingFunctions struct {
 type AlreadyResolved struct {
 	Value bool
 }
+
+// TODO: use interface
 type AdditionalFields struct {
-	Promise            *PromiseObject
-	AlreadyResolved    *AlreadyResolved
-	ResolvingFunctions *ResolvingFunctions
+	Promise                    *PromiseObject
+	AlreadyResolved            *AlreadyResolved
+	ResolvingFunctions         *ResolvingFunctions
+	PromiseThenFinallyCaptures *PromiseThenFinallyCaptures
+	Value                      Value
 }
 
 // 27.2.1.3
@@ -236,6 +317,10 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 			FulfillPromise(agent, _promise, resolution)
 			return UndefinedValue
 		}
+
+		thenJobCallback := agent.HostHooks.HostMakeJobCallback(MustGetObject(then))
+		job := NewPromiseResolveThenableJob(agent, _promise, MustGetObject(resolution), thenJobCallback)
+		agent.HostHooks.HostEnqueuePromiseJob(agent, job.Job, job.Realm)
 		return UndefinedValue
 	}
 	lengthResolve := 1
@@ -299,14 +384,25 @@ func TriggerPromiseReactions(agent *Agent, reactions []*PromiseReaction, argumen
 	}
 }
 
-type JobCaptures struct {
+type PromiseJobReactionCaptures struct {
 	Agent    *Agent
 	Reaction *PromiseReaction
 	Argument Value
 }
+type PromiseJobThenableReactionCaptures struct {
+	Agent            *Agent
+	PromiseToResolve *PromiseObject
+	Thenable         ObjectType
+	ThenJobCallback  *JobCallback
+}
+type PromiseThenFinallyCaptures struct {
+	OnFinally   Value
+	Constructor ObjectType
+}
+
 type Job struct {
-	Fun      func(captures *JobCaptures) Value
-	Captures *JobCaptures
+	Fun      func(captures interface{}) Value
+	Captures interface{}
 }
 
 type PromiseReactionJob struct {
@@ -316,13 +412,14 @@ type PromiseReactionJob struct {
 
 // 27.2.2.1
 func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Value) *PromiseReactionJob {
-	captures := &JobCaptures{
+	captures := &PromiseJobReactionCaptures{
 		Agent:    agent,
 		Reaction: reaction,
 		Argument: argument,
 	}
 
-	var fun = func(captures *JobCaptures) Value {
+	var fun = func(_captures interface{}) Value {
+		captures := _captures.(*PromiseJobReactionCaptures)
 		agent := captures.Agent
 		reaction := captures.Reaction
 		argument := captures.Argument
@@ -433,5 +530,42 @@ func PerformPromiseThen(agent *Agent, promise ObjectType, onFulfilled Value, onR
 		return UndefinedValue
 	} else {
 		return NewValueFromObject(resultCapability.Promise)
+	}
+}
+
+// 27.2.2.2
+func NewPromiseResolveThenableJob(agent *Agent, promise *PromiseObject, thenable ObjectType, thenJobCallback *JobCallback) *PromiseReactionJob {
+	captures := &PromiseJobThenableReactionCaptures{
+		Agent:            agent,
+		PromiseToResolve: promise,
+		Thenable:         thenable,
+		ThenJobCallback:  thenJobCallback,
+	}
+	var fun = func(_captures interface{}) Value {
+		captures := _captures.(*PromiseJobThenableReactionCaptures)
+		agent := captures.Agent
+		promiseToResolve := captures.PromiseToResolve
+		thenable := captures.Thenable
+		thenJobCallback := captures.ThenJobCallback
+
+		resolvingFunctions := CreateResolvingFunctions(agent, promiseToResolve)
+		thenCallResult := agent.HostHooks.HostCallJobCallback(thenJobCallback, thenable.ToValue(), []Value{resolvingFunctions.Resolve, resolvingFunctions.Reject})
+		return thenCallResult
+	}
+	job := &Job{
+		Fun:      fun,
+		Captures: captures,
+	}
+	getThenRealmResult := thenJobCallback.Callback.GetFunctionRealm()
+	var thenRealm *Realm
+	if getThenRealmResult != nil {
+		thenRealm = getThenRealmResult
+	} else {
+		thenRealm = agent.CurrentRealm()
+	}
+
+	return &PromiseReactionJob{
+		Realm: thenRealm,
+		Job:   job,
 	}
 }
