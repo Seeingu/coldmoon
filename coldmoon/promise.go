@@ -61,13 +61,37 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 
 }
 
+// MARK: - PromiseReaction
+
+type PromiseReactionType int
+
+const (
+	PromiseReactionTypeFulfill PromiseReactionType = iota
+	PromiseReactionTypeReject
+)
+
+type PromiseReaction struct {
+	Capability *PromiseCapability
+	Type       PromiseReactionType
+	Handler    *JobCallback
+}
+
+// MARK: - Job
+
+type JobCallback struct {
+	Callback    ObjectType
+	HostDefined interface{}
+}
+
 // MARK: - PromiseObject
 
 type PromiseObject struct {
 	*Object
-	PromiseState     PromiseState
-	PromiseResult    Value
-	PromiseIsHandled bool
+	PromiseState            PromiseState
+	PromiseResult           Value
+	PromiseFulfillReactions []*PromiseReaction
+	PromiseRejectReactions  []*PromiseReaction
+	PromiseIsHandled        bool
 }
 
 func NewPromisePrototype(realm *Realm) ObjectType {
@@ -176,16 +200,16 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		_alreadyResolved.Value = true
 		if SameValue(resolution, NewValueFromObject(_promise)) {
 			agent.ThrowException(TypeError, "self resolution")
-			RejectPromise(_promise, agent.exception)
+			RejectPromise(agent, _promise, agent.exception)
 			return UndefinedValue
 		}
 		if !ValueIsObject(resolution) {
-			FulfillPromise(_promise, resolution)
+			FulfillPromise(agent, _promise, resolution)
 			return UndefinedValue
 		}
 		then := MustGetObject(resolution).Get(NewStringPropertyKey("then"))
 		if !IsCallable(then) {
-			FulfillPromise(_promise, resolution)
+			FulfillPromise(agent, _promise, resolution)
 			return UndefinedValue
 		}
 		return UndefinedValue
@@ -226,17 +250,33 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 }
 
 // 27.2.1.4
-func FulfillPromise(promise *PromiseObject, value Value) {
+func FulfillPromise(agent *Agent, promise *PromiseObject, value Value) {
 	Assert(promise.PromiseState == PromiseStatePending)
-	promise.PromiseState = PromiseStateFulfilled
+	reactions := promise.PromiseFulfillReactions
 	promise.PromiseResult = value
+	promise.PromiseState = PromiseStateFulfilled
+	TriggerPromiseReactions(agent, reactions, value)
 }
 
 // 27.2.1.7
-func RejectPromise(promise *PromiseObject, reason Value) {
+func RejectPromise(agent *Agent, promise *PromiseObject, reason Value) {
 	Assert(promise.PromiseState == PromiseStatePending)
+	reactions := promise.PromiseRejectReactions
 	promise.PromiseState = PromiseStateRejected
 	promise.PromiseResult = reason
+	TriggerPromiseReactions(agent, reactions, reason)
+}
+
+// 27.2.1.8
+func TriggerPromiseReactions(agent *Agent, reactions []*PromiseReaction, argument Value) {
+	for _, reaction := range reactions {
+		NewPromiseReactionJob(agent, reaction, argument)
+	}
+}
+
+// 27.2.2.1
+func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Value) {
+	// TODO
 }
 
 // 27.2.4.7.1
