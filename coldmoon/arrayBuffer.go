@@ -1,8 +1,10 @@
 package coldmoon
 
+import "math"
+
 type ArrayBufferObject struct {
 	*Object
-	ArrayBufferData       []byte
+	ArrayBufferData       DataBlock
 	ArrayBufferByteLength uint64
 	ArrayBufferDetachKey  Value
 }
@@ -67,8 +69,58 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		length := o.ArrayBufferByteLength
 		return NewNumberValue(float64(length))
 	}
+	var slice = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		start := arguments[0]
+		end := arguments[1]
+		o := RequireInternalSlot[*ArrayBufferObject](this)
+		if IsDetachedBuffer(o) {
+			panic("TypeError")
+		}
+		length := o.ArrayBufferByteLength
+		relativeStart := ToIntegerOrInfinity(agent, start)
+		var first float64
+		if math.IsInf(relativeStart, -1) {
+			first = 0
+		} else if relativeStart < 0 {
+			first = math.Max(float64(length)+relativeStart, 0)
+		} else {
+			first = math.Min(relativeStart, float64(length))
+		}
+
+		relativeEnd := ToIntegerOrInfinity(agent, end)
+		var final float64
+		if math.IsInf(relativeEnd, -1) {
+			final = 0
+		} else if relativeEnd < 0 {
+			final = math.Max(float64(length)+relativeEnd, 0)
+		} else {
+			final = math.Min(relativeEnd, float64(length))
+		}
+
+		newLen := math.Max(final-first, 0)
+		ctor := o.SpeciesConstructor(realm.Intrinsics.ArrayBufferConstructor)
+		newObject := MustGetObject(ctor.Value).Construct([]Value{NewNumberValue(newLen)}, nil)
+		_new := RequireInternalSlot[*ArrayBufferObject](NewValueFromObject(newObject))
+		if IsDetachedBuffer(_new) {
+			panic("TypeError")
+		}
+		if _new == o {
+			panic("TypeError")
+		}
+		if _new.ArrayBufferByteLength < uint64(newLen) {
+			panic("TypeError")
+		}
+		if IsDetachedBuffer(o) {
+			panic("TypeError")
+		}
+		fromBuf := o.ArrayBufferData
+		toBuf := _new.ArrayBufferData
+		CopyDataBlockBytes(toBuf, 0, fromBuf, int(first), int(newLen))
+		return NewValueFromObject(_new)
+	}
 	DefineBuiltinFunction(object, "isView", isView, 1, realm)
 	DefineBuiltinAccessor(realm, object, "byteLength", byteLength, nil)
+	DefineBuiltinFunction(object, "slice", slice, 2, realm)
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value: NewValueFromObject(realm.Intrinsics.ArrayBufferPrototype),

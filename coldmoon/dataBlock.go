@@ -16,11 +16,11 @@ func CreateSharedByteDataBlock(agent *Agent, size int) DataBlock {
 
 // 6.2.9.3
 func CopyDataBlockBytes(
-	toBlock *DataBlock,
+	toBlock DataBlock,
 	toIndex int,
-	fromBlock *DataBlock,
+	fromBlock DataBlock,
 	fromIndex int,
 	count int,
 ) {
-	copy((*toBlock)[toIndex:], (*fromBlock)[fromIndex:fromIndex+count])
+	copy(toBlock[toIndex:], fromBlock[fromIndex:fromIndex+count])
 }
