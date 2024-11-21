@@ -294,11 +294,19 @@ func RejectPromise(agent *Agent, promise *PromiseObject, reason Value) {
 // 27.2.1.8
 func TriggerPromiseReactions(agent *Agent, reactions []*PromiseReaction, argument Value) {
 	for _, reaction := range reactions {
-		NewPromiseReactionJob(agent, reaction, argument)
+		job := NewPromiseReactionJob(agent, reaction, argument)
+		agent.HostHooks.HostEnqueuePromiseJob(agent, job.Job, job.Realm)
 	}
 }
 
+type JobCaptures struct {
+	Agent    *Agent
+	Reaction *PromiseReaction
+	Argument Value
+}
 type Job struct {
+	Fun      func(captures *JobCaptures) Value
+	Captures *JobCaptures
 }
 
 type PromiseReactionJob struct {
@@ -308,8 +316,62 @@ type PromiseReactionJob struct {
 
 // 27.2.2.1
 func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Value) *PromiseReactionJob {
-	// TODO
-	return nil
+	captures := &JobCaptures{
+		Agent:    agent,
+		Reaction: reaction,
+		Argument: argument,
+	}
+
+	var fun = func(captures *JobCaptures) Value {
+		agent := captures.Agent
+		reaction := captures.Reaction
+		argument := captures.Argument
+		promiseCapability := reaction.Capability
+		t := reaction.Type
+		handler := reaction.Handler
+		var handlerResult *CompletionRecord
+		if handler == nil {
+			if t == PromiseReactionTypeFulfill {
+				handlerResult = NewNormalCompletion(argument)
+			} else {
+				handlerResult = NewThrowCompletion(agent.exception)
+			}
+		} else {
+			handlerResult = NewNormalCompletion(agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument}))
+		}
+		if promiseCapability == nil {
+			return UndefinedValue
+		}
+		if handlerResult.Type != CompletionTypeNormal {
+			reason := handlerResult.Value
+			return promiseCapability.Reject.ToValue().CallAssumeCallable(
+				UndefinedValue, []Value{reason},
+			)
+		} else {
+			value := handlerResult.Value
+			return promiseCapability.Resolve.ToValue().CallAssumeCallable(
+				UndefinedValue, []Value{value},
+			)
+		}
+	}
+	job := &Job{
+		Fun:      fun,
+		Captures: captures,
+	}
+	var handlerRealm *Realm
+	if reaction.Handler != nil {
+		getHandlerRealmResult := reaction.Handler.Callback.GetFunctionRealm()
+		if getHandlerRealmResult != nil {
+			handlerRealm = getHandlerRealmResult
+		} else {
+			handlerRealm = agent.CurrentRealm()
+		}
+	}
+
+	return &PromiseReactionJob{
+		Realm: handlerRealm,
+		Job:   job,
+	}
 }
 
 // 27.2.4.7.1

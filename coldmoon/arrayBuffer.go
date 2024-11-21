@@ -137,5 +137,12 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 func NewArrayBufferPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
+		Value:        NewStringValue("ArrayBuffer"),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
 	return object
 }

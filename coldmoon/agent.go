@@ -2,18 +2,24 @@ package coldmoon
 
 import "github.com/Seeingu/coldmoon/pkg"
 
+type QueuedPromiseJob struct {
+	job   *Job
+	realm *Realm
+}
 type Agent struct {
 	symbolId              uint64
 	exception             Value
 	ExecutionContextStack pkg.Stack[*ExecutionContext]
 	HostHooks             *HostHooks
 	GlobalSymbolRegistry  map[string]*SymbolValue
+	QueuedPromiseJobs     pkg.Stack[*QueuedPromiseJob]
 }
 
 type HostHooks struct {
 	HostEnsureCanCompileStrings func(realm *Realm)
 	HostHasSourceTextAvailable  func(o ObjectType) bool
 	HostMakeJobCallback         func(callback ObjectType) *JobCallback
+	HostCallJobCallback         func(callback *JobCallback, this Value, arguments []Value) Value
 	HostEnqueuePromiseJob       func(agent *Agent, job *Job, realm *Realm)
 	HostPromiseRejectionTracker func(promise *PromiseObject, operation PromiseRejectionTrackerOperation)
 }
@@ -39,6 +45,7 @@ func NewAgent() *Agent {
 		HostEnsureCanCompileStrings: HostEnsureCanCompileStrings,
 		HostHasSourceTextAvailable:  HostHasSourceTextAvailable,
 		HostMakeJobCallback:         HostMakeJobCallback,
+		HostCallJobCallback:         HostCallJobCallback,
 		HostEnqueuePromiseJob:       HostEnqueuePromiseJob,
 		HostPromiseRejectionTracker: HostPromiseRejectionTracker,
 	}

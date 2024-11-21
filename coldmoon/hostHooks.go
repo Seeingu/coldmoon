@@ -27,9 +27,17 @@ const (
 
 // 9.5.5
 func HostEnqueuePromiseJob(agent *Agent, job *Job, realm *Realm) {
-	// TODO
+	agent.QueuedPromiseJobs.Push(&QueuedPromiseJob{
+		job:   job,
+		realm: realm,
+	})
 }
 
 func HostPromiseRejectionTracker(promise *PromiseObject, operation PromiseRejectionTrackerOperation) {
 	// TODO
+}
+
+func HostCallJobCallback(callback *JobCallback, this Value, arguments []Value) Value {
+	Assert(IsCallable(callback.Callback.ToValue()))
+	return callback.Callback.ToValue().CallAssumeCallable(this, arguments)
 }
