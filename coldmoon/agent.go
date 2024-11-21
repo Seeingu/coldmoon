@@ -13,6 +13,9 @@ type Agent struct {
 type HostHooks struct {
 	HostEnsureCanCompileStrings func(realm *Realm)
 	HostHasSourceTextAvailable  func(o ObjectType) bool
+	HostMakeJobCallback         func(callback ObjectType) *JobCallback
+	HostEnqueuePromiseJob       func(agent *Agent, job *Job, realm *Realm)
+	HostPromiseRejectionTracker func(promise *PromiseObject, operation PromiseRejectionTrackerOperation)
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]*SymbolValue{}
@@ -35,6 +38,9 @@ func NewAgent() *Agent {
 	a.HostHooks = &HostHooks{
 		HostEnsureCanCompileStrings: HostEnsureCanCompileStrings,
 		HostHasSourceTextAvailable:  HostHasSourceTextAvailable,
+		HostMakeJobCallback:         HostMakeJobCallback,
+		HostEnqueuePromiseJob:       HostEnqueuePromiseJob,
+		HostPromiseRejectionTracker: HostPromiseRejectionTracker,
 	}
 	return a
 }
@@ -156,10 +162,10 @@ func (a *Agent) CreateSymbol(desc string) *SymbolValue {
 }
 
 // 5.2.3.2
-func (a *Agent) ThrowException(exceptionType ExceptionType, message string) ObjectType {
+func (a *Agent) ThrowException(exceptionType ExceptionType, message string) *CompletionRecord {
 	realm := a.CurrentRealm()
 	constructor := realm.Intrinsics.Get("%" + exceptionType.String() + "%")
 	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
 	a.exception = NewValueFromObject(errorObject)
-	return errorObject
+	return NewThrowCompletion(a.exception)
 }

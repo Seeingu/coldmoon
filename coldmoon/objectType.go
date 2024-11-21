@@ -22,6 +22,8 @@ type ObjectType interface {
 	InternalMethods() *InternalMethods
 	Prototype() ObjectType
 	Extensible() bool
+	SpeciesConstructor(defaultConstructor ObjectType) *CompletionRecord
+	ToCompletion() *CompletionRecord
 }
 
 func ObjectIs[O ObjectType](o ObjectType) bool {

@@ -9,3 +9,27 @@ func HostEnsureCanCompileStrings(realm *Realm) {
 func HostHasSourceTextAvailable(o ObjectType) bool {
 	return true
 }
+
+// 9.5.2
+func HostMakeJobCallback(callback ObjectType) *JobCallback {
+	return &JobCallback{
+		Callback:    callback,
+		HostDefined: nil,
+	}
+}
+
+type PromiseRejectionTrackerOperation int
+
+const (
+	PromiseRejectionTrackerOperationReject PromiseRejectionTrackerOperation = iota
+	PromiseRejectionTrackerOperationHandle
+)
+
+// 9.5.5
+func HostEnqueuePromiseJob(agent *Agent, job *Job, realm *Realm) {
+	// TODO
+}
+
+func HostPromiseRejectionTracker(promise *PromiseObject, operation PromiseRejectionTrackerOperation) {
+	// TODO
+}

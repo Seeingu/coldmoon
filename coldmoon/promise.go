@@ -83,6 +83,10 @@ type JobCallback struct {
 	HostDefined interface{}
 }
 
+type RemainingElements struct {
+	Value int
+}
+
 // MARK: - PromiseObject
 
 type PromiseObject struct {
@@ -97,6 +101,20 @@ type PromiseObject struct {
 func NewPromisePrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+
+	var then BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		onFulfilled := arguments[0]
+		onRejected := arguments[1]
+		promise := this
+		if !ValueIsPromise(promise) {
+			panic("TypeError")
+		}
+		promiseObject := MustGetObject(promise)
+		C := promiseObject.SpeciesConstructor(realm.Intrinsics.Promise)
+		resultCapability := NewPromiseCapability(agent, C.Value)
+		return PerformPromiseThen(agent, promiseObject, onFulfilled, onRejected, resultCapability)
+	}
+	DefineBuiltinFunction(object, "then", then, 2, realm)
 
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("Promise"),
@@ -274,9 +292,18 @@ func TriggerPromiseReactions(agent *Agent, reactions []*PromiseReaction, argumen
 	}
 }
 
+type Job struct {
+}
+
+type PromiseReactionJob struct {
+	Realm *Realm
+	Job   *Job
+}
+
 // 27.2.2.1
-func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Value) {
+func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Value) *PromiseReactionJob {
 	// TODO
+	return nil
 }
 
 // 27.2.4.7.1
@@ -291,4 +318,52 @@ func PromiseResolve(agent *Agent, constructor ObjectType, x Value) ObjectType {
 	promiseCapability := NewPromiseCapability(agent, NewValueFromObject(constructor))
 	NewValueFromObject(promiseCapability.Resolve).CallAssumeCallable(UndefinedValue, []Value{x})
 	return promiseCapability.Promise
+}
+
+// 27.2.5.4.1
+func PerformPromiseThen(agent *Agent, promise ObjectType, onFulfilled Value, onRejected Value, resultCapability *PromiseCapability) Value {
+	var onFulfilledJobCallback *JobCallback
+	if IsCallable(onFulfilled) {
+		onFulfilledJobCallback = agent.HostHooks.HostMakeJobCallback(MustGetObject(onFulfilled))
+	}
+	var onRejectedJobCallback *JobCallback
+	if IsCallable(onRejected) {
+		onRejectedJobCallback = agent.HostHooks.HostMakeJobCallback(MustGetObject(onRejected))
+	}
+
+	fulfillReaction := &PromiseReaction{
+		Capability: resultCapability,
+		Type:       PromiseReactionTypeFulfill,
+		Handler:    onFulfilledJobCallback,
+	}
+	rejectReaction := &PromiseReaction{
+		Capability: resultCapability,
+		Type:       PromiseReactionTypeReject,
+		Handler:    onRejectedJobCallback,
+	}
+	p := promise.(*PromiseObject)
+	switch p.PromiseState {
+	case PromiseStatePending:
+		p.PromiseFulfillReactions = append(p.PromiseFulfillReactions, fulfillReaction)
+		p.PromiseRejectReactions = append(p.PromiseRejectReactions, rejectReaction)
+	case PromiseStateFulfilled:
+		value := p.PromiseResult
+		fulfillJob := NewPromiseReactionJob(agent, fulfillReaction, value)
+		agent.HostHooks.HostEnqueuePromiseJob(agent, fulfillJob.Job, fulfillJob.Realm)
+	case PromiseStateRejected:
+		reason := p.PromiseResult
+		if !p.PromiseIsHandled {
+			agent.HostHooks.HostPromiseRejectionTracker(p, PromiseRejectionTrackerOperationReject)
+		}
+
+		rejectJob := NewPromiseReactionJob(agent, rejectReaction, reason)
+		agent.HostHooks.HostEnqueuePromiseJob(agent, rejectJob.Job, rejectJob.Realm)
+	}
+
+	p.PromiseIsHandled = true
+	if resultCapability == nil {
+		return UndefinedValue
+	} else {
+		return NewValueFromObject(resultCapability.Promise)
+	}
 }

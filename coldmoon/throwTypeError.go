@@ -6,7 +6,7 @@ type ThrowTypeError struct {
 
 func NewThrowTypeError(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		return NewValueFromObject(realm.Agent.ThrowException(TypeError, ""))
+		return realm.Agent.ThrowException(TypeError, "").Value
 	}
 
 	object := CreateBuiltinFunction(
