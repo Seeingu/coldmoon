@@ -43,6 +43,10 @@ type Intrinsics struct {
 	AsyncFunctionConstructor ObjectType
 	// %AsyncFunction.prototype%
 	AsyncFunctionPrototype ObjectType
+	// %Promise%
+	Promise ObjectType
+	// %Promise.prototype%
+	PromisePrototype ObjectType
 	// %Date.Prototype%
 	DatePrototype ObjectType
 	// %Date%

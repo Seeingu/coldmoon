@@ -3,10 +3,11 @@ package coldmoon
 type BehaviorFn func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value
 type BuiltinFunction struct {
 	*Object
-	Realm          *Realm
-	InitialName    string
-	Behavior       BehaviorFn
-	RevocableProxy ObjectType
+	Realm            *Realm
+	InitialName      string
+	Behavior         BehaviorFn
+	RevocableProxy   ObjectType
+	AdditionalFields *AdditionalFields
 }
 
 func (b *BuiltinFunction) ToObject() *Object {
@@ -50,11 +51,12 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 }
 
 type builtinFunctionArgs struct {
-	realm          *Realm
-	prototype      ObjectType
-	prefix         string
-	isConstructor  bool
-	revocableProxy ObjectType
+	realm            *Realm
+	prototype        ObjectType
+	prefix           string
+	isConstructor    bool
+	revocableProxy   ObjectType
+	additionalFields *AdditionalFields
 }
 
 // 10.3.4
@@ -81,10 +83,12 @@ func CreateBuiltinFunction(
 	object := NewObject(agent, prototype.ToObject())
 	object.SetExtensible(true)
 	function := &BuiltinFunction{
-		Object:      object,
-		Realm:       realm,
-		Behavior:    behavior,
-		InitialName: "",
+		Object:           object,
+		Realm:            realm,
+		Behavior:         behavior,
+		InitialName:      "",
+		RevocableProxy:   args.revocableProxy,
+		AdditionalFields: args.additionalFields,
 	}
 	function.InternalMethods().Call = BuiltinCall
 	if args.isConstructor {
