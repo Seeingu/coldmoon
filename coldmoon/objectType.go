@@ -24,6 +24,7 @@ type ObjectType interface {
 	Extensible() bool
 	SpeciesConstructor(defaultConstructor ObjectType) *CompletionRecord
 	ToCompletion() *CompletionRecord
+	ToValue() Value
 }
 
 func ObjectIs[O ObjectType](o ObjectType) bool {

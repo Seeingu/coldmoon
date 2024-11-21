@@ -14,6 +14,10 @@ func (b *BuiltinFunction) ToObject() *Object {
 	return b.Object
 }
 
+func (b *BuiltinFunction) ToValue() Value {
+	return NewValueFromObject(b)
+}
+
 // 7.3.24
 func (b *BuiltinFunction) GetFunctionRealm() *Realm {
 	return b.Realm

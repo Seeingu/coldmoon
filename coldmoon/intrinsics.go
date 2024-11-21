@@ -17,6 +17,10 @@ type Intrinsics struct {
 	ArrayIteratorPrototype ObjectType
 	// %Array.prototype.values%
 	ArrayPrototypeValues ObjectType
+	// %ArrayBuffer.prototype%
+	ArrayBufferPrototype ObjectType
+	// %ArrayBuffer%
+	ArrayBufferConstructor ObjectType
 	// %Boolean.Prototype%
 	BooleanPrototype *BooleanObject
 	// %Boolean%

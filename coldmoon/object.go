@@ -26,6 +26,10 @@ func (o *Object) ToObject() *Object {
 	return o
 }
 
+func (o *Object) ToValue() Value {
+	return NewValueFromObject(o)
+}
+
 func NewObject(agent *Agent, prototype ObjectType) *Object {
 	o := &Object{
 		data: &Data{

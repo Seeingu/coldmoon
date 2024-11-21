@@ -46,6 +46,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.ArrayConstructor = NewArrayConstructor(r)
 	r.Intrinsics.ArrayIteratorPrototype = NewArrayIteratorPrototype(r)
 	r.Intrinsics.ArrayPrototypeValues = MustGetObject(r.Intrinsics.ArrayPrototype.PropertyStorage().Get(NewStringPropertyKey("values")).Value)
+	r.Intrinsics.ArrayBufferPrototype = NewArrayBufferPrototype(r)
+	r.Intrinsics.ArrayBufferConstructor = NewArrayBufferConstructor(r)
 	r.Intrinsics.StringPrototype = NewStringPrototype(r)
 	r.Intrinsics.StringConstructor = NewStringConstructor(r)
 	r.Intrinsics.StringIteratorPrototype = NewStringIteratorPrototype(r)

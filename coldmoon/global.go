@@ -278,6 +278,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"ArrayBuffer",
+			&PropertyDescriptor{
+				Value:        r.Intrinsics.ArrayBufferConstructor.ToValue(),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

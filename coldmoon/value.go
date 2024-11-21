@@ -490,7 +490,7 @@ func ToLength(agent *Agent, value Value) uint64 {
 }
 
 // 7.1.22
-func ToIndex(value Value, agent *Agent) uint64 {
+func ToIndex(agent *Agent, value Value) uint64 {
 	if value == UndefinedValue {
 		return 0
 	}
