@@ -40,6 +40,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.IsFinite = NewIsFinite(r)
 	r.Intrinsics.IsNaN = NewIsNaN(r)
 	r.Intrinsics.Eval = NewEval(r)
+	r.Intrinsics.ParseInt = NewParseInt(r)
 	r.Intrinsics.ObjectConstructor = NewObjectConstructor(r)
 	r.Intrinsics.FunctionConstructor = NewFunctionConstructor(r)
 	r.Intrinsics.ArrayPrototype = NewArrayPrototype(r)

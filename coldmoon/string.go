@@ -280,3 +280,8 @@ func thisStringValue(agent *Agent, v Value) string {
 	}
 	panic("TypeError")
 }
+
+// 22.1.3.32.1
+func (s *StringValue) TrimString() string {
+	return strings.TrimSpace(s.Data)
+}

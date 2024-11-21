@@ -95,6 +95,8 @@ type Intrinsics struct {
 	IsNaN ObjectType
 	// %eval%
 	Eval ObjectType
+	// %parseInt%
+	ParseInt ObjectType
 	// %EvalError%
 	EvalErrorConstructor ObjectType
 	// %EvalError.prototype%

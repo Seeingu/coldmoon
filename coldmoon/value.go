@@ -266,7 +266,7 @@ var POW_2_15 = math.Pow(2, 15)
 var POW_2_8 = math.Pow(2, 8)
 var POW_2_7 = math.Pow(2, 7)
 
-func ToInt32(value Value, agent *Agent) int32 {
+func ToInt32(agent *Agent, value Value) int32 {
 	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0

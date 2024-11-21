@@ -1,5 +1,7 @@
 package coldmoon
 
+import "strings"
+
 type constructorProperties struct {
 	Name               string
 	PropertyDescriptor *PropertyDescriptor
@@ -287,6 +289,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"parseInt",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.ParseInt),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }
@@ -321,6 +332,90 @@ func NewEval(realm *Realm) ObjectType {
 		return PerformEval(realm.Agent, args[0], false, false)
 	}
 	return CreateBuiltinFunction(realm.Agent, eval, 1, "eval", builtinFunctionArgs{
+		realm: realm,
+	})
+}
+
+// 7.1.17
+func ToString(agent *Agent, v Value) *StringValue {
+	switch v.(type) {
+	case *StringValue:
+		return v.(*StringValue)
+	case *NumberValue:
+		return NewStringValue(v.String())
+	case *BooleanValue:
+		return NewStringValue(v.String())
+	case *SymbolValue:
+		return NewStringValue(v.String())
+	case *BigIntValue:
+		return NewStringValue(v.String())
+	case *undefinedValue:
+		return NewStringValue("undefined")
+	case *nullValue:
+		return NewStringValue("null")
+	default:
+		Assert(ValueIsObject(v))
+		primValue := ToPrimitive(agent, v, PreferredTypeString)
+		Assert(!ValueIsObject(primValue))
+		return ToString(agent, primValue)
+	}
+
+}
+
+// 19.2.5
+func NewParseInt(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var parseInt BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		stringValue := arguments[0]
+		radix := arguments[1]
+		inputString := ToString(agent, stringValue)
+		S := inputString.TrimString()
+		sign := 1
+		if S[0] == '-' {
+			sign = -1
+		}
+		if S[0] == '+' || S[0] == '-' {
+			S = S[1:]
+		}
+		R := ToInt32(agent, radix)
+		stripPrefix := true
+		if R != 0 {
+			if R < 2 || R > 36 {
+				return NaNValue
+			}
+			if R != 16 {
+				stripPrefix = false
+			}
+		} else {
+			R = 10
+		}
+		if stripPrefix {
+			if strings.HasPrefix(S, "0x") || strings.HasPrefix(S, "0X") {
+				S = S[2:]
+				R = 16
+			}
+		}
+
+		var mathInt int64
+		for _, c := range S {
+			if c >= '0' && c <= '9' {
+				c -= '0'
+			} else if c >= 'a' && c <= 'z' {
+				c -= 'a' - 10
+			} else if c >= 'A' && c <= 'Z' {
+				c -= 'A' - 10
+			} else {
+				break
+			}
+			if int(c) >= int(R) {
+				break
+			}
+			mathInt = mathInt*int64(R) + int64(c)
+		}
+		return NewNumberValue(float64(sign) * float64(mathInt))
+	}
+
+	return CreateBuiltinFunction(agent, parseInt, 2, "parseInt", builtinFunctionArgs{
 		realm: realm,
 	})
 }
