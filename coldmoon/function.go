@@ -1,6 +1,9 @@
 package coldmoon
 
-import "github.com/samber/lo"
+import (
+	"github.com/samber/lo"
+	"math"
+)
 
 func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
@@ -21,6 +24,7 @@ func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
 
 // initFunctionMethods depends on %Function.prototype% being defined
 func initFunctionMethods(f ObjectType, realm *Realm) {
+	agent := realm.Agent
 	// 20.2.3.5 toString
 	var toString = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		o, ok := this.(*ObjectValue)
@@ -54,7 +58,44 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		}
 		return fun.CallAssumeCallable(thisArg, args)
 	}
+	var bind = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		thisArg := argumentsList[0]
+		args := argumentsList[1:]
+		target := this
+		if !IsCallable(target) {
+			panic("TypeError")
+		}
+		targetObject := MustGetObject(target)
+		F := BoundFunctionCreate(realm.Agent, targetObject, thisArg, args)
+		var L float64 = 0
+		targetHasLength := targetObject.HasProperty(NewStringPropertyKey("length"))
+		if targetHasLength {
+			targetLen := targetObject.Get(NewStringPropertyKey("length"))
+			if n, ok := ValueGet[*NumberValue](targetLen); ok {
+				if n.IsPositiveInf() {
+					L = math.Inf(1)
+				} else if n.IsNegativeInf() {
+					L = 0
+				} else {
+					targetLenAsInt := ToIntegerOrInfinity(agent, targetLen)
+					Assert(!math.IsInf(targetLenAsInt, 0))
+					argCount := len(args)
+					L = math.Max(0, targetLenAsInt-float64(argCount))
+				}
+			}
+		}
+
+		SetFunctionLength(F, L)
+		targetName := targetObject.Get(NewStringPropertyKey("name"))
+		targetNameString := ""
+		if s, ok := ValueGet[*StringValue](targetName); ok {
+			targetNameString = s.Data
+		}
+		SetFunctionName(F, NewStringPropertyKey(targetNameString), "bound")
+		return NewValueFromObject(F)
+	}
 	DefineBuiltinFunction(f, "call", call, 1, realm)
+	DefineBuiltinFunction(f, "bind", bind, 1, realm)
 
 	var apply = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		thisArg := argumentsList[0]

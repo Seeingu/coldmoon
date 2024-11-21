@@ -17,7 +17,7 @@ type ObjectType interface {
 	GetFunctionRealm() *Realm
 	Construct(
 		argumentLists []Value,
-		newTarget *Object,
+		newTarget ObjectType,
 	) ObjectType
 	InternalMethods() *InternalMethods
 	Prototype() ObjectType
