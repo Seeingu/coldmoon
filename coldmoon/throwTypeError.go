@@ -20,14 +20,14 @@ func NewThrowTypeError(realm *Realm) ObjectType {
 	)
 	object.(*BuiltinFunction).SetExtensible(false)
 
-	DefineBuiltinProperty(object, "length", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "length", &PropertyDescriptor{
 		Value:        NewNumberValue(0),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinProperty(object, "name", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "name", &PropertyDescriptor{
 		Value:        NewStringValue(""),
 		Writable:     false,
 		Enumerable:   false,

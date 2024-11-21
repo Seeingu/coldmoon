@@ -19,7 +19,7 @@ func DefineBuiltinFunction(object ObjectType,
 		functionName,
 		builtinFunctionArgs{realm: realm},
 	)
-	DefineBuiltinProperty(object, name, NewValueFromObject(f))
+	DefineBuiltinPropertyV(object, name, NewValueFromObject(f))
 }
 
 func DefineBuiltinFunctionWithAttributes(object ObjectType,
@@ -40,7 +40,7 @@ func DefineBuiltinFunctionWithAttributes(object ObjectType,
 		functionName,
 		builtinFunctionArgs{realm: realm},
 	)
-	DefineBuiltinProperty(object, name, &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, name, &PropertyDescriptor{
 		Value:        NewValueFromObject(f),
 		Writable:     attr.Writable,
 		Configurable: attr.Configurable,
@@ -48,20 +48,15 @@ func DefineBuiltinFunctionWithAttributes(object ObjectType,
 	})
 }
 
-func DefineBuiltinProperty(object ObjectType, name string, value interface{}) {
-	var descriptor *PropertyDescriptor
-	switch v := value.(type) {
-	case Value:
-		descriptor = &PropertyDescriptor{
-			Value:        v,
-			Writable:     true,
-			Enumerable:   false,
-			Configurable: true,
-		}
-	case *PropertyDescriptor:
-		descriptor = v
-	default:
-		panic("invalid value")
+func DefineBuiltinPropertyP(object ObjectType, name string, p *PropertyDescriptor) {
+	object.DefinePropertyOrThrow(NewStringPropertyKey(name), p)
+}
+func DefineBuiltinPropertyV(object ObjectType, name string, value Value) {
+	descriptor := &PropertyDescriptor{
+		Value:        value,
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: true,
 	}
 	object.DefinePropertyOrThrow(NewStringPropertyKey(name), descriptor)
 }

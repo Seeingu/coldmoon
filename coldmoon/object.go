@@ -486,7 +486,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.21
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.ObjectPrototype),
 		Writable:     false,
 		Enumerable:   false,
@@ -634,7 +634,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "assign", assign, 2, realm)
 
 	// 20.1.3.1
-	DefineBuiltinProperty(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 

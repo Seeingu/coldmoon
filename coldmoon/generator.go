@@ -11,13 +11,13 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 		Object: object,
 	}
 
-	DefineBuiltinProperty(object, "constructor", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("Generator"),
 		Writable:     false,
 		Enumerable:   false,

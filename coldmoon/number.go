@@ -371,62 +371,62 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "isInteger", isInteger, 1, realm)
 	DefineBuiltinFunction(object, "isNaN", isNaN, 1, realm)
 	DefineBuiltinFunction(object, "isSafeInteger", isSafeInteger, 1, realm)
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.NumberPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "EPSILON", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "EPSILON", &PropertyDescriptor{
 		Value:        NewNumberValue(2.220446049250313e-16),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "MAX_SAFE_INTEGER", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "MAX_SAFE_INTEGER", &PropertyDescriptor{
 		Value:        NewNumberValue(9007199254740991),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "MIN_SAFE_INTEGER", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "MIN_SAFE_INTEGER", &PropertyDescriptor{
 		Value:        NewNumberValue(-9007199254740991),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "MAX_VALUE", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "MAX_VALUE", &PropertyDescriptor{
 		Value:        NewNumberValue(1.7976931348623157e+308),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "MIN_VALUE", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "MIN_VALUE", &PropertyDescriptor{
 		Value:        NewNumberValue(5e-324),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "NaN", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "NaN", &PropertyDescriptor{
 		Value:        NewNumberValue(math.NaN()),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "NEGATIVE_INFINITY", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "NEGATIVE_INFINITY", &PropertyDescriptor{
 		Value:        NewNumberValue(math.Inf(-1)),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "POSITIVE_INFINITY", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "POSITIVE_INFINITY", &PropertyDescriptor{
 		Value:        NewNumberValue(math.Inf(1)),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinProperty(realm.Intrinsics.NumberPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.NumberPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }

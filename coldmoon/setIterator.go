@@ -4,7 +4,7 @@ type SetIteratorObject struct {
 	*Object
 	SetObject *SetObject
 	Kind      objectOwnPropertiesKind
-	Index uint64
+	Index     uint64
 }
 
 func CreateSetIterator(agent *Agent, value Value, kind objectOwnPropertiesKind) *SetIteratorObject {
@@ -54,7 +54,7 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 		return NewValueFromObject(CreateIterResultObject(realm.Agent, result, false))
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("SetObject Iterator"),
 		Writable:     false,
 		Enumerable:   false,

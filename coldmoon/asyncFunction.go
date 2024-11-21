@@ -24,13 +24,13 @@ func NewAsyncFunctionConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionConstructor,
 	})
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.AsyncFunctionPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(realm.Intrinsics.AsyncFunctionPrototype, "constructor", &PropertyDescriptor{
+	DefineBuiltinPropertyP(realm.Intrinsics.AsyncFunctionPrototype, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(object),
 		Writable:     false,
 		Enumerable:   false,
@@ -44,7 +44,7 @@ func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.FunctionPrototype)
 
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("AsyncFunction"),
 		Writable:     false,
 		Enumerable:   false,

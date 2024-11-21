@@ -62,14 +62,14 @@ func NewErrorConstructor(realm *Realm) ObjectType {
 		},
 	)
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.ErrorPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinProperty(realm.Intrinsics.ErrorPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.ErrorPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }
@@ -91,9 +91,9 @@ func NewErrorPrototype(realm *Realm) ObjectType {
 
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
 
-	DefineBuiltinProperty(object, "name", NewStringValue("Error"))
+	DefineBuiltinPropertyV(object, "name", NewStringValue("Error"))
 
-	DefineBuiltinProperty(object, "message", NewStringValue(""))
+	DefineBuiltinPropertyV(object, "message", NewStringValue(""))
 
 	var toString BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		O, ok := thisValue.(*ObjectValue)
@@ -179,13 +179,13 @@ func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 	})
 
 	protoName := "%" + name + ".prototype%"
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.Get(protoName)),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(realm.Intrinsics.Get(protoName), "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.Get(protoName), "constructor", NewValueFromObject(object))
 
 	return object
 }
@@ -194,8 +194,8 @@ func NewNativeErrorPrototype(realm *Realm, name string) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ErrorPrototype)
 
-	DefineBuiltinProperty(object, "name", NewStringValue(name))
-	DefineBuiltinProperty(object, "message", NewStringValue(""))
+	DefineBuiltinPropertyV(object, "name", NewStringValue(name))
+	DefineBuiltinPropertyV(object, "message", NewStringValue(""))
 
 	return object
 }
@@ -237,20 +237,20 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 		realm:     realm,
 		prototype: realm.Intrinsics.ErrorConstructor,
 	})
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.AggregateErrorPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(realm.Intrinsics.AggregateErrorPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.AggregateErrorPrototype, "constructor", NewValueFromObject(object))
 	return object
 }
 
 func NewAggregateErrorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ErrorPrototype)
-	DefineBuiltinProperty(object, "name", NewStringValue("AggregateError"))
-	DefineBuiltinProperty(object, "message", NewStringValue(""))
+	DefineBuiltinPropertyV(object, "name", NewStringValue("AggregateError"))
+	DefineBuiltinPropertyV(object, "message", NewStringValue(""))
 	return object
 }

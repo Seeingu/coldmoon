@@ -63,93 +63,93 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 	})
 
 	// 20.4.2.1
-	DefineBuiltinProperty(object, "asyncIterator", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "asyncIterator", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsAsyncIterator],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "hasInstance", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "hasInstance", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsHasInstance],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "isConcatSpreadable", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "isConcatSpreadable", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "iterator", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "iterator", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsIterator],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "match", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "match", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsMatch],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "matchAll", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "matchAll", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsMatchAll],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.SymbolPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "replace", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "replace", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsReplace],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "search", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "search", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsSearch],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "species", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "species", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsSpecies],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "split", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "split", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsSplit],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "toPrimitive", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "toPrimitive", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsToPrimitive],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "toStringTag", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsToStringTag],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(object, "unscopables", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "unscopables", &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsUnscopables],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinProperty(realm.Intrinsics.SymbolPrototype, "constructor",
+	DefineBuiltinPropertyV(realm.Intrinsics.SymbolPrototype, "constructor",
 		NewValueFromObject(object),
 	)
 
@@ -203,7 +203,7 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("String"),
 		Writable:     false,
 		Enumerable:   false,

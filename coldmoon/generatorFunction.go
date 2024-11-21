@@ -24,7 +24,7 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionConstructor,
 	})
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),
 		Writable:     false,
 		Enumerable:   false,
@@ -35,19 +35,19 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 
 func NewGeneratorFunctionPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype)
-	DefineBuiltinProperty(object, "constructor", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionConstructor),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototypePrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("GeneratorFunction"),
 		Writable:     false,
 		Enumerable:   false,

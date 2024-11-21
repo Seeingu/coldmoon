@@ -257,7 +257,7 @@ func CreateDynamicFunction(
 		MakeConstructor(function, false, nil)
 	case dynamicFunctionKindGenerator:
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
-		DefineBuiltinProperty(function, "prototype", &PropertyDescriptor{
+		DefineBuiltinPropertyP(function, "prototype", &PropertyDescriptor{
 			Value:        NewValueFromObject(prototype),
 			Writable:     true,
 			Enumerable:   false,
@@ -265,7 +265,7 @@ func CreateDynamicFunction(
 		})
 	case dynamicFunctionKindAsyncGenerator:
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
-		DefineBuiltinProperty(function, "prototype", &PropertyDescriptor{
+		DefineBuiltinPropertyP(function, "prototype", &PropertyDescriptor{
 			Value:        NewValueFromObject(prototype),
 			Writable:     true,
 			Enumerable:   false,

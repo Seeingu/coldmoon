@@ -45,7 +45,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		realm:     realm,
 	})
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.SetPrototype),
 		Writable:     false,
 		Enumerable:   false,
@@ -56,7 +56,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 	}
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 
-	DefineBuiltinProperty(realm.Intrinsics.SetPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.SetPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }
@@ -145,9 +145,9 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "values", setValues, 0, realm)
 	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
 
-	DefineBuiltinProperty(object, "keys", object.PropertyStorage().Get(NewStringPropertyKey("values")))
-	DefineBuiltinProperty(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "keys", object.PropertyStorage().Get(NewStringPropertyKey("values")))
+	DefineBuiltinPropertyP(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("SetObject"),
 		Writable:     false,
 		Enumerable:   false,

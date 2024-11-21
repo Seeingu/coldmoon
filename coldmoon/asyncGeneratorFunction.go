@@ -26,7 +26,7 @@ func NewAsyncGeneratorFunctionConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionConstructor,
 	})
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.AsyncGeneratorFunctionPrototype),
 		Writable:     false,
 		Enumerable:   false,
@@ -40,21 +40,21 @@ func NewAsyncGeneratorFunctionConstructor(realm *Realm) ObjectType {
 func NewAsyncGeneratorFunctionPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype)
 
-	DefineBuiltinProperty(object, "constructor", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.AsyncGeneratorFunction),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
 	})
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("AsyncGeneratorFunction"),
 		Writable:     false,
 		Enumerable:   false,

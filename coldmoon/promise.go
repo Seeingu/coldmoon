@@ -18,6 +18,13 @@ type PromiseObject struct {
 func NewPromisePrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
+		Value:        NewStringValue("Promise"),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
 	return object
 }
 
@@ -48,13 +55,13 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.PromisePrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(realm.Intrinsics.PromisePrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.PromisePrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }

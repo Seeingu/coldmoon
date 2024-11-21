@@ -138,13 +138,13 @@ func NewStringConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.StringPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(realm.Intrinsics.StringPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.StringPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }

@@ -61,13 +61,13 @@ func NewMapConstructor(realm *Realm) ObjectType {
 	}
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.MapPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinProperty(realm.Intrinsics.MapPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.MapPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }
@@ -154,8 +154,8 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "values", mapValues, 0, realm)
 	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
 
-	DefineBuiltinProperty(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("entries")))
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("entries")))
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("Map"),
 		Writable:     false,
 		Enumerable:   false,

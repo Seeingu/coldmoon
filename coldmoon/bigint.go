@@ -180,14 +180,14 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.BigIntPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinProperty(realm.Intrinsics.BigIntPrototype, "constructor",
+	DefineBuiltinPropertyV(realm.Intrinsics.BigIntPrototype, "constructor",
 		NewValueFromObject(object),
 	)
 
@@ -227,7 +227,7 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
 	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
 
-	DefineBuiltinProperty(object, "@@toStringTag", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("BigInt"),
 		Writable:     false,
 		Enumerable:   false,

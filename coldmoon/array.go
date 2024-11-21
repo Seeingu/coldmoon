@@ -261,7 +261,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "isArray", isArray, 1, realm)
 	DefineBuiltinFunction(object, "of", of, 0, realm)
 
-	DefineBuiltinProperty(object, "prototype", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.ArrayPrototype),
 		Writable:     false,
 		Enumerable:   false,
@@ -273,7 +273,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		return this
 	}
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
-	DefineBuiltinProperty(realm.Intrinsics.ArrayPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.ArrayPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }
@@ -284,7 +284,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
 	}
 
-	DefineBuiltinProperty(object.Object, "length", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object.Object, "length", &PropertyDescriptor{
 		Value:        NewNumberValue(0),
 		Writable:     true,
 		Enumerable:   false,
@@ -1393,13 +1393,13 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		unscopablesList.CreateDataPropertyOrThrow(NewStringPropertyKey(prop), NewBooleanValue(true))
 	}
 
-	DefineBuiltinProperty(object, "@@unscopables", &PropertyDescriptor{
+	DefineBuiltinPropertyP(object, "@@unscopables", &PropertyDescriptor{
 		Value:        unscopablesValue,
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineBuiltinProperty(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
+	DefineBuiltinPropertyP(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
 
 	return object
 }
