@@ -110,6 +110,29 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
 
+	var reject BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		reason := arguments[0]
+		C := this
+		capability := NewPromiseCapability(agent, C)
+		ValueCall(NewValueFromObject(capability.Reject), UndefinedValue, []Value{reason})
+		return NewValueFromObject(capability.Promise)
+	}
+	var resolve BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		resolution := arguments[0]
+		C := this
+		if !ValueIsObject(C) {
+			panic("TypeError")
+		}
+		return NewValueFromObject(PromiseResolve(agent, MustGetObject(C), resolution))
+	}
+	DefineBuiltinFunction(object, "reject", reject, 1, realm)
+	DefineBuiltinFunction(object, "resolve", resolve, 1, realm)
+
+	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return this
+	}
+	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.PromisePrototype),
 		Writable:     false,
@@ -214,4 +237,18 @@ func RejectPromise(promise *PromiseObject, reason Value) {
 	Assert(promise.PromiseState == PromiseStatePending)
 	promise.PromiseState = PromiseStateRejected
 	promise.PromiseResult = reason
+}
+
+// 27.2.4.7.1
+func PromiseResolve(agent *Agent, constructor ObjectType, x Value) ObjectType {
+	if ValueIsPromise(x) {
+		xConstructor := MustGetObject(x).Get(NewStringPropertyKey("constructor"))
+		if SameValue(xConstructor, NewValueFromObject(constructor)) {
+			return MustGetObject(x)
+		}
+	}
+
+	promiseCapability := NewPromiseCapability(agent, NewValueFromObject(constructor))
+	NewValueFromObject(promiseCapability.Resolve).CallAssumeCallable(UndefinedValue, []Value{x})
+	return promiseCapability.Promise
 }

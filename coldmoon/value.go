@@ -894,6 +894,15 @@ func ValueIsObject(value Value) bool {
 	return ok
 }
 
+func ValueIsPromise(value Value) bool {
+	objectValue, ok := value.(*ObjectValue)
+	if !ok {
+		return false
+	}
+	_, ok = objectValue.Object.(*PromiseObject)
+	return ok
+}
+
 func ValueGetObject(value Value) (object ObjectType, ok bool) {
 	v, ok := ValueGet[*ObjectValue](value)
 	if ok {
