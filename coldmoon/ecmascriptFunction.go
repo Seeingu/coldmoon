@@ -134,9 +134,24 @@ func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argume
 }
 
 func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
-	functionBody := function.ECMAScriptCode
-	FunctionDeclarationInstantiation(agent, function, argumentsList)
-	return GenerateAndRunBytecode(agent, functionBody)
+	realm := agent.CurrentRealm()
+	promiseCapability := NewPromiseCapability(agent, NewValueFromObject(realm.Intrinsics.Promise))
+	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
+	if completion.IsError() {
+		ex := agent.exception
+		NewValueFromObject(promiseCapability.Reject).CallAssumeCallable(
+			UndefinedValue,
+			[]Value{ex},
+		)
+		agent.exception = nil
+	} else {
+		// TODO
+	}
+	return &CompletionRecord{
+		Type:   CompletionTypeReturn,
+		Value:  NewValueFromObject(promiseCapability.Promise),
+		Target: "",
+	}
 }
 
 func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
@@ -164,7 +179,7 @@ func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, arguments
 }
 
 // 10.2.11
-func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) {
+func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) *CompletionRecord {
 	calleeContext := agent.runningExecutionContext()
 	code := function.ECMAScriptCode
 	strict := function.Strict
@@ -295,6 +310,7 @@ loop:
 		lexEnv = NewDeclarativeEnvironment(varEnv)
 	}
 	calleeContext.ECMAScriptCode.LexicalEnvironment = lexEnv
+	return UndefinedNormalCompletion
 }
 
 type functionCreateThisMode int

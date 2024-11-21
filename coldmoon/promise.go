@@ -1,5 +1,7 @@
 package coldmoon
 
+// MARK: - PromiseState
+
 type PromiseState int
 
 const (
@@ -7,6 +9,59 @@ const (
 	PromiseStateFulfilled
 	PromiseStateRejected
 )
+
+// 27.2.1.1
+type PromiseCapability struct {
+	Promise ObjectType
+	Resolve ObjectType
+	Reject  ObjectType
+}
+
+func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
+	if !IsConstructor(constructor) {
+		panic("TypeError")
+	}
+	var executorClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		resolve := argumentsList[0]
+		reject := argumentsList[1]
+		function := agent.ActiveFunctionObject()
+		additionalFields := function.(*BuiltinFunction).AdditionalFields
+		resolvingFunctions := additionalFields.ResolvingFunctions
+		if resolvingFunctions.Resolve != nil {
+			panic("TypeError")
+		}
+		if resolvingFunctions.Reject != nil {
+			panic("TypeError")
+		}
+		resolvingFunctions.Resolve = resolve
+		resolvingFunctions.Reject = reject
+		return UndefinedValue
+	}
+	additionalFields := &AdditionalFields{
+		ResolvingFunctions: &ResolvingFunctions{
+			Resolve: UndefinedValue,
+			Reject:  UndefinedValue,
+		},
+	}
+	executor := CreateBuiltinFunction(agent, executorClosure, 2, "", builtinFunctionArgs{
+		additionalFields: additionalFields,
+	})
+	promise := MustGetObject(constructor).Construct([]Value{NewValueFromObject(executor)}, nil)
+	if !IsCallable(additionalFields.ResolvingFunctions.Resolve) {
+		panic("TypeError")
+	}
+	if !IsCallable(additionalFields.ResolvingFunctions.Reject) {
+		panic("TypeError")
+	}
+	return &PromiseCapability{
+		Promise: promise,
+		Resolve: MustGetObject(additionalFields.ResolvingFunctions.Resolve),
+		Reject:  MustGetObject(additionalFields.ResolvingFunctions.Reject),
+	}
+
+}
+
+// MARK: - PromiseObject
 
 type PromiseObject struct {
 	*Object
@@ -47,7 +102,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 
 		resolvingFunctions := CreateResolvingFunctions(agent, promise)
-		executor.CallAssumeCallable(UndefinedValue, []Value{NewValueFromObject(resolvingFunctions.Resolve)})
+		executor.CallAssumeCallable(UndefinedValue, []Value{resolvingFunctions.Resolve})
 		return NewValueFromObject(promise)
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "Promise", builtinFunctionArgs{
@@ -67,16 +122,17 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 }
 
 type ResolvingFunctions struct {
-	Resolve ObjectType
-	Reject  ObjectType
+	Resolve Value
+	Reject  Value
 }
 
 type AlreadyResolved struct {
 	Value bool
 }
 type AdditionalFields struct {
-	Promise         *PromiseObject
-	AlreadyResolved *AlreadyResolved
+	Promise            *PromiseObject
+	AlreadyResolved    *AlreadyResolved
+	ResolvingFunctions *ResolvingFunctions
 }
 
 // 27.2.1.3
@@ -140,8 +196,8 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		additionalFields: rejectAdditionalFields,
 	})
 	return &ResolvingFunctions{
-		Resolve: resolve,
-		Reject:  reject,
+		Resolve: NewValueFromObject(resolve),
+		Reject:  NewValueFromObject(reject),
 	}
 
 }

@@ -19,9 +19,15 @@ type CompletionRecord struct {
 	Target string
 }
 
+func (c *CompletionRecord) IsError() bool {
+	return c.Type != CompletionTypeNormal && c.Type != CompletionTypeReturn
+}
+
 func NewNormalCompletion(value Value) *CompletionRecord {
 	return &CompletionRecord{Type: CompletionTypeNormal, Value: value}
 }
+
+var UndefinedNormalCompletion = NewNormalCompletion(UndefinedValue)
 
 func NewThrowCompletion(value Value) *CompletionRecord {
 	return &CompletionRecord{Type: CompletionTypeThrow, Value: value}
