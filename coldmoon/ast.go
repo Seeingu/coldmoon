@@ -729,6 +729,29 @@ type Expression interface {
 	AssignmentTargetType() AssignmentTargetType
 }
 
+// MARK: - MetaProperty
+
+type MetaProperty interface {
+	Expression
+}
+
+type MetaPropertyNewTarget struct {
+	MetaProperty
+}
+
+func (m *MetaPropertyNewTarget) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (m *MetaPropertyNewTarget) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (m *MetaPropertyNewTarget) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(InsGetNewTarget)
+}
+func (m *MetaPropertyNewTarget) String() string {
+	return "new.target"
+}
+
 // MARK: - PrimaryExpression
 
 type ExpressionPrimary struct {

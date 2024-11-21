@@ -820,6 +820,21 @@ func (p *Parser) tryUnaryExpression() (Expression, bool) {
 	}, true
 }
 
+func (p *Parser) metaProperty() (MetaProperty, bool) {
+	t := p.tokenizer.CurrentToken
+	if t.Type != TNew || p.tokenizer.NextToken.Type == TPeriod {
+		return nil, false
+	}
+	p.tokenizer.MustMatch(TNew)
+	p.tokenizer.MustMatch(TPeriod)
+	identifier := p.tokenizer.CurrentToken
+	if identifier.Value != "target" {
+		return nil, false
+	}
+	return &MetaPropertyNewTarget{}, true
+
+}
+
 func (p *Parser) updateExpression(primaryExpression Expression) (*ExpressionUpdate, bool) {
 	t := p.tokenizer.CurrentToken
 	var operator UpdateOperator
@@ -857,6 +872,10 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 	unary, ok := p.tryUnaryExpression()
 	if ok {
 		return unary
+	}
+	meta, ok := p.metaProperty()
+	if ok {
+		return meta
 	}
 	update, ok := p.updateExpression(nil)
 	if ok {

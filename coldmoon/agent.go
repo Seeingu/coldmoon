@@ -97,6 +97,14 @@ func (a *Agent) ResolveThisBinding() Value {
 	return envRec.GetThisBinding()
 }
 
+// 9.4.5
+func (a *Agent) GetNewTarget() ObjectType {
+	envRec := a.GetThisEnvironment()
+	fun, ok := envRec.(*FunctionEnvironment)
+	Assert(ok)
+	return fun.NewTarget
+}
+
 // 9.4.6
 func (a *Agent) GetGlobalObject() *Object {
 	return a.CurrentRealm().GlobalObject

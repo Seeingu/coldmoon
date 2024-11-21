@@ -489,6 +489,16 @@ func (i *IInstantiateAsyncFunctionExpression) String() string {
 	return "IInstantiateAsyncFunctionExpression " + i.FunctionExpression.String()
 }
 
+// MARK: - GetNewTarget
+
+type IGetNewTarget struct {
+	Instruction
+}
+
+func (i *IGetNewTarget) String() string {
+	return "IGetNewTarget"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
@@ -513,3 +523,4 @@ var InsLogicalNot = &ILogicalNot{}
 var InsPushReference = &IPushReference{}
 var InsPopReference = &IPopReference{}
 var InsPutValue = &IPutValue{}
+var InsGetNewTarget = &IGetNewTarget{}

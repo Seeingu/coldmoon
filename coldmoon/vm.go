@@ -404,6 +404,13 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		functionExpression := ins.FunctionExpression
 		closure := vm.InstantiateAsyncFunctionExpression(functionExpression)
 		vm.result = NewValueFromObject(closure)
+	case *IGetNewTarget:
+		t := vm.agent.GetNewTarget()
+		if t != nil {
+			vm.result = NewValueFromObject(t)
+		} else {
+			vm.result = UndefinedValue
+		}
 	}
 }
 
