@@ -114,7 +114,13 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 		resultCapability := NewPromiseCapability(agent, C.Value)
 		return PerformPromiseThen(agent, promiseObject, onFulfilled, onRejected, resultCapability)
 	}
+	var catch BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		onRejected := arguments[0]
+		promise := this
+		return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{UndefinedValue, onRejected})
+	}
 	DefineBuiltinFunction(object, "then", then, 2, realm)
+	DefineBuiltinFunction(object, "catch", catch, 1, realm)
 
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("Promise"),
