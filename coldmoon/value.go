@@ -117,6 +117,7 @@ func (o *ObjectValue) String() string {
 	return primValue.String()
 }
 
+// Deprecated: use object.ToValue() instead
 func NewValueFromObject(object ObjectType) Value {
 	return &ObjectValue{Object: object}
 }
