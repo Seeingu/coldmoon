@@ -12,6 +12,8 @@ type GetOwnPropertyFn = func(o ObjectType, p PropertyKey) *PropertyDescriptor
 type DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool
 type GetPrototypeOfFn = func(o ObjectType) ObjectType
 type SetPrototypeOfFn = func(o ObjectType, v ObjectType) bool
+
+// TODO: Update method signature
 type InternalMethods struct {
 	GetPrototypeOf    GetPrototypeOfFn
 	SetPrototypeOf    SetPrototypeOfFn

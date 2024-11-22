@@ -228,7 +228,7 @@ loop:
 		if strict || !simpleParameterList {
 			argumentsObject = CreateUnmappedArgumentsObject(agent, argumentsList)
 		} else {
-			argumentsObject = CreateMappedArgumentsObject(agent, formals, argumentsList, env)
+			argumentsObject = CreateMappedArgumentsObject(agent, function, formals, argumentsList, env)
 		}
 		if strict {
 			env.CreateImmutableBinding("arguments", false)

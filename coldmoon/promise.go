@@ -278,6 +278,11 @@ type AlreadyResolved struct {
 	Value bool
 }
 
+type ArgGetterSetterCaptures struct {
+	Name string
+	Env  EnvironmentRecord
+}
+
 // TODO: use interface
 type AdditionalFields struct {
 	Promise                    *PromiseObject
@@ -285,6 +290,7 @@ type AdditionalFields struct {
 	ResolvingFunctions         *ResolvingFunctions
 	PromiseThenFinallyCaptures *PromiseThenFinallyCaptures
 	Value                      Value
+	ArgGetterSetterCaptures    *ArgGetterSetterCaptures
 }
 
 // 27.2.1.3
