@@ -12,313 +12,57 @@ type constructorProperties struct {
 
 // 19.1
 func GlobalObjectProperties(r *Realm) []constructorProperties {
-	properties := []constructorProperties{
-		{
-			"globalThis",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.GlobalEnv.GlobalThisValue),
+	propNameValues := []struct {
+		name  string
+		value Value
+	}{
+		{"globalThis", NewValueFromObject(r.GlobalEnv.GlobalThisValue)},
+		{"Infinity", InfinityValue},
+		{"NaN", NaNValue},
+		{"undefined", UndefinedValue},
+		{"Boolean", NewValueFromObject(r.Intrinsics.BooleanConstructor)},
+		{"isFinite", NewValueFromObject(r.Intrinsics.IsFinite)},
+		{"isNaN", NewValueFromObject(r.Intrinsics.IsNaN)},
+		{"eval", NewValueFromObject(r.Intrinsics.Eval)},
+		{"Object", NewValueFromObject(r.Intrinsics.ObjectConstructor)},
+		{"Function", NewValueFromObject(r.Intrinsics.FunctionConstructor)},
+		{"Array", NewValueFromObject(r.Intrinsics.ArrayConstructor)},
+		{"String", NewValueFromObject(r.Intrinsics.StringConstructor)},
+		{"Number", NewValueFromObject(r.Intrinsics.NumberConstructor)},
+		{"Symbol", NewValueFromObject(r.Intrinsics.SymbolConstructor)},
+		{"BigInt", NewValueFromObject(r.Intrinsics.BigIntConstructor)},
+		{"Math", NewValueFromObject(r.Intrinsics.Math)},
+		{"Error", NewValueFromObject(r.Intrinsics.ErrorConstructor)},
+		{"EvalError", NewValueFromObject(r.Intrinsics.EvalErrorConstructor)},
+		{"RangeError", NewValueFromObject(r.Intrinsics.RangeErrorConstructor)},
+		{"ReferenceError", NewValueFromObject(r.Intrinsics.ReferenceErrorConstructor)},
+		{"SyntaxError", NewValueFromObject(r.Intrinsics.SyntaxErrorConstructor)},
+		{"TypeError", NewValueFromObject(r.Intrinsics.TypeErrorConstructor)},
+		{"URIError", NewValueFromObject(r.Intrinsics.URIErrorConstructor)},
+		{"Reflect", NewValueFromObject(r.Intrinsics.Reflect)},
+		{"Proxy", NewValueFromObject(r.Intrinsics.Proxy)},
+		{"AggregateError", NewValueFromObject(r.Intrinsics.AggregateErrorConstructor)},
+		{"Date", NewValueFromObject(r.Intrinsics.DateConstructor)},
+		{"Map", NewValueFromObject(r.Intrinsics.Map)},
+		{"Set", NewValueFromObject(r.Intrinsics.Set)},
+		{"Promise", NewValueFromObject(r.Intrinsics.Promise)},
+		{"ArrayBuffer", r.Intrinsics.ArrayBufferConstructor.ToValue()},
+		{"parseInt", NewValueFromObject(r.Intrinsics.ParseInt)},
+		{"parseFloat", NewValueFromObject(r.Intrinsics.ParseFloat)},
+		{"RegExp", NewValueFromObject(r.Intrinsics.RegExpConstructor)},
+	}
+
+	var properties []constructorProperties
+	for _, prop := range propNameValues {
+		properties = append(properties, constructorProperties{
+			Name: prop.name,
+			PropertyDescriptor: &PropertyDescriptor{
+				Value:        prop.value,
 				Writable:     true,
 				Enumerable:   false,
 				Configurable: true,
 			},
-		},
-		{
-			"Infinity",
-			&PropertyDescriptor{
-				Value:        InfinityValue,
-				Writable:     false,
-				Enumerable:   false,
-				Configurable: false,
-			},
-		},
-		{
-			"NaN",
-			&PropertyDescriptor{
-				Value:        NaNValue,
-				Writable:     false,
-				Enumerable:   false,
-				Configurable: false,
-			},
-		},
-		{
-			"undefined",
-			&PropertyDescriptor{
-				Value:        UndefinedValue,
-				Writable:     false,
-				Enumerable:   false,
-				Configurable: false,
-			},
-		},
-		{
-			"Boolean",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.BooleanConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"isFinite",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.IsFinite),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"isNaN",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.IsNaN),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"eval",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.Eval),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Object",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.ObjectConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Function",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.FunctionConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Array",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.ArrayConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"String",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.StringConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Number",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.NumberConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Symbol",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.SymbolConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"BigInt",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.BigIntConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Math",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.Math),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Error",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.ErrorConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"EvalError",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.EvalErrorConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"RangeError",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.RangeErrorConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"ReferenceError",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.ReferenceErrorConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"SyntaxError",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.SyntaxErrorConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"TypeError",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.TypeErrorConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"URIError",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.URIErrorConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Reflect",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.Reflect),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Proxy",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.Proxy),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"AggregateError",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.AggregateErrorConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Date",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.DateConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Map",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.Map),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"SetObject",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.Set),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"Promise",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.Promise),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"ArrayBuffer",
-			&PropertyDescriptor{
-				Value:        r.Intrinsics.ArrayBufferConstructor.ToValue(),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"parseInt",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.ParseInt),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"parseFloat",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.ParseFloat),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
-		{
-			"RegExp",
-			&PropertyDescriptor{
-				Value:        NewValueFromObject(r.Intrinsics.RegExpConstructor),
-				Writable:     true,
-				Enumerable:   false,
-				Configurable: true,
-			},
-		},
+		})
 	}
 	return properties
 }
