@@ -1607,6 +1607,26 @@ const (
 	UnaryOperatorBitwiseNot
 )
 
+func (u UnaryOperator) String() string {
+	switch u {
+	case UnaryOperatorDelete:
+		return "delete"
+	case UnaryOperatorVoid:
+		return "void"
+	case UnaryOperatorTypeof:
+		return "typeof"
+	case UnaryOperatorAddition:
+		return "+"
+	case UnaryOperatorSubtraction:
+		return "-"
+	case UnaryOperatorLogicalNot:
+		return "!"
+	case UnaryOperatorBitwiseNot:
+		return "~"
+	}
+	return ""
+}
+
 type UnaryExpression struct {
 	Expression
 	Operator UnaryOperator
@@ -1673,7 +1693,7 @@ func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 func (u *UnaryExpression) String() string {
-	return "UnaryExpression " + u.Operand.String()
+	return "UnaryExpression " + u.Operator.String() + u.Operand.String()
 }
 
 // MARK: - CallExpression

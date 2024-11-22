@@ -319,7 +319,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		array := MustGetObject(this)
 		length := array.LengthOfArrayLike()
 		var sep = ","
-		if args[0] != nil {
+		if len(args) > 0 {
 			sep = args[0].String()
 		}
 

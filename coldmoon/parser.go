@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"fmt"
 	"github.com/samber/lo"
 )
 
@@ -1097,10 +1098,10 @@ func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
 	} else if token.Type == TPeriod {
 		p.tokenizer.Next()
 		identifier := p.tokenizer.CurrentToken
-		p.tokenizer.Next()
 		if identifier.Type != TIdentifier {
 			panic("memberExpression: expected identifier")
 		}
+		p.tokenizer.Next()
 		property = &ASTPropertyIdentifier{
 			Identifier: IdentifierName(identifier.Value),
 		}
@@ -1135,6 +1136,7 @@ func (p *Parser) arguments() Arguments {
 		}
 		// Precedence greater than TComma
 		expr := p.expression(p.acceptContext(TYield))
+		p.tokenizer.Match(TComma)
 		list = append(list, expr)
 	}
 	p.tokenizer.MustMatch(TRightParen)
@@ -1142,9 +1144,15 @@ func (p *Parser) arguments() Arguments {
 }
 
 func (p *Parser) tryArrowFunction() *PrimaryExpressionArrowFunction {
-	// FIXME: Rollback tokenizer state when not matched
 	startOffset := p.tokenizer.Index
-	p.tokenizer.Next()
+	p.tokenizer.store()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in tryArrowFunction", r)
+			p.tokenizer.restore()
+		}
+	}()
+	p.tokenizer.Match(TLeftParen)
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TEqualsGreaterThan)
@@ -1363,7 +1371,7 @@ func (p *Parser) arrayLiteral() *PrimaryExpressionArrayLiteral {
 			p.tokenizer.Next()
 			break
 		}
-		if p.tokenizer.NextToken.Type == TComma {
+		if t.Type == TComma {
 			list = append(list, &ArrayElementElision{})
 			p.tokenizer.Next()
 		} else {
@@ -1371,9 +1379,7 @@ func (p *Parser) arrayLiteral() *PrimaryExpressionArrayLiteral {
 			list = append(list, &ArrayElementExpression{
 				Expression: expr,
 			})
-			if p.tokenizer.CurrentToken.Type == TComma {
-				p.tokenizer.Next()
-			}
+			p.tokenizer.Match(TComma)
 		}
 	}
 	return &PrimaryExpressionArrayLiteral{
@@ -1395,6 +1401,8 @@ func (p *Parser) literal() Literal {
 		return p.numericLiteral()
 	case TString:
 		return p.stringLiteral()
+	case TComment:
+		return &LiteralNull{}
 	default:
 		panic("literal: unhandled token")
 	}
@@ -1451,8 +1459,7 @@ func (p *Parser) variableDeclarationList() *VariableDeclarationList {
 func (p *Parser) variableDeclaration() *VariableDeclaration {
 	identifier := p.bindingIdentifier()
 	var init Expression
-	if p.tokenizer.CurrentToken.Type == TEquals {
-		p.tokenizer.Next()
+	if p.tokenizer.Match(TEquals) {
 		// Precedence greater than TComma
 		init = p.expression(p.acceptContext(TYield))
 	}

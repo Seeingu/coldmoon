@@ -860,7 +860,7 @@ func CallNoArgs(self Value, value Value) Value {
 }
 
 func CallAssumeCallableNoArgs(self, value Value) Value {
-	return self.CallAssumeCallable(value, nil)
+	return self.CallAssumeCallable(value, []Value{})
 }
 
 func ValueType(value Value) string {

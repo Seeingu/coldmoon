@@ -26,5 +26,28 @@ func runTest(filePath string) {
 	ParseScript(string(assertJs), realm, nil).Evaluate()
 }
 
-func TestParseSta(t *testing.T) {
+func mustReadFile(filePath string) string {
+	f, err := os.ReadFile(filePath)
+	if err != nil {
+		panic(err)
+	}
+	return string(f)
+}
+
+func runTestHarness(f string) {
+	content := mustReadFile(makeTest262Path("./test262/harness/" + f))
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	v := ParseScript(content, realm, nil).Evaluate()
+	print(v.String())
+}
+
+func TestHarness(t *testing.T) {
+	files := []string{
+		"nans.js",
+	}
+	for _, f := range files {
+		runTestHarness(f)
+	}
 }

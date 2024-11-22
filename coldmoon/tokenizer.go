@@ -129,12 +129,20 @@ type Token struct {
 	Value string
 }
 
+type cachedState struct {
+	index        int
+	line         int
+	currentToken Token
+	nextToken    Token
+}
 type Tokenizer struct {
 	SourceText   []rune
 	Index        int
 	Length       int
+	line         int
 	CurrentToken Token
 	NextToken    Token
+	cachedState  *cachedState
 }
 
 func NewTokenizer(sourceText string) *Tokenizer {
@@ -142,11 +150,31 @@ func NewTokenizer(sourceText string) *Tokenizer {
 	tokenizer := &Tokenizer{
 		SourceText: source,
 		Index:      0,
+		line:       1,
 		Length:     len(source),
 	}
 	tokenizer.Peek()
 	tokenizer.Peek()
 	return tokenizer
+}
+
+func (t *Tokenizer) store() {
+	t.cachedState = &cachedState{
+		index:        t.Index,
+		line:         t.line,
+		currentToken: t.CurrentToken,
+		nextToken:    t.NextToken,
+	}
+}
+func (t *Tokenizer) restore() {
+	if t.cachedState == nil {
+		panic("no cached state")
+	}
+	t.Index = t.cachedState.index
+	t.line = t.cachedState.line
+	t.CurrentToken = t.cachedState.currentToken
+	t.NextToken = t.cachedState.nextToken
+	t.cachedState = nil
 }
 
 func (t *Tokenizer) peek() Token {
@@ -396,6 +424,7 @@ func (t *Tokenizer) comment(commentType string) string {
 			ch := t.SourceText[t.Index]
 			if lo.Contains(lineTerminators, ch) {
 				t.Index++
+				t.line++
 				return string(t.SourceText[startIndex:t.Index])
 			}
 			t.Index++
@@ -404,6 +433,9 @@ func (t *Tokenizer) comment(commentType string) string {
 	if commentType == "/*" {
 		for t.Index < t.Length {
 			ch := t.SourceText[t.Index]
+			if ch == '\n' {
+				t.line++
+			}
 			if ch == '*' {
 				t.Index++
 				if t.Index < t.Length && t.SourceText[t.Index] == '/' {
@@ -443,6 +475,17 @@ func (t *Tokenizer) number() Token {
 			t.Index++
 		} else {
 			break
+		}
+	}
+	if t.Index < t.Length && t.SourceText[t.Index] == '.' {
+		t.Index++
+		for t.Index < t.Length {
+			ch := t.SourceText[t.Index]
+			if lo.Contains(lo.NumbersCharset, ch) {
+				t.Index++
+			} else {
+				break
+			}
 		}
 	}
 	value := string(t.SourceText[start:t.Index])
@@ -575,6 +618,9 @@ func (t *Tokenizer) skipWhiteSpace() {
 	for t.Index < t.Length {
 		ch := t.SourceText[t.Index]
 		if lo.Contains(whitespace, ch) || lo.Contains(lineTerminators, rune(ch)) {
+			if ch == '\n' {
+				t.line++
+			}
 			t.Index++
 		} else {
 			break
