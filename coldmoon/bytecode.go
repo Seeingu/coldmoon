@@ -2,7 +2,7 @@ package coldmoon
 
 import "fmt"
 
-func GenerateAndRunBytecode(agent *Agent, node ASTNode) *CompletionRecord {
+func GenerateAndRunBytecode(agent *Agent, node ASTNode) *CompletionValue {
 	vm := NewVM(agent)
 	exe := NewExecutable()
 

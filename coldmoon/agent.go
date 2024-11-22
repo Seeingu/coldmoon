@@ -169,7 +169,7 @@ func (a *Agent) CreateSymbol(desc string) *SymbolValue {
 }
 
 // 5.2.3.2
-func (a *Agent) ThrowException(exceptionType ExceptionType, message string) *CompletionRecord {
+func (a *Agent) ThrowException(exceptionType ExceptionType, message string) *CompletionValue {
 	realm := a.CurrentRealm()
 	constructor := realm.Intrinsics.Get("%" + exceptionType.String() + "%")
 	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)

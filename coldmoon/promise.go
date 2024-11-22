@@ -426,21 +426,21 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 		promiseCapability := reaction.Capability
 		t := reaction.Type
 		handler := reaction.Handler
-		var handlerResult *CompletionRecord
+		var handlerResult *CompletionValue
 		if handler == nil {
 			if t == PromiseReactionTypeFulfill {
-				handlerResult = NewNormalCompletion(argument)
+				handlerResult = NewCompletionValue(argument)
 			} else {
 				handlerResult = NewThrowCompletion(agent.exception)
 			}
 		} else {
-			handlerResult = NewNormalCompletion(agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument}))
+			handlerResult = NewCompletionValue(agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument}))
 		}
 		if promiseCapability == nil {
 			return UndefinedValue
 		}
-		if handlerResult.Type != CompletionTypeNormal {
-			reason := handlerResult.Value
+		if handlerResult.IsError() {
+			reason := handlerResult.Error
 			return promiseCapability.Reject.ToValue().CallAssumeCallable(
 				UndefinedValue, []Value{reason},
 			)

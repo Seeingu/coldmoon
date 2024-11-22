@@ -97,7 +97,7 @@ func OrdinaryGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescrip
 }
 
 func InternalDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
-	return OrdinaryDefineOwnProperty(object.(*Object), key, desc)
+	return OrdinaryDefineOwnProperty(object, key, desc)
 }
 
 func OrdinaryDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
@@ -225,10 +225,10 @@ func ValidateAndApplyPropertyDescriptor(
 }
 
 func InternalHasProperty(object ObjectType, key PropertyKey) bool {
-	return OrdinaryHasProperty(object.(*Object), key)
+	return OrdinaryHasProperty(object, key)
 }
 
-func OrdinaryHasProperty(object *Object, key PropertyKey) bool {
+func OrdinaryHasProperty(object ObjectType, key PropertyKey) bool {
 	hasOwn := object.InternalMethods().GetOwnProperty(object, key)
 	if hasOwn != nil {
 		return true
@@ -276,10 +276,10 @@ func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) Value {
 }
 
 func InternalSet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
-	return OrdinarySet(object.(*Object), key, value, receiver)
+	return OrdinarySet(object, key, value, receiver)
 }
 
-func OrdinarySet(object *Object, key PropertyKey, value Value, receiver Value) bool {
+func OrdinarySet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
 	ownDesc := object.InternalMethods().GetOwnProperty(object, key)
 	return OrdinarySetWithOwnDescriptor(object, key, value, receiver, ownDesc)
 
@@ -287,7 +287,7 @@ func OrdinarySet(object *Object, key PropertyKey, value Value, receiver Value) b
 
 // 10.1.9.2
 func OrdinarySetWithOwnDescriptor(
-	object *Object,
+	object ObjectType,
 	key PropertyKey,
 	value Value,
 	receiver Value,
@@ -316,7 +316,7 @@ func OrdinarySetWithOwnDescriptor(
 		if !isObject {
 			return false
 		}
-		receiverObject := r.Object.ToObject()
+		receiverObject := r.Object
 
 		existingDescriptor := object.InternalMethods().GetOwnProperty(receiverObject, key)
 
@@ -355,7 +355,7 @@ func InternalDelete(object ObjectType, key PropertyKey) bool {
 	return OrdinaryDelete(object.(*Object), key)
 }
 
-func OrdinaryDelete(object *Object, key PropertyKey) bool {
+func OrdinaryDelete(object ObjectType, key PropertyKey) bool {
 	desc := object.InternalMethods().GetOwnProperty(object, key)
 	if desc == nil {
 		return true

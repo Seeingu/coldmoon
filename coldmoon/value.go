@@ -35,6 +35,7 @@ type Value interface {
 	String() string
 	ToBoolean() bool
 	CallAssumeCallable(value Value, argumentsList ArgumentsList) Value
+	ToCompletion() *CompletionValue
 }
 
 type undefinedValue struct {

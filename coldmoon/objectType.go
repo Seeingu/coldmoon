@@ -5,6 +5,7 @@ type ObjectType interface {
 	LengthOfArrayLike() uint64
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
+	CreateDataProperty(key PropertyKey, value Value) bool
 	DeletePropertyOrThrow(key PropertyKey) bool
 	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
 	EnumerableOwnProperties(kind objectOwnPropertiesKind) []Value
@@ -22,8 +23,8 @@ type ObjectType interface {
 	InternalMethods() *InternalMethods
 	Prototype() ObjectType
 	Extensible() bool
-	SpeciesConstructor(defaultConstructor ObjectType) *CompletionRecord
-	ToCompletion() *CompletionRecord
+	SpeciesConstructor(defaultConstructor ObjectType) *CompletionValue
+	ToCompletion() *CompletionValue
 	ToValue() Value
 }
 

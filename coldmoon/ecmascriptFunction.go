@@ -118,7 +118,7 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 }
 
 // 10.2.1.4
-func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
 	functionBody := function.ECMAScriptCode
 	switch functionBody.Type {
 	case FunctionTypeNormal:
@@ -133,7 +133,7 @@ func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argume
 	panic("unreachable")
 }
 
-func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
 	realm := agent.CurrentRealm()
 	promiseCapability := NewPromiseCapability(agent, NewValueFromObject(realm.Intrinsics.Promise))
 	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
@@ -147,39 +147,29 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 	} else {
 		// TODO
 	}
-	return &CompletionRecord{
-		Type:   CompletionTypeReturn,
-		Value:  NewValueFromObject(promiseCapability.Promise),
-		Target: "",
-	}
+	return NewCompletion(CompletionTypeReturn, NewValueFromObject(promiseCapability.Promise))
 }
 
-func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
 	functionBody := function.ECMAScriptCode
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	return GenerateAndRunBytecode(agent, functionBody)
 }
 
-func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	G := OrdinaryCreateFromConstructor(agent, function, "%AsyncGeneratorFunction.prototype.prototype%", nil)
-	return &CompletionRecord{
-		Type:  CompletionTypeReturn,
-		Value: NewValueFromObject(G),
-	}
+	return NewCompletionReturnValue(NewValueFromObject(G))
 }
 
-func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionRecord {
+func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	G := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
-	return &CompletionRecord{
-		Type:  CompletionTypeReturn,
-		Value: NewValueFromObject(G),
-	}
+	return NewCompletionReturnValue(NewValueFromObject(G))
 }
 
 // 10.2.11
-func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) *CompletionRecord {
+func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) *CompletionValue {
 	calleeContext := agent.runningExecutionContext()
 	code := function.ECMAScriptCode
 	strict := function.Strict

@@ -667,7 +667,7 @@ func (vm *VM) MethodDefinitionEvaluation(ins *IObjectDefineMethod) *PrivateEleme
 	panic("unreachable")
 }
 
-func (vm *VM) Run(executable *Executable) *CompletionRecord {
+func (vm *VM) Run(executable *Executable) *CompletionValue {
 	for vm.ip < len(executable.Instructions) {
 		i := executable.Instructions[vm.ip]
 		vm.execute(executable, i)
