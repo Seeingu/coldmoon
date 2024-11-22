@@ -273,7 +273,7 @@ func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) *CompletionVa
 		return defaultConstructor.ToCompletion()
 	}
 	if !ValueIsObject(c) {
-		return o.Agent().ThrowException(TypeError, c.String()+" is not an object")
+		return o.Agent().ThrowException(TypeError, c.String()+" is not an object").ToCompletion()
 	}
 	cObject := MustGetObject(c)
 	s := cObject.Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]))
@@ -709,6 +709,8 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 			builtInTag = "String"
 		} else if ObjectIs[*DateObject](o) {
 			builtInTag = "Date"
+		} else if ObjectIs[*RegExpObject](o) {
+			builtInTag = "RegExp"
 		} else {
 			builtInTag = "Object"
 		}

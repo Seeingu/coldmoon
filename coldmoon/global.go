@@ -310,6 +310,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 				Configurable: true,
 			},
 		},
+		{
+			"RegExp",
+			&PropertyDescriptor{
+				Value:        NewValueFromObject(r.Intrinsics.RegExpConstructor),
+				Writable:     true,
+				Enumerable:   false,
+				Configurable: true,
+			},
+		},
 	}
 	return properties
 }

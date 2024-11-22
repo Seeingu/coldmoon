@@ -99,6 +99,10 @@ type Intrinsics struct {
 	ParseInt ObjectType
 	// %parseFloat%
 	ParseFloat ObjectType
+	// %RegExp%
+	RegExpConstructor ObjectType
+	// %RegExp.prototype%
+	RegExpPrototype ObjectType
 	// %EvalError%
 	EvalErrorConstructor ObjectType
 	// %EvalError.prototype%

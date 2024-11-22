@@ -81,6 +81,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.BigIntConstructor = NewBigIntConstructor(r)
 	r.Intrinsics.Reflect = NewReflectObject(r)
 	r.Intrinsics.Proxy = NewProxyConstructor(r)
+	r.Intrinsics.RegExpPrototype = NewRegExpPrototype(r)
+	r.Intrinsics.RegExpConstructor = NewRegExpConstructor(r)
 	r.Intrinsics.IteratorPrototype = NewIteratorPrototype(r)
 	r.Intrinsics.ErrorPrototype = NewErrorPrototype(r)
 	r.Intrinsics.ErrorConstructor = NewErrorConstructor(r)

@@ -41,6 +41,34 @@ func (c *CompletionPropertyDescriptor) IsError() bool {
 	return false
 }
 
+// MARK: - Object
+
+type CompletionObject struct {
+	Completion
+	Type   CompletionType
+	Object ObjectType
+	Error  Value
+}
+
+func NewCompletionObject(obj ObjectType) *CompletionObject {
+	return &CompletionObject{
+		Type:   CompletionTypeNormal,
+		Object: obj,
+	}
+}
+func NewCompletionObjectError(err Value) *CompletionObject {
+	return &CompletionObject{
+		Type:  CompletionTypeThrow,
+		Error: err,
+	}
+}
+func (c *CompletionObject) IsError() bool {
+	return c.Error != nil
+}
+func (c *CompletionObject) IsUndefined() bool {
+	return false
+}
+
 // MARK: - Value
 
 type CompletionValue struct {

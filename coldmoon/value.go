@@ -1,12 +1,15 @@
 package coldmoon
 
 import (
+	"errors"
 	"math"
 	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/bits-and-blooms/bitset"
+	"github.com/dlclark/regexp2"
 	"lukechampine.com/uint128"
 )
 
@@ -843,6 +846,22 @@ func OrdinaryHasInstance(self Value, value Value) bool {
 
 }
 
+// 7.2.8
+func IsRegExp(value Value) bool {
+	object, ok := ValueGetObject(value)
+	if !ok {
+		return false
+	}
+	matcher := object.Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatch]))
+	if matcher != UndefinedValue {
+		return matcher.ToBoolean()
+	}
+	if _, ok := object.(*RegExpObject); ok {
+		return true
+	}
+	return false
+}
+
 // 10.1.15
 func RequireInternalSlot[O ObjectType](value Value) O {
 	if !ValueIsObject(value) {
@@ -853,6 +872,113 @@ func RequireInternalSlot[O ObjectType](value Value) O {
 		panic("TypeError")
 	}
 	return o.(O)
+}
+
+// 22.2.3.2
+func RegExpAlloc(agent *Agent, newTarget ObjectType) ObjectType {
+	obj := OrdinaryCreateFromConstructor(agent, newTarget, "%RegExp.prototype%", nil)
+	obj.DefinePropertyOrThrow(NewStringPropertyKey("lastIndex"), &PropertyDescriptor{
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	return obj
+}
+
+// 22.2.3.3
+func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) *CompletionObject {
+	var p Value
+	if pattern == UndefinedValue {
+		p = NewStringValue("")
+	} else {
+		p = ToString(agent, pattern)
+	}
+	var f Value
+	if flags == UndefinedValue {
+		f = NewStringValue("")
+	} else {
+		f = ToString(agent, flags)
+	}
+
+	var flagsBitSet bitset.BitSet
+	flagsD := uint(1)
+	flagsG := uint(1 << 1)
+	flagsI := uint(1 << 2)
+	flagsM := uint(1 << 3)
+	flagsS := uint(1 << 4)
+	flagsU := uint(1 << 5)
+	flagsY := uint(1 << 6)
+	flagsV := uint(1 << 7)
+	for _, c := range f.String() {
+		var flagsBit uint
+		switch c {
+		case 'd':
+			flagsBit = flagsD
+		case 'g':
+			flagsBit = flagsG
+		case 'i':
+			flagsBit = flagsI
+		case 'm':
+			flagsBit = flagsM
+		case 's':
+			flagsBit = flagsS
+		case 'u':
+			flagsBit = flagsU
+		case 'y':
+			flagsBit = flagsY
+		case 'v':
+			flagsBit = flagsV
+		default:
+			return NewCompletionObjectError(agent.ThrowException(SyntaxError, "Invalid flags"))
+		}
+		if flagsBitSet.Test(flagsBit) {
+			return NewCompletionObjectError(agent.ThrowException(SyntaxError, "Duplicate flags"))
+		}
+		flagsBitSet.Set(flagsBit)
+	}
+
+	var patternText = p.String()
+	parseResult, err := ParsePattern(patternText, flagsBitSet.Test(flagsU), flagsBitSet.Test(flagsV))
+	if err != nil {
+		return NewCompletionObjectError(agent.ThrowException(SyntaxError, "Invalid pattern"))
+	}
+
+	regexpObject := obj.(*RegExpObject)
+	regexpObject.OriginalSource = p.String()
+	regexpObject.OriginalFlags = f.String()
+
+	capturingGroupsCount := CountLeftCapturingParensWithin(parseResult)
+	rer := &RegExpRecord{
+		IgnoreCase:           flagsBitSet.Test(flagsI),
+		Multiline:            flagsBitSet.Test(flagsM),
+		Unicode:              flagsBitSet.Test(flagsU),
+		DotAll:               flagsBitSet.Test(flagsS),
+		UnicodeSets:          flagsBitSet.Test(flagsV),
+		CapturingGroupsCount: capturingGroupsCount,
+	}
+	regexpObject.RegExpRecord = rer
+	regexpObject.RegExpMatcher = parseResult
+
+	obj.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow)
+
+	return NewCompletionObject(obj)
+}
+
+func CountLeftCapturingParensWithin(r *regexp2.Regexp) int {
+	// TODO
+	return 0
+}
+
+// 22.2.3.4
+func ParsePattern(pattern string, unicode bool, unicodeSets bool) (r *regexp2.Regexp, err error) {
+	if unicode && unicodeSets {
+		err = errors.New("SyntaxError")
+		return
+	}
+	if unicodeSets || unicode {
+		return regexp2.Compile(pattern, regexp2.Unicode)
+	}
+	return
 }
 
 func CallNoArgs(self Value, value Value) Value {
