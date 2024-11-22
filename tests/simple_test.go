@@ -54,6 +54,8 @@ async function* c() {
 }
 async function d() {
 }
+const a = async () => {
+}
 `
 	testSource(t, sourceText)
 

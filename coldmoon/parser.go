@@ -158,7 +158,7 @@ func (p *Parser) acceptContext(t TokenType) *acceptContext {
 			precedence:    2,
 			associativity: associativeRight,
 		}
-	case TEqualsGreaterThan:
+	case TArrow:
 		return &acceptContext{
 			precedence:    2,
 			associativity: associativeRight,
@@ -387,6 +387,51 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 		FormalParameters: params,
 		SourceText:       sourceText,
 		Body:             functionBody,
+	}
+}
+
+func (p *Parser) asyncArrowFunction() *PrimaryExpressionAsyncArrowFunction {
+	startOffset := p.tokenizer.Index
+	p.tokenizer.Match(TAsync)
+	var params *FormalParameters
+	if p.tokenizer.Match(TLeftParen) {
+		params = p.formalParameters()
+		p.tokenizer.MustMatch(TRightParen)
+	} else {
+		identifier := p.bindingIdentifier()
+		params = &FormalParameters{
+			Items: []FormalParametersItem{
+				&FormalParameter{
+					BindingElement: &BindingElement{
+						Identifier: identifier,
+					},
+				},
+			},
+		}
+	}
+	p.tokenizer.MustMatch(TArrow)
+	var body *FunctionBody
+	if p.tokenizer.Match(TLeftBrace) {
+		body = p.functionBody(FunctionTypeAsync)
+		p.tokenizer.MustMatch(TRightBrace)
+	} else {
+		// prec: greater than ,
+		e := p.expression(p.acceptContext(TYield))
+		body = &FunctionBody{
+			StatementList: StatementList{
+				&StatementListItemStatement{
+					Statement: &StatementExpression{
+						Expression: e,
+					},
+				},
+			},
+		}
+	}
+	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	return &PrimaryExpressionAsyncArrowFunction{
+		FormalParameters: params,
+		SourceText:       sourceText,
+		Body:             body,
 	}
 }
 
@@ -1155,7 +1200,7 @@ func (p *Parser) tryArrowFunction() *PrimaryExpressionArrowFunction {
 	p.tokenizer.Match(TLeftParen)
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
-	p.tokenizer.MustMatch(TEqualsGreaterThan)
+	p.tokenizer.MustMatch(TArrow)
 	p.noLineTerminatorHere()
 	var body *FunctionBody
 	if p.tokenizer.Match(TLeftBrace) {
@@ -1240,6 +1285,9 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		p.tokenizer.MustMatch(TAsync)
 		if p.tokenizer.NextToken.Type == TStar {
 			return p.asyncGeneratorExpression()
+		}
+		if p.tokenizer.CurrentToken.Type == TLeftParen {
+			return p.asyncArrowFunction()
 		}
 		return p.asyncFunctionExpression()
 	default:

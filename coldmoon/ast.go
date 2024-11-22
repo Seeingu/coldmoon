@@ -487,6 +487,30 @@ func (p *PrimaryExpressionFunctionExpression) String() string {
 	return "FunctionExpression " + string(p.Identifier)
 }
 
+// MARK: - AsyncArrowFunction
+
+type PrimaryExpressionAsyncArrowFunction struct {
+	PrimaryExpression
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (p *PrimaryExpressionAsyncArrowFunction) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (p *PrimaryExpressionAsyncArrowFunction) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (p *PrimaryExpressionAsyncArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
+	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
+	p.Body.Strict = strict
+	e.AddInstruction(&IInstantiateAsyncArrowFunctionExpression{FunctionExpression: p})
+}
+func (p *PrimaryExpressionAsyncArrowFunction) String() string {
+	return "AsyncArrowFunction"
+}
+
 // MARK: - ArrowFunction
 
 type PrimaryExpressionArrowFunction struct {

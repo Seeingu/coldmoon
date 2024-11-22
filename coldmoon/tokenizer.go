@@ -55,7 +55,7 @@ const (
 	TSlash
 	TSlashSlash
 	TEqualsEquals
-	TEqualsGreaterThan
+	TArrow
 	TPlusEquals
 	TThis
 	TMinusEquals
@@ -355,7 +355,7 @@ func (t *Tokenizer) peek() Token {
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '>' {
 			t.Index++
-			return Token{Type: TEqualsGreaterThan, Value: "=>"}
+			return Token{Type: TArrow, Value: "=>"}
 		}
 		return Token{Type: TEquals, Value: "="}
 	case '|':

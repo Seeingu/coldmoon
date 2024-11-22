@@ -411,7 +411,31 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		} else {
 			vm.result = UndefinedValue
 		}
+	case *IInstantiateAsyncArrowFunctionExpression:
+		functionExpression := ins.FunctionExpression
+		closure := vm.InstantiateAsyncArrowFunctionExpression(functionExpression, "")
+		vm.result = NewValueFromObject(closure)
+
 	}
+}
+
+func (vm *VM) InstantiateAsyncArrowFunctionExpression(functionExpression *PrimaryExpressionAsyncArrowFunction, name string) ObjectType {
+	realm := vm.agent.CurrentRealm()
+	env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	sourceText := functionExpression.SourceText
+	closure := OrdinaryFunctionCreate(
+		vm.agent,
+		realm.Intrinsics.AsyncFunctionPrototype,
+		sourceText,
+		functionExpression.FormalParameters,
+		functionExpression.Body,
+		functionCreateThisModeLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(closure, NewStringPropertyKey(name), "")
+	return closure
 }
 
 func (vm *VM) InstantiateAsyncFunctionExpression(functionExpression *PrimaryExpressionAsyncFunctionExpression) ObjectType {

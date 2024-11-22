@@ -480,6 +480,15 @@ func (i *IInstantiateAsyncGeneratorFunctionExpression) String() string {
 	return "IInstantiateAsyncGeneratorFunctionExpression " + i.FunctionExpression.String()
 }
 
+type IInstantiateAsyncArrowFunctionExpression struct {
+	Instruction
+	FunctionExpression *PrimaryExpressionAsyncArrowFunction
+}
+
+func (i *IInstantiateAsyncArrowFunctionExpression) String() string {
+	return "IInstantiateAsyncArrowFunctionExpression"
+}
+
 type IInstantiateAsyncFunctionExpression struct {
 	Instruction
 	FunctionExpression *PrimaryExpressionAsyncFunctionExpression
