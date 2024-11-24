@@ -1290,6 +1290,8 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 			return p.asyncArrowFunction()
 		}
 		return p.asyncFunctionExpression()
+	case TRegularExpression:
+		return p.regularExpressionLiteral()
 	default:
 		literal := p.literal()
 
@@ -1298,6 +1300,20 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 				Literal: literal,
 			},
 		}
+	}
+}
+
+func (p *Parser) regularExpressionLiteral() *PrimaryExpressionRegularExpressionLiteral {
+	t := p.tokenizer.CurrentToken
+	p.tokenizer.MustMatch(TRegularExpression)
+	var flags string
+	if p.tokenizer.CurrentToken.Type == TIdentifier {
+		flags = p.tokenizer.CurrentToken.Value
+		p.tokenizer.Next()
+	}
+	return &PrimaryExpressionRegularExpressionLiteral{
+		Pattern: t.Value,
+		Flags:   flags,
 	}
 }
 

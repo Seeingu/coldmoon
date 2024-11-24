@@ -251,6 +251,9 @@ func (t *Tokenizer) peek() Token {
 			comment := t.comment("/*")
 			return Token{Type: TComment, Value: comment}
 		}
+		if token, ok := t.tryToMatchRegularExpression(); ok {
+			return token
+		}
 		return Token{Type: TSlash, Value: "/"}
 	case '*':
 		t.Index++
@@ -578,6 +581,44 @@ func (t *Tokenizer) matchString(s string) bool {
 		return true
 	}
 	return false
+}
+
+func (t *Tokenizer) tryToMatchRegularExpression() (token Token, ok bool) {
+	isRegExp := false
+	index := t.Index
+	for index < t.Length {
+		ch := t.SourceText[index]
+		if ch == '\n' {
+			break
+		}
+		if ch == '/' {
+			isRegExp = true
+			break
+		}
+		index++
+	}
+
+	if isRegExp {
+		return t.regularExpression(), true
+	}
+	return
+}
+
+func (t *Tokenizer) regularExpression() Token {
+	start := t.Index
+	for t.Index < t.Length {
+		ch := t.SourceText[t.Index]
+		if ch == '/' {
+			t.Index++
+			break
+		}
+		if ch == '\\' {
+			t.Index++
+		}
+		t.Index++
+	}
+	value := string(t.SourceText[start : t.Index-1])
+	return Token{Type: TRegularExpression, Value: value}
 }
 
 func (t *Tokenizer) Peek() Token {

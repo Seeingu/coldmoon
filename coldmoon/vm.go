@@ -415,7 +415,10 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		functionExpression := ins.FunctionExpression
 		closure := vm.InstantiateAsyncArrowFunctionExpression(functionExpression, "")
 		vm.result = NewValueFromObject(closure)
-
+	case *IRegExpCreate:
+		flags := vm.stack.Pop()
+		pattern := vm.stack.Pop()
+		vm.result = RegExpCreate(vm.agent, pattern, flags).Object.ToValue()
 	}
 }
 

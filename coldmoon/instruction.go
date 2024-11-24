@@ -508,6 +508,16 @@ func (i *IGetNewTarget) String() string {
 	return "IGetNewTarget"
 }
 
+// MARK: - RegExp
+
+type IRegExpCreate struct {
+	Instruction
+}
+
+func (i *IRegExpCreate) String() string {
+	return "IRegExpCreate"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
@@ -533,3 +543,4 @@ var InsPushReference = &IPushReference{}
 var InsPopReference = &IPopReference{}
 var InsPutValue = &IPutValue{}
 var InsGetNewTarget = &IGetNewTarget{}
+var InsRegExpCreate = &IRegExpCreate{}

@@ -28,6 +28,33 @@ type PrimaryExpression interface {
 	AssignmentTargetType() AssignmentTargetType
 }
 
+// MARK: - RegularExpressionLiteral
+
+type PrimaryExpressionRegularExpressionLiteral struct {
+	PrimaryExpression
+	Pattern string
+	Flags   string
+}
+
+func (p *PrimaryExpressionRegularExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (p *PrimaryExpressionRegularExpressionLiteral) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (p *PrimaryExpressionRegularExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&ILoadConstant{Value: NewStringValue(p.Pattern)})
+	e.AddInstruction(&ILoadConstant{Value: NewStringValue(p.Flags)})
+	e.AddInstruction(&IRegExpCreate{})
+}
+func (p *PrimaryExpressionRegularExpressionLiteral) String() string {
+	return "/" + p.Pattern + "/" + p.Flags
+}
+func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLiteral() bool {
+	// TODO
+	return true
+}
+
 // MARK: - IdentifierReference
 
 type IdentifierName string

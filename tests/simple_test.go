@@ -44,7 +44,6 @@ func testSource(t *testing.T, s string) {
 }
 
 func TestBaseline(t *testing.T) {
-	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
 	sourceText := `
 function a() {
 }

@@ -230,6 +230,14 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 	return object
 }
 
+// 22.2.3.1
+func RegExpCreate(agent *Agent, pattern Value, flags Value) *CompletionObject {
+	realm := agent.CurrentRealm()
+
+	obj := RegExpAlloc(agent, realm.Intrinsics.RegExpConstructor)
+	return RegExpInitialize(agent, obj, pattern, flags)
+}
+
 // 22.2.6.4.1
 func RegExpHasFlag(agent *Agent, R Value, flag string) *CompletionValue {
 	if !ValueIsObject(R) {

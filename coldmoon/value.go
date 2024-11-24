@@ -878,12 +878,15 @@ func RequireInternalSlot[O ObjectType](value Value) O {
 // 22.2.3.2
 func RegExpAlloc(agent *Agent, newTarget ObjectType) ObjectType {
 	obj := OrdinaryCreateFromConstructor(agent, newTarget, "%RegExp.prototype%", nil)
-	obj.DefinePropertyOrThrow(NewStringPropertyKey("lastIndex"), &PropertyDescriptor{
+	regexp := &RegExpObject{
+		Object: obj,
+	}
+	regexp.DefinePropertyOrThrow(NewStringPropertyKey("lastIndex"), &PropertyDescriptor{
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	return obj
+	return regexp
 }
 
 // 22.2.3.3
