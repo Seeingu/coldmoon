@@ -4,24 +4,46 @@ import "math"
 
 type ArrayBufferObject struct {
 	*Object
-	ArrayBufferData       DataBlock
-	ArrayBufferByteLength uint64
-	ArrayBufferDetachKey  Value
+	ArrayBufferData          DataBlock
+	ArrayBufferByteLength    uint64
+	ArrayBufferDetachKey     Value
+	ArrayBufferMaxByteLength uint64
 }
 
 func (a *ArrayBufferObject) ToValue() Value {
 	return NewValueFromObject(a)
 }
 
-// 25.1.2.1
-func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength uint64) *ArrayBufferObject {
+// 25.1.3.1
+func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength uint64, maxByteLength uint64) *CompletionObject {
+	var allocatingResizableBuffer bool
+	if maxByteLength != 0 {
+		allocatingResizableBuffer = true
+	}
+	if allocatingResizableBuffer {
+		if byteLength > maxByteLength {
+			return NewCompletionObjectError(agent.ThrowException(RangeError, "byteLength > maxByteLength"))
+		}
+	}
 	object := OrdinaryCreateFromConstructor(agent, constructor, "%ArrayBuffer.prototype%", nil)
 	arrayBuffer := &ArrayBufferObject{
 		Object:                object,
 		ArrayBufferData:       make([]byte, byteLength),
 		ArrayBufferByteLength: byteLength,
 	}
-	return arrayBuffer
+	return NewCompletionObject(arrayBuffer)
+}
+
+func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (l uint64) {
+	if !ValueIsObject(options) {
+		return
+	}
+	maxByteLength := MustGetObject(options).Get(NewStringPropertyKey("maxByteLength"))
+	if maxByteLength == UndefinedValue {
+		return
+	}
+
+	return ToIndex(agent, maxByteLength)
 }
 
 // 25.1.2.2
@@ -40,17 +62,35 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		length := argumentsList[0]
+		options := argumentsList[1]
 		if newTarget == nil {
 			panic("TypeError")
 		}
 		byteLength := ToIndex(agent, length)
-		return AllocateArrayBuffer(agent, newTarget, byteLength).ToValue()
+		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
+		return AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Object.ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "ArrayBuffer", builtinFunctionArgs{
 		realm:         realm,
 		isConstructor: true,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 	})
+
+	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
+		Value: NewValueFromObject(realm.Intrinsics.ArrayBufferPrototype),
+	})
+	DefineBuiltinPropertyV(realm.Intrinsics.ArrayBufferPrototype, "constructor", NewValueFromObject(object))
+
+	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		return this
+	}
+	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+	return object
+}
+
+func NewArrayBufferPrototype(realm *Realm) ObjectType {
+	agent := realm.Agent
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
 
 	var isView BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		arg := arguments[0]
@@ -115,28 +155,16 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		}
 		fromBuf := o.ArrayBufferData
 		toBuf := _new.ArrayBufferData
-		CopyDataBlockBytes(toBuf, 0, fromBuf, int(first), int(newLen))
+		currentLen := o.ArrayBufferByteLength
+		if first < float64(currentLen) {
+			count := math.Min(newLen, float64(currentLen)-first)
+			CopyDataBlockBytes(toBuf, 0, fromBuf, int(first), int(count))
+		}
 		return NewValueFromObject(_new)
 	}
 	DefineBuiltinFunction(object, "isView", isView, 1, realm)
 	DefineBuiltinAccessor(realm, object, "byteLength", byteLength, nil)
 	DefineBuiltinFunction(object, "slice", slice, 2, realm)
-
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value: NewValueFromObject(realm.Intrinsics.ArrayBufferPrototype),
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.ArrayBufferPrototype, "constructor", NewValueFromObject(object))
-
-	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return this
-	}
-	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
-	return object
-}
-
-func NewArrayBufferPrototype(realm *Realm) ObjectType {
-	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
 
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("ArrayBuffer"),

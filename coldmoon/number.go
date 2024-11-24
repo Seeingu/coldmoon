@@ -425,6 +425,8 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: false,
 	})
+	DefineBuiltinPropertyV(object, "parseFloat", NewValueFromObject(realm.Intrinsics.ParseFloat))
+	DefineBuiltinPropertyV(object, "parseInt", NewValueFromObject(realm.Intrinsics.ParseInt))
 
 	DefineBuiltinPropertyV(realm.Intrinsics.NumberPrototype, "constructor", NewValueFromObject(object))
 
