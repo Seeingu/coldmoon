@@ -1,6 +1,9 @@
 package coldmoon
 
-import "github.com/dlclark/regexp2"
+import (
+	"github.com/dlclark/regexp2"
+	"strings"
+)
 
 type RegExpObject struct {
 	*Object
@@ -164,8 +167,27 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
 		return NewStringValue("/" + EscapeRegExpPattern(src.String(), _flags.String()) + "/")
 	}
+	var exec = func(this Value, arguments []Value, _ ObjectType) Value {
+		if !ValueIsObject(this) {
+			return agent.ThrowException(TypeError, "RegExp.prototype.exec: 'this' is not an object")
+		}
+		r, ok := MustGetObject(this).(*RegExpObject)
+		if !ok {
+			return agent.ThrowException(TypeError, "RegExp.prototype.exec: 'this' is not a RegExp object")
+		}
+		s := ToString(agent, arguments[0])
+		result := RegExpBuiltinExec(agent, r, s.Data)
+		if result.IsNull() {
+			return NullValue
+		} else if result.IsError() {
+			panic("RegExp.prototype.exec: error")
+		} else {
+			return result.Object.ToValue()
+		}
+	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	DefineBuiltinFunction(object, "exec", exec, 1, realm)
 
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 	DefineBuiltinAccessor(realm, object, "dotAll", dotAll, nil)
@@ -228,4 +250,176 @@ func EscapeRegExpPattern(P string, F string) string {
 		return P
 	}
 	return P
+}
+
+type MatchRecord struct {
+	StartIndex int
+	EndIndex   int
+}
+type MatchState struct {
+}
+
+// return null, object, or throw
+func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) *CompletionObject {
+	length := len(s)
+	lastIndex := int(ToLength(agent, regExp.Get(NewStringPropertyKey("lastIndex"))))
+
+	flags := regExp.OriginalFlags
+	global := strings.Contains(flags, "g")
+	sticky := strings.Contains(flags, "y")
+	hasIndices := strings.Contains(flags, "d")
+
+	if !global && !sticky {
+		lastIndex = 0
+	}
+
+	matcher := regExp.RegExpMatcher
+	fullUnicode := strings.Contains(flags, "u") || strings.Contains(flags, "v")
+	matchSucceeded := false
+	input := s
+	if fullUnicode {
+		input = s
+	}
+
+	match, err := matcher.FindStringMatch(input)
+	if err != nil {
+		return NewCompletionObjectError(NewStringValue(err.Error()))
+	}
+	var matchRecord *MatchRecord
+	for !matchSucceeded {
+		if lastIndex > length {
+			if global || sticky {
+				regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeIgnore)
+			}
+			return NewCompletionObjectNull()
+		}
+		match, err = matcher.FindNextMatch(match)
+		if err != nil {
+			if sticky {
+				regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow)
+				return NewCompletionObjectNull()
+			}
+			lastIndex++
+			return NewCompletionObjectError(NewStringValue(err.Error()))
+		} else {
+			matchSucceeded = true
+			matchRecord = &MatchRecord{
+				StartIndex: match.Index,
+				EndIndex:   match.Index + match.Length,
+			}
+		}
+	}
+	e := matchRecord.EndIndex
+	if fullUnicode {
+		// TODO: GetStringIndex
+	}
+	if global || sticky {
+		regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(float64(e)), setThrowTypeIgnore)
+	}
+	n := len(match.Captures)
+	Assert(float64(n) < POW_2_32-1)
+
+	A := ArrayCreate(agent, float64(n)+1, nil)
+	A.CreateDataPropertyOrThrow(
+		NewStringPropertyKey("index"),
+		NewNumberValue(float64(matchRecord.StartIndex)))
+	A.CreateDataPropertyOrThrow(NewStringPropertyKey("input"), NewStringValue(s))
+
+	indices := make([]*MatchRecord, n)
+	indices = append(indices, matchRecord)
+
+	matchedSubstr := NewStringValue(GetMatchString(agent, s, matchRecord))
+	A.CreateDataPropertyOrThrow(NewStringPropertyKey("0"), matchedSubstr)
+
+	var groups Value
+	var hasGroups bool
+	if regExp.RegExpRecord.CapturingGroupsCount > 0 {
+		groups = OrdinaryObjectCreate(agent, nil, nil).ToValue()
+		hasGroups = true
+	} else {
+		groups = UndefinedValue
+		hasGroups = false
+	}
+
+	A.CreateDataPropertyOrThrow(NewStringPropertyKey("groups"), groups)
+	i := 1
+	groupNames := make([]string, n-1)
+	for i < n {
+		var captureI *MatchRecord
+		var capturedValue Value
+		if i >= len(match.Captures) {
+			indices = append(indices, nil)
+			capturedValue = UndefinedValue
+		} else {
+			captureI = &MatchRecord{
+				StartIndex: match.Captures[i].Index,
+				EndIndex:   match.Captures[i].Index + match.Captures[i].Length,
+			}
+			capturedValue = NewStringValue(GetMatchString(agent, s, captureI))
+			indices = append(indices, captureI)
+		}
+		A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), capturedValue)
+
+		if hasGroups {
+			groupName := match.Groups()[i].Name
+			MustGetObject(groups).CreateDataPropertyOrThrow(NewStringPropertyKey(groupName), capturedValue)
+			groupNames[i-1] = groupName
+		} else {
+			groupNames[i-1] = ""
+		}
+
+		i++
+	}
+
+	if hasIndices {
+		indicesArray := MakeMatchIndicesIndexPairArray(agent, s, indices, groupNames, hasGroups)
+		A.CreateDataPropertyOrThrow(NewStringPropertyKey("indices"), indicesArray.ToValue())
+	}
+	return NewCompletionObject(A)
+}
+
+// 22.2.7.6
+func GetMatchString(agent *Agent, s string, match *MatchRecord) string {
+	Assert(match.StartIndex <= match.EndIndex)
+	return s[match.StartIndex:match.EndIndex]
+}
+
+// 22.2.7.7
+func GetMatchIndexPair(agent *Agent, s string, match *MatchRecord) ObjectType {
+	Assert(match.StartIndex <= match.EndIndex)
+	return CreateArrayFromList(agent, []Value{
+		NewNumberValue(float64(match.StartIndex)),
+		NewNumberValue(float64(match.EndIndex)),
+	})
+}
+
+// 22.2.7.8
+func MakeMatchIndicesIndexPairArray(agent *Agent, s string, indices []*MatchRecord, groupNames []string, hasGroups bool) ObjectType {
+	n := len(indices)
+	Assert(float64(n) < POW_2_32-1)
+	Assert(len(groupNames) == n-1)
+	A := ArrayCreate(agent, 0, nil)
+	var groups Value
+	if hasGroups {
+		groups = OrdinaryObjectCreate(agent, nil, nil).ToValue()
+	} else {
+		groups = UndefinedValue
+	}
+
+	A.CreateDataPropertyOrThrow(NewStringPropertyKey("groups"), groups)
+	i := 0
+	for i < n {
+		var matchIndexPair Value = UndefinedValue
+		var matchIndices *MatchRecord
+		if i < len(indices) {
+			matchIndices = indices[i]
+			matchIndexPair = GetMatchIndexPair(agent, s, matchIndices).ToValue()
+		}
+		A.CreateDataPropertyOrThrow(NewStringPropertyKey(groupNames[i]), matchIndexPair)
+		if i > 0 && groupNames[i-1] != "" {
+			MustGetObject(groups).CreateDataPropertyOrThrow(NewStringPropertyKey(groupNames[i-1]), matchIndexPair)
+		}
+		i++
+	}
+	return A
 }

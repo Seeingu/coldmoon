@@ -14,6 +14,7 @@ const (
 type Completion interface {
 	IsError() bool
 	IsUndefined() bool
+	IsNull() bool
 }
 
 // MARK: - PropertyDescriptor
@@ -48,6 +49,7 @@ type CompletionObject struct {
 	Type   CompletionType
 	Object ObjectType
 	Error  Value
+	isNull bool
 }
 
 func NewCompletionObject(obj ObjectType) *CompletionObject {
@@ -62,11 +64,20 @@ func NewCompletionObjectError(err Value) *CompletionObject {
 		Error: err,
 	}
 }
+func NewCompletionObjectNull() *CompletionObject {
+	return &CompletionObject{
+		Type:   CompletionTypeNormal,
+		isNull: true,
+	}
+}
 func (c *CompletionObject) IsError() bool {
 	return c.Error != nil
 }
 func (c *CompletionObject) IsUndefined() bool {
 	return false
+}
+func (c *CompletionObject) IsNull() bool {
+	return c.isNull
 }
 
 // MARK: - Value
