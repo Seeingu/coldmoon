@@ -26,64 +26,7 @@ type RegExpRecord struct {
 func NewRegExpPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
-	return object
-}
 
-func NewRegExpConstructor(realm *Realm) ObjectType {
-	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, target ObjectType) Value {
-		pattern := argumentsList[0]
-		flags := argumentsList[1]
-		patternIsRegexp := IsRegExp(pattern)
-		var newTarget ObjectType
-		if target == nil {
-			newTarget = agent.ActiveFunctionObject()
-			if patternIsRegexp && flags == UndefinedValue {
-				patternConstructor := MustGetObject(pattern).Get(NewStringPropertyKey("constructor"))
-				if SameValue(newTarget.ToValue(), patternConstructor) {
-					return pattern
-				}
-			}
-		} else {
-			newTarget = target
-		}
-		var p Value
-		var f Value
-		if ValueIsObject(pattern) {
-			if regexp, ok := MustGetObject(pattern).(*RegExpObject); ok {
-				p = NewStringValue(regexp.OriginalSource)
-				if flags == UndefinedValue {
-					f = NewStringValue(regexp.OriginalFlags)
-				} else {
-					f = flags
-				}
-			}
-		} else if patternIsRegexp {
-			p = pattern
-			if flags == UndefinedValue {
-				f = NewStringValue("")
-			} else {
-				f = flags
-			}
-		} else {
-			p = pattern
-			f = flags
-		}
-		o := RegExpAlloc(agent, target)
-		return NewValueFromObject(
-			RegExpInitialize(agent, o, p, f).Object,
-		)
-
-	}
-	object := CreateBuiltinFunction(agent, behavior, 2, "RegExp", builtinFunctionArgs{
-		realm:         realm,
-		isConstructor: true,
-		prototype:     realm.Intrinsics.FunctionPrototype,
-	})
-
-	var getter = func(this Value, arguments []Value, _ ObjectType) Value {
-		return this
-	}
 	var dotAll = func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "s").Value
 	}
@@ -185,11 +128,25 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 			return result.Object.ToValue()
 		}
 	}
+	var test = func(this Value, arguments []Value, _ ObjectType) Value {
+		if !ValueIsObject(this) {
+			return agent.ThrowException(TypeError, "RegExp.prototype.test: 'this' is not an object")
+		}
+		r, ok := MustGetObject(this).(*RegExpObject)
+		if !ok {
+			return agent.ThrowException(TypeError, "RegExp.prototype.test: 'this' is not a RegExp object")
+		}
+		s := ToString(agent, arguments[0])
+		m := RegExpExec(agent, r, s.Data)
+		if m.IsNull() {
+			return FalseValue
+		}
+		return TrueValue
+	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "exec", exec, 1, realm)
-
-	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+	DefineBuiltinFunction(object, "test", test, 1, realm)
 	DefineBuiltinAccessor(realm, object, "dotAll", dotAll, nil)
 	DefineBuiltinAccessor(realm, object, "global", global, nil)
 	DefineBuiltinAccessor(realm, object, "hasIndices", hasIndices, nil)
@@ -200,6 +157,67 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 	DefineBuiltinAccessor(realm, object, "unicodeSets", unicodeSets, nil)
 	DefineBuiltinAccessor(realm, object, "flags", flags, nil)
 	DefineBuiltinAccessor(realm, object, "source", source, nil)
+
+	return object
+}
+
+func NewRegExpConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, target ObjectType) Value {
+		pattern := argumentsList[0]
+		flags := argumentsList[1]
+		patternIsRegexp := IsRegExp(pattern)
+		var newTarget ObjectType
+		if target == nil {
+			newTarget = agent.ActiveFunctionObject()
+			if patternIsRegexp && flags == UndefinedValue {
+				patternConstructor := MustGetObject(pattern).Get(NewStringPropertyKey("constructor"))
+				if SameValue(newTarget.ToValue(), patternConstructor) {
+					return pattern
+				}
+			}
+		} else {
+			newTarget = target
+		}
+		var p Value
+		var f Value
+		if ValueIsObject(pattern) {
+			if regexp, ok := MustGetObject(pattern).(*RegExpObject); ok {
+				p = NewStringValue(regexp.OriginalSource)
+				if flags == UndefinedValue {
+					f = NewStringValue(regexp.OriginalFlags)
+				} else {
+					f = flags
+				}
+			}
+		} else if patternIsRegexp {
+			p = pattern
+			if flags == UndefinedValue {
+				f = NewStringValue("")
+			} else {
+				f = flags
+			}
+		} else {
+			p = pattern
+			f = flags
+		}
+		o := RegExpAlloc(agent, target)
+		return NewValueFromObject(
+			RegExpInitialize(agent, o, p, f).Object,
+		)
+
+	}
+	object := CreateBuiltinFunction(agent, behavior, 2, "RegExp", builtinFunctionArgs{
+		realm:         realm,
+		isConstructor: true,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+	})
+
+	var getter = func(this Value, arguments []Value, _ ObjectType) Value {
+		return this
+	}
+
+	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        NewRegExpPrototype(realm).ToValue(),
@@ -256,9 +274,21 @@ type MatchRecord struct {
 	StartIndex int
 	EndIndex   int
 }
-type MatchState struct {
+
+// 22.2.7.1
+func RegExpExec(agent *Agent, regExp *RegExpObject, s string) *CompletionObject {
+	exec := regExp.Get(NewStringPropertyKey("exec"))
+	if IsCallable(exec) {
+		result := exec.CallAssumeCallable(regExp.ToValue(), []Value{NewStringValue(s)})
+		if !ValueIsObject(result) && result != nil {
+			return NewCompletionObjectError(agent.ThrowException(TypeError, "RegExpExec: exec is not an object"))
+		}
+		return NewCompletionObject(MustGetObject(result))
+	}
+	return RegExpBuiltinExec(agent, regExp, s)
 }
 
+// 22.2.7.2
 // return null, object, or throw
 func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) *CompletionObject {
 	length := len(s)
