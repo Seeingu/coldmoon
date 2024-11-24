@@ -41,3 +41,16 @@ func HostCallJobCallback(callback *JobCallback, this Value, arguments []Value) V
 	Assert(IsCallable(callback.Callback.ToValue()))
 	return callback.Callback.ToValue().CallAssumeCallable(this, arguments)
 }
+
+// MARK: - HostResizeArrayBuffer 25.1.3.8
+
+type ResizeArrayBufferHandled int
+
+const (
+	ResizeArrayBufferHandledHandled ResizeArrayBufferHandled = iota
+	ResizeArrayBufferHandledUnhandled
+)
+
+func HostResizeArrayBuffer(buffer *ArrayBufferObject, newByteLength uint64) ResizeArrayBufferHandled {
+	return ResizeArrayBufferHandledUnhandled
+}

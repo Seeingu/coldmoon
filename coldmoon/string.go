@@ -253,6 +253,20 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewStringValue(s)
 	}
+	var search BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		regexp := argumentsList[0]
+		o := RequireObjectCoercible(agent, thisArgument)
+		if regexp != UndefinedValue && regexp != NullValue {
+			searcher := GetMethod(agent, regexp, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]))
+			if searcher != nil {
+				return searcher.ToValue().CallAssumeCallable(regexp, []Value{o})
+			}
+		}
+
+		s := ToString(agent, o)
+		rx := RegExpCreate(agent, regexp, UndefinedValue)
+		return ValueInvoke(agent, rx.Object.ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]), []Value{s})
+	}
 
 	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "valueOf", valueOf, 0, realm)
@@ -263,6 +277,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	DefineBuiltinFunction(stringPrototype, "slice", slice, 2, realm)
 	DefineBuiltinFunction(stringPrototype, "repeat", repeat, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "concat", concat, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "search", search, 1, realm)
 
 	return stringPrototype
 }

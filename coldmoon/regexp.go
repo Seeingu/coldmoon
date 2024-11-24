@@ -143,10 +143,32 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return TrueValue
 	}
+	var search = func(this Value, arguments []Value, _ ObjectType) Value {
+		rx := this
+		if !ValueIsObject(rx) {
+			panic("TypeError")
+		}
+		rxObject := MustGetObject(rx)
+		S := ToString(agent, arguments[0])
+		previousLastIndex := rxObject.Get(NewStringPropertyKey("lastIndex"))
+		if !SameValue(previousLastIndex, NewNumberValue(0)) {
+			rxObject.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow)
+		}
+		result := RegExpExec(agent, rxObject.(*RegExpObject), S.Data)
+		currentLastIndex := rxObject.Get(NewStringPropertyKey("lastIndex"))
+		if !SameValue(currentLastIndex, previousLastIndex) {
+			rxObject.Set(NewStringPropertyKey("lastIndex"), previousLastIndex, setThrowTypeThrow)
+		}
+		if result.IsNull() {
+			return NewNumberValue(-1)
+		}
+		return result.Object.Get(NewStringPropertyKey("index"))
+	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "exec", exec, 1, realm)
 	DefineBuiltinFunction(object, "test", test, 1, realm)
+	DefineBuiltinFunction(object, "@@search", search, 1, realm)
 	DefineBuiltinAccessor(realm, object, "dotAll", dotAll, nil)
 	DefineBuiltinAccessor(realm, object, "global", global, nil)
 	DefineBuiltinAccessor(realm, object, "hasIndices", hasIndices, nil)

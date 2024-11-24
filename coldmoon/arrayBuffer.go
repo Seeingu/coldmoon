@@ -58,6 +58,11 @@ func DetachArrayBuffer(buffer *ArrayBufferObject) {
 	buffer.ArrayBufferDetachKey = nil
 }
 
+// 25.1.3.8
+func IsFixedLengthArrayBuffer(buffer *ArrayBufferObject) bool {
+	return buffer.ArrayBufferMaxByteLength == 0
+}
+
 func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
@@ -162,9 +167,52 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(_new)
 	}
+	var maxByteLength = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		o := RequireInternalSlot[*ArrayBufferObject](this)
+		if IsDetachedBuffer(o) {
+			return NewNumberValue(0)
+		}
+		var length uint64
+		if IsFixedLengthArrayBuffer(o) {
+			length = o.ArrayBufferByteLength
+		} else {
+			length = o.ArrayBufferMaxByteLength
+		}
+		return NewNumberValue(float64(length))
+	}
+	var resizable = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		o := RequireInternalSlot[*ArrayBufferObject](this)
+		return NewBooleanValue(IsFixedLengthArrayBuffer(o))
+	}
+	var resize = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		newByteLength := ToIndex(agent, arguments[0])
+		o := RequireInternalSlot[*ArrayBufferObject](this)
+		if o.ArrayBufferMaxByteLength == 0 {
+			panic("TypeError")
+		}
+		if IsDetachedBuffer(o) {
+			panic("TypeError")
+		}
+		if newByteLength > o.ArrayBufferMaxByteLength {
+			panic("TypeError")
+		}
+		hostHandled := HostResizeArrayBuffer(o, newByteLength)
+		if hostHandled == ResizeArrayBufferHandledHandled {
+			return UndefinedValue
+		}
+
+		// TODO: Resize
+
+		return UndefinedValue
+	}
+
 	DefineBuiltinFunction(object, "isView", isView, 1, realm)
-	DefineBuiltinAccessor(realm, object, "byteLength", byteLength, nil)
 	DefineBuiltinFunction(object, "slice", slice, 2, realm)
+	DefineBuiltinFunction(object, "resize", resize, 1, realm)
+
+	DefineBuiltinAccessor(realm, object, "byteLength", byteLength, nil)
+	DefineBuiltinAccessor(realm, object, "maxByteLength", maxByteLength, nil)
+	DefineBuiltinAccessor(realm, object, "resizable", resizable, nil)
 
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("ArrayBuffer"),

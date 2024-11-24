@@ -22,6 +22,7 @@ type HostHooks struct {
 	HostCallJobCallback         func(callback *JobCallback, this Value, arguments []Value) Value
 	HostEnqueuePromiseJob       func(agent *Agent, job *Job, realm *Realm)
 	HostPromiseRejectionTracker func(promise *PromiseObject, operation PromiseRejectionTrackerOperation)
+	HostResizeArrayBuffer       func(buffer *ArrayBufferObject, newByteLength uint64) ResizeArrayBufferHandled
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]*SymbolValue{}
@@ -48,6 +49,7 @@ func NewAgent() *Agent {
 		HostCallJobCallback:         HostCallJobCallback,
 		HostEnqueuePromiseJob:       HostEnqueuePromiseJob,
 		HostPromiseRejectionTracker: HostPromiseRejectionTracker,
+		HostResizeArrayBuffer:       HostResizeArrayBuffer,
 	}
 	return a
 }
