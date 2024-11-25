@@ -355,14 +355,23 @@ func (p *Parser) formalParameters() *FormalParameters {
 		if t.Type == TRightParen {
 			break
 		}
-		identifier := p.bindingIdentifier()
-		items = append(items, &FormalParameter{
-			BindingElement: &BindingElement{
-				Identifier: identifier,
-			},
-		})
-		if p.tokenizer.CurrentToken.Type == TComma {
-			p.tokenizer.Next()
+		if p.tokenizer.Match(TDotDotDot) {
+			identifier := p.bindingIdentifier()
+			items = append(items, &FormalParameterFunctionRestParameter{
+				BindingRestElement: &BindingElement{
+					Identifier: identifier,
+				},
+			})
+			p.tokenizer.Match(TComma)
+			break
+		} else {
+			identifier := p.bindingIdentifier()
+			items = append(items, &FormalParameter{
+				BindingElement: &BindingElement{
+					Identifier: identifier,
+				},
+			})
+			p.tokenizer.Match(TComma)
 		}
 	}
 

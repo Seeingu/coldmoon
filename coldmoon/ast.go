@@ -2230,14 +2230,27 @@ func (f *FormalParameters) ContainsExpression() bool {
 
 func (f *FormalParameters) BoundNames() (l []IdentifierName) {
 	for _, item := range f.Items {
-		l = append(l, item.(*FormalParameter).BindingElement.Identifier)
+		var name IdentifierName
+		switch p := item.(type) {
+		case *FormalParameter:
+			name = p.BindingElement.Identifier
+		case *FormalParameterFunctionRestParameter:
+			name = p.BindingRestElement.(*BindingRestElementIdentifier).Identifier
+		}
+		l = append(l, name)
 	}
 	return
 }
 
 // 15.1.5
 func (f *FormalParameters) ExpectedArgumentCount() int {
-	return len(f.Items)
+	l := len(f.Items)
+	if l > 0 {
+		if _, ok := f.Items[l-1].(*FormalParameterFunctionRestParameter); ok {
+			return l - 1
+		}
+	}
+	return l
 }
 
 func (f *FormalParameters) String() string {
@@ -2254,6 +2267,27 @@ func (f *FormalParameters) String() string {
 type FormalParametersItem interface {
 	ASTNode
 }
+
+// MARK:-
+type FormalParameterFunctionRestParameter struct {
+	FormalParametersItem
+	BindingRestElement BindingRestElement
+}
+
+// MARK: - BindingRestElement
+
+type BindingRestElement interface {
+}
+type BindingRestElementIdentifier struct {
+	BindingRestElement
+	Identifier IdentifierName
+}
+
+func (b *BindingRestElementIdentifier) String() string {
+	return "..." + string(b.Identifier)
+}
+
+// MARK: - FormalParameter
 
 type FormalParameter struct {
 	FormalParametersItem

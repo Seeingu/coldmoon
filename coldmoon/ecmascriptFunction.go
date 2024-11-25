@@ -247,17 +247,33 @@ loop:
 		}
 	}
 
-	for i, parameterName := range parameterNames {
+	for i, item := range formals.Items {
 		e := env
-		if hasDuplicates {
-			e = nil
-		}
-		value := argumentsList[i]
-		ref := agent.ResolveBinding(string(parameterName), e, strict)
-		if e == nil {
-			ref.PutValue(agent, value)
-		} else {
-			ref.InitializeReferencedBinding(value)
+		switch param := item.(type) {
+		case *FormalParameter:
+			name := param.BindingElement.Identifier
+			value := argumentsList[i]
+			ref := agent.ResolveBinding(string(name), e, strict)
+			if e == nil {
+				ref.PutValue(agent, value)
+			} else {
+				ref.InitializeReferencedBinding(value)
+			}
+		case *FormalParameterFunctionRestParameter:
+			name := param.BindingRestElement.(*BindingRestElementIdentifier).Identifier
+			ref := agent.ResolveBinding(string(name), e, strict)
+			array := ArrayCreate(agent, 0, nil)
+			rest := argumentsList[i:]
+			for j, value := range rest {
+				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(j), value)
+			}
+			if e == nil {
+				ref.PutValue(agent, array.ToValue())
+			} else {
+				ref.InitializeReferencedBinding(array.ToValue())
+			}
+		default:
+			panic("unreachable")
 		}
 	}
 
