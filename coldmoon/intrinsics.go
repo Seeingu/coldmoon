@@ -103,6 +103,8 @@ type Intrinsics struct {
 	RegExpConstructor ObjectType
 	// %RegExp.prototype%
 	RegExpPrototype ObjectType
+	// %RegExpStringIteratorPrototype%
+	RegExpStringIteratorPrototype ObjectType
 	// %EvalError%
 	EvalErrorConstructor ObjectType
 	// %EvalError.prototype%

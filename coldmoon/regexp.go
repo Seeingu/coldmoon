@@ -438,6 +438,20 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) *Completion
 	return NewCompletionObject(A)
 }
 
+// 22.2.7.3
+func AdvanceStringIndex(s string, index uint64, unicode bool) uint64 {
+	if !unicode {
+		return index + 1
+	}
+	length := len(s)
+	if index+1 >= uint64(length) {
+		return index + 1
+	}
+	// TODO: code point at
+	cp := s[index]
+	return uint64(cp) + index
+}
+
 // 22.2.7.6
 func GetMatchString(agent *Agent, s string, match *MatchRecord) string {
 	Assert(match.StartIndex <= match.EndIndex)
