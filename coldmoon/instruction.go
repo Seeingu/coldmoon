@@ -293,6 +293,22 @@ func (i *IArraySetLength) String() string {
 	return "IArraySetLength " + fmt.Sprintf("%d", i.Length)
 }
 
+type IArrayPushValue struct {
+	Instruction
+}
+
+func (i *IArrayPushValue) String() string {
+	return "IArrayPushValue"
+}
+
+type IArraySpread struct {
+	Instruction
+}
+
+func (i *IArraySpread) String() string {
+	return "IArraySpread"
+}
+
 // MARK: - Object
 
 type IObjectCreate struct {

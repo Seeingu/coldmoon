@@ -249,6 +249,10 @@ type ArrayElementExpression struct {
 	ArrayElement
 	Expression Expression
 }
+type ArrayElementSpread struct {
+	ArrayElement
+	Spread Expression
+}
 type PrimaryExpressionArrayLiteral struct {
 	PrimaryExpression
 	ElementList []ArrayElement
@@ -269,9 +273,15 @@ func (p *PrimaryExpressionArrayLiteral) Bytecode(e *Executable, c *BytecodeConte
 			e.AddInstruction(InsLoad)
 		case *ArrayElementElision:
 			e.AddInstruction(InsStore)
-			e.AddInstruction(&IArraySetLength{
-				Length: i + 1,
-			})
+			e.AddInstruction(&IArrayPushValue{})
+			e.AddInstruction(InsLoad)
+		case *ArrayElementSpread:
+			element.Spread.Bytecode(e, c)
+			if element.Spread.Analyze(AnalyzeQueryIsReference) {
+				e.AddInstruction(InsGetValue)
+			}
+			e.AddInstruction(InsLoad)
+			e.AddInstruction(&IArraySpread{})
 			e.AddInstruction(InsLoad)
 		}
 	}

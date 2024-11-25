@@ -14,7 +14,7 @@ const (
 	// TLeftParen (
 	TLeftParen
 	TRightParen
-	TPeriod
+	TDot
 	TDotDotDot
 	TSemicolon
 	TPipe
@@ -279,7 +279,7 @@ func (t *Tokenizer) peek() Token {
 				return Token{Type: TDotDotDot, Value: "..."}
 			}
 		}
-		return Token{Type: TPeriod, Value: "."}
+		return Token{Type: TDot, Value: "."}
 	case ';':
 		t.Index++
 		return Token{Type: TSemicolon, Value: ";"}

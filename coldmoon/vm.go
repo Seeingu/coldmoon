@@ -251,6 +251,35 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			initValue,
 		)
 		vm.result = NewValueFromObject(array)
+	case *IArrayPushValue:
+		initValue := vm.stack.Pop()
+		arrayValue := vm.stack.Pop()
+		array := arrayValue.(*ObjectValue).Object
+		length, _ := ValueGetLength(arrayValue)
+		array.CreateDataPropertyOrThrow(
+			NewIntegerIndexPropertyKey(int(length)),
+			initValue,
+		)
+		vm.result = NewValueFromObject(array)
+	case *IArraySpread:
+		spread := vm.stack.Pop()
+		arrayValue := vm.stack.Pop()
+		array := MustGetObject(arrayValue)
+		iteratorRecord := GetIterator(vm.agent, spread, GetIteratorKindSync)
+		nextIndex, _ := ValueGetLength(arrayValue)
+		for {
+			next := iteratorRecord.IteratorStep()
+			if next == nil {
+				break
+			}
+			nextValue := IteratorValue(next)
+			array.CreateDataPropertyOrThrow(
+				NewIntegerIndexPropertyKey(int(nextIndex)),
+				nextValue,
+			)
+			nextIndex++
+		}
+		vm.result = NewValueFromObject(array)
 	case *IGreaterThan:
 		right := vm.stack.Pop()
 		left := vm.stack.Pop()

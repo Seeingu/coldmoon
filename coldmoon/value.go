@@ -1050,3 +1050,13 @@ func ValueGet[Type Value](value Value) (Type, bool) {
 	v, ok := value.(Type)
 	return v, ok
 }
+
+func ValueGetLength(v Value) (l uint64, ok bool) {
+	if !ValueIsObject(v) {
+		return
+	}
+	o := MustGetObject(v)
+	length := o.PropertyStorage().Get(NewStringPropertyKey("length"))
+	l = uint64(MustGetObject(length.Value).(*NumberObject).Data)
+	return l, true
+}

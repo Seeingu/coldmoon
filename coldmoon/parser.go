@@ -72,7 +72,7 @@ func (p *Parser) acceptContext(t TokenType) *acceptContext {
 		return &acceptContext{
 			precedence: 18,
 		}
-	case TPeriod, TQuestionDot:
+	case TDot, TQuestionDot:
 		return &acceptContext{
 			precedence:    17,
 			associativity: associativeLeft,
@@ -868,11 +868,11 @@ func (p *Parser) tryUnaryExpression() (Expression, bool) {
 
 func (p *Parser) metaProperty() (MetaProperty, bool) {
 	t := p.tokenizer.CurrentToken
-	if t.Type != TNew || p.tokenizer.NextToken.Type == TPeriod {
+	if t.Type != TNew || p.tokenizer.NextToken.Type == TDot {
 		return nil, false
 	}
 	p.tokenizer.MustMatch(TNew)
-	p.tokenizer.MustMatch(TPeriod)
+	p.tokenizer.MustMatch(TDot)
 	identifier := p.tokenizer.CurrentToken
 	if identifier.Value != "target" {
 		return nil, false
@@ -957,7 +957,7 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 	switch t.Type {
 	case TLeftParen:
 		return p.callExpression(left)
-	case TLeftBracket, TPeriod:
+	case TLeftBracket, TDot:
 		return p.memberExpression(left)
 	case TPlusPlus, TMinusMinus:
 		update, ok := p.updateExpression(left)
@@ -1140,7 +1140,7 @@ func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
 		property = &ASTPropertyExpression{
 			Expression: propertyExpression,
 		}
-	} else if token.Type == TPeriod {
+	} else if token.Type == TDot {
 		p.tokenizer.Next()
 		identifier := p.tokenizer.CurrentToken
 		if identifier.Type != TIdentifier {
@@ -1435,9 +1435,14 @@ func (p *Parser) arrayLiteral() *PrimaryExpressionArrayLiteral {
 			p.tokenizer.Next()
 			break
 		}
-		if t.Type == TComma {
+		if p.tokenizer.Match(TComma) {
 			list = append(list, &ArrayElementElision{})
-			p.tokenizer.Next()
+		} else if p.tokenizer.Match(TDotDotDot) {
+			expr := p.expression(accept)
+			list = append(list, &ArrayElementSpread{
+				Spread: expr,
+			})
+			p.tokenizer.Match(TComma)
 		} else {
 			expr := p.expression(accept)
 			list = append(list, &ArrayElementExpression{
