@@ -407,6 +407,23 @@ func (p *PropertyDefinitionNameAndExpression) String() string {
 	return p.Name.String() + ": " + p.Expression.String()
 }
 
+type PropertyDefinitionSpread struct {
+	PropertyDefinition
+	Spread Expression
+}
+
+func (p *PropertyDefinitionSpread) Bytecode(e *Executable, c *BytecodeContext) {
+	p.Spread.Bytecode(e, c)
+	if p.Spread.Analyze(AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	e.AddInstruction(InsLoad)
+	e.AddInstruction(&IObjectSpreadValue{})
+}
+func (p *PropertyDefinitionSpread) String() string {
+	return "..." + p.Spread.String()
+}
+
 // MARK: - Method Definition
 
 type MethodDefinitionType int

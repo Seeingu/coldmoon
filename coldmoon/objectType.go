@@ -10,6 +10,7 @@ type ObjectType interface {
 	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
 	EnumerableOwnProperties(kind objectOwnPropertiesKind) []Value
 	OrdinaryToPrimitive(hint PreferredType) Value
+	CopyDataProperties(source Value, excludedItems []PropertyKey)
 	ToObject() *Object
 	Get(key PropertyKey) Value
 	Set(key PropertyKey, value Value, throw setThrowType)

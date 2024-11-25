@@ -255,9 +255,7 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 				return false
 			}
 		}
-
 	}
-
 	return true
 }
 
@@ -266,7 +264,7 @@ func (o *Object) LengthOfArrayLike() uint64 {
 	return ToLength(o.Agent(), o.Get(NewStringPropertyKey("length")))
 }
 
-// 7.3.23
+// 7.3.22
 func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) *CompletionObject {
 	c := o.Get(NewStringPropertyKey("constructor"))
 	if c == UndefinedValue {
@@ -290,7 +288,7 @@ func (o *Object) ToCompletion() *CompletionValue {
 	return NewNormalCompletion(NewValueFromObject(o))
 }
 
-// 7.3.23
+// MARK: - 7.3.23
 type objectOwnPropertiesKind int
 
 const (
@@ -330,6 +328,30 @@ func (o *Object) EnumerableOwnProperties(kind objectOwnPropertiesKind) (results 
 // 7.3.24
 func (o *Object) GetFunctionRealm() *Realm {
 	return o.Agent().CurrentRealm()
+}
+
+// MARK: - 7.3.25
+
+func (o *Object) CopyDataProperties(source Value, excludedItems []PropertyKey) {
+	if source == UndefinedValue || source == NullValue {
+		return
+	}
+	from := ValueToObject(o.Agent(), source)
+	keys := from.InternalMethods().OwnPropertyKeys(from)
+
+	for _, key := range keys {
+		excluded := false
+		if lo.Contains(excludedItems, key) {
+			excluded = true
+		}
+		if !excluded {
+			desc := from.InternalMethods().GetOwnProperty(from, key)
+			if desc != nil && desc.Enumerable {
+				propValue := from.Get(key)
+				o.CreateDataPropertyOrThrow(key, propValue)
+			}
+		}
+	}
 }
 
 // MARK: - Object Constructor

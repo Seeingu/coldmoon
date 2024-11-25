@@ -337,6 +337,14 @@ func (i *IObjectDefineMethod) String() string {
 	return "IObjectDefineMethod"
 }
 
+type IObjectSpreadValue struct {
+	Instruction
+}
+
+func (i *IObjectSpreadValue) String() string {
+	return "IObjectSpreadValue"
+}
+
 // MARK: - Relation
 
 type IGreaterThan struct {

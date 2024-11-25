@@ -421,6 +421,13 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		}
 	case *IObjectDefineMethod:
 		vm.MethodDefinitionEvaluation(ins)
+	case *IObjectSpreadValue:
+		fromValue := vm.stack.Pop()
+		toValue := vm.stack.Pop()
+		object := MustGetObject(toValue)
+		var excludedNames []PropertyKey
+		object.CopyDataProperties(fromValue, excludedNames)
+		vm.result = NewValueFromObject(object)
 	case *IInstantiateGeneratorFunctionExpression:
 		functionExpression := ins.FunctionExpression
 		closure := vm.InstantiateGeneratorFunctionExpression(functionExpression)

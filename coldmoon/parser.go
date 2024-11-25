@@ -1350,7 +1350,16 @@ func (p *Parser) propertyDefinitionList() *PropertyDefinitionList {
 func (p *Parser) propertyDefinition(methodType MethodDefinitionType) PropertyDefinition {
 	t := p.tokenizer.CurrentToken
 	var propertyName PropertyName
+
+	// Prec: TComma + 1
+	accept := p.acceptContext(TYield)
 	switch t.Type {
+	case TDotDotDot:
+		p.tokenizer.Next()
+		expr := p.expression(accept)
+		return &PropertyDefinitionSpread{
+			Spread: expr,
+		}
 	case TIdentifier:
 		identifierRef := p.identifierReference()
 		if methodType == MethodDefinitionTypeNil {
@@ -1392,8 +1401,7 @@ func (p *Parser) propertyDefinition(methodType MethodDefinitionType) PropertyDef
 		panic("propertyDefinition: unexpected token")
 	}
 	if p.tokenizer.Match(TColon) {
-		// Prec: TComma + 1
-		value := p.expression(p.acceptContext(TYield))
+		value := p.expression(accept)
 		return &PropertyDefinitionNameAndExpression{
 			Name:       propertyName,
 			Expression: value,
