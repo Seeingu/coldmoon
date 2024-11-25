@@ -267,23 +267,23 @@ func (o *Object) LengthOfArrayLike() uint64 {
 }
 
 // 7.3.23
-func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) *CompletionValue {
+func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) *CompletionObject {
 	c := o.Get(NewStringPropertyKey("constructor"))
 	if c == UndefinedValue {
-		return defaultConstructor.ToCompletion()
+		return NewCompletionObject(defaultConstructor)
 	}
 	if !ValueIsObject(c) {
-		return o.Agent().ThrowException(TypeError, c.String()+" is not an object").ToCompletion()
+		return NewCompletionObjectError(o.Agent().ThrowException(TypeError, c.String()+" is not an object"))
 	}
 	cObject := MustGetObject(c)
 	s := cObject.Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]))
 	if s == UndefinedValue || s == NullValue {
-		return defaultConstructor.ToCompletion()
+		return NewCompletionObject(defaultConstructor)
 	}
 	if IsConstructor(s) {
-		return MustGetObject(s).ToCompletion()
+		return NewCompletionObject(MustGetObject(s))
 	}
-	return defaultConstructor.ToCompletion()
+	return NewCompletionObject(defaultConstructor)
 }
 
 func (o *Object) ToCompletion() *CompletionValue {

@@ -23,7 +23,7 @@ type ObjectType interface {
 	InternalMethods() *InternalMethods
 	Prototype() ObjectType
 	Extensible() bool
-	SpeciesConstructor(defaultConstructor ObjectType) *CompletionValue
+	SpeciesConstructor(defaultConstructor ObjectType) *CompletionObject
 	ToCompletion() *CompletionValue
 	ToValue() Value
 }

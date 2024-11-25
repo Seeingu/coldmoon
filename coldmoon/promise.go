@@ -111,7 +111,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 		}
 		promiseObject := MustGetObject(promise)
 		C := promiseObject.SpeciesConstructor(realm.Intrinsics.Promise)
-		resultCapability := NewPromiseCapability(agent, C.Value)
+		resultCapability := NewPromiseCapability(agent, C.Object.ToValue())
 		return PerformPromiseThen(agent, promiseObject, onFulfilled, onRejected, resultCapability)
 	}
 	var catch BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
@@ -126,7 +126,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		C := MustGetObject(promise).SpeciesConstructor(realm.Intrinsics.Promise)
-		Assert(IsConstructor(C.Value))
+		Assert(IsConstructor(C.Object.ToValue()))
 		var thenFinally Value
 		var catchFinally Value
 		if !IsCallable(onFinally) {
@@ -137,7 +137,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 			catchFinally = NewValueFromObject(realm.Intrinsics.FunctionPrototype)
 			captures := &PromiseThenFinallyCaptures{
 				OnFinally:   onFinally,
-				Constructor: MustGetObject(C.Value),
+				Constructor: C.Object,
 			}
 			var thenFinallyClosure = func(this Value, arguments []Value, newTarget ObjectType) Value {
 				function := agent.ActiveFunctionObject()

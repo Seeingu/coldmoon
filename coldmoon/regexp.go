@@ -164,11 +164,31 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return result.Object.Get(NewStringPropertyKey("index"))
 	}
+	var matchAll = func(this Value, arguments []Value, _ ObjectType) Value {
+		if !ValueIsObject(this) {
+			panic("TypeError")
+		}
+		rx, ok := this.(*ObjectValue)
+		if !ok {
+			panic("TypeError")
+		}
+		r := rx.Object
+		s := ToString(agent, arguments[0])
+		c := r.SpeciesConstructor(realm.Intrinsics.RegExpConstructor)
+		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
+		matcher := c.Object.Construct([]Value{this, _flags}, nil)
+		lastIndex := ToLength(agent, r.Get(NewStringPropertyKey("lastIndex")))
+		matcher.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(float64(lastIndex)), setThrowTypeThrow)
+		_global := strings.Contains(_flags.Data, "g")
+		_fullUnicode := strings.Contains(_flags.Data, "u") || strings.Contains(_flags.Data, "v")
+		return CreateRegExpStringIterator(agent, matcher.(*RegExpObject), s.Data, _global, _fullUnicode).ToValue()
+	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "exec", exec, 1, realm)
 	DefineBuiltinFunction(object, "test", test, 1, realm)
 	DefineBuiltinFunction(object, "@@search", search, 1, realm)
+	DefineBuiltinFunction(object, "@@matchAll", matchAll, 1, realm)
 	DefineBuiltinAccessor(realm, object, "dotAll", dotAll, nil)
 	DefineBuiltinAccessor(realm, object, "global", global, nil)
 	DefineBuiltinAccessor(realm, object, "hasIndices", hasIndices, nil)
