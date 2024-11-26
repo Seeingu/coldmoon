@@ -43,7 +43,6 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IStoreConstant:
 		vm.result = ins.Value
 	case *IResolveBinding:
-		// TODO: maybe ins.IdentifierName can pass to ResolveBinding directly
 		vm.reference = vm.agent.ResolveBinding(string(ins.Name), nil, ins.Strict)
 	case *ICall:
 		argumentCount := ins.ArgumentCount
@@ -835,7 +834,9 @@ func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, h
 	realm := agent.CurrentRealm()
 	var name PropertyKeyOrPrivateName
 	value := GenerateAndRunBytecode(agent, fieldDefinition.PropertyName)
-	name = ToPropertyKey(agent, value.Value)
+	if value.Value != nil {
+		name = ToPropertyKey(agent, value.Value)
+	}
 	var initializer ObjectType
 	if fieldDefinition.Initializer != nil {
 		formalParameterList := &FormalParameters{}

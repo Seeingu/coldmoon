@@ -21,11 +21,14 @@ func TestBaseline(t *testing.T) {
 const a = {
 	b: 1,
 };
+let b = 2;
 `
 	testSource(t, sourceText)
 
 	sourceText = `
-class A {}
+class A {
+	static sa = 'a';
+}
 const B = class {}
 `
 	testSource(t, sourceText)

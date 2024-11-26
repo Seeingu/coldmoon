@@ -573,6 +573,9 @@ func (p *Parser) classBody() *ClassBody {
 	}
 }
 func (p *Parser) classElement() ClassElement {
+	defer func() {
+		p.tokenizer.Match(TSemicolon)
+	}()
 	if p.tokenizer.Match(TStatic) {
 		def, ok := p.methodDefinition(MethodDefinitionTypeNil)
 		if ok {
@@ -1494,6 +1497,7 @@ func (p *Parser) propertyName() (PropertyName, bool) {
 
 func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefinition, bool) {
 	var err error
+	p.tokenizer.store()
 	defer func() {
 		if r := recover(); r != nil {
 			msg := "recovered in methodDefinition"
