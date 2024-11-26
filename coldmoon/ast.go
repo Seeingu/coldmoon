@@ -58,6 +58,7 @@ func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLite
 // MARK: - IdentifierReference
 
 type IdentifierName string
+type PrivateIdentifierName string
 type PrimaryExpressionIdentifierReference struct {
 	PrimaryExpression
 	Identifier IdentifierName
@@ -2822,6 +2823,136 @@ func (d *GeneratorDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, e
 func (d *GeneratorDeclaration) String() string {
 	return "GeneratorDeclaration " + string(d.Identifier)
 }
+
+// MARK: - ClassDeclaration
+
+type DeclarationClass struct {
+	Declaration
+	IdentifierName IdentifierName
+	ClassTail      *ClassTail
+	SourceText     string
+}
+
+func (d *DeclarationClass) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IBindingClassDeclarationEvaluation{
+		ClassDeclaration: d,
+	})
+}
+func (d *DeclarationClass) String() string {
+	return "ClassDeclaration " + string(d.IdentifierName)
+}
+
+type ClassTail struct {
+	ClassHeritage Expression
+	ClassBody     *ClassBody
+}
+
+type ClassBody struct {
+	ASTNode
+	ClassElementList *ClassElementList
+}
+
+func (c *ClassBody) ConstructorMethod() *PropertyDefinitionMethodDefinition {
+	// TODO
+	return nil
+}
+
+func (c *ClassBody) PrivateBoundIdentifiers() (l []PrivateIdentifierName) {
+	// TODO
+	return
+}
+
+func (c *ClassBody) NonConstructorElements() (l []ClassElement) {
+	for _, item := range c.ClassElementList.Items {
+		if item.ClassElementKind() == ClassElementKindNonConstructorMethod {
+			l = append(l, item)
+		}
+	}
+	return l
+}
+
+func (c *ClassBody) Bytecode(e *Executable, cx *BytecodeContext) {
+	containedInStrictCode := cx.containedInStrictCode
+	cx.containedInStrictCode = true
+	defer func() {
+		cx.containedInStrictCode = containedInStrictCode
+	}()
+	c.ClassElementList.Bytecode(e, cx)
+}
+func (c *ClassBody) String() string {
+	return c.ClassElementList.String()
+}
+
+// MARK: - ClassElementList
+
+type ClassElementList struct {
+	ASTNode
+	Items []ClassElement
+}
+
+func (c *ClassElementList) Bytecode(e *Executable, cx *BytecodeContext) {
+	for _, item := range c.Items {
+		item.Bytecode(e, cx)
+	}
+}
+func (c *ClassElementList) String() string {
+	var sb string
+	for i, item := range c.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+// MARK: - Class: ClassElementList
+
+type ClassElementKind int
+
+const (
+	ClassElementKindConstructorMethod ClassElementKind = iota
+	ClassElementKindNonConstructorMethod
+	ClassElementKindEmpty
+)
+
+type ClassElement interface {
+	ASTNode
+	ClassElementKind() ClassElementKind
+}
+
+// MARK: - ClassElement: EmptyStatement
+
+type ClassElementEmpty struct {
+	ClassElement
+}
+
+func (c *ClassElementEmpty) ClassElementKind() ClassElementKind {
+	return ClassElementKindEmpty
+}
+
+// MARK: - ClassElement: MethodDefinition
+
+type ClassElementMethodDefinition struct {
+	ClassElement
+	MethodDefinition *PropertyDefinitionMethodDefinition
+}
+
+func (c *ClassElementMethodDefinition) ClassElementKind() ClassElementKind {
+	return ClassElementKindNonConstructorMethod
+}
+
+func (c *ClassElementMethodDefinition) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (c *ClassElementMethodDefinition) Bytecode(e *Executable, cx *BytecodeContext) {
+	c.MethodDefinition.Bytecode(e, cx)
+}
+func (c *ClassElementMethodDefinition) String() string {
+	return c.MethodDefinition.String()
+}
+
+// MARK: - Class: MethodDefinition
 
 // MARK: - LexicalDeclaration
 

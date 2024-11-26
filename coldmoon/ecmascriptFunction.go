@@ -444,6 +444,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 	agent := F.Agent()
 	realm := agent.CurrentRealm()
 	fun, isECMAScriptFunction := F.(*ECMAScriptFunction)
+
 	if isECMAScriptFunction {
 		Assert(!IsConstructor(NewValueFromObject(fun)))
 
@@ -457,6 +458,8 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 
 	if isECMAScriptFunction {
 		fun.ConstructorKind = ConstructorKindBase
+	} else if b, isBuiltinFunction := F.(*BuiltinFunction); isBuiltinFunction {
+		b.AdditionalFields.ClassConstructorFields.ConstructorKind = ConstructorKindBase
 	}
 
 	proto := prototype

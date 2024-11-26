@@ -531,6 +531,50 @@ func (p *Parser) noLineTerminatorHere() {
 	// TODO
 }
 
+func (p *Parser) classDeclaration() *DeclarationClass {
+	startIndex := p.tokenizer.Index
+	p.tokenizer.MustMatch(TClass)
+	identifier := p.bindingIdentifier()
+	classTail := p.classTail()
+	sourceText := p.SourceText[startIndex:p.tokenizer.Index]
+	return &DeclarationClass{
+		IdentifierName: identifier,
+		ClassTail:      classTail,
+		SourceText:     sourceText,
+	}
+}
+func (p *Parser) classTail() *ClassTail {
+	var classHeritage Expression
+	if p.tokenizer.Match(TExtends) {
+		classHeritage = p.expression(p.acceptContextLowest())
+	}
+	p.tokenizer.MustMatch(TLeftBrace)
+	classBody := p.classBody()
+	p.tokenizer.MustMatch(TRightBrace)
+	return &ClassTail{
+		ClassHeritage: classHeritage,
+		ClassBody:     classBody,
+	}
+}
+
+func (p *Parser) classBody() *ClassBody {
+	var items []ClassElement
+	for {
+		if p.tokenizer.CurrentToken.Type == TRightBrace {
+			break
+		}
+		items = append(items, p.classElement())
+	}
+	return &ClassBody{
+		ClassElementList: &ClassElementList{
+			Items: items,
+		},
+	}
+}
+func (p *Parser) classElement() ClassElement {
+	return &ClassElementEmpty{}
+}
+
 func (p *Parser) lexicalDeclaration() *DeclarationLexical {
 	t := p.tokenizer.CurrentToken
 	var lexicalType LexicalDeclarationType
@@ -666,6 +710,9 @@ func (p *Parser) declaration() Declaration {
 	t := p.tokenizer.CurrentToken
 	if t.Type == TFunction || t.Type == TAsync {
 		return p.hoistableDeclaration()
+	}
+	if t.Type == TClass {
+		return p.classDeclaration()
 	}
 	if t.Type == TLet || t.Type == TConst {
 		return p.lexicalDeclaration()

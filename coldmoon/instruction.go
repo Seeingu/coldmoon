@@ -542,6 +542,17 @@ func (i *IRegExpCreate) String() string {
 	return "IRegExpCreate"
 }
 
+// MARK: - Class
+
+type IBindingClassDeclarationEvaluation struct {
+	Instruction
+	ClassDeclaration *DeclarationClass
+}
+
+func (i *IBindingClassDeclarationEvaluation) String() string {
+	return "IBindingClassDeclarationEvaluation"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

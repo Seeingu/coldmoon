@@ -291,6 +291,7 @@ type AdditionalFields struct {
 	PromiseThenFinallyCaptures *PromiseThenFinallyCaptures
 	Value                      Value
 	ArgGetterSetterCaptures    *ArgGetterSetterCaptures
+	ClassConstructorFields     *ClassConstructorFields
 }
 
 // 27.2.1.3

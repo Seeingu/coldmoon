@@ -455,6 +455,158 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		flags := vm.stack.Pop()
 		pattern := vm.stack.Pop()
 		vm.result = RegExpCreate(vm.agent, pattern, flags).Object.ToValue()
+	case *IBindingClassDeclarationEvaluation:
+		classDeclaration := ins.ClassDeclaration
+		vm.result = vm.BindingClassDeclarationEvaluation(classDeclaration).ToValue()
+	}
+}
+
+// 15.7.14
+func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding string, className string) ObjectType {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	classEnv := NewDeclarativeEnvironment(env)
+	if classBinding != "" {
+		classEnv.CreateImmutableBinding(classBinding, true)
+	}
+
+	outerPrivateEnvironment := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	classPrivateEnvironment := NewPrivateEnvironment(outerPrivateEnvironment)
+
+	if len(classTail.ClassBody.ClassElementList.Items) > 0 {
+		// TODO
+	}
+
+	var protoParent ObjectType
+	var constructorParent ObjectType
+	if classTail.ClassHeritage == nil {
+		protoParent = realm.Intrinsics.ObjectPrototype
+		constructorParent = realm.Intrinsics.FunctionPrototype
+	} else {
+		agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
+		superclassRef := GenerateAndRunBytecode(agent, classTail.ClassHeritage)
+		agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+		superclass := superclassRef.Value
+		if superclass == nil {
+			protoParent = nil
+			constructorParent = realm.Intrinsics.FunctionPrototype
+		} else if !IsConstructor(superclass) {
+			panic("TypeError: superclass is not a constructor")
+		} else {
+			protoParentValue := MustGetObject(superclass).Get(NewStringPropertyKey("prototype"))
+			if !ValueIsObject(protoParentValue) {
+				panic("TypeError: prototype is not an object")
+			}
+			protoParent = MustGetObject(protoParentValue)
+			constructorParent = MustGetObject(superclass)
+		}
+	}
+
+	proto := OrdinaryObjectCreate(agent, protoParent, nil)
+	constructor := classTail.ClassBody.ConstructorMethod()
+	agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
+	agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = classPrivateEnvironment
+
+	var function ObjectType
+	if constructor == nil {
+		var defaultConstructor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			args := arguments
+			if newTarget == nil {
+				panic("TypeError: newTarget is nil")
+			}
+
+			F := agent.ActiveFunctionObject()
+			classConstructorFields := F.(*BuiltinFunction).AdditionalFields.ClassConstructorFields
+			var result ObjectType
+			if classConstructorFields.ConstructorKind == ConstructorKindDerived {
+				fun := function.InternalMethods().GetPrototypeOf(function)
+				if !IsConstructor(fun.ToValue()) {
+					panic("TypeError: prototype is not a constructor")
+				}
+				result = fun.Construct(args, newTarget)
+			} else {
+				result = OrdinaryCreateFromConstructor(agent, newTarget, "%Object.prototype", nil)
+			}
+			return result.ToValue()
+		}
+
+		function = CreateBuiltinFunction(
+			agent,
+			defaultConstructor,
+			0,
+			"constructor",
+			builtinFunctionArgs{
+				prototype:     constructorParent,
+				realm:         realm,
+				isConstructor: true,
+				additionalFields: &AdditionalFields{
+					ClassConstructorFields: &ClassConstructorFields{},
+				},
+			})
+	} else {
+		// TODO
+	}
+
+	MakeConstructor(function, false, proto)
+	if classTail.ClassHeritage != nil {
+		if f, ok := function.(*ECMAScriptFunction); ok {
+			f.ConstructorKind = ConstructorKindDerived
+		} else if b, ok := function.(*BuiltinFunction); ok {
+			b.AdditionalFields.ClassConstructorFields.ConstructorKind = ConstructorKindDerived
+		} else {
+			panic("unreachable")
+		}
+	}
+
+	DefineMethodProperty(proto, NewStringPropertyKey("constructor"), function, false)
+
+	agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+	if classBinding != "" {
+		classEnv.InitializeBinding(classBinding, function.ToValue())
+	}
+
+	agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+
+	return function
+}
+
+// 15.7.15
+func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *DeclarationClass) ObjectType {
+	agent := vm.agent
+	if classDeclaration.IdentifierName != "" {
+		className := string(classDeclaration.IdentifierName)
+		value := vm.ClassDefinitionEvaluation(classDeclaration.ClassTail, className, className)
+		if f, ok := value.(*ECMAScriptFunction); ok {
+			f.SourceText = classDeclaration.SourceText
+		} else if b, ok := value.(*BuiltinFunction); ok {
+			b.AdditionalFields.ClassConstructorFields.SourceText = classDeclaration.SourceText
+		} else {
+			panic("unreachable")
+		}
+
+		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		vm.InitializeBoundName(className, value.ToValue(), env)
+		return value
+	} else {
+		value := vm.ClassDefinitionEvaluation(classDeclaration.ClassTail, "", "default")
+		if f, ok := value.(*ECMAScriptFunction); ok {
+			f.SourceText = classDeclaration.SourceText
+		} else if b, ok := value.(*BuiltinFunction); ok {
+			b.AdditionalFields.ClassConstructorFields.SourceText = classDeclaration.SourceText
+		} else {
+			panic("unreachable")
+		}
+		return value
+	}
+}
+
+func (vm *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord) {
+	if env == nil {
+		lhs := vm.agent.ResolveBinding(name, nil, true)
+		lhs.PutValue(vm.agent, value)
+	} else {
+		env.InitializeBinding(name, value)
 	}
 }
 

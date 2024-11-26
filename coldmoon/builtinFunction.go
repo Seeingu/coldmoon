@@ -104,3 +104,10 @@ func CreateBuiltinFunction(
 
 	return function
 }
+
+// MARK: - Class
+
+type ClassConstructorFields struct {
+	ConstructorKind ConstructorKind
+	SourceText      string
+}
