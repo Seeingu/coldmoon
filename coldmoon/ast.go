@@ -461,14 +461,14 @@ const (
 type PropertyDefinitionMethodDefinition struct {
 	PropertyDefinition
 	Type               MethodDefinitionType
-	Name               PropertyName
+	PropertyName       PropertyName
 	FunctionExpression *PrimaryExpressionFunctionExpression
 }
 
 func (p *PropertyDefinitionMethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.FunctionExpression.Body.FunctionBodyContainsUseStrict()
 	p.FunctionExpression.Body.Strict = strict
-	p.Name.Bytecode(e, c)
+	p.PropertyName.Bytecode(e, c)
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IObjectDefineMethod{
 		FunctionExpression: p.FunctionExpression,
@@ -2875,7 +2875,11 @@ type ClassBody struct {
 }
 
 func (c *ClassBody) ConstructorMethod() *PropertyDefinitionMethodDefinition {
-	// TODO
+	for _, item := range c.ClassElementList.Items {
+		if item.ClassElementKind() == ClassElementKindConstructorMethod {
+			return item.(*ClassElementMethodDefinition).MethodDefinition
+		}
+	}
 	return nil
 }
 
@@ -2943,6 +2947,16 @@ type ClassElement interface {
 	ClassElementKind() ClassElementKind
 }
 
+// 15.7.4
+func ClassElementIsStatic(c ClassElement) bool {
+	switch c.(type) {
+	case *ClassElementStaticMethodDefinition:
+		return true
+	default:
+		return false
+	}
+}
+
 // MARK: - ClassElement: EmptyStatement
 
 type ClassElementEmpty struct {
@@ -2953,6 +2967,17 @@ func (c *ClassElementEmpty) ClassElementKind() ClassElementKind {
 	return ClassElementKindEmpty
 }
 
+// MARK: - ClassElement: StaticMethodDefinition
+
+type ClassElementStaticMethodDefinition struct {
+	ClassElement
+	MethodDefinition *PropertyDefinitionMethodDefinition
+}
+
+func (c *ClassElementStaticMethodDefinition) ClassElementKind() ClassElementKind {
+	return ClassElementKindNonConstructorMethod
+}
+
 // MARK: - ClassElement: MethodDefinition
 
 type ClassElementMethodDefinition struct {
@@ -2961,6 +2986,14 @@ type ClassElementMethodDefinition struct {
 }
 
 func (c *ClassElementMethodDefinition) ClassElementKind() ClassElementKind {
+	switch pn := c.MethodDefinition.PropertyName.(type) {
+	case PropertyNameLiteral:
+		if l, ok := pn.(*PropertyNameLiteralIdentifier); ok {
+			if l.Identifier == "constructor" {
+				return ClassElementKindConstructorMethod
+			}
+		}
+	}
 	return ClassElementKindNonConstructorMethod
 }
 

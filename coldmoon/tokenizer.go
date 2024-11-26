@@ -96,6 +96,7 @@ const (
 	TDelete
 	TComment
 	TIn
+	TStatic
 	TInstanceof
 	TNew
 	TVar
@@ -558,6 +559,7 @@ var keywordsMap = map[string]TokenType{
 	"case":       TCase,
 	"enum":       TEnum,
 	"async":      TAsync,
+	"static":     TStatic,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {

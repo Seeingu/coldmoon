@@ -439,6 +439,11 @@ func AddRestrictedFunctionProperties(F ObjectType, realm *Realm) {
 
 }
 
+func MakeClassConstructor(function *ECMAScriptFunction) {
+	Assert(!function.IsClassConstructor)
+	function.IsClassConstructor = true
+}
+
 // 10.2.5
 func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 	agent := F.Agent()

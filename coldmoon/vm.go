@@ -420,7 +420,13 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			panic("unreachable")
 		}
 	case *IObjectDefineMethod:
-		vm.MethodDefinitionEvaluation(ins)
+		propertyName := vm.stack.Pop()
+		object := MustGetObject(vm.stack.Pop())
+		vm.MethodDefinitionEvaluation(methodDefinitionArgs{
+			PropertyName:       propertyName,
+			MethodType:         MethodDefinitionTypeMethod,
+			FunctionExpression: ins.FunctionExpression,
+		}, object, true)
 	case *IObjectSpreadValue:
 		fromValue := vm.stack.Pop()
 		toValue := vm.stack.Pop()
@@ -483,6 +489,28 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			vm.result = value.ToValue()
 		}
 	}
+}
+
+// 15.7.3
+func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) {
+	switch ce := classElement.(type) {
+	case *ClassElementStaticMethodDefinition, *ClassElementMethodDefinition:
+		var methodDefinition *PropertyDefinitionMethodDefinition
+		if c, ok := ce.(*ClassElementStaticMethodDefinition); ok {
+			methodDefinition = c.MethodDefinition
+		} else {
+			methodDefinition = ce.(*ClassElementMethodDefinition).MethodDefinition
+		}
+		propertyName := GenerateAndRunBytecode(vm.agent, methodDefinition.PropertyName)
+		vm.MethodDefinitionEvaluation(methodDefinitionArgs{
+			PropertyName:       propertyName.Value,
+			FunctionExpression: methodDefinition.FunctionExpression,
+			MethodType:         methodDefinition.Type,
+		}, object, true)
+	case *ClassElementEmpty:
+		return
+	}
+
 }
 
 // 15.7.14
@@ -569,7 +597,11 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 				},
 			})
 	} else {
-		// TODO
+		constructorInfo := DefineMethod(agent, constructor.FunctionExpression, NewStringValue("constructor"), proto, constructorParent)
+		F := constructorInfo.Closure
+		MakeClassConstructor(F.(*ECMAScriptFunction))
+		SetFunctionName(F, NewStringPropertyKey(className), "")
+		function = F
 	}
 
 	MakeConstructor(function, false, proto)
@@ -584,6 +616,20 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 	}
 
 	DefineMethodProperty(proto, NewStringPropertyKey("constructor"), function, false)
+
+	for _, classElement := range classTail.ClassBody.ClassElementList.Items {
+		// TODO: assign to the result of evaluation
+		var element *CompletionValue = NewCompletionValueUndefined()
+		if ClassElementIsStatic(classElement) {
+			vm.ClassElementEvaluation(classElement, proto)
+		} else {
+			vm.ClassElementEvaluation(classElement, function)
+		}
+		if element.IsAbrupt() {
+			agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+			agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+		}
+	}
 
 	agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 	if classBinding != "" {
@@ -811,17 +857,18 @@ func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *Primary
 
 }
 
+type methodDefinitionArgs struct {
+	PropertyName       Value
+	MethodType         MethodDefinitionType
+	FunctionExpression *PrimaryExpressionFunctionExpression
+}
+
 // 15.4.5
-func (vm *VM) MethodDefinitionEvaluation(ins *IObjectDefineMethod) *PrivateElement {
+func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, object ObjectType, enumerable bool) *PrivateElement {
 	agent := vm.agent
-	functionExpression := ins.FunctionExpression
-	methodType := ins.MethodType
+	functionExpression := methodDefinition.FunctionExpression
+	methodType := methodDefinition.MethodType
 	propertyName := vm.stack.Pop()
-	object := MustGetObject(vm.stack.Pop())
-	defer func() {
-		vm.result = NewValueFromObject(object)
-	}()
-	enumerable := true
 	switch methodType {
 	case MethodDefinitionTypeMethod:
 		methodDef := DefineMethod(

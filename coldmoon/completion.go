@@ -15,6 +15,7 @@ type Completion interface {
 	IsError() bool
 	IsUndefined() bool
 	IsNull() bool
+	IsAbrupt() bool
 }
 
 // MARK: - PropertyDescriptor
@@ -120,6 +121,12 @@ func (c *CompletionValue) IsUndefined() bool {
 }
 func (c *CompletionValue) IsError() bool {
 	return c.Error != nil
+}
+func (c *CompletionValue) IsNull() bool {
+	return false
+}
+func (c *CompletionValue) IsAbrupt() bool {
+	return c.Type != CompletionTypeNormal
 }
 
 func NewNormalCompletion(value Value) *CompletionValue {

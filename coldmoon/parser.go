@@ -572,6 +572,12 @@ func (p *Parser) classBody() *ClassBody {
 	}
 }
 func (p *Parser) classElement() ClassElement {
+	if p.tokenizer.Match(TStatic) {
+		def := p.propertyDefinition(MethodDefinitionTypeNil)
+		return &ClassElementStaticMethodDefinition{
+			MethodDefinition: def.(*PropertyDefinitionMethodDefinition),
+		}
+	}
 	return &ClassElementEmpty{}
 }
 
@@ -1493,8 +1499,8 @@ func (p *Parser) propertyDefinition(methodType MethodDefinitionType) PropertyDef
 			m = methodType
 		}
 		return &PropertyDefinitionMethodDefinition{
-			Type: m,
-			Name: propertyName,
+			Type:         m,
+			PropertyName: propertyName,
 			FunctionExpression: &PrimaryExpressionFunctionExpression{
 				Identifier:       "",
 				FormalParameters: formalParameters,
