@@ -495,8 +495,11 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 }
 
 // 15.7.3
-func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) (*ClassFieldDefinition, error) {
+func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) (classFieldDefinition *ClassFieldDefinition, staticBlockDefinition *ClassStaticBlockDefinition, err error) {
 	switch ce := classElement.(type) {
+	case *ClassElementStaticBlock:
+		staticBlockDefinition = vm.ClassStaticBlockDefinitionEvaluation(ce, object)
+		return
 	case *ClassElementFieldDefinition, *ClassElementStaticFieldDefinition:
 		var fieldDefinition *FieldDefinition
 		if c, ok := ce.(*ClassElementFieldDefinition); ok {
@@ -504,7 +507,8 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 		} else {
 			fieldDefinition = ce.(*ClassElementStaticFieldDefinition).FieldDefinition
 		}
-		return vm.ClassFieldDefinitionEvaluation(fieldDefinition, object), nil
+		classFieldDefinition = vm.ClassFieldDefinitionEvaluation(fieldDefinition, object)
+		return
 	case *ClassElementStaticMethodDefinition, *ClassElementMethodDefinition:
 		var methodDefinition *MethodDefinition
 		if c, ok := ce.(*ClassElementStaticMethodDefinition); ok {
@@ -518,9 +522,9 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 			FunctionExpression: methodDefinition.FunctionExpression,
 			MethodType:         methodDefinition.Type,
 		}, object, true)
-		return nil, nil
+		return
 	case *ClassElementEmpty:
-		return nil, nil
+		return
 	}
 	panic("unreachable")
 }
@@ -633,26 +637,31 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 
 	instanceFields := make([]*ClassFieldDefinition, 0)
 
-	staticElements := make([]*ClassFieldDefinition, 0)
+	staticClassFields := make([]*ClassFieldDefinition, 0)
+	staticStaticBlocks := make([]*ClassStaticBlockDefinition, 0)
 
 	for _, classElement := range elements {
-		// TODO: assign to the result of evaluation
-		var element *ClassFieldDefinition
+		var classFieldDefinition *ClassFieldDefinition
+		var staticBlockDefinition *ClassStaticBlockDefinition
 		var err error
 		if ClassElementIsStatic(classElement) {
-			element, err = vm.ClassElementEvaluation(classElement, proto)
+			classFieldDefinition, staticBlockDefinition, err = vm.ClassElementEvaluation(classElement, proto)
 		} else {
-			element, err = vm.ClassElementEvaluation(classElement, function)
+			classFieldDefinition, staticBlockDefinition, err = vm.ClassElementEvaluation(classElement, function)
 		}
 		if err != nil {
 			agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 			agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
-		} else {
+		} else if classFieldDefinition != nil {
 			if !ClassElementIsStatic(classElement) {
-				instanceFields = append(instanceFields, element)
+				instanceFields = append(instanceFields, classFieldDefinition)
 			} else {
-				staticElements = append(staticElements, element)
+				staticClassFields = append(staticClassFields, classFieldDefinition)
 			}
+		} else if staticBlockDefinition != nil {
+			staticStaticBlocks = append(staticStaticBlocks, staticBlockDefinition)
+		} else {
+			panic("unreachable")
 		}
 	}
 
@@ -663,8 +672,11 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 
 	function.(InternalSlotFields).SetFields(instanceFields)
 
-	for _, element := range staticElements {
+	for _, element := range staticClassFields {
 		function.DefineField(element)
+	}
+	for _, block := range staticStaticBlocks {
+		CallAssumeCallableNoArgs(block.BodyFunction.ToValue(), function.ToValue())
 	}
 
 	agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
@@ -829,6 +841,35 @@ func (vm *VM) InstantiateAsyncGeneratorFunctionExpression(functionExpression *Pr
 	}
 }
 
+func (vm *VM) ClassStaticBlockDefinitionEvaluation(classStaticBlock *ClassElementStaticBlock, homeObject ObjectType) *ClassStaticBlockDefinition {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	lex := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	sourceText := ""
+	formalParameters := &FormalParameters{}
+	var bodyFunction *ECMAScriptFunction
+	functionBody := &FunctionBody{
+		StatementList: classStaticBlock.StatementList,
+		Strict:        true,
+		Type:          FunctionTypeNormal,
+	}
+	bodyFunction = OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		formalParameters,
+		functionBody,
+		functionCreateThisModeNonLexical,
+		lex,
+		privateEnv,
+	)
+	MakeMethod(bodyFunction, homeObject)
+	return &ClassStaticBlockDefinition{
+		BodyFunction: bodyFunction,
+	}
+}
+
 func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, homeObject ObjectType) *ClassFieldDefinition {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
@@ -844,7 +885,7 @@ func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, h
 		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		var sourceText = ""
 		functionBody := &FunctionBody{
-			StatementList: &StatementList{
+			StatementList: StatementList{
 				&StatementListItemStatement{
 					Statement: &StatementReturn{
 						Expression: fieldDefinition.Initializer,

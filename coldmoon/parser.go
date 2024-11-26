@@ -245,7 +245,7 @@ func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 
 	list := p.statementList()
 	return &FunctionBody{
-		StatementList: &list,
+		StatementList: list,
 	}
 }
 
@@ -428,7 +428,7 @@ func (p *Parser) asyncArrowFunction() *PrimaryExpressionAsyncArrowFunction {
 		// prec: greater than ,
 		e := p.expression(p.acceptContext(TYield))
 		body = &FunctionBody{
-			StatementList: &StatementList{
+			StatementList: StatementList{
 				&StatementListItemStatement{
 					Statement: &StatementExpression{
 						Expression: e,
@@ -577,6 +577,13 @@ func (p *Parser) classElement() ClassElement {
 		p.tokenizer.Match(TSemicolon)
 	}()
 	if p.tokenizer.Match(TStatic) {
+		if p.tokenizer.Match(TLeftBrace) {
+			statementList := p.statementList()
+			p.tokenizer.MustMatch(TRightBrace)
+			return &ClassElementStaticBlock{
+				StatementList: statementList,
+			}
+		}
 		def, ok := p.methodDefinition(MethodDefinitionTypeNil)
 		if ok {
 			return &ClassElementStaticMethodDefinition{
@@ -1307,7 +1314,7 @@ func (p *Parser) tryArrowFunction() *PrimaryExpressionArrowFunction {
 	} else {
 		expression := p.expression(p.acceptContext(TComma))
 		body = &FunctionBody{
-			StatementList: &StatementList{
+			StatementList: StatementList{
 				&StatementReturn{
 					Expression: expression,
 				},

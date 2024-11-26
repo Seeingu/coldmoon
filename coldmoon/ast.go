@@ -2242,7 +2242,7 @@ const (
 
 type FunctionBody struct {
 	ASTNode
-	StatementList *StatementList
+	StatementList StatementList
 	Strict        bool
 	Type          FunctionType
 }
@@ -2974,7 +2974,7 @@ func (c *ClassElementList) String() string {
 	return sb
 }
 
-// MARK: - Class: ClassElementList
+// MARK: - Class: ClassElement
 
 type ClassElementKind int
 
@@ -2997,6 +2997,17 @@ func ClassElementIsStatic(c ClassElement) bool {
 	default:
 		return false
 	}
+}
+
+// MARK: - ClassElement: ClassStaticBlock
+
+type ClassElementStaticBlock struct {
+	ClassElement
+	StatementList StatementList
+}
+
+func (c *ClassElementStaticBlock) ClassElementKind() ClassElementKind {
+	return ClassElementKindNonConstructorMethod
 }
 
 // MARK: - ClassElement: FieldDefinition, StaticFieldDefinition
