@@ -81,6 +81,7 @@ const (
 	TFalse
 	TDebugger
 	TNull
+	TUndefined
 	TIf
 	TElse
 	TWhile
@@ -523,6 +524,7 @@ var keywordsMap = map[string]TokenType{
 	"true":       TTrue,
 	"false":      TFalse,
 	"null":       TNull,
+	"undefined":  TUndefined,
 	"debugger":   TDebugger,
 	"this":       TThis,
 	"break":      TBreak,

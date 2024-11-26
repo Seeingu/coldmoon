@@ -35,7 +35,11 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *ILoadConstant:
 		vm.stack.Push(ins.Value)
 	case *IStore:
-		vm.result = vm.stack.Pop()
+		if vm.stack.Len() > 0 {
+			vm.result = vm.stack.Pop()
+		} else {
+			vm.result = UndefinedValue
+		}
 	case *IStoreConstant:
 		vm.result = ins.Value
 	case *IResolveBinding:

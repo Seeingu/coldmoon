@@ -706,6 +706,19 @@ func (l *LiteralNull) String() string {
 	return "null"
 }
 
+type LiteralUndefined struct {
+	Literal
+}
+
+var _ Literal = (*LiteralUndefined)(nil)
+
+func (l *LiteralUndefined) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
+}
+func (l *LiteralUndefined) String() string {
+	return "undefined"
+}
+
 func (l *LiteralNull) Analyze(a AnalyzeQuery) bool {
 	return false
 }
@@ -1935,6 +1948,8 @@ func (v *VariableDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 	e.AddInstruction(InsPutValue)
 	e.AddInstruction(InsPopReference)
+
+	e.AddInstruction(InsStore)
 }
 
 func (v *VariableDeclaration) String() string {
@@ -2856,9 +2871,11 @@ type DeclarationClass struct {
 }
 
 func (d *DeclarationClass) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IBindingClassDeclarationEvaluation{
 		ClassDeclaration: d,
 	})
+	e.AddInstruction(InsStore)
 }
 func (d *DeclarationClass) String() string {
 	return "ClassDeclaration " + string(d.IdentifierName)

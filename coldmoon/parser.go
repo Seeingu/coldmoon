@@ -1554,12 +1554,14 @@ func (p *Parser) literal() Literal {
 		}
 	case TNull:
 		return &LiteralNull{}
+	case TUndefined:
+		return &LiteralUndefined{}
 	case TNumber:
 		return p.numericLiteral()
 	case TString:
 		return p.stringLiteral()
 	case TComment:
-		return &LiteralNull{}
+		return &LiteralUndefined{}
 	default:
 		panic("literal: unhandled token")
 	}
