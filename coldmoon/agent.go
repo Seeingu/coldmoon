@@ -16,13 +16,14 @@ type Agent struct {
 }
 
 type HostHooks struct {
-	HostEnsureCanCompileStrings func(realm *Realm)
-	HostHasSourceTextAvailable  func(o ObjectType) bool
-	HostMakeJobCallback         func(callback ObjectType) *JobCallback
-	HostCallJobCallback         func(callback *JobCallback, this Value, arguments []Value) Value
-	HostEnqueuePromiseJob       func(agent *Agent, job *Job, realm *Realm)
-	HostPromiseRejectionTracker func(promise *PromiseObject, operation PromiseRejectionTrackerOperation)
-	HostResizeArrayBuffer       func(buffer *ArrayBufferObject, newByteLength uint64) ResizeArrayBufferHandled
+	HostEnsureCanCompileStrings    func(realm *Realm)
+	HostHasSourceTextAvailable     func(o ObjectType) bool
+	HostMakeJobCallback            func(callback ObjectType) *JobCallback
+	HostCallJobCallback            func(callback *JobCallback, this Value, arguments []Value) Value
+	HostEnqueuePromiseJob          func(agent *Agent, job *Job, realm *Realm)
+	HostPromiseRejectionTracker    func(promise *PromiseObject, operation PromiseRejectionTrackerOperation)
+	HostResizeArrayBuffer          func(buffer *ArrayBufferObject, newByteLength uint64) ResizeArrayBufferHandled
+	HostEnsureCanAddPrivateElement func()
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]*SymbolValue{}
@@ -50,6 +51,9 @@ func NewAgent() *Agent {
 		HostEnqueuePromiseJob:       HostEnqueuePromiseJob,
 		HostPromiseRejectionTracker: HostPromiseRejectionTracker,
 		HostResizeArrayBuffer:       HostResizeArrayBuffer,
+		HostEnsureCanAddPrivateElement: func() {
+			// TODO
+		},
 	}
 	return a
 }

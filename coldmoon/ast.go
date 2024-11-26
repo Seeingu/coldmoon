@@ -339,6 +339,13 @@ type PrimaryExpressionObjectLiteral struct {
 	PropertyList *PropertyDefinitionList
 }
 
+func (p *PrimaryExpressionObjectLiteral) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (p *PrimaryExpressionObjectLiteral) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+
 func (p *PrimaryExpressionObjectLiteral) Bytecode(e *Executable, c *BytecodeContext) {
 	if len(p.PropertyList.Items) == 0 {
 		e.AddInstruction(&IObjectCreate{})
@@ -458,14 +465,14 @@ const (
 	MethodDefinitionTypeSet
 )
 
-type PropertyDefinitionMethodDefinition struct {
+type MethodDefinition struct {
 	PropertyDefinition
 	Type               MethodDefinitionType
 	PropertyName       PropertyName
 	FunctionExpression *PrimaryExpressionFunctionExpression
 }
 
-func (p *PropertyDefinitionMethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
+func (p *MethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.FunctionExpression.Body.FunctionBodyContainsUseStrict()
 	p.FunctionExpression.Body.Strict = strict
 	p.PropertyName.Bytecode(e, c)
@@ -476,6 +483,13 @@ func (p *PropertyDefinitionMethodDefinition) Bytecode(e *Executable, c *Bytecode
 	})
 }
 
+// MARK: - FieldDefinition
+
+type FieldDefinition struct {
+	PropertyName PropertyName
+	Initializer  Expression
+}
+
 // MARK: - PropertyName
 
 type PropertyName interface {
@@ -483,10 +497,15 @@ type PropertyName interface {
 }
 type PropertyNameLiteral interface {
 	PropertyName
+	LiteralString() string
 }
 type PropertyNameLiteralIdentifier struct {
 	PropertyNameLiteral
 	Identifier IdentifierName
+}
+
+func (p *PropertyNameLiteralIdentifier) LiteralString() string {
+	return string(p.Identifier)
 }
 
 func (p *PropertyNameLiteralIdentifier) String() string {
@@ -501,6 +520,9 @@ type PropertyNameLiteralString struct {
 	StringLiteral *LiteralString
 }
 
+func (p *PropertyNameLiteralString) LiteralString() string {
+	return p.StringLiteral.Value
+}
 func (p *PropertyNameLiteralString) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: p.StringLiteral.StringValue()})
 }
@@ -520,6 +542,9 @@ func (p *PropertyNameLiteralNumeric) Bytecode(e *Executable, c *BytecodeContext)
 
 func (p *PropertyNameLiteralNumeric) String() string {
 	return p.NumericLiteral.String()
+}
+func (p *PropertyNameLiteralNumeric) LiteralString() string {
+	return p.NumericLiteral.Value
 }
 
 type PropertyNameComputed struct {
@@ -2217,7 +2242,7 @@ const (
 
 type FunctionBody struct {
 	ASTNode
-	StatementList StatementList
+	StatementList *StatementList
 	Strict        bool
 	Type          FunctionType
 }
@@ -2891,7 +2916,7 @@ type ClassBody struct {
 	ClassElementList *ClassElementList
 }
 
-func (c *ClassBody) ConstructorMethod() *PropertyDefinitionMethodDefinition {
+func (c *ClassBody) ConstructorMethod() *MethodDefinition {
 	for _, item := range c.ClassElementList.Items {
 		if item.ClassElementKind() == ClassElementKindConstructorMethod {
 			return item.(*ClassElementMethodDefinition).MethodDefinition
@@ -2974,6 +2999,26 @@ func ClassElementIsStatic(c ClassElement) bool {
 	}
 }
 
+// MARK: - ClassElement: FieldDefinition, StaticFieldDefinition
+
+type ClassElementFieldDefinition struct {
+	ClassElement
+	FieldDefinition *FieldDefinition
+}
+
+func (c *ClassElementFieldDefinition) ClassElementKind() ClassElementKind {
+	return ClassElementKindNonConstructorMethod
+}
+
+type ClassElementStaticFieldDefinition struct {
+	ClassElement
+	FieldDefinition *FieldDefinition
+}
+
+func (c *ClassElementStaticFieldDefinition) ClassElementKind() ClassElementKind {
+	return ClassElementKindNonConstructorMethod
+}
+
 // MARK: - ClassElement: EmptyStatement
 
 type ClassElementEmpty struct {
@@ -2988,7 +3033,7 @@ func (c *ClassElementEmpty) ClassElementKind() ClassElementKind {
 
 type ClassElementStaticMethodDefinition struct {
 	ClassElement
-	MethodDefinition *PropertyDefinitionMethodDefinition
+	MethodDefinition *MethodDefinition
 }
 
 func (c *ClassElementStaticMethodDefinition) ClassElementKind() ClassElementKind {
@@ -2999,7 +3044,7 @@ func (c *ClassElementStaticMethodDefinition) ClassElementKind() ClassElementKind
 
 type ClassElementMethodDefinition struct {
 	ClassElement
-	MethodDefinition *PropertyDefinitionMethodDefinition
+	MethodDefinition *MethodDefinition
 }
 
 func (c *ClassElementMethodDefinition) ClassElementKind() ClassElementKind {

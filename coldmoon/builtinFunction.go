@@ -3,11 +3,26 @@ package coldmoon
 type BehaviorFn func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value
 type BuiltinFunction struct {
 	*Object
+	InternalSlotPrivateMethods
+	InternalSlotFields
 	Realm            *Realm
 	InitialName      string
 	Behavior         BehaviorFn
 	RevocableProxy   ObjectType
 	AdditionalFields *AdditionalFields
+}
+
+var _ InternalSlotPrivateMethods = (*BuiltinFunction)(nil)
+var _ InternalSlotFields = (*BuiltinFunction)(nil)
+
+func (b *BuiltinFunction) PrivateMethods() []*PrivateMethodDefinition {
+	return b.AdditionalFields.ClassConstructorFields.PrivateMethods
+}
+func (b *BuiltinFunction) Fields() []*ClassFieldDefinition {
+	return b.AdditionalFields.ClassConstructorFields.Fields
+}
+func (b *BuiltinFunction) SetFields(f []*ClassFieldDefinition) {
+	b.AdditionalFields.ClassConstructorFields.Fields = f
 }
 
 func (b *BuiltinFunction) ToObject() *Object {
@@ -110,4 +125,6 @@ func CreateBuiltinFunction(
 type ClassConstructorFields struct {
 	ConstructorKind ConstructorKind
 	SourceText      string
+	PrivateMethods  []*PrivateMethodDefinition
+	Fields          []*ClassFieldDefinition
 }

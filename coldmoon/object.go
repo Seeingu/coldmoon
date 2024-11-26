@@ -354,6 +354,49 @@ func (o *Object) CopyDataProperties(source Value, excludedItems []PropertyKey) {
 	}
 }
 
+func (o *Object) PrivateFieldAdd(privateName *PrivateName, value Value) {
+	// TODO
+}
+
+// MARK: - DefineField
+
+func (o *Object) DefineField(field *ClassFieldDefinition) {
+	fieldName := field.Name
+	var initializer Value = UndefinedValue
+	if field.Initializer != nil {
+		initializer = field.Initializer.ToValue()
+	}
+
+	switch name := fieldName.(type) {
+	case PropertyKey:
+		o.CreateDataPropertyOrThrow(name, initializer)
+	case *PrivateName:
+		o.PrivateFieldAdd(name, initializer)
+	default:
+		panic("unreachable")
+	}
+}
+
+// MARK: - InitializeInstanceElements
+
+func (o *Object) InitializeInstanceElements(constructor ObjectType) {
+	methods := constructor.(InternalSlotPrivateMethods).PrivateMethods()
+	for _, method := range methods {
+		o.PrivateMethodOrAccessorAdd(method.PrivateElement)
+	}
+
+	fields := constructor.(InternalSlotFields).Fields()
+	for _, field := range fields {
+		o.DefineField(field)
+	}
+}
+
+func (o *Object) PrivateMethodOrAccessorAdd(method *PrivateElement) {
+	Assert(method.Kind == PrivateElementKindMethod || method.Kind == PrivateElementKindAccessor)
+	o.Agent().HostHooks.HostEnsureCanAddPrivateElement()
+	// TODO
+}
+
 // MARK: - Object Constructor
 
 // 20.1.1

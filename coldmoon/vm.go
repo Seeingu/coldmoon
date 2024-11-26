@@ -496,10 +496,18 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 }
 
 // 15.7.3
-func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) {
+func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) (*ClassFieldDefinition, error) {
 	switch ce := classElement.(type) {
+	case *ClassElementFieldDefinition, *ClassElementStaticFieldDefinition:
+		var fieldDefinition *FieldDefinition
+		if c, ok := ce.(*ClassElementFieldDefinition); ok {
+			fieldDefinition = c.FieldDefinition
+		} else {
+			fieldDefinition = ce.(*ClassElementStaticFieldDefinition).FieldDefinition
+		}
+		return vm.ClassFieldDefinitionEvaluation(fieldDefinition, object), nil
 	case *ClassElementStaticMethodDefinition, *ClassElementMethodDefinition:
-		var methodDefinition *PropertyDefinitionMethodDefinition
+		var methodDefinition *MethodDefinition
 		if c, ok := ce.(*ClassElementStaticMethodDefinition); ok {
 			methodDefinition = c.MethodDefinition
 		} else {
@@ -511,10 +519,11 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 			FunctionExpression: methodDefinition.FunctionExpression,
 			MethodType:         methodDefinition.Type,
 		}, object, true)
+		return nil, nil
 	case *ClassElementEmpty:
-		return
+		return nil, nil
 	}
-
+	panic("unreachable")
 }
 
 // 15.7.14
@@ -621,23 +630,42 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 
 	DefineMethodProperty(proto, NewStringPropertyKey("constructor"), function, false)
 
-	for _, classElement := range classTail.ClassBody.ClassElementList.Items {
+	elements := classTail.ClassBody.ClassElementList.Items
+
+	instanceFields := make([]*ClassFieldDefinition, 0)
+
+	staticElements := make([]*ClassFieldDefinition, 0)
+
+	for _, classElement := range elements {
 		// TODO: assign to the result of evaluation
-		var element *CompletionValue = NewCompletionValueUndefined()
+		var element *ClassFieldDefinition
+		var err error
 		if ClassElementIsStatic(classElement) {
-			vm.ClassElementEvaluation(classElement, proto)
+			element, err = vm.ClassElementEvaluation(classElement, proto)
 		} else {
-			vm.ClassElementEvaluation(classElement, function)
+			element, err = vm.ClassElementEvaluation(classElement, function)
 		}
-		if element.IsAbrupt() {
+		if err != nil {
 			agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 			agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+		} else {
+			if !ClassElementIsStatic(classElement) {
+				instanceFields = append(instanceFields, element)
+			} else {
+				staticElements = append(staticElements, element)
+			}
 		}
 	}
 
 	agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 	if classBinding != "" {
 		classEnv.InitializeBinding(classBinding, function.ToValue())
+	}
+
+	function.(InternalSlotFields).SetFields(instanceFields)
+
+	for _, element := range staticElements {
+		function.DefineField(element)
 	}
 
 	agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
@@ -799,6 +827,53 @@ func (vm *VM) InstantiateAsyncGeneratorFunctionExpression(functionExpression *Pr
 			Configurable: false,
 		})
 		return closure
+	}
+}
+
+func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, homeObject ObjectType) *ClassFieldDefinition {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	var name PropertyKeyOrPrivateName
+	value := GenerateAndRunBytecode(agent, fieldDefinition.PropertyName)
+	name = ToPropertyKey(agent, value.Value)
+	var initializer ObjectType
+	if fieldDefinition.Initializer != nil {
+		formalParameterList := &FormalParameters{}
+		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		var sourceText = ""
+		functionBody := &FunctionBody{
+			StatementList: &StatementList{
+				&StatementListItemStatement{
+					Statement: &StatementReturn{
+						Expression: fieldDefinition.Initializer,
+					},
+				},
+			},
+			Strict: true,
+			Type:   FunctionTypeNormal,
+		}
+		initializer = OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			formalParameterList,
+			functionBody,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(initializer.(*ECMAScriptFunction), homeObject)
+		initializer.(InternalSlotClassFieldInitializerName).SetClassFieldInitializerName(name)
+	} else {
+		return &ClassFieldDefinition{
+			Name: name,
+		}
+	}
+
+	return &ClassFieldDefinition{
+		Name:        name,
+		Initializer: initializer.(*ECMAScriptFunction),
 	}
 }
 

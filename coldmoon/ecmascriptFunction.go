@@ -22,18 +22,44 @@ const (
 
 type ECMAScriptFunction struct {
 	*Object
-	Realm              *Realm
-	Environment        EnvironmentRecord
-	PrivateEnvironment *PrivateEnvironment
-	FormalParameters   *FormalParameters
-	ECMAScriptCode     *FunctionBody
-	ConstructorKind    ConstructorKind
-	ScriptOrModule     ScriptOrModule
-	ThisMode           ThisMode
-	Strict             bool
-	HomeObject         ObjectType
-	SourceText         string
-	IsClassConstructor bool
+	InternalSlotPrivateMethods
+	InternalSlotFields
+	InternalSlotClassFieldInitializerName
+	privateMethods            []*PrivateMethodDefinition
+	fields                    []*ClassFieldDefinition
+	classFieldInitializerName ClassFieldInitializerName
+	Realm                     *Realm
+	Environment               EnvironmentRecord
+	PrivateEnvironment        *PrivateEnvironment
+	FormalParameters          *FormalParameters
+	ECMAScriptCode            *FunctionBody
+	ConstructorKind           ConstructorKind
+	ScriptOrModule            ScriptOrModule
+	ThisMode                  ThisMode
+	Strict                    bool
+	HomeObject                ObjectType
+	SourceText                string
+	IsClassConstructor        bool
+}
+
+var _ InternalSlotPrivateMethods = (*ECMAScriptFunction)(nil)
+var _ InternalSlotFields = (*ECMAScriptFunction)(nil)
+var _ InternalSlotClassFieldInitializerName = (*ECMAScriptFunction)(nil)
+
+func (e *ECMAScriptFunction) PrivateMethods() []*PrivateMethodDefinition {
+	return e.privateMethods
+}
+func (e *ECMAScriptFunction) Fields() []*ClassFieldDefinition {
+	return e.fields
+}
+func (e *ECMAScriptFunction) SetFields(f []*ClassFieldDefinition) {
+	e.fields = f
+}
+func (e *ECMAScriptFunction) ClassFieldInitializerName() ClassFieldInitializerName {
+	return e.classFieldInitializerName
+}
+func (e *ECMAScriptFunction) SetClassFieldInitializerName(n ClassFieldInitializerName) {
+	e.classFieldInitializerName = n
 }
 
 // 7.3.24
@@ -353,6 +379,8 @@ func ECMAScriptFunctionConstruct(
 
 	if kind == ConstructorKindBase {
 		OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
+
+		MustGetObject(thisArgument).InitializeInstanceElements(function)
 	}
 
 	constructorEnv := calleeContext.ECMAScriptCode.LexicalEnvironment

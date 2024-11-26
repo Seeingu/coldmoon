@@ -5,6 +5,8 @@ type ObjectType interface {
 	LengthOfArrayLike() uint64
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
+	DefineField(field *ClassFieldDefinition)
+	InitializeInstanceElements(constructor ObjectType)
 	CreateDataProperty(key PropertyKey, value Value) bool
 	DeletePropertyOrThrow(key PropertyKey) bool
 	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool

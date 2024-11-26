@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"errors"
 	"fmt"
 	"github.com/samber/lo"
 )
@@ -244,7 +245,7 @@ func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 
 	list := p.statementList()
 	return &FunctionBody{
-		StatementList: list,
+		StatementList: &list,
 	}
 }
 
@@ -427,7 +428,7 @@ func (p *Parser) asyncArrowFunction() *PrimaryExpressionAsyncArrowFunction {
 		// prec: greater than ,
 		e := p.expression(p.acceptContext(TYield))
 		body = &FunctionBody{
-			StatementList: StatementList{
+			StatementList: &StatementList{
 				&StatementListItemStatement{
 					Statement: &StatementExpression{
 						Expression: e,
@@ -573,12 +574,44 @@ func (p *Parser) classBody() *ClassBody {
 }
 func (p *Parser) classElement() ClassElement {
 	if p.tokenizer.Match(TStatic) {
-		def := p.propertyDefinition(MethodDefinitionTypeNil)
-		return &ClassElementStaticMethodDefinition{
-			MethodDefinition: def.(*PropertyDefinitionMethodDefinition),
+		def, ok := p.methodDefinition(MethodDefinitionTypeNil)
+		if ok {
+			return &ClassElementStaticMethodDefinition{
+				MethodDefinition: def,
+			}
+		} else {
+			field := p.fieldDefinition()
+			return &ClassElementStaticFieldDefinition{
+				FieldDefinition: field,
+			}
+		}
+	} else {
+		def, ok := p.methodDefinition(MethodDefinitionTypeNil)
+		if ok {
+			return &ClassElementMethodDefinition{
+				MethodDefinition: def,
+			}
+		} else {
+			field := p.fieldDefinition()
+			return &ClassElementFieldDefinition{
+				FieldDefinition: field,
+			}
 		}
 	}
 	return &ClassElementEmpty{}
+}
+
+func (p *Parser) fieldDefinition() *FieldDefinition {
+	propertyName, ok := p.propertyName()
+	Assert(ok)
+	var initializer Expression
+	if p.tokenizer.Match(TEquals) {
+		initializer = p.expression(p.acceptContextLowest())
+	}
+	return &FieldDefinition{
+		PropertyName: propertyName,
+		Initializer:  initializer,
+	}
 }
 
 func (p *Parser) lexicalDeclaration() *DeclarationLexical {
@@ -1271,7 +1304,7 @@ func (p *Parser) tryArrowFunction() *PrimaryExpressionArrowFunction {
 	} else {
 		expression := p.expression(p.acceptContext(TComma))
 		body = &FunctionBody{
-			StatementList: StatementList{
+			StatementList: &StatementList{
 				&StatementReturn{
 					Expression: expression,
 				},
@@ -1416,7 +1449,7 @@ func (p *Parser) propertyDefinitionList() *PropertyDefinitionList {
 			p.tokenizer.Next()
 			continue
 		}
-		prop := p.propertyDefinition(MethodDefinitionTypeNil)
+		prop := p.propertyDefinition()
 		list = append(list, prop)
 		if p.tokenizer.CurrentToken.Type == TComma {
 			p.tokenizer.Next()
@@ -1427,36 +1460,12 @@ func (p *Parser) propertyDefinitionList() *PropertyDefinitionList {
 	}
 }
 
-func (p *Parser) propertyDefinition(methodType MethodDefinitionType) PropertyDefinition {
-	t := p.tokenizer.CurrentToken
+func (p *Parser) propertyName() (PropertyName, bool) {
 	var propertyName PropertyName
-
-	// Prec: TComma + 1
-	accept := p.acceptContext(TYield)
+	t := p.tokenizer.CurrentToken
 	switch t.Type {
-	case TDotDotDot:
-		p.tokenizer.Next()
-		expr := p.expression(accept)
-		return &PropertyDefinitionSpread{
-			Spread: expr,
-		}
 	case TIdentifier:
 		identifierRef := p.identifierReference()
-		if methodType == MethodDefinitionTypeNil {
-			isGet := identifierRef.Identifier == "get"
-			isSet := identifierRef.Identifier == "set"
-			if isGet {
-				return p.propertyDefinition(MethodDefinitionTypeGet)
-			}
-			if isSet {
-				return p.propertyDefinition(MethodDefinitionTypeSet)
-			}
-		}
-		if p.tokenizer.CurrentToken.Type != TColon && p.tokenizer.CurrentToken.Type != TLeftParen {
-			return &PropertyDefinitionIdentifierReference{
-				IdentifierReference: identifierRef,
-			}
-		}
 		propertyName = &PropertyNameLiteralIdentifier{
 			Identifier: identifierRef.Identifier,
 		}
@@ -1478,38 +1487,99 @@ func (p *Parser) propertyDefinition(methodType MethodDefinitionType) PropertyDef
 		}
 		p.tokenizer.MustMatch(TRightBracket)
 	default:
-		panic("propertyDefinition: unexpected token")
+		return nil, false
 	}
+	return propertyName, true
+}
+
+func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefinition, bool) {
+	var err error
+	defer func() {
+		if r := recover(); r != nil {
+			msg := "recovered in methodDefinition"
+			fmt.Println(msg)
+			p.tokenizer.restore()
+			err = errors.New(msg)
+		}
+	}()
+	if err != nil {
+		return nil, false
+	}
+	propertyName, ok := p.propertyName()
+	if methodType == MethodDefinitionTypeNil && ok {
+		literal, ok := propertyName.(PropertyNameLiteral)
+		if ok {
+			isGet := literal.LiteralString() == "get"
+			isSet := literal.LiteralString() == "set"
+			if isGet {
+				return p.methodDefinition(MethodDefinitionTypeGet)
+			}
+			if isSet {
+				return p.methodDefinition(MethodDefinitionTypeSet)
+			}
+		}
+	}
+	p.tokenizer.Match(TLeftParen)
+	start := p.tokenizer.Index
+	formalParameters := p.formalParameters()
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	body := p.functionBody(FunctionTypeNormal)
+	p.tokenizer.MustMatch(TRightBrace)
+	sourceText := p.SourceText[start:p.tokenizer.Index]
+	var m = MethodDefinitionTypeMethod
+	if methodType != MethodDefinitionTypeNil {
+		m = methodType
+	}
+	return &MethodDefinition{
+		Type:         m,
+		PropertyName: propertyName,
+		FunctionExpression: &PrimaryExpressionFunctionExpression{
+			Identifier:       "",
+			FormalParameters: formalParameters,
+			SourceText:       sourceText,
+			Body:             body,
+		},
+	}, true
+}
+
+func (p *Parser) propertyDefinition() PropertyDefinition {
+	t := p.tokenizer.CurrentToken
+	var propertyName PropertyName
+	p.tokenizer.store()
+
+	// Prec: TComma + 1
+	accept := p.acceptContext(TYield)
+	switch t.Type {
+	case TDotDotDot:
+		p.tokenizer.Next()
+		expr := p.expression(accept)
+		return &PropertyDefinitionSpread{
+			Spread: expr,
+		}
+	case TIdentifier:
+		method, ok := p.methodDefinition(MethodDefinitionTypeNil)
+		if ok {
+			return method
+		}
+	}
+	propertyName, ok := p.propertyName()
+	Assert(ok)
+
 	if p.tokenizer.Match(TColon) {
 		value := p.expression(accept)
 		return &PropertyDefinitionNameAndExpression{
 			Name:       propertyName,
 			Expression: value,
 		}
-	} else if p.tokenizer.Match(TLeftParen) {
-		start := p.tokenizer.Index
-		formalParameters := p.formalParameters()
-		p.tokenizer.MustMatch(TRightParen)
-		p.tokenizer.MustMatch(TLeftBrace)
-		body := p.functionBody(FunctionTypeNormal)
-		p.tokenizer.MustMatch(TRightBrace)
-		sourceText := p.SourceText[start:p.tokenizer.Index]
-		var m = MethodDefinitionTypeMethod
-		if methodType != MethodDefinitionTypeNil {
-			m = methodType
-		}
-		return &PropertyDefinitionMethodDefinition{
-			Type:         m,
-			PropertyName: propertyName,
-			FunctionExpression: &PrimaryExpressionFunctionExpression{
-				Identifier:       "",
-				FormalParameters: formalParameters,
-				SourceText:       sourceText,
-				Body:             body,
+	} else {
+		identifier, ok := propertyName.(*PropertyNameLiteralIdentifier)
+		Assert(ok)
+		return &PropertyDefinitionIdentifierReference{
+			IdentifierReference: &PrimaryExpressionIdentifierReference{
+				Identifier: identifier.Identifier,
 			},
 		}
-	} else {
-		panic("propertyDefinition: expected colon or left paren")
 	}
 }
 
