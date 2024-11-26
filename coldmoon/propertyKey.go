@@ -5,6 +5,7 @@ import (
 )
 
 type PropertyKey interface {
+	PropertyKeyOrPrivateName
 	Hash() string
 	ToValue() Value
 }

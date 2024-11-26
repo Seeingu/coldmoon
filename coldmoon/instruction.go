@@ -553,6 +553,15 @@ func (i *IBindingClassDeclarationEvaluation) String() string {
 	return "IBindingClassDeclarationEvaluation"
 }
 
+type IClassDefinitionEvaluation struct {
+	Instruction
+	ClassExpression *PrimaryExpressionClassExpression
+}
+
+func (i *IClassDefinitionEvaluation) String() string {
+	return "IClassDefinitionEvaluation"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

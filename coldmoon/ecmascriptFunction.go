@@ -489,10 +489,6 @@ func MakeMethod(F *ECMAScriptFunction, homeObject ObjectType) {
 
 type PropertyKeyOrPrivateName interface {
 }
-type PropertyKeyOrPrivateNameKey struct {
-	PropertyKeyOrPrivateName
-	PropertyKey PropertyKey
-}
 type PropertyKeyOrPrivateNameName struct {
 	PropertyKeyOrPrivateName
 	PrivateName PrivateName
@@ -508,14 +504,14 @@ func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, c
 			Kind:  PrivateElementKindMethod,
 			Value: NewValueFromObject(closure),
 		}
-	case PropertyKeyOrPrivateNameKey:
+	case PropertyKey:
 		desc := &PropertyDescriptor{
 			Value:        NewValueFromObject(closure),
 			Writable:     true,
 			Enumerable:   enumerable,
 			Configurable: true,
 		}
-		homeObject.DefinePropertyOrThrow(k.PropertyKey, desc)
+		homeObject.DefinePropertyOrThrow(k, desc)
 		// unused
 		return nil
 	}

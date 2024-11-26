@@ -39,7 +39,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IStoreConstant:
 		vm.result = ins.Value
 	case *IResolveBinding:
-		// TODO: maybe ins.Name can pass to ResolveBinding directly
+		// TODO: maybe ins.IdentifierName can pass to ResolveBinding directly
 		vm.reference = vm.agent.ResolveBinding(string(ins.Name), nil, ins.Strict)
 	case *ICall:
 		argumentCount := ins.ArgumentCount
@@ -458,6 +458,30 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IBindingClassDeclarationEvaluation:
 		classDeclaration := ins.ClassDeclaration
 		vm.result = vm.BindingClassDeclarationEvaluation(classDeclaration).ToValue()
+	case *IClassDefinitionEvaluation:
+		classExpression := ins.ClassExpression
+		if classExpression.IdentifierName != "" {
+			className := string(classExpression.IdentifierName)
+			value := vm.ClassDefinitionEvaluation(classExpression.ClassTail, className, className)
+			if f, ok := value.(*ECMAScriptFunction); ok {
+				f.SourceText = classExpression.SourceText
+			} else if b, ok := value.(*BuiltinFunction); ok {
+				b.AdditionalFields.ClassConstructorFields.SourceText = classExpression.SourceText
+			} else {
+				panic("unreachable")
+			}
+			vm.result = value.ToValue()
+		} else {
+			value := vm.ClassDefinitionEvaluation(classExpression.ClassTail, "", "")
+			if f, ok := value.(*ECMAScriptFunction); ok {
+				f.SourceText = classExpression.SourceText
+			} else if b, ok := value.(*BuiltinFunction); ok {
+				b.AdditionalFields.ClassConstructorFields.SourceText = classExpression.SourceText
+			} else {
+				panic("unreachable")
+			}
+			vm.result = value.ToValue()
+		}
 	}
 }
 

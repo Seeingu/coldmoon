@@ -45,6 +45,12 @@ func testSource(t *testing.T, s string) {
 
 func TestBaseline(t *testing.T) {
 	sourceText := `
+class A {}
+const B = class {}
+`
+	testSource(t, sourceText)
+
+	sourceText = `
 function a() {
 }
 function* b() {

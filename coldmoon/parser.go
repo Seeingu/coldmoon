@@ -252,7 +252,7 @@ func (p *Parser) statementListItem() StatementListItem {
 	t := p.tokenizer.CurrentToken
 	var stmt Statement
 	switch t.Type {
-	case TAsync, TFunction, TLet, TConst:
+	case TAsync, TFunction, TLet, TConst, TClass:
 		d := p.declaration()
 		stmt = &StatementListItemDeclaration{
 			Declaration: d,
@@ -1348,6 +1348,8 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		return p.asyncFunctionExpression()
 	case TRegularExpression:
 		return p.regularExpressionLiteral()
+	case TClass:
+		return p.classExpression()
 	default:
 		literal := p.literal()
 
@@ -1356,6 +1358,22 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 				Literal: literal,
 			},
 		}
+	}
+}
+
+func (p *Parser) classExpression() *PrimaryExpressionClassExpression {
+	startIndex := p.tokenizer.Index
+	p.tokenizer.MustMatch(TClass)
+	var identifier IdentifierName
+	if p.tokenizer.Match(TIdentifier) {
+		identifier = p.bindingIdentifier()
+	}
+	classTail := p.classTail()
+	sourceText := p.SourceText[startIndex:p.tokenizer.Index]
+	return &PrimaryExpressionClassExpression{
+		IdentifierName: identifier,
+		ClassTail:      classTail,
+		SourceText:     sourceText,
 	}
 }
 

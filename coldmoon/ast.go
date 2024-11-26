@@ -28,6 +28,28 @@ type PrimaryExpression interface {
 	AssignmentTargetType() AssignmentTargetType
 }
 
+// MARK: - ClassExpression
+
+type PrimaryExpressionClassExpression struct {
+	PrimaryExpression
+	IdentifierName IdentifierName
+	ClassTail      *ClassTail
+	SourceText     string
+}
+
+func (p *PrimaryExpressionClassExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (p *PrimaryExpressionClassExpression) Analyze(a AnalyzeQuery) bool {
+	return false
+}
+func (p *PrimaryExpressionClassExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IClassDefinitionEvaluation{ClassExpression: p})
+}
+func (p *PrimaryExpressionClassExpression) String() string {
+	return "ClassExpression"
+}
+
 // MARK: - RegularExpressionLiteral
 
 type PrimaryExpressionRegularExpressionLiteral struct {
