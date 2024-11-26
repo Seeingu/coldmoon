@@ -124,6 +124,10 @@ func (g *GlobalEnvironment) HasThisBinding() bool {
 	return true
 }
 
+func (g *GlobalEnvironment) HasSuperBinding() bool {
+	return false
+}
+
 // 9.1.1.4.10
 func (g *GlobalEnvironment) WithBaseObject() ObjectType {
 	return nil

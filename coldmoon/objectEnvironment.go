@@ -94,6 +94,10 @@ func (o *ObjectEnvironment) HasThisBinding() bool {
 	return false
 }
 
+func (o *ObjectEnvironment) HasSuperBinding() bool {
+	return false
+}
+
 // 9.1.1.2.10
 func (o *ObjectEnvironment) WithBaseObject() ObjectType {
 	if o.IsWithEnvironment {

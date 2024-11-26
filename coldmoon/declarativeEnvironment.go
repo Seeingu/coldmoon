@@ -55,6 +55,10 @@ func (d *DeclarativeEnvironment) HasBinding(name string) bool {
 	return ok
 }
 
+func (d *DeclarativeEnvironment) HasSuperBinding() bool {
+	return false
+}
+
 // 9.1.1.1.10
 func (d *DeclarativeEnvironment) WithBaseObject() ObjectType {
 	return nil

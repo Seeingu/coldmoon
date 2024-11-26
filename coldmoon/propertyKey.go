@@ -55,5 +55,5 @@ func (i IntegerIndexPropertyKey) Hash() string {
 }
 
 func (i IntegerIndexPropertyKey) ToValue() Value {
-	return NewNumberValue(float64(i.Value))
+	return NewStringValue(fmt.Sprintf("%d", i.Value))
 }
