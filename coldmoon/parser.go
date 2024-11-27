@@ -12,6 +12,7 @@ type Parser struct {
 	inFunctionBody          bool
 	inClassBody             bool
 	inMethodDefinition      bool
+	inClassConstructor      bool
 	callExpressionForbidden bool
 	ctx                     ParserContext
 }
@@ -919,6 +920,21 @@ func (p *Parser) expressionStatement() *StatementExpression {
 	}
 }
 
+func (p *Parser) superCall() (*ExpressionSuperCall, bool) {
+	t := p.tokenizer.CurrentToken
+	if t.Type != TSuper {
+		return nil, false
+	}
+	p.tokenizer.Next()
+	args := p.arguments()
+	if !p.inClassConstructor {
+		panic("superCall: not in class constructor")
+	}
+	return &ExpressionSuperCall{
+		Arguments: args,
+	}, true
+}
+
 func (p *Parser) newExpression() (*ExpressionNewExpression, bool) {
 	t := p.tokenizer.CurrentToken
 
@@ -1036,6 +1052,9 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 		return update
 	}
 	if super, ok := p.superProperty(); ok {
+		return super
+	}
+	if super, ok := p.superCall(); ok {
 		return super
 	}
 	if newExpression, ok := p.newExpression(); ok {
@@ -1530,9 +1549,12 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefin
 	var err error
 	p.tokenizer.store()
 	inMethodDefinition := p.inMethodDefinition
+	inClassConstructor := p.inClassConstructor
 	p.inMethodDefinition = true
+	p.inClassConstructor = true
 	defer func() {
 		p.inMethodDefinition = inMethodDefinition
+		p.inClassConstructor = inClassConstructor
 	}()
 	defer func() {
 		if r := recover(); r != nil {

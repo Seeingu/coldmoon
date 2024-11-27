@@ -512,7 +512,33 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			}
 			vm.result = value.ToValue()
 		}
+	case *IEvaluateSuperCall:
+		argumentCount := ins.ArgumentCount
+		newTarget := agent.GetNewTarget()
+		fun := vm.getSuperConstructor()
+		arguments := make([]Value, argumentCount)
+		for i := argumentCount - 1; i >= 0; i-- {
+			arguments[i] = vm.stack.Pop()
+		}
+		if !IsConstructor(fun) {
+			panic("TypeError: fun is not a constructor")
+		}
+		result := MustGetObject(fun).Construct(arguments, newTarget)
+		thisER := agent.GetThisEnvironment()
+		thisER.(*FunctionEnvironment).BindThisValue(result.ToValue())
+		F := thisER.(*FunctionEnvironment).FunctionObject
+		result.InitializeInstanceElements(F)
+		vm.result = result.ToValue()
 	}
+}
+
+func (vm *VM) getSuperConstructor() Value {
+	agent := vm.agent
+	envRec := agent.GetThisEnvironment()
+	funEnv := envRec.(*FunctionEnvironment)
+	activeFunction := funEnv.FunctionObject
+	superConstructor := activeFunction.InternalMethods().GetPrototypeOf(activeFunction)
+	return superConstructor.ToValue()
 }
 
 // 15.7.3

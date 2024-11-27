@@ -910,6 +910,23 @@ func (s *SuperPropertyIdentifier) String() string {
 	return "super." + string(s.IdentifierName)
 }
 
+// MARK: - SuperCall
+
+type ExpressionSuperCall struct {
+	Expression
+	Arguments Arguments
+}
+
+func (e *ExpressionSuperCall) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (e *ExpressionSuperCall) Bytecode(ex *Executable, c *BytecodeContext) {
+	e.Arguments.Bytecode(ex, c)
+	ex.AddInstruction(&IEvaluateSuperCall{
+		ArgumentCount: len(e.Arguments),
+	})
+}
+
 // MARK: - PrimaryExpression
 
 type ExpressionPrimary struct {
@@ -1830,6 +1847,16 @@ func (u *UnaryExpression) String() string {
 // MARK: - CallExpression
 
 type Arguments []Expression
+
+func (a Arguments) Bytecode(e *Executable, c *BytecodeContext) {
+	for _, arg := range a {
+		arg.Bytecode(e, c)
+		if ExpressionAnalyze(arg, AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		e.AddInstruction(InsLoad)
+	}
+}
 
 type CallExpression struct {
 	Expression

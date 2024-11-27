@@ -577,6 +577,19 @@ type IMakeSuperPropertyReference struct {
 	Strict bool
 }
 
+func (i *IMakeSuperPropertyReference) String() string {
+	return "IMakeSuperPropertyReference"
+}
+
+type IEvaluateSuperCall struct {
+	Instruction
+	ArgumentCount int
+}
+
+func (i *IEvaluateSuperCall) String() string {
+	return "IEvaluateSuperCall"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
