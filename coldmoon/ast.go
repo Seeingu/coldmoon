@@ -427,23 +427,35 @@ const (
 	MethodDefinitionTypeMethod
 	MethodDefinitionTypeGet
 	MethodDefinitionTypeSet
+	MethodDefinitionTypeGenerator
+	MethodDefinitionTypeAsync
+	MethodDefinitionTypeAsyncGenerator
 )
 
 type MethodDefinition struct {
 	PropertyDefinition
-	Type               MethodDefinitionType
-	PropertyName       PropertyName
-	FunctionExpression *PrimaryExpressionFunctionExpression
+	Type                     MethodDefinitionType
+	PropertyName             PropertyName
+	FunctionExpression       *PrimaryExpressionFunctionExpression
+	GeneratorExpression      *PrimaryExpressionGeneratorExpression
+	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
+	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
 }
 
 func (p *MethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
-	strict := c.containedInStrictCode || p.FunctionExpression.Body.FunctionBodyContainsUseStrict()
-	p.FunctionExpression.Body.Strict = strict
+	strict := c.containedInStrictCode
+	if p.FunctionExpression != nil {
+		strict = strict || p.FunctionExpression.Body.FunctionBodyContainsUseStrict()
+		p.FunctionExpression.Body.Strict = strict
+	}
 	p.PropertyName.Bytecode(e, c)
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IObjectDefineMethod{
-		FunctionExpression: p.FunctionExpression,
-		MethodType:         p.Type,
+		FunctionExpression:       p.FunctionExpression,
+		MethodType:               p.Type,
+		GeneratorExpression:      p.GeneratorExpression,
+		AsyncFunctionExpression:  p.AsyncFunctionExpression,
+		AsyncGeneratorExpression: p.AsyncGeneratorExpression,
 	})
 }
 

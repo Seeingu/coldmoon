@@ -447,9 +447,12 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		propertyName := vm.stack.Pop()
 		object := MustGetObject(vm.stack.Pop())
 		vm.MethodDefinitionEvaluation(methodDefinitionArgs{
-			PropertyName:       propertyName,
-			MethodType:         MethodDefinitionTypeMethod,
-			FunctionExpression: ins.FunctionExpression,
+			PropertyName:             propertyName,
+			MethodType:               MethodDefinitionTypeMethod,
+			FunctionExpression:       ins.FunctionExpression,
+			GeneratorExpression:      ins.GeneratorExpression,
+			AsyncFunctionExpression:  ins.AsyncFunctionExpression,
+			AsyncGeneratorExpression: ins.AsyncGeneratorExpression,
 		}, object, true)
 	case *IObjectSpreadValue:
 		fromValue := vm.stack.Pop()
@@ -1026,14 +1029,18 @@ func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *Primary
 }
 
 type methodDefinitionArgs struct {
-	PropertyName       Value
-	MethodType         MethodDefinitionType
-	FunctionExpression *PrimaryExpressionFunctionExpression
+	PropertyName             Value
+	MethodType               MethodDefinitionType
+	FunctionExpression       *PrimaryExpressionFunctionExpression
+	GeneratorExpression      *PrimaryExpressionGeneratorExpression
+	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
+	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
 }
 
 // 15.4.5
 func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, object ObjectType, enumerable bool) *PrivateElement {
 	agent := vm.agent
+	realm := agent.CurrentRealm()
 	functionExpression := methodDefinition.FunctionExpression
 	methodType := methodDefinition.MethodType
 	propertyName := vm.stack.Pop()
@@ -1117,6 +1124,79 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 			object.DefinePropertyOrThrow(propKey, desc)
 			return nil
 		}
+	case MethodDefinitionTypeGenerator:
+		propKey := ToPropertyKey(vm.agent, propertyName)
+		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		generatorExpression := methodDefinition.GeneratorExpression
+		sourceText := generatorExpression.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.GeneratorFunctionPrototype,
+			sourceText,
+			generatorExpression.FormalParameters,
+			generatorExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+
+		MakeMethod(closure, object)
+		SetFunctionName(closure, propKey, "")
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        NewValueFromObject(prototype),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+		DefineMethodProperty(object, propKey, closure, enumerable)
+	case MethodDefinitionTypeAsync:
+		a := methodDefinition.AsyncFunctionExpression
+		propKey := ToPropertyKey(vm.agent, propertyName)
+		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := a.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.AsyncFunctionPrototype,
+			sourceText,
+			a.FormalParameters,
+			a.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(closure, object)
+		SetFunctionName(closure, propKey, "")
+		DefineMethodProperty(object, propKey, closure, enumerable)
+	case MethodDefinitionTypeAsyncGenerator:
+		a := methodDefinition.AsyncGeneratorExpression
+		propKey := ToPropertyKey(vm.agent, propertyName)
+		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := a.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.AsyncGeneratorFunctionPrototype,
+			sourceText,
+			a.FormalParameters,
+			a.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(closure, object)
+		SetFunctionName(closure, propKey, "")
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        NewValueFromObject(prototype),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+		DefineMethodProperty(object, propKey, closure, enumerable)
 	}
 	panic("unreachable")
 }

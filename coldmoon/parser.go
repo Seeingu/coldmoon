@@ -1567,12 +1567,23 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefin
 	if err != nil {
 		return nil, false
 	}
+	if methodType == MethodDefinitionTypeNil {
+		if p.tokenizer.Match(TStar) {
+			return p.methodDefinition(MethodDefinitionTypeGenerator)
+		}
+	}
 	propertyName, ok := p.propertyName()
 	if methodType == MethodDefinitionTypeNil && ok {
 		literal, ok := propertyName.(PropertyNameLiteral)
 		if ok {
 			isGet := literal.LiteralString() == "get"
 			isSet := literal.LiteralString() == "set"
+			if literal.LiteralString() == "async" {
+				if p.tokenizer.CurrentToken.Type == TStar {
+					return p.methodDefinition(MethodDefinitionTypeAsyncGenerator)
+				}
+				return p.methodDefinition(MethodDefinitionTypeAsync)
+			}
 			if isGet {
 				return p.methodDefinition(MethodDefinitionTypeGet)
 			}
@@ -1593,15 +1604,49 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefin
 	if methodType != MethodDefinitionTypeNil {
 		m = methodType
 	}
-	return &MethodDefinition{
-		Type:         m,
-		PropertyName: propertyName,
-		FunctionExpression: &PrimaryExpressionFunctionExpression{
+	var funExpression *PrimaryExpressionFunctionExpression
+	if m == MethodDefinitionTypeMethod {
+		funExpression = &PrimaryExpressionFunctionExpression{
 			Identifier:       "",
 			FormalParameters: formalParameters,
 			SourceText:       sourceText,
 			Body:             body,
-		},
+		}
+	}
+	var genExpression *PrimaryExpressionGeneratorExpression
+	if m == MethodDefinitionTypeGenerator {
+		genExpression = &PrimaryExpressionGeneratorExpression{
+			IdentifierName:   "",
+			FormalParameters: formalParameters,
+			SourceText:       sourceText,
+			Body:             body,
+		}
+	}
+	var asyncExpression *PrimaryExpressionAsyncFunctionExpression
+	if m == MethodDefinitionTypeAsync {
+		asyncExpression = &PrimaryExpressionAsyncFunctionExpression{
+			Identifier:       "",
+			FormalParameters: formalParameters,
+			SourceText:       sourceText,
+			Body:             body,
+		}
+	}
+	var asyncGenerator *PrimaryExpressionAsyncGeneratorExpression
+	if m == MethodDefinitionTypeAsyncGenerator {
+		asyncGenerator = &PrimaryExpressionAsyncGeneratorExpression{
+			IdentifierName:   "",
+			FormalParameters: formalParameters,
+			SourceText:       sourceText,
+			Body:             body,
+		}
+	}
+	return &MethodDefinition{
+		Type:                     m,
+		PropertyName:             propertyName,
+		FunctionExpression:       funExpression,
+		GeneratorExpression:      genExpression,
+		AsyncFunctionExpression:  asyncExpression,
+		AsyncGeneratorExpression: asyncGenerator,
 	}, true
 }
 

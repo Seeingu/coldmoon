@@ -380,6 +380,9 @@ func RejectPromise(agent *Agent, promise *PromiseObject, reason Value) {
 	reactions := promise.PromiseRejectReactions
 	promise.PromiseState = PromiseStateRejected
 	promise.PromiseResult = reason
+	if !promise.PromiseIsHandled {
+		agent.HostHooks.HostPromiseRejectionTracker(promise, PromiseRejectionTrackerOperationReject)
+	}
 	TriggerPromiseReactions(agent, reactions, reason)
 }
 

@@ -337,8 +337,11 @@ func (i *IObjectSetProperty) String() string {
 
 type IObjectDefineMethod struct {
 	Instruction
-	MethodType         MethodDefinitionType
-	FunctionExpression *PrimaryExpressionFunctionExpression
+	MethodType               MethodDefinitionType
+	FunctionExpression       *PrimaryExpressionFunctionExpression
+	GeneratorExpression      *PrimaryExpressionGeneratorExpression
+	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
+	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
 }
 
 func (i *IObjectDefineMethod) String() string {
