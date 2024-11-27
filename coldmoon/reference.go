@@ -17,6 +17,7 @@ type ReferenceRecordBaseUnresolvable struct {
 }
 
 type ReferencedName interface {
+	_isRefName()
 }
 
 type ReferencedNameString struct {
@@ -24,14 +25,20 @@ type ReferencedNameString struct {
 	String string
 }
 
+func (r *ReferencedNameString) _isRefName() {}
+
 type ReferencedNameSymbol struct {
 	ReferencedName
 	Symbol *SymbolValue
 }
 
+func (r *ReferencedNameSymbol) _isRefName() {}
+
 type ReferencedNamePrivateName struct {
 	ReferencedName
 }
+
+func (r *ReferencedNamePrivateName) _isRefName() {}
 
 type ReferenceRecord struct {
 	Base           ReferenceRecordBase

@@ -10,6 +10,8 @@ type Parser struct {
 	SourceText              string
 	tokenizer               *Tokenizer
 	inFunctionBody          bool
+	inClassBody             bool
+	inMethodDefinition      bool
 	callExpressionForbidden bool
 	ctx                     ParserContext
 }
@@ -249,9 +251,8 @@ func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 	}
 }
 
-func (p *Parser) statementListItem() StatementListItem {
+func (p *Parser) statementListItem() (stmt StatementListItem) {
 	t := p.tokenizer.CurrentToken
-	var stmt Statement
 	switch t.Type {
 	case TAsync, TFunction, TLet, TConst, TClass:
 		d := p.declaration()
@@ -560,6 +561,11 @@ func (p *Parser) classTail() *ClassTail {
 
 func (p *Parser) classBody() *ClassBody {
 	var items []ClassElement
+	inClassBody := p.inClassBody
+	p.inClassBody = true
+	defer func() {
+		p.inClassBody = inClassBody
+	}()
 	for {
 		if p.tokenizer.CurrentToken.Type == TRightBrace {
 			break
@@ -1020,20 +1026,19 @@ func (p *Parser) updateExpression(primaryExpression Expression) (*ExpressionUpda
 }
 
 func (p *Parser) expression(accept *acceptContext) Expression {
-	unary, ok := p.tryUnaryExpression()
-	if ok {
+	if unary, ok := p.tryUnaryExpression(); ok {
 		return unary
 	}
-	meta, ok := p.metaProperty()
-	if ok {
+	if meta, ok := p.metaProperty(); ok {
 		return meta
 	}
-	update, ok := p.updateExpression(nil)
-	if ok {
+	if update, ok := p.updateExpression(nil); ok {
 		return update
 	}
-	newExpression, ok := p.newExpression()
-	if ok {
+	if super, ok := p.superProperty(); ok {
+		return super
+	}
+	if newExpression, ok := p.newExpression(); ok {
 		return newExpression
 	}
 
@@ -1057,7 +1062,7 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 	}
 }
 
-func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptContext) Expression {
+func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Expression {
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
 	case TLeftParen:
@@ -1123,7 +1128,7 @@ func (p *Parser) secondaryExpression(left PrimaryExpression, accept *acceptConte
 	return left
 }
 
-func (p *Parser) assignmentExpression(left PrimaryExpression, accept *acceptContext) *ExpressionAssignmentExpression {
+func (p *Parser) assignmentExpression(left Expression, accept *acceptContext) *ExpressionAssignmentExpression {
 	t := p.tokenizer.CurrentToken
 	p.tokenizer.Next()
 	right := p.expression(accept)
@@ -1134,7 +1139,7 @@ func (p *Parser) assignmentExpression(left PrimaryExpression, accept *acceptCont
 	}
 }
 
-func (p *Parser) binaryExpression(left PrimaryExpression, accept *acceptContext) *ExpressionBinaryExpression {
+func (p *Parser) binaryExpression(left Expression, accept *acceptContext) *ExpressionBinaryExpression {
 	t := p.tokenizer.CurrentToken
 	p.tokenizer.Next()
 	right := p.expression(accept)
@@ -1145,7 +1150,7 @@ func (p *Parser) binaryExpression(left PrimaryExpression, accept *acceptContext)
 	}
 }
 
-func (p *Parser) sequenceExpression(left PrimaryExpression) *ExpressionSequenceExpression {
+func (p *Parser) sequenceExpression(left Expression) *ExpressionSequenceExpression {
 	list := []Expression{left}
 	for {
 		t := p.tokenizer.CurrentToken
@@ -1162,7 +1167,7 @@ func (p *Parser) sequenceExpression(left PrimaryExpression) *ExpressionSequenceE
 	}
 }
 
-func (p *Parser) conditionalExpression(left PrimaryExpression, accept *acceptContext) *ExpressionConditionalExpression {
+func (p *Parser) conditionalExpression(left Expression, accept *acceptContext) *ExpressionConditionalExpression {
 	p.tokenizer.MustMatch(TQuestion)
 	consequent := p.expression(accept)
 	p.tokenizer.MustMatch(TColon)
@@ -1174,7 +1179,7 @@ func (p *Parser) conditionalExpression(left PrimaryExpression, accept *acceptCon
 	}
 }
 
-func (p *Parser) logicalExpression(left PrimaryExpression, accept *acceptContext) *ExpressionLogicalExpression {
+func (p *Parser) logicalExpression(left Expression, accept *acceptContext) *ExpressionLogicalExpression {
 	t := p.tokenizer.CurrentToken
 	tokenTypes := []TokenType{
 		TAmpersandAmpersand,
@@ -1193,7 +1198,7 @@ func (p *Parser) logicalExpression(left PrimaryExpression, accept *acceptContext
 	panic("logicalExpression: unexpected token")
 }
 
-func (p *Parser) equalityExpression(left PrimaryExpression, accept *acceptContext) *ExpressionEqualityExpression {
+func (p *Parser) equalityExpression(left Expression, accept *acceptContext) *ExpressionEqualityExpression {
 	t := p.tokenizer.CurrentToken
 	tokenTypes := []TokenType{
 		TEqualsEquals,
@@ -1213,7 +1218,7 @@ func (p *Parser) equalityExpression(left PrimaryExpression, accept *acceptContex
 	panic("equalityExpression: unexpected token")
 }
 
-func (p *Parser) relationalExpression(left PrimaryExpression, accept *acceptContext) *ExpressionRelationalExpression {
+func (p *Parser) relationalExpression(left Expression, accept *acceptContext) *ExpressionRelationalExpression {
 	t := p.tokenizer.CurrentToken
 	tokenTypes := []TokenType{
 		TLessThan,
@@ -1235,7 +1240,7 @@ func (p *Parser) relationalExpression(left PrimaryExpression, accept *acceptCont
 	panic("relationalExpression: unexpected token")
 }
 
-func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
+func (p *Parser) memberExpression(left Expression) *MemberExpression {
 	token := p.tokenizer.CurrentToken
 	var property ASTProperty
 	if token.Type == TLeftBracket {
@@ -1265,7 +1270,31 @@ func (p *Parser) memberExpression(left PrimaryExpression) *MemberExpression {
 	}
 }
 
-func (p *Parser) callExpression(left PrimaryExpression) *CallExpression {
+func (p *Parser) superProperty() (sp SuperProperty, ok bool) {
+	p.tokenizer.Match(TSuper)
+	if !p.inClassBody || p.inMethodDefinition {
+		return
+	}
+	t := p.tokenizer.CurrentToken
+	switch t.Type {
+	case TDot:
+		p.tokenizer.Next()
+		identifier := p.tokenizer.CurrentToken
+		return &SuperPropertyIdentifier{
+			IdentifierName: IdentifierName(identifier.Value),
+		}, true
+	case TLeftBracket:
+		expr := p.expression(p.acceptContextLowest())
+		p.tokenizer.Match(TRightBracket)
+		return &SuperPropertyExpression{
+			Expression: expr,
+		}, true
+	default:
+		return
+	}
+}
+
+func (p *Parser) callExpression(left Expression) *CallExpression {
 	if p.callExpressionForbidden {
 		panic("callExpression: call expression forbidden")
 	}
@@ -1366,9 +1395,7 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 	switch t.Type {
 	case TThis:
 		p.tokenizer.Next()
-		return &ExpressionPrimary{
-			PrimaryExpression: &PrimaryExpressionThis{},
-		}
+		return &PrimaryExpressionThis{}
 	case TLeftBracket:
 		return p.arrayLiteral()
 	case TLeftBrace:
@@ -1401,11 +1428,8 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		return p.classExpression()
 	default:
 		literal := p.literal()
-
-		return &ExpressionPrimary{
-			PrimaryExpression: &PrimaryExpressionLiteral{
-				Literal: literal,
-			},
+		return &PrimaryExpressionLiteral{
+			Literal: literal,
 		}
 	}
 }
@@ -1505,6 +1529,11 @@ func (p *Parser) propertyName() (PropertyName, bool) {
 func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefinition, bool) {
 	var err error
 	p.tokenizer.store()
+	inMethodDefinition := p.inMethodDefinition
+	p.inMethodDefinition = true
+	defer func() {
+		p.inMethodDefinition = inMethodDefinition
+	}()
 	defer func() {
 		if r := recover(); r != nil {
 			msg := "recovered in methodDefinition"

@@ -162,6 +162,14 @@ func (i *ILoadThisValue) String() string {
 	return "ILoadThisValue"
 }
 
+type ILoadThisValueSuper struct {
+	Instruction
+}
+
+func (i *ILoadThisValueSuper) String() string {
+	return "ILoadThisValueSuper"
+}
+
 // MARK: - Typeof
 
 type ITypeof struct {
@@ -562,11 +570,19 @@ func (i *IClassDefinitionEvaluation) String() string {
 	return "IClassDefinitionEvaluation"
 }
 
+// MARK: - Super
+
+type IMakeSuperPropertyReference struct {
+	Instruction
+	Strict bool
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
 var InsThrow = &IThrow{}
 var InsLoadThisValue = &ILoadThisValue{}
+var InsLoadThisValueSuper = &ILoadThisValueSuper{}
 var InsGetValue = &IGetValue{}
 var InsTypeof = &ITypeof{}
 var InsToNumber = &IToNumber{}

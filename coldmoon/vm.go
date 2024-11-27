@@ -79,6 +79,27 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *ILoadThisValue:
 		this := evaluateCallGetThisValue(vm.referenceStack.Peek())
 		vm.stack.Push(this)
+	case *ILoadThisValueSuper:
+		env := agent.GetThisEnvironment()
+		actualThis := env.GetThisBinding()
+		vm.stack.Push(actualThis)
+	case *IMakeSuperPropertyReference:
+		propertyNameValue := vm.stack.Pop()
+		strict := ins.Strict
+		actualThis := vm.stack.Pop()
+		propertyKey := ToPropertyKey(vm.agent, propertyNameValue)
+		env := agent.GetThisEnvironment()
+		Assert(env.HasSuperBinding())
+		baseValue := env.(*FunctionEnvironment).GetSuperBase()
+		vm.reference = &ReferenceRecord{
+			Base: &ReferenceRecordBaseValue{
+				Value: baseValue,
+			},
+			ReferencedName: propertyKey.ToReference(),
+			Strict:         strict,
+			ThisValue:      actualThis,
+		}
+
 	case *IResolveThisBinding:
 		vm.result = vm.agent.ResolveThisBinding()
 	case *IReturn:
