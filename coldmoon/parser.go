@@ -1445,11 +1445,55 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		return p.regularExpressionLiteral()
 	case TClass:
 		return p.classExpression()
+	case TTemplateHead, TNoSubstitutionTemplate:
+		return p.templateLiteral()
 	default:
 		literal := p.literal()
 		return &PrimaryExpressionLiteral{
 			Literal: literal,
 		}
+	}
+}
+
+func (p *Parser) templateLiteral() *PrimaryExpressionTemplateLiteral {
+	if p.tokenizer.Match(TNoSubstitutionTemplate) {
+		return &PrimaryExpressionTemplateLiteral{
+			TemplateLiteral: &TemplateLiteral{},
+		}
+	}
+	startIndex := p.tokenizer.Index
+	templateHead := p.tokenizer.CurrentToken
+	p.tokenizer.MustMatch(TTemplateHead)
+	var spans []*TemplateSpan
+	var expr Expression
+	for {
+		t := p.tokenizer.CurrentToken
+		if t.Type == TTemplateTail {
+			spans = append(spans, &TemplateSpan{
+				Text:       t.Value,
+				Expression: expr,
+			})
+			p.tokenizer.Next()
+			break
+		}
+		if t.Type == TTemplateMiddle {
+			spans = append(spans, &TemplateSpan{
+				Text:       t.Value,
+				Expression: expr,
+			})
+			p.tokenizer.Next()
+			continue
+		}
+		expr = p.expression(p.acceptContextLowest())
+	}
+	p.tokenizer.MustMatch(TTemplateTail)
+	sourceText := p.SourceText[startIndex:p.tokenizer.Index]
+	return &PrimaryExpressionTemplateLiteral{
+		TemplateLiteral: &TemplateLiteral{
+			TemplateHead: templateHead.Value,
+			Spans:        spans,
+		},
+		SourceText: sourceText,
 	}
 }
 

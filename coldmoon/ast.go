@@ -981,6 +981,33 @@ func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
 	}
 }
 
+// MARK: - TemplateLiteral
+
+type PrimaryExpressionTemplateLiteral struct {
+	PrimaryExpression
+	TemplateLiteral *TemplateLiteral
+	SourceText      string
+}
+
+func (t *PrimaryExpressionTemplateLiteral) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IStoreConstant{
+		Value: NewStringValue(t.SourceText),
+	})
+}
+
+func (t *PrimaryExpressionTemplateLiteral) String() string {
+	return t.SourceText
+}
+
+type TemplateSpan struct {
+	Text       string
+	Expression Expression
+}
+type TemplateLiteral struct {
+	TemplateHead string
+	Spans        []*TemplateSpan
+}
+
 // MARK: - UpdateExpression
 
 type UpdateOperator int

@@ -96,6 +96,10 @@ const (
 	TFunction
 	TDelete
 	TComment
+	TTemplateHead
+	TTemplateMiddle
+	TTemplateTail
+	TNoSubstitutionTemplate
 	TIn
 	TStatic
 	TInstanceof
@@ -145,6 +149,7 @@ type Tokenizer struct {
 	CurrentToken Token
 	NextToken    Token
 	cachedState  *cachedState
+	isTemplate   bool
 }
 
 func NewTokenizer(sourceText string) *Tokenizer {
@@ -201,6 +206,9 @@ func (t *Tokenizer) peek() Token {
 		t.Index++
 		return Token{Type: TLeftBrace, Value: "{"}
 	case '}':
+		if t.isTemplate {
+			return t.templateMiddleOrTail()
+		}
 		t.Index++
 		return Token{Type: TRightBrace, Value: "}"}
 	case '[':
@@ -257,6 +265,8 @@ func (t *Tokenizer) peek() Token {
 			return token
 		}
 		return Token{Type: TSlash, Value: "/"}
+	case '`':
+		return t.templateHead()
 	case '*':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
@@ -420,6 +430,50 @@ func (t *Tokenizer) peek() Token {
 	}
 	panic("unhandled token: " + string(ch))
 
+}
+
+func (t *Tokenizer) templateMiddleOrTail() Token {
+	start := t.Index
+	t.Index++
+	for t.Index < t.Length {
+		ch := t.SourceText[t.Index]
+		if ch == '`' {
+			t.Index++
+			t.isTemplate = false
+			return Token{Type: TTemplateTail, Value: string(t.SourceText[start : t.Index-1])}
+		}
+		if ch == '$' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '{' {
+				t.Index++
+				t.isTemplate = true
+				return Token{Type: TTemplateMiddle, Value: string(t.SourceText[start : t.Index-2])}
+			}
+		}
+		t.Index++
+	}
+	panic("unterminated template")
+}
+
+func (t *Tokenizer) templateHead() Token {
+	start := t.Index
+	for t.Index < t.Length {
+		ch := t.SourceText[t.Index]
+		if ch == '`' {
+			t.Index++
+			return Token{Type: TNoSubstitutionTemplate, Value: string(t.SourceText[start:t.Index])}
+		}
+		if ch == '$' {
+			t.Index++
+			if t.Index < t.Length && t.SourceText[t.Index] == '{' {
+				t.Index++
+				t.isTemplate = true
+				return Token{Type: TTemplateHead, Value: string(t.SourceText[start : t.Index-2])}
+			}
+		}
+		t.Index++
+	}
+	panic("unterminated template")
 }
 
 func (t *Tokenizer) comment(commentType string) string {
