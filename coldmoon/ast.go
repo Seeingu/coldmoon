@@ -3375,6 +3375,8 @@ func (e *ExpressionStatement) String() string {
 	return e.Expression.String()
 }
 
+// MARK: - Script
+
 type Script struct {
 	ASTNode
 	StatementList StatementList
@@ -3391,3 +3393,58 @@ func (s *Script) String() string {
 func (s *Script) IsStrict() bool {
 	return s.StatementList.ContainsDirective("use strict")
 }
+
+// MARK: - Module
+
+type Module struct {
+	ASTNode
+	ModuleItemList ModuleItemList
+}
+
+func (m *Module) Bytecode(e *Executable, c *BytecodeContext) {
+	m.ModuleItemList.Bytecode(e, c)
+}
+
+type ModuleItemList []ModuleItem
+
+func (m ModuleItemList) Bytecode(e *Executable, c *BytecodeContext) {
+	for _, item := range m {
+		item.Bytecode(e, c)
+	}
+}
+
+// MARK: - ModuleItem
+
+type ModuleItem interface {
+	ASTNode
+	_moduleItem()
+}
+
+// MARK: - ModuleItem: StatementListItem
+
+type ModuleItemStatementListItem struct {
+	ModuleItem
+	StatementListItem StatementListItem
+}
+
+func (m *ModuleItemStatementListItem) Bytecode(e *Executable, c *BytecodeContext) {
+	m.StatementListItem.Bytecode(e, c)
+}
+
+func (m *ModuleItemStatementListItem) _moduleItem() {}
+
+// MARK: - ModuleItem: ImportDeclaration
+
+type ModuleItemImportDeclaration struct {
+	ModuleItem
+}
+
+func (m *ModuleItemImportDeclaration) _moduleItem() {}
+
+// MARK: - ModuleItem: ExportDeclaration
+
+type ModuleItemExportDeclaration struct {
+	ModuleItem
+}
+
+func (m *ModuleItemExportDeclaration) _moduleItem() {}

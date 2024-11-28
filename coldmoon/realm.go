@@ -144,7 +144,7 @@ func InitializeHostDefinedRealm(
 	newContext := &ExecutionContext{
 		Function:       nil,
 		Realm:          realm,
-		ScriptOrModule: ScriptOrModuleNull,
+		ScriptOrModule: nil,
 	}
 
 	agent.ExecutionContextStack.Push(newContext)

@@ -62,6 +62,11 @@ func (e *ECMAScriptFunction) SetClassFieldInitializerName(n ClassFieldInitialize
 	e.classFieldInitializerName = n
 }
 
+func (e *ECMAScriptFunction) EvaluateBody() *CompletionValue {
+	vm := NewVM(e.Agent())
+	return GenerateAndRunBytecode(vm.agent, e.ECMAScriptCode)
+}
+
 // 7.3.24
 func (e *ECMAScriptFunction) GetFunctionRealm() *Realm {
 	return e.Realm

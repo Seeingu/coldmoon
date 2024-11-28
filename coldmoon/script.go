@@ -3,11 +3,14 @@ package coldmoon
 import "fmt"
 
 type ScriptRecord struct {
+	ScriptOrModule
 	Realm          *Realm
 	ECMAScriptCode *Script
 	LoadedModules  interface{}
 	HostDefined    interface{}
 }
+
+func (s *ScriptRecord) _scriptOrModule() {}
 
 // ParseScript
 // 16.1.5
@@ -32,7 +35,7 @@ func (s *ScriptRecord) Evaluate() Value {
 	scriptContext := &ExecutionContext{
 		Function:       nil,
 		Realm:          s.Realm,
-		ScriptOrModule: TScript,
+		ScriptOrModule: s,
 		ECMAScriptCode: &ExecutionContextAdditionalState{
 			VariableEnvironment: globalEnv,
 			LexicalEnvironment:  globalEnv,

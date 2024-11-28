@@ -31,6 +31,44 @@ func (p *Parser) Parse() *Script {
 	}
 }
 
+func (p *Parser) ParseModule() *Module {
+	return p.module()
+}
+
+func (p *Parser) module() *Module {
+	moduleItemList := p.moduleItemList()
+	return &Module{
+		ModuleItemList: moduleItemList,
+	}
+}
+func (p *Parser) moduleItemList() ModuleItemList {
+	var items ModuleItemList
+	for {
+		item := p.moduleItem()
+		if item == nil {
+			break
+		}
+		items = append(items, item)
+	}
+	return items
+}
+func (p *Parser) moduleItem() ModuleItem {
+	t := p.tokenizer.CurrentToken
+	switch t.Type {
+	case TImport:
+		panic("unimplemented")
+	case TExport:
+		panic("unimplemented")
+	case TEOF:
+		return nil
+	default:
+		item := p.statementListItem()
+		return &ModuleItemStatementListItem{
+			StatementListItem: item,
+		}
+	}
+}
+
 type ParserContext struct {
 	FileName string
 }

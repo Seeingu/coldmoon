@@ -52,3 +52,29 @@ func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
 	})
 	return object
 }
+
+func AsyncFunctionStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction) {
+	runningContext := agent.runningExecutionContext()
+	asyncContext := runningContext
+	AsyncBlockStart(agent, promiseCapability, asyncFunction, asyncContext)
+}
+
+func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction, asyncContext *ExecutionContext) {
+	runningContext := agent.runningExecutionContext()
+
+	var closure = func() {
+		result := asyncFunction.EvaluateBody()
+		agent.ExecutionContextStack.Pop()
+
+		if result.Type == CompletionTypeNormal {
+			promiseCapability.Resolve.ToValue().CallAssumeCallable(
+				UndefinedValue, []Value{result.Value})
+		} else {
+			panic("AsyncBlockStart: completion type not normal")
+		}
+	}
+
+	agent.ExecutionContextStack.Push(asyncContext)
+	closure()
+	Assert(runningContext == agent.runningExecutionContext())
+}

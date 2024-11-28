@@ -58,7 +58,7 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 	calleeContext := &ExecutionContext{
 		Function:       b.Object,
 		Realm:          b.Realm,
-		ScriptOrModule: ScriptOrModuleNull,
+		ScriptOrModule: nil,
 	}
 
 	a.ExecutionContextStack.Push(calleeContext)

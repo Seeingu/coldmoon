@@ -74,16 +74,16 @@ func (a *Agent) ActiveFunctionObject() ObjectType {
 // 9.4.1
 func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
 	if a.ExecutionContextStack.IsEmpty() {
-		return ScriptOrModuleNull
+		return nil
 	}
 	var ec *ExecutionContext
 	for i := a.ExecutionContextStack.Len() - 1; i >= 0; i-- {
 		ec = a.ExecutionContextStack.Index(i)
-		if ec.ScriptOrModule != ScriptOrModuleNull {
+		if ec.ScriptOrModule != nil {
 			return ec.ScriptOrModule
 		}
 	}
-	return ScriptOrModuleNull
+	return nil
 }
 
 // 9.4.2

@@ -1,13 +1,9 @@
 package coldmoon
 
 // 9.4
-type ScriptOrModule int
-
-const (
-	ScriptOrModuleNull ScriptOrModule = iota
-	TScript
-	TModule
-)
+type ScriptOrModule interface {
+	_scriptOrModule()
+}
 
 type ExecutionContextAdditionalState struct {
 	LexicalEnvironment  EnvironmentRecord
