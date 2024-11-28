@@ -24,6 +24,8 @@ type HostHooks struct {
 	HostPromiseRejectionTracker    func(promise *PromiseObject, operation PromiseRejectionTrackerOperation)
 	HostResizeArrayBuffer          func(buffer *ArrayBufferObject, newByteLength uint64) ResizeArrayBufferHandled
 	HostEnsureCanAddPrivateElement func()
+	HostGetImportMetaProperties    func(module *SourceTextModule) ImportMetaProperties
+	HostFinalizeImportMeta         func(meta ObjectType, module *SourceTextModule)
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]*SymbolValue{}
@@ -54,6 +56,8 @@ func NewAgent() *Agent {
 		HostEnsureCanAddPrivateElement: func() {
 			// TODO
 		},
+		HostGetImportMetaProperties: HostGetImportMetaProperties,
+		HostFinalizeImportMeta:      HostFinalizeImportMeta,
 	}
 	return a
 }

@@ -54,3 +54,13 @@ const (
 func HostResizeArrayBuffer(buffer *ArrayBufferObject, newByteLength uint64) ResizeArrayBufferHandled {
 	return ResizeArrayBufferHandledUnhandled
 }
+
+type ImportMetaProperties map[PropertyKey]Value
+
+func HostGetImportMetaProperties(module *SourceTextModule) (i ImportMetaProperties) {
+	return
+}
+
+func HostFinalizeImportMeta(meta ObjectType, module *SourceTextModule) {
+	// return UNUSED
+}

@@ -865,6 +865,20 @@ func (m *MetaPropertyNewTarget) String() string {
 	return "new.target"
 }
 
+type MetaPropertyImportMeta struct {
+	MetaProperty
+}
+
+func (m *MetaPropertyImportMeta) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (m *MetaPropertyImportMeta) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddInstruction(&IGetOrCreateImportMeta{})
+}
+func (m *MetaPropertyImportMeta) String() string {
+	return "import.meta"
+}
+
 // MARK: - SuperProperty
 
 type SuperProperty interface {

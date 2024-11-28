@@ -593,6 +593,16 @@ func (i *IEvaluateSuperCall) String() string {
 	return "IEvaluateSuperCall"
 }
 
+// MARK: - Import Meta
+
+type IGetOrCreateImportMeta struct {
+	Instruction
+}
+
+func (i *IGetOrCreateImportMeta) String() string {
+	return "GetOrCreateImportMeta"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}

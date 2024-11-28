@@ -13,6 +13,7 @@ type Parser struct {
 	inClassBody             bool
 	inMethodDefinition      bool
 	inClassConstructor      bool
+	inModule                bool
 	callExpressionForbidden bool
 	ctx                     ParserContext
 }
@@ -32,6 +33,12 @@ func (p *Parser) Parse() *Script {
 }
 
 func (p *Parser) ParseModule() *Module {
+	inModule := p.inModule
+	p.inModule = true
+	defer func() {
+		p.inModule = inModule
+	}()
+
 	return p.module()
 }
 
@@ -1032,18 +1039,35 @@ func (p *Parser) tryUnaryExpression() (Expression, bool) {
 }
 
 func (p *Parser) metaProperty() (MetaProperty, bool) {
+	newTarget, ok := p.newTarget()
+	if ok {
+		return newTarget, true
+	}
+	return nil, false
+}
+
+func (p *Parser) importMeta() *MetaPropertyImportMeta {
+	p.tokenizer.MustMatch(TImport)
+	p.tokenizer.MustMatch(TDot)
+	p.tokenizer.MustMatch(TIdentifier)
+	if !p.inModule {
+		panic("importMeta: not in module")
+	}
+	return &MetaPropertyImportMeta{}
+}
+
+func (p *Parser) newTarget() (m *MetaPropertyNewTarget, ok bool) {
 	t := p.tokenizer.CurrentToken
 	if t.Type != TNew || p.tokenizer.NextToken.Type == TDot {
-		return nil, false
+		return
 	}
 	p.tokenizer.MustMatch(TNew)
 	p.tokenizer.MustMatch(TDot)
 	identifier := p.tokenizer.CurrentToken
 	if identifier.Value != "target" {
-		return nil, false
+		return
 	}
 	return &MetaPropertyNewTarget{}, true
-
 }
 
 func (p *Parser) updateExpression(primaryExpression Expression) (*ExpressionUpdate, bool) {

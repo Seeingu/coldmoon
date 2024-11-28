@@ -532,6 +532,21 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		F := thisER.(*FunctionEnvironment).FunctionObject
 		result.InitializeInstanceElements(F)
 		vm.result = result.ToValue()
+	case *IGetOrCreateImportMeta:
+		module := agent.GetActiveScriptOrModule().(*SourceTextModule)
+		if module.ImportMeta == nil {
+			importMeta := OrdinaryObjectCreate(agent, nil, nil)
+			importMetaValues := agent.HostHooks.HostGetImportMetaProperties(module)
+			for k, v := range importMetaValues {
+				importMeta.CreateDataPropertyOrThrow(k, v)
+			}
+
+			agent.HostHooks.HostFinalizeImportMeta(importMeta, module)
+			module.ImportMeta = importMeta
+			vm.result = importMeta.ToValue()
+		} else {
+			vm.result = module.ImportMeta.ToValue()
+		}
 	}
 }
 
