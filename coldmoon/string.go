@@ -288,6 +288,147 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		rx := RegExpCreate(agent, regexp, UndefinedValue)
 		return ValueInvoke(agent, rx.Object.ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatchAll]), []Value{s})
 	}
+	var indexOf = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		searchString := argumentsList[0]
+		position := ToIntegerOrInfinity(agent, argumentsList[1])
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		searchStr := ToString(agent, searchString)
+		pos := int(position)
+		length := len(s)
+		start := lo.Clamp(pos, 0, length)
+		return NewNumberValue(float64(StringIndexOf(s, searchStr.Data, start)))
+	}
+	var startsWith = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		searchString := argumentsList[0]
+		var position Value
+		if len(argumentsList) > 1 {
+			position = argumentsList[1]
+		}
+		o := RequireObjectCoercible(agent, this)
+		s := ToString(agent, o)
+		isRegExp := IsRegExp(searchString)
+		if isRegExp {
+			panic("TypeError")
+		}
+		searchStr := ToString(agent, searchString)
+		length := len(s.Data)
+		var pos int
+		if position == nil {
+			pos = 0
+		} else {
+			pos = int(ToIntegerOrInfinity(agent, position))
+		}
+
+		start := lo.Clamp(pos, 0, length)
+		searchLength := len(searchStr.Data)
+
+		if searchLength == 0 {
+			return TrueValue
+		}
+
+		end := start + searchLength
+		if end > length {
+			return FalseValue
+		}
+
+		substring := s.Data[start:end]
+		if substring == searchStr.Data {
+			return TrueValue
+		}
+
+		return FalseValue
+	}
+	var endsWith = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		searchString := argumentsList[0]
+		var position Value
+		if len(argumentsList) > 1 {
+			position = argumentsList[1]
+		}
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := ToString(agent, o)
+		isRegExp := IsRegExp(searchString)
+		if isRegExp {
+			panic("TypeError")
+		}
+		searchStr := ToString(agent, searchString)
+		length := len(s.Data)
+		var pos int
+		if position == nil {
+			pos = length
+		} else {
+			pos = int(ToIntegerOrInfinity(agent, position))
+		}
+
+		end := lo.Clamp(pos, 0, length)
+		searchLength := len(searchStr.Data)
+
+		if searchLength == 0 {
+			return TrueValue
+		}
+
+		start := end - searchLength
+		if start < 0 {
+			return FalseValue
+		}
+
+		substring := s.Data[start:end]
+		if substring == searchStr.Data {
+			return TrueValue
+		}
+
+		return FalseValue
+	}
+	var includes BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		searchString := argumentsList[0]
+		var position Value
+		if len(argumentsList) > 1 {
+			position = argumentsList[1]
+		}
+		o := RequireObjectCoercible(agent, this)
+		s := ToString(agent, o)
+		isRegExp := IsRegExp(searchString)
+		if isRegExp {
+			panic("TypeError")
+		}
+		searchStr := ToString(agent, searchString)
+		length := len(s.Data)
+		var pos int
+		if position == nil {
+			pos = 0
+		} else {
+			pos = int(ToIntegerOrInfinity(agent, position))
+		}
+
+		start := lo.Clamp(pos, 0, length)
+		searchLength := len(searchStr.Data)
+
+		if searchLength == 0 {
+			return TrueValue
+		}
+
+		end := length - searchLength
+		if start > end {
+			return FalseValue
+		}
+
+		if strings.Contains(s.Data[start:], searchStr.Data) {
+			return TrueValue
+		}
+
+		return FalseValue
+	}
+	var codePointAt BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		pos := argumentsList[0]
+		o := RequireObjectCoercible(agent, this)
+		s := ToString(agent, o)
+		position := ToIntegerOrInfinity(agent, pos)
+		size := len(s.Data)
+		if position < 0 || int(position) >= size {
+			return UndefinedValue
+		}
+		return NewNumberValue(float64(s.Data[int(position)]))
+	}
 
 	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "valueOf", valueOf, 0, realm)
@@ -300,6 +441,11 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	DefineBuiltinFunction(stringPrototype, "concat", concat, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "search", search, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "matchAll", matchAll, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "indexOf", indexOf, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "startsWith", startsWith, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "endsWith", endsWith, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "includes", includes, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "codePointAt", codePointAt, 1, realm)
 
 	return stringPrototype
 }
@@ -321,4 +467,14 @@ func thisStringValue(agent *Agent, v Value) string {
 // 22.1.3.32.1
 func (s *StringValue) TrimString() string {
 	return strings.TrimSpace(s.Data)
+}
+
+func StringIndexOf(s string, searchString string, position int) int {
+	if position < 0 {
+		position = 0
+	}
+	if position > len(s) {
+		return -1
+	}
+	return strings.Index(s[position:], searchString)
 }
