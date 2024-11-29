@@ -3,6 +3,7 @@ package coldmoon
 import (
 	"errors"
 	"fmt"
+	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
 )
 
@@ -63,7 +64,7 @@ func (p *Parser) moduleItem() ModuleItem {
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
 	case TImport:
-		panic("unimplemented")
+		return p.importDeclaration()
 	case TExport:
 		panic("unimplemented")
 	case TEOF:
@@ -73,6 +74,30 @@ func (p *Parser) moduleItem() ModuleItem {
 		return &ModuleItemStatementListItem{
 			StatementListItem: item,
 		}
+	}
+}
+
+func (p *Parser) importDeclaration() *ModuleItemImportDeclaration {
+	p.tokenizer.MustMatch(TImport)
+	importClause := p.importClause()
+	p.tokenizer.MustMatch(TFrom)
+	moduleSpecifier := p.stringLiteral()
+	p.automaticSemicolonInsertion()
+	return &ModuleItemImportDeclaration{
+		ImportDeclaration: &ImportDeclaration{
+			ImportClause:    importClause,
+			ModuleSpecifier: moduleSpecifier,
+		},
+	}
+}
+
+func (p *Parser) importClause() *ImportClause {
+	identifier, err := pkg.RecoverFromFunc(p.bindingIdentifier)
+	if err != nil {
+		panic(err)
+	}
+	return &ImportClause{
+		ImportedDefaultBinding: identifier,
 	}
 }
 
@@ -320,10 +345,7 @@ func (p *Parser) statementListItem() (stmt StatementListItem) {
 }
 
 func (p *Parser) automaticSemicolonInsertion() {
-	t := p.tokenizer.CurrentToken
-	if t.Type == TSemicolon {
-		p.tokenizer.Next()
-	}
+	p.tokenizer.Match(TSemicolon)
 }
 
 func (p *Parser) statement() Statement {

@@ -3485,6 +3485,7 @@ func (m *ModuleItemStatementListItem) _moduleItem() {}
 
 type ModuleItemImportDeclaration struct {
 	ModuleItem
+	ImportDeclaration *ImportDeclaration
 }
 
 func (m *ModuleItemImportDeclaration) _moduleItem() {}
@@ -3496,3 +3497,20 @@ type ModuleItemExportDeclaration struct {
 }
 
 func (m *ModuleItemExportDeclaration) _moduleItem() {}
+
+// MARK: - Import
+
+type ImportDeclaration struct {
+	ASTNode
+	ImportClause    *ImportClause
+	ModuleSpecifier *LiteralString
+}
+
+type ImportClause struct {
+	ImportedDefaultBinding IdentifierName
+	NamespaceImport        IdentifierName
+	NamedImports           ImportsList
+}
+
+type ImportsList struct {
+}
