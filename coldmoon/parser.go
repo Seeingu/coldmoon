@@ -1,7 +1,6 @@
 package coldmoon
 
 import (
-	"errors"
 	"fmt"
 	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
@@ -92,9 +91,9 @@ func (p *Parser) importDeclaration() *ModuleItemImportDeclaration {
 }
 
 func (p *Parser) importClause() *ImportClause {
-	identifier, err := pkg.RecoverFromFunc(p.bindingIdentifier)
-	if err != nil {
-		panic(err)
+	identifier, ok := parserRecoverOk(p, p.bindingIdentifier)
+	if !ok {
+		panic("importClause: expected binding identifier")
 	}
 	return &ImportClause{
 		ImportedDefaultBinding: identifier,
@@ -658,8 +657,9 @@ func (p *Parser) classElement() ClassElement {
 				StatementList: statementList,
 			}
 		}
-		def, ok := p.methodDefinition(MethodDefinitionTypeNil)
-		if ok {
+		if def, ok := parserRecoverOk(p, func() *MethodDefinition {
+			return p.methodDefinition(MethodDefinitionTypeNil)
+		}); ok {
 			return &ClassElementStaticMethodDefinition{
 				MethodDefinition: def,
 			}
@@ -670,8 +670,9 @@ func (p *Parser) classElement() ClassElement {
 			}
 		}
 	} else {
-		def, ok := p.methodDefinition(MethodDefinitionTypeNil)
-		if ok {
+		if def, ok := parserRecoverOk(p, func() *MethodDefinition {
+			return p.methodDefinition(MethodDefinitionTypeNil)
+		}); ok {
 			return &ClassElementMethodDefinition{
 				MethodDefinition: def,
 			}
@@ -1425,15 +1426,8 @@ func (p *Parser) arguments() Arguments {
 	return list
 }
 
-func (p *Parser) tryArrowFunction() *PrimaryExpressionArrowFunction {
+func (p *Parser) arrowFunction() *PrimaryExpressionArrowFunction {
 	startOffset := p.tokenizer.Index
-	p.tokenizer.store()
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in tryArrowFunction", r)
-			p.tokenizer.restore()
-		}
-	}()
 	p.tokenizer.Match(TLeftParen)
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
@@ -1506,8 +1500,7 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 	case TIdentifier:
 		return p.identifierReference()
 	case TLeftParen:
-		e := p.tryArrowFunction()
-		if e != nil {
+		if e, ok := parserRecoverOk(p, p.arrowFunction); ok {
 			return e
 		}
 		return p.parenthesizedExpression()
@@ -1673,8 +1666,7 @@ func (p *Parser) propertyName() (PropertyName, bool) {
 	return propertyName, true
 }
 
-func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefinition, bool) {
-	var err error
+func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefinition {
 	p.tokenizer.store()
 	inMethodDefinition := p.inMethodDefinition
 	inClassConstructor := p.inClassConstructor
@@ -1684,17 +1676,6 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefin
 		p.inMethodDefinition = inMethodDefinition
 		p.inClassConstructor = inClassConstructor
 	}()
-	defer func() {
-		if r := recover(); r != nil {
-			msg := "recovered in methodDefinition"
-			fmt.Println(msg)
-			p.tokenizer.restore()
-			err = errors.New(msg)
-		}
-	}()
-	if err != nil {
-		return nil, false
-	}
 	if methodType == MethodDefinitionTypeNil {
 		if p.tokenizer.Match(TStar) {
 			return p.methodDefinition(MethodDefinitionTypeGenerator)
@@ -1775,7 +1756,7 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) (*MethodDefin
 		GeneratorExpression:      genExpression,
 		AsyncFunctionExpression:  asyncExpression,
 		AsyncGeneratorExpression: asyncGenerator,
-	}, true
+	}
 }
 
 func (p *Parser) propertyDefinition() PropertyDefinition {
@@ -1793,8 +1774,9 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 			Spread: expr,
 		}
 	case TIdentifier:
-		method, ok := p.methodDefinition(MethodDefinitionTypeNil)
-		if ok {
+		if method, ok := parserRecoverOk(p, func() *MethodDefinition {
+			return p.methodDefinition(MethodDefinitionTypeNil)
+		}); ok {
 			return method
 		}
 	}
@@ -1947,4 +1929,16 @@ func (p *Parser) block() *Block {
 	return &Block{
 		StatementList: list,
 	}
+}
+
+func parserRecoverOk[T any](p *Parser, f func() T) (r T, ok bool) {
+	p.tokenizer.store()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("parser recovered from: ", pkg.GetFunctionName(f), r)
+			p.tokenizer.restore()
+			ok = false
+		}
+	}()
+	return f(), true
 }

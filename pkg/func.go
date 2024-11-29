@@ -3,6 +3,7 @@ package pkg
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 )
 
 // FuncEqual is a function that check if two functions are equal
@@ -18,8 +19,11 @@ func RecoverFromFunc[T any](f func() T) (r T, err error) {
 			err = fmt.Errorf("%v", r)
 		}
 	}()
-	if err != nil {
-		return
-	}
 	return f(), nil
+}
+
+// GetFunctionName
+// see: https://stackoverflow.com/questions/7052693/how-to-get-the-name-of-a-function-in-go
+func GetFunctionName(i interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
