@@ -18,6 +18,13 @@ func testSource(t *testing.T, s string) {
 
 func TestBaseline(t *testing.T) {
 	var sourceText string
+
+	sourceText = `
+const a = {};
+const b = a?.b;
+`
+	testSource(t, sourceText)
+
 	sourceText = "``"
 	testSource(t, sourceText)
 

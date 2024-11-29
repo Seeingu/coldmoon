@@ -100,9 +100,13 @@ func (p *Parser) importClause() *ImportClause {
 	}
 }
 
+// MARK: - ParserContext
+
 type ParserContext struct {
 	FileName string
 }
+
+// MARK: - Precedence
 
 type precedence int
 type precedenceAssociativityAlt int
@@ -130,8 +134,6 @@ type acceptContext struct {
 	precedence    precedence
 	associativity associativity
 }
-
-// MARK: - Precedence
 
 func (p *Parser) acceptContextLowest() *acceptContext {
 	return &acceptContext{
@@ -1169,6 +1171,8 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Expression {
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
+	case TQuestionDot:
+		return p.optionalExpression(left)
 	case TLeftParen:
 		return p.callExpression(left)
 	case TLeftBracket, TDot:
@@ -1230,6 +1234,29 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 		panic("secondaryExpression: unexpected token")
 	}
 	return left
+}
+
+func (p *Parser) optionalExpression(left Expression) *OptionalExpression {
+	p.tokenizer.MustMatch(TQuestionDot)
+	var arguments Arguments
+	var expr Expression
+	var identifier IdentifierName
+	if p.tokenizer.Match(TLeftParen) {
+		arguments = p.arguments()
+	} else if p.tokenizer.Match(TLeftBracket) {
+		expr = p.expression(p.acceptContextLowest())
+		p.tokenizer.MustMatch(TRightBracket)
+	} else {
+		identifier = p.identifierReference().Identifier
+	}
+	return &OptionalExpression{
+		Expr: left,
+		Property: &OptionalExpressionProperty{
+			Arguments:  arguments,
+			Expression: expr,
+			Identifier: identifier,
+		},
+	}
 }
 
 func (p *Parser) assignmentExpression(left Expression, accept *acceptContext) *ExpressionAssignmentExpression {

@@ -861,6 +861,100 @@ func ExpressionAnalyze(e Expression, a AnalyzeQuery) bool {
 	panic("unreachable")
 }
 
+// MARK: - OptionalExpression
+
+type OptionalExpression struct {
+	Expression
+	Property *OptionalExpressionProperty
+	Expr     Expression
+}
+
+func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+func (o *OptionalExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	o.Expr.Bytecode(e, c)
+	if o.Property.Arguments != nil {
+		e.AddInstruction(InsPushReference)
+	}
+	if ExpressionAnalyze(o.Expr, AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	e.AddInstruction(InsLoad)
+
+	e.AddInstruction(InsLoad)
+	e.AddInstruction(&ILoadConstant{
+		Value: UndefinedValue,
+	})
+	e.AddInstruction(InsLooselyEqual)
+
+	jumpIfTrue := &IJumpIfTrue{}
+	e.AddInstruction(jumpIfTrue)
+
+	jumpIfTrue.Target = len(e.Instructions) - 1
+	e.AddInstruction(InsStore)
+	e.AddInstruction(&IStoreConstant{
+		Value: UndefinedValue,
+	})
+	endJump := &IJump{}
+
+	jumpIfTrue.TargetElse = len(e.Instructions) - 1
+	strict := c.containedInStrictCode
+
+	if o.Property.Arguments != nil {
+		e.AddInstruction(InsLoadThisValue)
+		for _, arg := range o.Property.Arguments {
+			arg.Bytecode(e, c)
+			if ExpressionAnalyze(arg, AnalyzeQueryIsReference) {
+				e.AddInstruction(InsGetValue)
+			}
+			e.AddInstruction(InsLoad)
+		}
+
+		e.AddInstruction(&ICall{
+			ArgumentCount: len(o.Property.Arguments),
+			Strict:        strict,
+		})
+	} else if o.Property.Expression != nil {
+		expr := o.Property.Expression
+		expr.Bytecode(e, c)
+		if ExpressionAnalyze(expr, AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(&IEvaluatePropertyAccessWithExpressionKey{
+			Strict: strict,
+		})
+	} else if o.Property.Identifier != "" {
+		e.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKey{
+			Strict: strict,
+			Name:   o.Property.Identifier,
+		})
+	}
+
+	endJump.Target = len(e.Instructions) - 1
+}
+func (o *OptionalExpression) String() string {
+	return o.Expr.String() + "?." + o.Property.String()
+}
+
+// Enum
+type OptionalExpressionProperty struct {
+	Arguments  Arguments
+	Expression Expression
+	Identifier IdentifierName
+}
+
+func (o *OptionalExpressionProperty) String() string {
+	if o.Arguments != nil {
+		return "(" + o.Arguments.String() + ")"
+	}
+	if o.Expression != nil {
+		return "[" + o.Expression.String() + "]"
+	}
+	return string(o.Identifier)
+}
+
 // MARK: - MetaProperty
 
 type MetaProperty interface {
@@ -1916,6 +2010,17 @@ func (u *UnaryExpression) String() string {
 // MARK: - CallExpression
 
 type Arguments []Expression
+
+func (a Arguments) String() string {
+	var sb string
+	for i, arg := range a {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += arg.String()
+	}
+	return sb
+}
 
 func (a Arguments) Bytecode(e *Executable, c *BytecodeContext) {
 	for _, arg := range a {
