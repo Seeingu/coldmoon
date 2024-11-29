@@ -79,6 +79,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.SymbolConstructor = NewSymbolConstructor(r)
 	r.Intrinsics.BigIntPrototype = NewBigIntPrototype(r)
 	r.Intrinsics.BigIntConstructor = NewBigIntConstructor(r)
+	r.Intrinsics.JSON = NewJSON(r)
 	r.Intrinsics.Reflect = NewReflectObject(r)
 	r.Intrinsics.Proxy = NewProxyConstructor(r)
 	r.Intrinsics.RegExpPrototype = NewRegExpPrototype(r)

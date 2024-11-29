@@ -69,6 +69,8 @@ type Intrinsics struct {
 	BigIntPrototype ObjectType
 	// %BigInt%
 	BigIntConstructor ObjectType
+	// %JSON%
+	JSON ObjectType
 	// %Reflect%
 	Reflect ObjectType
 	// %Proxy%
