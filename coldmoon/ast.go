@@ -14,12 +14,28 @@ type BytecodeContext struct {
 	containedInStrictCode bool
 }
 
+// MARK: - AnalyzeQuery
+
 type AnalyzeQuery int
 
 const (
 	AnalyzeQueryIsReference AnalyzeQuery = iota
 	AnalyzeQueryIsStringLiteral
 )
+
+// MARK: - Scope Declaration
+
+// VarScopedDeclaration Enum
+type VarScopedDeclaration struct {
+	VariableDeclaration  *VariableDeclaration
+	HoistableDeclaration DeclarationHoistable
+}
+
+// LexicallyScopedDeclaration Enum
+type LexicallyScopedDeclaration struct {
+	HoistableDeclaration DeclarationHoistable
+	// TODO
+}
 
 // MARK: - PrimaryExpression
 
@@ -2075,6 +2091,9 @@ type StatementBlock struct {
 
 var _ Statement = (*StatementBlock)(nil)
 
+func (s *StatementBlock) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return s.BlockStatement.VarScopedDeclarations()
+}
 func (s *StatementBlock) _statement() {}
 func (s *StatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
 	s.BlockStatement.Bytecode(e, c)
@@ -2243,6 +2262,9 @@ type StatementExpression struct {
 
 var _ Statement = (*StatementExpression)(nil)
 
+func (s *StatementExpression) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return
+}
 func (s *StatementExpression) _statement() {}
 func (s *StatementExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	s.Expression.Bytecode(e, c)
@@ -3264,29 +3286,11 @@ func (b *Block) String() string {
 
 type StatementList []StatementListItem
 
-func (s StatementList) VarScopedDeclarations() []*VariableDeclaration {
-	var vars []*VariableDeclaration
+func (s StatementList) VarScopedDeclarations() (l []*VariableDeclaration) {
 	for _, item := range s {
-		switch stmt := item.(type) {
-		case *StatementListItemStatement:
-			if v, ok := stmt.Statement.(*StatementVariable); ok {
-				for _, varDeclaration := range v.DeclarationList.Items {
-					vars = append(vars, varDeclaration)
-				}
-			}
-		case *StatementListItemDeclaration:
-			switch decl := item.(type) {
-			case *DeclarationLexical:
-				for _, bindingItem := range decl.BindingList.Items {
-					vars = append(vars, &VariableDeclaration{
-						Identifier:  bindingItem.Identifier,
-						Initializer: bindingItem.Initializer,
-					})
-				}
-			}
-		}
+		l = append(l, item.VarScopedDeclarations()...)
 	}
-	return vars
+	return
 }
 
 func (s StatementList) ContainsDirective(directive string) bool {
@@ -3326,6 +3330,7 @@ func (s StatementList) String() string {
 
 type StatementListItem interface {
 	ASTNode
+	VarScopedDeclarations() []*VariableDeclaration
 }
 
 func StatementListItemAnalyze(s StatementListItem, a AnalyzeQuery) bool {
@@ -3345,8 +3350,12 @@ type StatementListItemStatement struct {
 
 var _ ASTNode = (*StatementListItemStatement)(nil)
 
-func (s *StatementListItemStatement) VarScopedDeclarations() []*VariableDeclaration {
-	return s.Statement.VarScopedDeclarations()
+func (s *StatementListItemStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	vars := s.Statement.VarScopedDeclarations()
+	if vars == nil {
+		return
+	}
+	return vars
 }
 
 func (s *StatementListItemStatement) Bytecode(e *Executable, c *BytecodeContext) {
@@ -3364,8 +3373,19 @@ type StatementListItemDeclaration struct {
 
 var _ ASTNode = (*StatementListItemDeclaration)(nil)
 
-func (s *StatementListItemDeclaration) VarScopedDeclarations() []*VariableDeclaration {
-	return nil
+func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDeclaration) {
+	switch d := s.Declaration.(type) {
+	case *DeclarationLexical:
+		for _, bindingItem := range d.BindingList.Items {
+			l = append(l, &VariableDeclaration{
+				Identifier:  bindingItem.Identifier,
+				Initializer: bindingItem.Initializer,
+			})
+		}
+	default:
+
+	}
+	return
 }
 
 func (s *StatementListItemDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
@@ -3425,6 +3445,20 @@ func (m ModuleItemList) Bytecode(e *Executable, c *BytecodeContext) {
 	for _, item := range m {
 		item.Bytecode(e, c)
 	}
+}
+
+func (m ModuleItemList) VarScopedDeclarations() (l []*VariableDeclaration) {
+	for _, item := range m {
+		switch stmt := item.(type) {
+		case *ModuleItemStatementListItem:
+			l = append(l, stmt.StatementListItem.VarScopedDeclarations()...)
+		case *ModuleItemImportDeclaration:
+			panic("not implemented")
+		case *ModuleItemExportDeclaration:
+			panic("not implemented")
+		}
+	}
+	return
 }
 
 // MARK: - ModuleItem

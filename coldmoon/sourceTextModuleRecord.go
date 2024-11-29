@@ -81,6 +81,24 @@ type SourceTextModule struct {
 
 func (s *SourceTextModule) _scriptOrModule() {}
 
+// [[BindingName]] union
+type BindingName struct {
+	String    string
+	Namespace bool
+}
+type ResolvedBinding struct {
+	// [[Module]]
+	Module *ModuleRecord
+	// [[BindingName]]
+	BindingName *BindingName
+	Ambiguous   bool
+}
+
+func (s *SourceTextModule) ResolveExport(exportName string, resolveSet []*ModuleRecord) *ResolvedBinding {
+	// TODO
+	return nil
+}
+
 // 16.2.1.6.1
 func ParseModule(sourceText string, realm *Realm, hostDefined any, ctx ParserContext) *SourceTextModule {
 	body := NewParser(sourceText, ctx).ParseModule()
@@ -93,8 +111,70 @@ func ParseModule(sourceText string, realm *Realm, hostDefined any, ctx ParserCon
 }
 
 // 16.2.1.6.4
-func (s *SourceTextModule) InitializeEnvironment() {
-	s.Environment = s.Realm.GlobalEnv
+func (s *SourceTextModule) InitializeEnvironment() *CompletionValue {
+	realm := s.Realm
+	agent := realm.Agent
+	env := NewModuleEnvironment(realm.GlobalEnv)
+	s.Environment = env
+
+	for _, importEntry := range s.ImportEntries {
+		importedModule := GetImportedModule(s, importEntry.ModuleRequest)
+		importName := importEntry.ImportName
+		localName := importEntry.LocalName
+		if _, ok := importName.(*ImportNameNamespaceObject); ok {
+			namespace := GetModuleNamespace(agent, importedModule)
+			env.CreateImmutableBinding(localName, true)
+			env.InitializeBinding(localName, namespace.ToValue())
+		} else {
+			resolution := importedModule.SourceTextModule.ResolveExport(importName.(ImportNameString).String, []*ModuleRecord{})
+			if resolution == nil {
+				return NewCompletionValueError(
+					agent.ThrowException(SyntaxError, "Failed to resolve export"))
+			} else if resolution.Ambiguous {
+				return NewCompletionValueError(
+					agent.ThrowException(SyntaxError, "Ambiguous export"))
+			}
+			if resolution.BindingName.Namespace {
+				namespace := GetModuleNamespace(agent, resolution.Module)
+				env.CreateImmutableBinding(localName, true)
+				env.InitializeBinding(localName, namespace.ToValue())
+			} else {
+				env.CreateImportBinding(localName, resolution.Module.SourceTextModule, resolution.BindingName.String)
+			}
+		}
+	}
+
+	moduleContext := &ExecutionContext{
+		Realm:          realm,
+		Function:       nil,
+		ScriptOrModule: s,
+		ECMAScriptCode: &ExecutionContextAdditionalState{
+			LexicalEnvironment:  env,
+			VariableEnvironment: env,
+			PrivateEnvironment:  nil,
+		},
+	}
+	s.Context = moduleContext
+	agent.ExecutionContextStack.Push(moduleContext)
+	code := s.ECMAScriptCode
+
+	varDeclarations := code.ModuleItemList.VarScopedDeclarations()
+
+	declaredVarNames := make(map[string]bool)
+
+	for _, varDeclaration := range varDeclarations {
+		varName := string(varDeclaration.Identifier)
+		if _, ok := declaredVarNames[varName]; !ok {
+			env.CreateMutableBinding(varName, false)
+			env.InitializeBinding(varName, UndefinedValue)
+			declaredVarNames[varName] = true
+		}
+	}
+
+	// TODO:
+
+	agent.ExecutionContextStack.Pop()
+	return NewCompletionValue(UndefinedValue)
 }
 
 func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
@@ -113,7 +193,7 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 		GenerateAndRunBytecode(agent, s.ECMAScriptCode)
 		agent.ExecutionContextStack.Pop()
 	} else {
-	
+
 	}
 
 }
