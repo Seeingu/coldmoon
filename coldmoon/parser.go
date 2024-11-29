@@ -13,6 +13,8 @@ type Parser struct {
 	inClassBody             bool
 	inMethodDefinition      bool
 	inClassConstructor      bool
+	inIteration             bool
+	inBreakable             bool
 	inModule                bool
 	callExpressionForbidden bool
 	ctx                     ParserContext
@@ -376,8 +378,47 @@ func (p *Parser) statement() Statement {
 		return nil
 	case TReturn:
 		return p.returnStatement()
+	case TContinue:
+		return p.continueStatement()
+	case TBreak:
+		return p.breakStatement()
 	default:
 		return p.expressionStatement()
+	}
+}
+
+func (p *Parser) breakStatement() *StatementBreak {
+	p.tokenizer.MustMatch(TBreak)
+	if !p.inBreakable {
+		panic("breakStatement: not in breakable")
+	}
+
+	t := p.tokenizer.CurrentToken
+	var label string
+	if t.Type == TIdentifier {
+		label = t.Value
+		p.tokenizer.Next()
+	}
+	p.automaticSemicolonInsertion()
+	return &StatementBreak{
+		Label: IdentifierName(label),
+	}
+}
+
+func (p *Parser) continueStatement() *StatementContinue {
+	p.tokenizer.MustMatch(TContinue)
+	if !p.inIteration {
+		panic("continueStatement: not in iteration")
+	}
+	t := p.tokenizer.CurrentToken
+	var label string
+	if t.Type == TIdentifier {
+		label = t.Value
+		p.tokenizer.Next()
+	}
+	p.automaticSemicolonInsertion()
+	return &StatementContinue{
+		Label: IdentifierName(label),
 	}
 }
 
@@ -847,6 +888,11 @@ func (p *Parser) declaration() Declaration {
 }
 
 func (p *Parser) breakableStatement() *BreakableStatement {
+	inBreakable := p.inBreakable
+	p.inBreakable = true
+	defer func() {
+		p.inBreakable = inBreakable
+	}()
 	return &BreakableStatement{
 		IterationStatement: p.iterationStatement(),
 	}
@@ -856,6 +902,12 @@ func (p *Parser) breakableStatement() *BreakableStatement {
 
 func (p *Parser) iterationStatement() IterationStatement {
 	t := p.tokenizer.CurrentToken
+	inIteration := p.inIteration
+	p.inIteration = true
+	defer func() {
+		p.inIteration = inIteration
+	}()
+
 	if t.Type == TDo {
 		return p.doWhileStatement()
 	} else if t.Type == TWhile {

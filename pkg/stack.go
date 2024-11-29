@@ -44,3 +44,7 @@ func (s *Stack[T]) Len() int {
 func (s *Stack[T]) Index(i int) T {
 	return s.data[i]
 }
+
+func (s *Stack[T]) Clear() {
+	s.data = []T{}
+}

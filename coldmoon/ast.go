@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"github.com/Seeingu/coldmoon/pkg"
 	"strconv"
 )
 
@@ -10,8 +11,13 @@ type ASTNode interface {
 }
 
 type BytecodeContext struct {
-	agent                 *Agent
-	containedInStrictCode bool
+	agent                     *Agent
+	containedInStrictCode     bool
+	labelContinueJumpIndexMap map[string]pkg.Stack[*IJump]
+	labelBreakJumpIndexMap    map[string]pkg.Stack[*IJump]
+	continueJumpIndices       pkg.Stack[*IJump]
+	breakJumpIndices          pkg.Stack[*IJump]
+	Label                     string
 }
 
 // MARK: - AnalyzeQuery
@@ -2641,7 +2647,7 @@ func (s *StatementWhile) VarScopedDeclarations() []*VariableDeclaration {
 func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
 
-	condition := len(e.Instructions)
+	conditionIndex := len(e.Instructions) - 1
 	s.Condition.Bytecode(e, c)
 	if ExpressionAnalyze(s.Condition, AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
@@ -2653,12 +2659,22 @@ func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	jumpIfTrue.Target = len(e.Instructions)
 	e.AddInstruction(InsStore)
 	s.Body.Bytecode(e, c)
-	e.AddInstruction(&ILoad{})
+	bodyEndIndex := len(e.Instructions) - 1
+	e.AddInstruction(InsLoad)
 
-	e.AddInstruction(&IJump{Target: condition})
+	e.AddInstruction(&IJump{Target: conditionIndex})
 
 	jumpIfTrue.TargetElse = len(e.Instructions)
 	e.AddInstruction(InsStore)
+
+	for _, index := range c.continueJumpIndices.Data() {
+		index.Target = bodyEndIndex
+	}
+	c.continueJumpIndices.Clear()
+	for _, index := range c.breakJumpIndices.Data() {
+		index.Target = len(e.Instructions) - 1
+	}
+	c.breakJumpIndices.Clear()
 }
 
 func (s *StatementWhile) String() string {
@@ -2683,22 +2699,35 @@ func (s *StatementDoWhile) VarScopedDeclarations() []*VariableDeclaration {
 func (s *StatementDoWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
 
-	bodyIndex := len(e.Instructions)
+	bodyStartIndex := len(e.Instructions) - 1
 
 	e.AddInstruction(InsStore)
 	s.Body.Bytecode(e, c)
-	e.AddInstruction(&ILoad{})
+	bodyEndIndex := len(e.Instructions) - 1
+	e.AddInstruction(InsLoad)
 
 	s.Condition.Bytecode(e, c)
 	if ExpressionAnalyze(s.Condition, AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
 
-	e.AddInstruction(&ILoad{})
-	jumpIfTrue := &IJumpIfTrue{Target: bodyIndex, TargetElse: 0}
+	e.AddInstruction(InsLoad)
+	jumpIfTrue := &IJumpIfTrue{Target: bodyStartIndex, TargetElse: 0}
 	jumpIfTrue.TargetElse = len(e.Instructions)
 
 	e.AddInstruction(InsStore)
+
+	for _, index := range c.continueJumpIndices.Data() {
+		index.Target = bodyEndIndex
+	}
+	c.continueJumpIndices.Clear()
+	if c.Label != "" {
+		// TODO: Label Jump
+	}
+	for _, index := range c.breakJumpIndices.Data() {
+		index.Target = len(e.Instructions) - 1
+	}
+	c.breakJumpIndices.Clear()
 }
 
 func (s *StatementDoWhile) String() string {
@@ -2791,6 +2820,7 @@ func (s *StatementFor) Bytecode(e *Executable, c *BytecodeContext) {
 
 	e.AddInstruction(InsStore)
 	s.Body.Bytecode(e, c)
+	bodyEndIndex := len(e.Instructions) - 1
 	e.AddInstruction(&ILoad{})
 
 	if s.Increment != nil {
@@ -2805,6 +2835,15 @@ func (s *StatementFor) Bytecode(e *Executable, c *BytecodeContext) {
 		endJump.TargetElse = len(e.Instructions) - 1
 	}
 	e.AddInstruction(InsStore)
+
+	for _, index := range c.continueJumpIndices.Data() {
+		index.Target = bodyEndIndex
+	}
+	c.continueJumpIndices.Clear()
+	for _, index := range c.breakJumpIndices.Data() {
+		index.Target = len(e.Instructions) - 1
+	}
+	c.breakJumpIndices.Clear()
 }
 
 func (s *StatementFor) String() string {
@@ -2821,6 +2860,58 @@ func (s *StatementFor) String() string {
 	sb += " \n"
 	sb += s.Body.String()
 	return sb
+}
+
+// MARK: - BreakStatement
+
+type StatementBreak struct {
+	Statement
+	Label IdentifierName
+}
+
+func (s *StatementBreak) Bytecode(e *Executable, c *BytecodeContext) {
+	jump := &IJump{}
+	if s.Label != "" {
+		e.AddInstruction(jump)
+		if list, ok := c.labelBreakJumpIndexMap[string(s.Label)]; ok {
+			list.Push(jump)
+		}
+	} else {
+		e.AddInstruction(jump)
+		c.breakJumpIndices.Push(jump)
+	}
+}
+func (s *StatementBreak) String() string {
+	if s.Label != "" {
+		return "Break " + string(s.Label)
+	}
+	return "Break"
+}
+
+// MARK: - ContinueStatement
+
+type StatementContinue struct {
+	Statement
+	Label IdentifierName
+}
+
+func (s *StatementContinue) Bytecode(e *Executable, c *BytecodeContext) {
+	jump := &IJump{}
+	if s.Label != "" {
+		e.AddInstruction(jump)
+		if list, ok := c.labelContinueJumpIndexMap[string(s.Label)]; ok {
+			list.Push(jump)
+		}
+	} else {
+		e.AddInstruction(jump)
+		c.continueJumpIndices.Push(jump)
+	}
+}
+func (s *StatementContinue) String() string {
+	if s.Label != "" {
+		return "Continue " + string(s.Label)
+	}
+	return "Continue"
 }
 
 // MARK: - ReturnStatement
