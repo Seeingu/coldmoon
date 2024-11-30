@@ -62,6 +62,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.AsyncIteratorPrototype = NewAsyncIteratorPrototype(r)
 	r.Intrinsics.AsyncFunctionPrototype = NewAsyncFunctionPrototype(r)
 	r.Intrinsics.AsyncFunctionConstructor = NewAsyncFunctionConstructor(r)
+	r.Intrinsics.DataViewPrototype = NewDataViewPrototype(r)
+	r.Intrinsics.DataViewConstructor = NewDataViewConstructor(r)
 	r.Intrinsics.PromisePrototype = NewPromisePrototype(r)
 	r.Intrinsics.Promise = NewPromiseConstructor(r)
 	r.Intrinsics.DatePrototype = NewDatePrototype(r)

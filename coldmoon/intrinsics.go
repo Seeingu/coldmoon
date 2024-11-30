@@ -35,6 +35,10 @@ type Intrinsics struct {
 	GeneratorFunctionPrototype ObjectType
 	// %GeneratorFunction.prototype.prototype%
 	GeneratorFunctionPrototypePrototype ObjectType
+	// %DataView.prototype%
+	DataViewPrototype ObjectType
+	// %DataView%
+	DataViewConstructor ObjectType
 	// %AsyncGeneratorFunction%
 	AsyncGeneratorFunction ObjectType
 	// %AsyncGeneratorFunction.prototype%

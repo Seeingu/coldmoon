@@ -1,6 +1,10 @@
 package coldmoon
 
-import "math"
+import (
+	"bytes"
+	"encoding/binary"
+	"math"
+)
 
 type ArrayBufferObject struct {
 	*Object
@@ -58,9 +62,60 @@ func DetachArrayBuffer(buffer *ArrayBufferObject) {
 	buffer.ArrayBufferDetachKey = nil
 }
 
+type MemoryOrder int
+
+const (
+	SeqCst MemoryOrder = iota
+	Relaxed
+)
+
+func ArrayBufferByteLength(buffer *ArrayBufferObject, memoryOrder MemoryOrder) uint64 {
+	return buffer.ArrayBufferByteLength
+}
+
 // 25.1.3.8
 func IsFixedLengthArrayBuffer(buffer *ArrayBufferObject) bool {
 	return buffer.ArrayBufferMaxByteLength == 0
+}
+
+func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferObject, byteIndex uint64, size uint64, isTypedArray bool, order MemoryOrder, isLittleEndian bool) uint64 {
+	Assert(!IsDetachedBuffer(arrayBuffer))
+	Assert(byteIndex+size <= arrayBuffer.ArrayBufferByteLength)
+	block := arrayBuffer.ArrayBufferData
+	elementSize := size
+
+	var rawValue []byte
+	if IsSharedArrayBuffer(arrayBuffer) {
+		// TODO
+	} else {
+		rawValue = block[byteIndex : byteIndex+elementSize]
+	}
+
+	return RawBytesToNumeric(rawValue, isLittleEndian)
+}
+
+func IsSharedArrayBuffer(buffer *ArrayBufferObject) bool {
+	return false
+}
+
+func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) uint64 {
+	buf := &bytes.Buffer{}
+	var endian binary.ByteOrder
+	if isLittleEndian {
+		endian = binary.LittleEndian
+	} else {
+		endian = binary.BigEndian
+	}
+	err := binary.Write(buf, endian, rawBytes)
+	if err != nil {
+		panic(err)
+	}
+	t := uint64(0)
+	err = binary.Read(buf, endian, &t)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
 
 func NewArrayBufferConstructor(realm *Realm) ObjectType {
@@ -102,7 +157,10 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		if !ValueIsObject(arg) {
 			return FalseValue
 		}
-		// TODO
+		o := MustGetObject(arg)
+		if ObjectIs[*DataView](o) {
+			return TrueValue
+		}
 
 		return FalseValue
 	}

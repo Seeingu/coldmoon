@@ -50,6 +50,7 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 		{"parseInt", NewValueFromObject(r.Intrinsics.ParseInt)},
 		{"parseFloat", NewValueFromObject(r.Intrinsics.ParseFloat)},
 		{"RegExp", NewValueFromObject(r.Intrinsics.RegExpConstructor)},
+		{"DataView", NewValueFromObject(r.Intrinsics.DataViewConstructor)},
 	}
 
 	var properties []constructorProperties
