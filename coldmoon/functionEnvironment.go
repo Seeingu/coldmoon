@@ -9,13 +9,12 @@ const (
 )
 
 type FunctionEnvironment struct {
-	EnvironmentRecord
-	outerEnv               EnvironmentRecord
-	thisBindingStatus      ThisBindingStatus
-	thisValue              Value
-	FunctionObject         *ECMAScriptFunction
-	NewTarget              ObjectType
-	DeclarativeEnvironment *DeclarativeEnvironment
+	*DeclarativeEnvironment
+	outerEnv          EnvironmentRecord
+	thisBindingStatus ThisBindingStatus
+	thisValue         Value
+	FunctionObject    *ECMAScriptFunction
+	NewTarget         ObjectType
 }
 
 func NewFunctionEnvironment(function *ECMAScriptFunction, newTarget ObjectType) *FunctionEnvironment {
@@ -76,16 +75,4 @@ func (f *FunctionEnvironment) GetSuperBase() Value {
 
 func (f *FunctionEnvironment) OuterEnv() EnvironmentRecord {
 	return f.outerEnv
-}
-
-func (f *FunctionEnvironment) HasBinding(name string) bool {
-	return f.DeclarativeEnvironment.HasBinding(name)
-}
-
-func (f *FunctionEnvironment) GetBindingValue(name string, strict bool) Value {
-	return f.DeclarativeEnvironment.GetBindingValue(name, strict)
-}
-
-func (f *FunctionEnvironment) WithBaseObject() ObjectType {
-	return f.DeclarativeEnvironment.WithBaseObject()
 }

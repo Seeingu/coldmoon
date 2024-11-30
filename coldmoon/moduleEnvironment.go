@@ -1,7 +1,7 @@
 package coldmoon
 
 type ModuleEnvironment struct {
-	EnvironmentRecord
+	*DeclarativeEnvironment
 	outerEnv EnvironmentRecord
 }
 
