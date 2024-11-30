@@ -1015,8 +1015,7 @@ func (p *Parser) ifStatement() *StatementIf {
 	consequent := p.statement()
 
 	var alternate Statement
-	if p.tokenizer.Peek().Type == TElse {
-		p.tokenizer.Next()
+	if p.tokenizer.Match(TElse) {
 		alternate = p.statement()
 	}
 
@@ -1074,6 +1073,7 @@ func (p *Parser) newExpression() (*ExpressionNewExpression, bool) {
 	expr := p.expression(accept)
 	p.callExpressionForbidden = previous
 	args := p.arguments()
+	p.automaticSemicolonInsertion()
 	return &ExpressionNewExpression{
 		Callee:    expr,
 		Arguments: args,
@@ -1135,7 +1135,7 @@ func (p *Parser) importMeta() *MetaPropertyImportMeta {
 
 func (p *Parser) newTarget() (m *MetaPropertyNewTarget, ok bool) {
 	t := p.tokenizer.CurrentToken
-	if t.Type != TNew || p.tokenizer.NextToken.Type == TDot {
+	if t.Type != TNew || p.tokenizer.NextToken.Type != TDot {
 		return
 	}
 	p.tokenizer.MustMatch(TNew)
@@ -1181,27 +1181,23 @@ func (p *Parser) updateExpression(primaryExpression Expression) (*ExpressionUpda
 }
 
 func (p *Parser) expression(accept *acceptContext) Expression {
+	var e Expression
 	if unary, ok := p.tryUnaryExpression(); ok {
-		return unary
+		e = unary
+	} else if meta, ok := p.metaProperty(); ok {
+		e = meta
+	} else if update, ok := p.updateExpression(nil); ok {
+		e = update
+	} else if super, ok := p.superProperty(); ok {
+		e = super
+	} else if super, ok := p.superCall(); ok {
+		e = super
+	} else if newExpression, ok := p.newExpression(); ok {
+		e = newExpression
+	} else {
+		e = p.primaryExpression()
 	}
-	if meta, ok := p.metaProperty(); ok {
-		return meta
-	}
-	if update, ok := p.updateExpression(nil); ok {
-		return update
-	}
-	if super, ok := p.superProperty(); ok {
-		return super
-	}
-	if super, ok := p.superCall(); ok {
-		return super
-	}
-	if newExpression, ok := p.newExpression(); ok {
-		return newExpression
-	}
-
-	primary := p.primaryExpression()
-	var expr Expression = primary
+	var expr Expression = e
 	for {
 		nextToken := p.tokenizer.CurrentToken
 		newAcceptContext := p.acceptContext(nextToken.Type)
@@ -1226,6 +1222,9 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 	case TQuestionDot:
 		return p.optionalExpression(left)
 	case TLeftParen:
+		if p.callExpressionForbidden {
+			return nil
+		}
 		return p.callExpression(left)
 	case TLeftBracket, TDot:
 		return p.memberExpression(left)
@@ -1478,9 +1477,6 @@ func (p *Parser) superProperty() (sp SuperProperty, ok bool) {
 }
 
 func (p *Parser) callExpression(left Expression) *CallExpression {
-	if p.callExpressionForbidden {
-		panic("callExpression: call expression forbidden")
-	}
 	args := p.arguments()
 	return &CallExpression{
 		Callee:    left,

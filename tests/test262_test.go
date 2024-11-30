@@ -34,20 +34,22 @@ func mustReadFile(filePath string) string {
 	return string(f)
 }
 
-func runTestHarness(f string) {
+func runTestHarness(realm *Realm, f string) {
 	content := mustReadFile(makeTest262Path("./test262/harness/" + f))
-	agent := NewAgent()
-	InitializeHostDefinedRealm(agent, nil)
-	realm := agent.CurrentRealm()
 	v := ParseScript(content, realm, nil).Evaluate()
 	print(v.String())
 }
 
 func TestHarness(t *testing.T) {
 	files := []string{
+		"isConstructor.js",
 		"nans.js",
 	}
+
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
 	for _, f := range files {
-		runTestHarness(f)
+		runTestHarness(realm, f)
 	}
 }
