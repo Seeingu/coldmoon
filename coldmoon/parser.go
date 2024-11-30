@@ -999,7 +999,7 @@ func (p *Parser) returnStatement() *StatementReturn {
 		return &StatementReturn{}
 	}
 	expr := p.expression(p.acceptContextLowest())
-	p.tokenizer.MustMatch(TSemicolon)
+	p.automaticSemicolonInsertion()
 	return &StatementReturn{
 		Expression: expr,
 	}

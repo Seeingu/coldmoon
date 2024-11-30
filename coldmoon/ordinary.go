@@ -404,7 +404,7 @@ func OrdinaryCreateFromConstructor(agent *Agent, constructor ObjectType, intrins
 // 10.1.14
 func GetPrototypeFromConstructor(constructor ObjectType, intrinsicDefaultProto string) ObjectType {
 	// TODO: Assert
-	proto := constructor.ToObject().Get(NewStringPropertyKey("prototype"))
+	proto := constructor.Get(NewStringPropertyKey("prototype"))
 
 	switch p := proto.(type) {
 	case *ObjectValue:

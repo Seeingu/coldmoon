@@ -191,6 +191,16 @@ func ObjectConstruct(
 	return o.InternalMethods().Construct(o, _argumentLists, newTarget)
 }
 
+func (o *Object) Construct(
+	argumentLists []Value,
+	newTarget ObjectType,
+) ObjectType {
+	if newTarget == nil {
+		newTarget = o
+	}
+	return o.InternalMethods().Construct(o, argumentLists, newTarget)
+}
+
 // 7.3.15
 func SetIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 	status := o.InternalMethods().PreventExtensions(o)

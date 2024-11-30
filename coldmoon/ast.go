@@ -2092,6 +2092,23 @@ type Statement interface {
 	_statement()
 }
 
+type StatementDefaultImpl struct {
+	Statement
+}
+
+func (s *StatementDefaultImpl) _statement() {}
+func (s *StatementDefaultImpl) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+func (s *StatementDefaultImpl) Bytecode(e *Executable, c *BytecodeContext) {
+	panic("should implement")
+}
+
+func (s *StatementDefaultImpl) String() string {
+	panic("should implement")
+}
+
 func StatementAnalyze(s Statement, a AnalyzeQuery) bool {
 	exprStmt, isExpr := s.(*StatementExpression)
 	switch a {
@@ -2410,7 +2427,7 @@ func (b *BreakableStatement) String() string {
 // MARK: - ThrowStatement
 
 type StatementThrow struct {
-	Statement
+	*StatementDefaultImpl
 	Expression Expression
 }
 
@@ -2917,7 +2934,7 @@ func (s *StatementContinue) String() string {
 // MARK: - ReturnStatement
 
 type StatementReturn struct {
-	Statement
+	*StatementDefaultImpl
 	Expression Expression
 }
 

@@ -358,13 +358,16 @@ const (
 )
 
 // 10.2.2
-func ECMAScriptFunctionConstruct(
-	object ObjectType,
+func (e *ECMAScriptFunction) Construct(
 	argumentsList []Value,
-	newTarget ObjectType,
+	_newTarget ObjectType,
 ) ObjectType {
-	agent := object.Agent()
-	function := object.(*ECMAScriptFunction)
+	newTarget := _newTarget
+	if newTarget == nil {
+		newTarget = e
+	}
+	agent := e.Agent()
+	function := e
 
 	kind := function.ConstructorKind
 
@@ -394,7 +397,7 @@ func ECMAScriptFunctionConstruct(
 
 	agent.ExecutionContextStack.Pop()
 
-	if result.Type == CompletionTypeReturn {
+	if !result.IsError() {
 		if o, ok := result.Value.(*ObjectValue); ok {
 			return o.Object
 		}
@@ -413,6 +416,13 @@ func ECMAScriptFunctionConstruct(
 	Assert(ok)
 
 	return thisBindingObject.Object
+}
+func ECMAScriptFunctionConstruct(
+	object ObjectType,
+	argumentsList []Value,
+	newTarget ObjectType,
+) ObjectType {
+	return object.(*ECMAScriptFunction).Construct(argumentsList, newTarget)
 }
 
 // 10.2.3

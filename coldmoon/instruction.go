@@ -176,6 +176,10 @@ type ITypeof struct {
 	Instruction
 }
 
+func (i *ITypeof) String() string {
+	return "ITypeof"
+}
+
 // MARK: - Call
 
 type ICall struct {

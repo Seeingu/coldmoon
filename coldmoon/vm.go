@@ -1267,8 +1267,9 @@ func evaluateNew(agent *Agent, constructor Value, arguments []Value) Value {
 	if !IsConstructor(constructor) {
 		panic("TypeError: constructor is not a constructor")
 	}
+	o := MustGetObject(constructor)
 	return NewValueFromObject(
-		constructor.(*ObjectValue).Object.Construct(arguments, nil),
+		o.Construct(arguments, nil),
 	)
 }
 
