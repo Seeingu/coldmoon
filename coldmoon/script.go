@@ -23,7 +23,9 @@ func ParseScript(sourceText string, realm *Realm, hostDefined interface{}) *Scri
 		ECMAScriptCode: script,
 	}
 
-	fmt.Println("AST: ", s.ECMAScriptCode.String())
+	if Debug.PrintAST {
+		fmt.Println("AST: ", s.ECMAScriptCode.String())
+	}
 	return s
 }
 
