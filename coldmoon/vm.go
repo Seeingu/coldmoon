@@ -487,7 +487,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IRegExpCreate:
 		flags := vm.stack.Pop()
 		pattern := vm.stack.Pop()
-		vm.result = RegExpCreate(vm.agent, pattern, flags).Object.ToValue()
+		vm.result = RegExpCreate(vm.agent, pattern, flags).Data().ToValue()
 	case *IBindingClassDeclarationEvaluation:
 		classDeclaration := ins.ClassDeclaration
 		vm.result = vm.BindingClassDeclarationEvaluation(classDeclaration).ToValue()

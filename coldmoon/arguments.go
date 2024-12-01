@@ -130,7 +130,7 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 	}
 	internalMethods := obj.InternalMethods()
 	internalMethods.GetOwnProperty = func(o ObjectType, p PropertyKey) *PropertyDescriptor {
-		return GetOwnProperty(obj, p).PropertyDescriptor
+		return GetOwnProperty(obj, p).Data()
 	}
 	internalMethods.DefineOwnProperty = DefineOwnProperty
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {

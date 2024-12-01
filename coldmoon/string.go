@@ -265,7 +265,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 		s := ToString(agent, o)
 		rx := RegExpCreate(agent, regexp, UndefinedValue)
-		return ValueInvoke(agent, rx.Object.ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]), []Value{s})
+		return ValueInvoke(agent, rx.Data().ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]), []Value{s})
 	}
 	var matchAll BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		regexp := argumentsList[0]
@@ -286,7 +286,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		s := ToString(agent, o)
 		rx := RegExpCreate(agent, regexp, UndefinedValue)
-		return ValueInvoke(agent, rx.Object.ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatchAll]), []Value{s})
+		return ValueInvoke(agent, rx.Data().ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatchAll]), []Value{s})
 	}
 	var indexOf = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		searchString := argumentsList[0]

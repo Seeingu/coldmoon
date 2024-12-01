@@ -125,7 +125,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		} else if result.IsError() {
 			panic("RegExp.prototype.exec: error")
 		} else {
-			return result.Object.ToValue()
+			return result.Data().ToValue()
 		}
 	}
 	var test = func(this Value, arguments []Value, _ ObjectType) Value {
@@ -162,7 +162,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		if result.IsNull() {
 			return NewNumberValue(-1)
 		}
-		return result.Object.Get(NewStringPropertyKey("index"))
+		return result.Data().Get(NewStringPropertyKey("index"))
 	}
 	var matchAll = func(this Value, arguments []Value, _ ObjectType) Value {
 		if !ValueIsObject(this) {
@@ -176,7 +176,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		s := ToString(agent, arguments[0])
 		c := r.SpeciesConstructor(realm.Intrinsics.RegExpConstructor)
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
-		matcher := c.Object.Construct([]Value{this, _flags}, nil)
+		matcher := c.Data().Construct([]Value{this, _flags}, nil)
 		lastIndex := ToLength(agent, r.Get(NewStringPropertyKey("lastIndex")))
 		matcher.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(float64(lastIndex)), setThrowTypeThrow)
 		_global := strings.Contains(_flags.Data, "g")
@@ -245,7 +245,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 		}
 		o := RegExpAlloc(agent, target)
 		return NewValueFromObject(
-			RegExpInitialize(agent, o, p, f).Object,
+			RegExpInitialize(agent, o, p, f).Data(),
 		)
 
 	}

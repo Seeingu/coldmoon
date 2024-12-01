@@ -160,7 +160,7 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		}
 		byteLength := ToIndex(agent, length)
 		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
-		return AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Object.ToValue()
+		return AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Data().ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "ArrayBuffer", builtinFunctionArgs{
 		realm:         realm,
@@ -234,7 +234,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 
 		newLen := math.Max(final-first, 0)
 		ctor := o.SpeciesConstructor(realm.Intrinsics.ArrayBufferConstructor)
-		newObject := ctor.Object.Construct([]Value{NewNumberValue(newLen)}, nil)
+		newObject := ctor.Data().Construct([]Value{NewNumberValue(newLen)}, nil)
 		_new := RequireInternalSlot[*ArrayBufferObject](NewValueFromObject(newObject))
 		if IsDetachedBuffer(_new) {
 			panic("TypeError")
