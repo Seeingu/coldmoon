@@ -146,6 +146,23 @@ func NewStringConstructor(realm *Realm) ObjectType {
 	})
 	DefineBuiltinPropertyV(realm.Intrinsics.StringPrototype, "constructor", NewValueFromObject(object))
 
+	var fromCharCode BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		var s string
+		for _, arg := range argumentsList {
+			s += string(rune(int(ToIntegerOrInfinity(realm.Agent, arg))))
+		}
+		return NewStringValue(s)
+	}
+	var fromCodePoint BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		codePoints := make([]rune, len(argumentsList))
+		for i, arg := range argumentsList {
+			codePoints[i] = rune(ToIntegerOrInfinity(realm.Agent, arg))
+		}
+		return NewStringValue(string(codePoints))
+	}
+	DefineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm)
+	DefineBuiltinFunction(object, "fromCodePoint", fromCodePoint, 1, realm)
+
 	return object
 }
 
