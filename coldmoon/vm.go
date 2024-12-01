@@ -1284,7 +1284,7 @@ func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
 		target,
 		NewSymbolPropertyKey(symbol))
 	if instOfHandler != nil {
-		return Call(instOfHandler, target, []Value{value}).ToBoolean()
+		return instOfHandler.ToValue().CallAssumeCallable(target, []Value{value}).ToBoolean()
 	}
 
 	if !IsCallable(target) {

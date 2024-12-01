@@ -239,7 +239,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		reason := arguments[0]
 		C := this
 		capability := NewPromiseCapability(agent, C)
-		ValueCall(NewValueFromObject(capability.Reject), UndefinedValue, []Value{reason})
+		NewValueFromObject(capability.Reject).Call(UndefinedValue, []Value{reason})
 		return NewValueFromObject(capability.Promise)
 	}
 	var resolve BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
@@ -292,6 +292,14 @@ type AdditionalFields struct {
 	Value                      Value
 	ArgGetterSetterCaptures    *ArgGetterSetterCaptures
 	ClassConstructorFields     *ClassConstructorFields
+}
+
+func IfAbruptRejectPromise(agent *Agent, value *CompletionValue, capability *PromiseCapability) Value {
+	if value.IsAbrupt() {
+		capability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{value.Error})
+		return capability.Promise.ToValue()
+	}
+	return value.Value
 }
 
 // 27.2.1.3

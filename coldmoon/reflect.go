@@ -19,7 +19,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		args := CreateListFromArrayLike(agent, argumentsList)
 
-		return ValueCall(target, thisArgument, args)
+		return target.Call(thisArgument, args)
 	}
 	var construct BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]

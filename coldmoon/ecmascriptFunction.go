@@ -73,9 +73,9 @@ func (e *ECMAScriptFunction) GetFunctionRealm() *Realm {
 }
 
 // 10.2.1
-func Call(object ObjectType, thisArgument Value, argumentsList []Value) Value {
-	agent := object.Agent()
-	function := object.(*ECMAScriptFunction)
+func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Value {
+	agent := e.Agent()
+	function := e
 
 	calleeContext := PrepareForOrdinaryCall(agent, function, nil)
 	Assert(calleeContext == agent.runningExecutionContext())
@@ -454,7 +454,10 @@ func OrdinaryFunctionCreate(
 		HomeObject:         nil,
 		ConstructorKind:    ConstructorKindBase,
 	}
-	function.InternalMethods().Call = Call
+	var call = func(o ObjectType, this Value, arguments []Value) Value {
+		return o.(*ECMAScriptFunction).Call(this, arguments)
+	}
+	function.InternalMethods().Call = call
 
 	length := parameterList.ExpectedArgumentCount()
 	SetFunctionLength(function.Object, float64(length))

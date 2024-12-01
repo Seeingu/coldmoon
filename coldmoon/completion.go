@@ -126,7 +126,7 @@ func (c *CompletionValue) IsNull() bool {
 	return false
 }
 func (c *CompletionValue) IsAbrupt() bool {
-	return c.Type != CompletionTypeNormal
+	return c.Type != CompletionTypeNormal && c.Type != CompletionTypeReturn
 }
 
 func NewNormalCompletion(value Value) *CompletionValue {

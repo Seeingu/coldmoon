@@ -40,6 +40,7 @@ type Value interface {
 	String() string
 	ToBoolean() bool
 	CallAssumeCallable(value Value, argumentsList ArgumentsList) Value
+	Call(this Value, argumentsList ArgumentsList) Value
 	ToCompletion() *CompletionValue
 }
 
@@ -105,28 +106,6 @@ var NaNValue = &NumberValue{Data: math.NaN()}
 
 var InfinityValue = &NumberValue{Data: math.Inf(1)}
 var NegativeInfinityValue = NumberValue{Data: math.Inf(-1)}
-
-type ObjectValue struct {
-	Value
-	Object ObjectType
-}
-
-func (o *ObjectValue) ToCompletion() *CompletionValue {
-	return NewCompletionValue(o)
-}
-
-func (o *ObjectValue) CallAssumeCallable(value Value, argumentsList ArgumentsList) Value {
-	object := o.Object
-	return object.InternalMethods().Call(object, value, argumentsList)
-}
-
-func (o *ObjectValue) String() string {
-	primValue := ToPrimitive(o.Object.Agent(), o, PreferredTypeString)
-	if _, isObject := primValue.(*ObjectValue); isObject {
-		panic("")
-	}
-	return primValue.String()
-}
 
 // Deprecated: use object.ToValue() instead
 func NewValueFromObject(object ObjectType) Value {
@@ -774,15 +753,6 @@ func GetMethod(agent *Agent, value Value, key PropertyKey) ObjectType {
 	return fun.(*ObjectValue).Object
 }
 
-// 7.3.14
-func ValueCall(self Value, value Value, argumentsList []Value) Value {
-	if !IsCallable(value) {
-		panic("TypeError")
-	}
-
-	return value.(*ObjectValue).Object.ToObject().InternalMethods().Call(value.(*ObjectValue).Object, self, argumentsList)
-}
-
 // 7.3.18
 func CreateArrayFromList(agent *Agent, elements []Value) ObjectType {
 	array := ArrayCreate(agent, float64(len(elements)), nil)
@@ -824,7 +794,7 @@ func CreateListFromArrayLike(agent *Agent, self Value) []Value {
 // 7.3.21
 func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsList []Value) Value {
 	fun := GetV(agent, self, propertyKey)
-	return ValueCall(fun, self, argumentsList)
+	return fun.Call(self, argumentsList)
 }
 
 // 7.3.21
@@ -994,10 +964,6 @@ func ParsePattern(pattern string, unicode bool, unicodeSets bool) (r *regexp2.Re
 		return regexp2.Compile(pattern, regexp2.Unicode)
 	}
 	return
-}
-
-func CallNoArgs(self Value, value Value) Value {
-	return ValueCall(self, value, nil)
 }
 
 func CallAssumeCallableNoArgs(self, value Value) Value {
