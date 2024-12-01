@@ -38,6 +38,7 @@ func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength uint64
 	return NewCompletionObject(arrayBuffer)
 }
 
+// 25.1.3.7
 func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (l uint64) {
 	if !ValueIsObject(options) {
 		return
@@ -48,6 +49,10 @@ func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (l uint64) {
 	}
 
 	return ToIndex(agent, maxByteLength)
+}
+
+func IsBigIntElementType(size uint64) bool {
+	return size == 8
 }
 
 // 25.1.2.2
@@ -98,6 +103,33 @@ func IsSharedArrayBuffer(buffer *ArrayBufferObject) bool {
 	return false
 }
 
+// 25.1.3.17
+func NumericToRawBytes(value uint64, size uint64, isLittleEndian bool) []byte {
+	buf := &bytes.Buffer{}
+	var endian binary.ByteOrder
+	if isLittleEndian {
+		endian = binary.LittleEndian
+	} else {
+		endian = binary.BigEndian
+	}
+	err := binary.Write(buf, endian, value)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+func SetValueInBuffer(agent *Agent, arrayBuffer *ArrayBufferObject, byteIndex uint64, value uint64, size uint64, isTypedArray bool, order MemoryOrder, isLittleEndian bool) {
+	Assert(!IsDetachedBuffer(arrayBuffer))
+	Assert(byteIndex+size <= arrayBuffer.ArrayBufferByteLength)
+	block := arrayBuffer.ArrayBufferData
+	elementSize := size
+
+	rawValue := NumericToRawBytes(value, elementSize, isLittleEndian)
+	CopyDataBlockBytes(block, int(byteIndex), rawValue, 0, int(elementSize))
+}
+
+// 25.1.3.14
 func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) uint64 {
 	buf := &bytes.Buffer{}
 	var endian binary.ByteOrder

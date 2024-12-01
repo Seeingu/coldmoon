@@ -40,16 +40,20 @@ func TestHarness(t *testing.T) {
 		"assert.js",
 		"isConstructor.js",
 		"nans.js",
+		"assertRelativeDateMs.js",
 	}
 
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	for _, f := range files {
-		runTestHarness(realm, f, f == "sta.js")
+		runTestHarness(realm, f, false)
 	}
 
 	Debug.Enable()
-	ParseScript("new Test262Error('hello')", realm, nil).Evaluate()
+	dataViewDir := "./test262/test/built-ins/DataView/"
+	_ = dataViewDir
+	//f := makeTest262Path(dataViewDir + "constructor.js")
+	//ParseScript(mustReadFile(f), realm, nil).Evaluate()
 	Debug.Disable()
 }
