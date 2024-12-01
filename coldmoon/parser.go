@@ -67,7 +67,7 @@ func (p *Parser) moduleItem() ModuleItem {
 	case TImport:
 		return p.importDeclaration()
 	case TExport:
-		panic("unimplemented")
+		return p.exportDeclaration()
 	case TEOF:
 		return nil
 	default:
@@ -76,6 +76,123 @@ func (p *Parser) moduleItem() ModuleItem {
 			StatementListItem: item,
 		}
 	}
+}
+
+func (p *Parser) exportDeclaration() (m *ModuleItemExportDeclaration) {
+	p.tokenizer.MustMatch(TExport)
+	if p.tokenizer.Match(TDefault) {
+		if d, ok := parserRecoverOk(p, p.hoistableDeclaration); ok {
+			m.DefaultHoistableDeclaration = d
+		} else if c, ok := parserRecoverOk(p, p.classDeclaration); ok {
+			m.DefaultClassDeclaration = c
+		} else if e, ok := parserRecoverOk[Expression](p, func() Expression {
+			return p.expression(p.acceptContextLowest())
+		}); ok {
+			m.DefaultExpression = e
+		} else {
+			panic("exportDeclaration: expected hoistable declaration, class declaration or expression")
+		}
+	} else if e, ok := parserRecoverOk(p, p.exportFrom); ok {
+		m.ExportFrom = e
+	} else if n, ok := p.namedExports(); ok {
+		m.NamedExports = n
+	} else if v, ok := parserRecoverOk(p, p.variableStatement); ok {
+		m.VariableStatement = v
+	} else if d, ok := parserRecoverOk(p, p.declaration); ok {
+		m.Declaration = d
+	} else {
+		panic("exportDeclaration: unimplemented")
+	}
+	return
+}
+
+func (p *Parser) exportFrom() *ExportFrom {
+	specifiers := p.exportFromClause()
+	p.tokenizer.MustMatch(TFrom)
+	moduleSpecifier := p.stringLiteral()
+	p.automaticSemicolonInsertion()
+	return &ExportFrom{
+		ExportFromClause: specifiers,
+		ModuleSpecifier:  moduleSpecifier,
+	}
+}
+func (p *Parser) exportFromClause() (e *ExportFromClause) {
+	if p.tokenizer.Match(TStar) {
+		if p.tokenizer.Match(TAs) {
+			e.StarAs, _ = p.moduleExportName()
+			return
+		} else {
+			e.Star = true
+			return
+		}
+	} else if n, ok := p.namedExports(); ok {
+		e.NamedExports = n
+		return
+	}
+	panic("exportFromClause: expected * or named exports")
+}
+
+func (p *Parser) moduleExportName() (m *ModuleExportName, ok bool) {
+	if id, _ok := parserRecoverOk(p, p.bindingIdentifier); ok {
+		m.IdentifierName = id
+		ok = _ok
+		return
+	} else if s, _ok := parserRecoverOk(p, p.stringLiteral); ok {
+		m.StringLiteral = s
+		ok = _ok
+		return
+	} else {
+		return
+	}
+}
+
+func (p *Parser) namedExports() (n *NamedExports, ok bool) {
+	specifiers, ok := p.exportSpecifierList()
+	if !ok {
+		return
+	}
+	return &NamedExports{
+		ExportsList: specifiers,
+	}, true
+}
+func (p *Parser) exportSpecifierList() (s *ExportsList, ok bool) {
+	p.tokenizer.MustMatch(TLeftBrace)
+	var items []*ExportSpecifier
+	for {
+		item, ok := p.exportSpecifier()
+		if !ok {
+			break
+		}
+		items = append(items, item)
+		if p.tokenizer.Match(TComma) {
+			continue
+		}
+		if p.tokenizer.CurrentToken.Type == TRightBrace {
+			break
+		}
+	}
+	p.tokenizer.MustMatch(TRightBrace)
+	return &ExportsList{
+		Items: items,
+	}, true
+
+}
+func (p *Parser) exportSpecifier() (s *ExportSpecifier, ok bool) {
+	name, ok := p.moduleExportName()
+	if !ok {
+		return
+	}
+	var alias *ModuleExportName
+	if p.tokenizer.Match(TAs) {
+		alias, ok = p.moduleExportName()
+		if !ok {
+			return
+		}
+	}
+	return &ExportSpecifier{
+		Name:  name,
+		Alias: alias,
+	}, true
 }
 
 func (p *Parser) importDeclaration() *ModuleItemImportDeclaration {

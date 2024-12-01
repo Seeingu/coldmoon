@@ -88,6 +88,17 @@ func (s *SourceTextModule) ToReferrer() ImportedModuleReferrer {
 	}
 }
 
+func (s *SourceTextModule) Link() CompletionValue {
+	// TODO
+	return *NewCompletionValue(UndefinedValue)
+}
+
+// 16.2.1.5.3
+func (s *SourceTextModule) Evaluate() *PromiseObject {
+	// TODO
+	return nil
+}
+
 // [[BindingName]] union
 type BindingName struct {
 	String    string
@@ -106,6 +117,11 @@ func (s *SourceTextModule) ResolveExport(exportName string, resolveSet []*Module
 	return nil
 }
 
+func (s *SourceTextModule) GetExportedNames() Exports {
+	// TODO
+	return []string{}
+}
+
 // 16.2.1.6.1
 func ParseModule(sourceText string, realm *Realm, hostDefined *HostDefined, ctx ParserContext) *SourceTextModule {
 	body := NewParser(sourceText, ctx).ParseModule()
@@ -120,6 +136,17 @@ func ParseModule(sourceText string, realm *Realm, hostDefined *HostDefined, ctx 
 // 16.2.1.5.1.2
 func ContinueModuleLoading(agent *Agent, state *GraphLoadingState, moduleCompletion CompletionModule) {
 	// TODO
+}
+
+// 16.2.1.5.1
+func (s *SourceTextModule) LoadRequestedModules(agent *Agent, hostDefined *HostDefined) ObjectType {
+	realm := agent.CurrentRealm()
+	pc := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
+
+	state := &GraphLoadingState{}
+
+	InnerModuleLoading(agent, state, pc)
+	return pc.Promise
 }
 
 // 16.2.1.6.4
@@ -208,4 +235,8 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 
 	}
 
+}
+
+func InnerModuleLoading(agent *Agent, state *GraphLoadingState, capability *PromiseCapability) {
+	// TODO
 }

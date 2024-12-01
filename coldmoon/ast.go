@@ -3723,8 +3723,45 @@ func (m *ModuleItemImportDeclaration) _moduleItem() {}
 
 // MARK: - ModuleItem: ExportDeclaration
 
+// ModuleItemExportDeclaration Enum
 type ModuleItemExportDeclaration struct {
 	ModuleItem
+	ExportFrom                  *ExportFrom
+	NamedExports                *NamedExports
+	Declaration                 Declaration
+	VariableStatement           *StatementVariable
+	DefaultHoistableDeclaration DeclarationHoistable
+	DefaultClassDeclaration     *DeclarationClass
+	DefaultExpression           Expression
+}
+
+type ExportFrom struct {
+	ExportFromClause *ExportFromClause
+	ModuleSpecifier  *LiteralString
+}
+
+// Enum
+type ExportFromClause struct {
+	Star         bool
+	StarAs       *ModuleExportName
+	NamedExports *NamedExports
+}
+
+type NamedExports struct {
+	ExportsList *ExportsList
+}
+type ExportsList struct {
+	Items []*ExportSpecifier
+}
+type ExportSpecifier struct {
+	Name  *ModuleExportName
+	Alias *ModuleExportName
+}
+
+// Enum
+type ModuleExportName struct {
+	IdentifierName IdentifierName
+	StringLiteral  *LiteralString
 }
 
 func (m *ModuleItemExportDeclaration) _moduleItem() {}
