@@ -17,6 +17,7 @@ type Completion[T any] interface {
 	IsNull() bool
 	IsAbrupt() bool
 	Data() T
+	Error() Value
 }
 
 type completionDefaultImpl[T any] struct {
@@ -44,6 +45,9 @@ func (c *completionDefaultImpl[T]) IsAbrupt() bool {
 }
 func (c *completionDefaultImpl[T]) Data() T {
 	return c.data
+}
+func (c *completionDefaultImpl[T]) Error() Value {
+	return c.err
 }
 
 type completionNormalArgs[T any] struct {
@@ -104,6 +108,21 @@ func NewCompletionObjectNull() *CompletionObject {
 		Type:   CompletionTypeNormal,
 		isNull: true,
 	}
+}
+
+// MARK: - Module
+
+type CompletionModule completionDefaultImpl[*ModuleRecord]
+
+func NewCompletionModule(module *ModuleRecord) CompletionModule {
+	c := newCompletionNormal(completionNormalArgs[*ModuleRecord]{
+		data: module,
+	})
+	return CompletionModule(*c)
+}
+func NewCompletionModuleError(err Value) CompletionModule {
+	c := newCompletionError[*ModuleRecord](err)
+	return CompletionModule(*c)
 }
 
 // MARK: - Value

@@ -26,6 +26,7 @@ type HostHooks struct {
 	HostEnsureCanAddPrivateElement func()
 	HostGetImportMetaProperties    func(module *SourceTextModule) ImportMetaProperties
 	HostFinalizeImportMeta         func(meta ObjectType, module *SourceTextModule)
+	HostLoadImportedModule         func(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined any, payload ImportedModulePayload)
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]*SymbolValue{}
@@ -58,6 +59,7 @@ func NewAgent() *Agent {
 		},
 		HostGetImportMetaProperties: HostGetImportMetaProperties,
 		HostFinalizeImportMeta:      HostFinalizeImportMeta,
+		HostLoadImportedModule:      HostLoadImportedModule,
 	}
 	return a
 }

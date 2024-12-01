@@ -6,7 +6,7 @@ type ScriptRecord struct {
 	ScriptOrModule
 	Realm          *Realm
 	ECMAScriptCode *Script
-	LoadedModules  interface{}
+	LoadedModules  map[string]*ModuleRecord
 	HostDefined    interface{}
 }
 

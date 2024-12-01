@@ -110,6 +110,11 @@ func ParseModule(sourceText string, realm *Realm, hostDefined any, ctx ParserCon
 	}
 }
 
+// 16.2.1.5.1.2
+func ContinueModuleLoading(agent *Agent, state *GraphLoadingState, moduleCompletion CompletionModule) {
+	// TODO
+}
+
 // 16.2.1.6.4
 func (s *SourceTextModule) InitializeEnvironment() *CompletionValue {
 	realm := s.Realm
