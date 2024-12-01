@@ -1967,7 +1967,6 @@ func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
 			e.AddInstruction(&IDelete{})
 		}
 	case UnaryOperatorVoid:
-		u.Operand.Bytecode(e, c)
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
@@ -1975,33 +1974,24 @@ func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
 			Value: UndefinedValue,
 		})
 	case UnaryOperatorTypeof:
-		u.Operand.Bytecode(e, c)
 		e.AddInstruction(InsTypeof)
 	case UnaryOperatorAddition:
-		u.Operand.Bytecode(e, c)
-
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
 		e.AddInstruction(InsToNumber)
 	case UnaryOperatorSubtraction:
-		u.Operand.Bytecode(e, c)
-
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
 		e.AddInstruction(InsToNumeric)
 		e.AddInstruction(InsUnaryMinus)
 	case UnaryOperatorLogicalNot:
-		u.Operand.Bytecode(e, c)
-
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
 		e.AddInstruction(&ILogicalNot{})
 	case UnaryOperatorBitwiseNot:
-		u.Operand.Bytecode(e, c)
-
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
@@ -2010,7 +2000,7 @@ func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 func (u *UnaryExpression) String() string {
-	return "UnaryExpression " + u.Operator.String() + u.Operand.String()
+	return "UnaryExpression " + u.Operator.String() + " " + u.Operand.String()
 }
 
 // MARK: - CallExpression
@@ -3537,6 +3527,7 @@ func (s StatementList) String() string {
 		case *StatementListItemDeclaration:
 			str += t.Declaration.String()
 		}
+		str += "\n"
 	}
 	return str
 }

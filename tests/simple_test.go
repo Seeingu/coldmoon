@@ -6,6 +6,7 @@ import (
 )
 
 func testSource(t *testing.T, s string) {
+	Debug.Enable()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
@@ -13,11 +14,18 @@ func testSource(t *testing.T, s string) {
 	sourceText := s
 	script := ParseScript(sourceText, realm, nil)
 	_ = script.Evaluate()
-
+	Debug.Disable()
 }
 
 func TestBaseline(t *testing.T) {
 	var sourceText string
+
+	sourceText = `
+function a() {}
+a.b = 1;
+a.b;
+`
+	testSource(t, sourceText)
 
 	sourceText = `
 const a = {};

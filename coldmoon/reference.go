@@ -144,7 +144,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 			baseObj,
 			referencedName,
 			value,
-			r.ThisValue)
+			r.GetThisValue())
 		if !succeeded && r.Strict {
 			panic("TypeError")
 		}
