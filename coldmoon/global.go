@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -51,6 +52,7 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 		{"parseFloat", NewValueFromObject(r.Intrinsics.ParseFloat)},
 		{"RegExp", NewValueFromObject(r.Intrinsics.RegExpConstructor)},
 		{"DataView", NewValueFromObject(r.Intrinsics.DataViewConstructor)},
+		{"decodeURI", NewValueFromObject(r.Intrinsics.DecodeURI)},
 	}
 
 	var properties []constructorProperties
@@ -202,5 +204,33 @@ func NewParseFloat(realm *Realm) ObjectType {
 	return CreateBuiltinFunction(agent, parseFloat, 1, "parseFloat", builtinFunctionArgs{
 		realm: realm,
 	})
+}
 
+func NewDecodeURI(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var decodeURI BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		uriString := ToString(agent, arguments[0]).String()
+		preserveEscapeSet := ";/?:@&=+$,#"
+		return NewStringValue(decode(agent, uriString, preserveEscapeSet))
+	}
+	return CreateBuiltinFunction(agent, decodeURI, 1, "decodeURI", builtinFunctionArgs{
+		realm: realm,
+	})
+}
+
+func NewDecodeURIComponent(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var decodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		uriString := ToString(agent, arguments[0]).String()
+		preserveEscapeSet := ""
+		return NewStringValue(decode(agent, uriString, preserveEscapeSet))
+	}
+	return CreateBuiltinFunction(agent, decodeURIComponent, 1, "decodeURIComponent", builtinFunctionArgs{
+		realm: realm,
+	})
+}
+
+func decode(agent *Agent, uriString string, reservedSet string) string {
+	// TODO:
+	return url.QueryEscape(uriString)
 }

@@ -105,6 +105,10 @@ type Intrinsics struct {
 	ParseInt ObjectType
 	// %parseFloat%
 	ParseFloat ObjectType
+	// %decodeURI%
+	DecodeURI ObjectType
+	// %decodeURIComponent%
+	DecodeURIComponent ObjectType
 	// %RegExp%
 	RegExpConstructor ObjectType
 	// %RegExp.prototype%
