@@ -8,7 +8,8 @@ type EnvironmentRecord interface {
 	CreateImmutableBinding(name string, strict bool)
 	InitializeBinding(name string, value Value)
 	SetMutableBinding(name string, value Value, strict bool)
-	GetBindingValue(name string, strict bool) Value
+	// GetBindingValue ( N, S ) returns either a normal completion value or a throw completion.
+	GetBindingValue(agent *Agent, name string, strict bool) *CompletionValue
 	DeleteBinding(name string) bool
 	HasThisBinding() bool
 	HasSuperBinding() bool

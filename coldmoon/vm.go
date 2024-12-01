@@ -142,7 +142,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		}
 		var value = vm.result
 		if vm.reference != nil {
-			value = vm.reference.GetValue()
+			value = vm.reference.GetValue(agent)
 		}
 
 		switch v := value.(type) {
@@ -257,7 +257,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		}
 	case *IGetValue:
 		if vm.reference != nil {
-			vm.result = vm.reference.GetValue()
+			vm.result = vm.reference.GetValue(agent)
 		}
 		vm.reference = nil
 	case *IArrayCreate:

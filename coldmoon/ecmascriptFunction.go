@@ -335,7 +335,7 @@ loop:
 				var initialValue Value
 				if !lo.Contains(parameterNames, varName) || lo.Contains(functionNames, varName) {
 				} else {
-					initialValue = env.GetBindingValue(string(varName), false)
+					initialValue = env.GetBindingValue(agent, string(varName), false).Value
 				}
 				varEnv.InitializeBinding(string(varName), initialValue)
 			}

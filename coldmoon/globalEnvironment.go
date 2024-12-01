@@ -89,13 +89,13 @@ func (g *GlobalEnvironment) SetMutableBinding(name string, value Value, strict b
 }
 
 // 9.1.1.4.6
-func (g *GlobalEnvironment) GetBindingValue(name string, strict bool) Value {
+func (g *GlobalEnvironment) GetBindingValue(agent *Agent, name string, strict bool) *CompletionValue {
 	DclRec := g.DeclarativeRecord
 	if DclRec.HasBinding(name) {
-		return DclRec.GetBindingValue(name, strict)
+		return DclRec.GetBindingValue(agent, name, strict)
 	}
 	ObjRec := g.ObjectRecord
-	return ObjRec.GetBindingValue(name, strict)
+	return ObjRec.GetBindingValue(agent, name, strict)
 }
 
 func (g *GlobalEnvironment) DeleteBinding(name string) bool {

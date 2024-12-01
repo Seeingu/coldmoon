@@ -201,7 +201,7 @@ func MakeArgGetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 	var getterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		function := agent.ActiveFunctionObject()
 		_captures := function.(*BuiltinFunction).AdditionalFields.ArgGetterSetterCaptures
-		return _captures.Env.GetBindingValue(_captures.Name, false)
+		return _captures.Env.GetBindingValue(agent, _captures.Name, false).Value
 	}
 	getter := CreateBuiltinFunction(agent, getterClosure, 1, "", builtinFunctionArgs{
 		additionalFields: &AdditionalFields{

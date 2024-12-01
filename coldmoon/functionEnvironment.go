@@ -10,7 +10,6 @@ const (
 
 type FunctionEnvironment struct {
 	*DeclarativeEnvironment
-	outerEnv          EnvironmentRecord
 	thisBindingStatus ThisBindingStatus
 	thisValue         Value
 	FunctionObject    *ECMAScriptFunction
@@ -26,9 +25,8 @@ func NewFunctionEnvironment(function *ECMAScriptFunction, newTarget ObjectType) 
 		FunctionObject:         function,
 		thisBindingStatus:      thisBindingStatus,
 		NewTarget:              newTarget,
-		outerEnv:               function.Environment,
 		thisValue:              nil,
-		DeclarativeEnvironment: NewDeclarativeEnvironment(nil),
+		DeclarativeEnvironment: NewDeclarativeEnvironment(function.Environment),
 	}
 }
 
@@ -71,8 +69,4 @@ func (f *FunctionEnvironment) GetSuperBase() Value {
 		return UndefinedValue
 	}
 	return home.InternalMethods().GetPrototypeOf(home).ToValue()
-}
-
-func (f *FunctionEnvironment) OuterEnv() EnvironmentRecord {
-	return f.outerEnv
 }

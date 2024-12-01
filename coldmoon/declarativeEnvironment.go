@@ -29,9 +29,12 @@ func (d *DeclarativeEnvironment) HasThisBinding() bool {
 }
 
 // 9.1.1.1.6
-func (d *DeclarativeEnvironment) GetBindingValue(name string, strict bool) Value {
-	binding, _ := d.Bindings[name]
-	return binding.Value
+func (d *DeclarativeEnvironment) GetBindingValue(agent *Agent, name string, strict bool) *CompletionValue {
+	binding, ok := d.Bindings[name]
+	if !ok {
+		return NewCompletionValueError(agent.ThrowException(ReferenceError, "Binding not found"))
+	}
+	return binding.Value.ToCompletion()
 }
 
 func (d *DeclarativeEnvironment) DeleteBinding(name string) bool {

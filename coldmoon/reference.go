@@ -85,7 +85,7 @@ func (r *ReferenceRecord) IsPrivateReference() bool {
 }
 
 // 6.2.5.5
-func (r *ReferenceRecord) GetValue() Value {
+func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 	if r.IsUnresolvableReference() {
 		panic("ReferenceError")
 	}
@@ -106,7 +106,7 @@ func (r *ReferenceRecord) GetValue() Value {
 		panic("unreachable")
 	} else {
 		base := r.Base.(*ReferenceRecordBaseEnvironment)
-		return base.Environment.GetBindingValue(r.ReferencedName.(*ReferencedNameString).String, r.Strict)
+		return base.Environment.GetBindingValue(agent, r.ReferencedName.(*ReferencedNameString).String, r.Strict).Value
 	}
 }
 

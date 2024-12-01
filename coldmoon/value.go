@@ -13,6 +13,8 @@ import (
 	"lukechampine.com/uint128"
 )
 
+// MARK: - PreferredType
+
 type PreferredType int
 
 const (
@@ -41,12 +43,17 @@ type Value interface {
 	ToCompletion() *CompletionValue
 }
 
+// MARK: - UndefinedValue
+
 type undefinedValue struct {
 	Value
 }
 
 var _ Value = (*undefinedValue)(nil)
 
+func (u *undefinedValue) ToCompletion() *CompletionValue {
+	return NewNormalCompletion(u)
+}
 func (u *undefinedValue) String() string {
 	return "undefined"
 }
@@ -102,6 +109,10 @@ var NegativeInfinityValue = NumberValue{Data: math.Inf(-1)}
 type ObjectValue struct {
 	Value
 	Object ObjectType
+}
+
+func (o *ObjectValue) ToCompletion() *CompletionValue {
+	return NewCompletionValue(o)
 }
 
 func (o *ObjectValue) CallAssumeCallable(value Value, argumentsList ArgumentsList) Value {

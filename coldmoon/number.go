@@ -19,7 +19,9 @@ func NewNumberValue(v float64) *NumberValue {
 	}
 }
 
-var _ Value = (*NumberValue)(nil)
+func (n *NumberValue) ToCompletion() *CompletionValue {
+	return NewCompletionValue(n)
+}
 
 func (n *NumberValue) String() string {
 	return fmt.Sprintf("%f", n.Data)
