@@ -7,14 +7,21 @@ type ScriptRecord struct {
 	Realm          *Realm
 	ECMAScriptCode *Script
 	LoadedModules  map[string]*ModuleRecord
-	HostDefined    interface{}
+	HostDefined    *HostDefined
 }
 
 func (s *ScriptRecord) _scriptOrModule() {}
+func (s *ScriptRecord) ToReferrer() ImportedModuleReferrer {
+	return ImportedModuleReferrer{
+		Script: s,
+		Module: nil,
+		Realm:  nil,
+	}
+}
 
 // ParseScript
 // 16.1.5
-func ParseScript(sourceText string, realm *Realm, hostDefined interface{}) *ScriptRecord {
+func ParseScript(sourceText string, realm *Realm, hostDefined *HostDefined) *ScriptRecord {
 	script := NewParser(sourceText, ParserContext{FileName: "file.js"}).Parse()
 
 	s := &ScriptRecord{

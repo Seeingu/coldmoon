@@ -845,6 +845,14 @@ type Expression interface {
 	AssignmentTargetType() AssignmentTargetType
 }
 
+type expressionDefaultImpl struct {
+	Expression
+}
+
+func (e *expressionDefaultImpl) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
 func ExpressionAnalyze(e Expression, a AnalyzeQuery) bool {
 	switch a {
 	case AnalyzeQueryIsReference:
@@ -865,6 +873,25 @@ func ExpressionAnalyze(e Expression, a AnalyzeQuery) bool {
 		}
 	}
 	panic("unreachable")
+}
+
+// MARK: - ImportCall
+
+type ExpressionImportCall struct {
+	*expressionDefaultImpl
+	Expression Expression
+}
+
+func (i *ExpressionImportCall) Bytecode(e *Executable, c *BytecodeContext) {
+	i.Expression.Bytecode(e, c)
+	if ExpressionAnalyze(i.Expression, AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	e.AddInstruction(InsLoad)
+	e.AddInstruction(&IImportCall{})
+}
+func (i *ExpressionImportCall) String() string {
+	return "import(" + i.Expression.String() + ")"
 }
 
 // MARK: - OptionalExpression

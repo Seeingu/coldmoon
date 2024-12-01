@@ -16,6 +16,14 @@ type Realm struct {
 	Rng            rand.Rand
 }
 
+func (r *Realm) ToReferrer() ImportedModuleReferrer {
+	return ImportedModuleReferrer{
+		Script: nil,
+		Module: nil,
+		Realm:  r,
+	}
+}
+
 // CreateRealm creates a new realm.
 // 9.3.1
 func CreateRealm(agent *Agent) *Realm {

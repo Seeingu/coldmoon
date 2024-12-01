@@ -1041,6 +1041,21 @@ func (p *Parser) expressionStatement() *StatementExpression {
 	}
 }
 
+func (p *Parser) importCall() (*ExpressionImportCall, bool) {
+	t := p.tokenizer.CurrentToken
+	if t.Type != TImport {
+		return nil, false
+	}
+	p.tokenizer.Next()
+	p.tokenizer.MustMatch(TLeftParen)
+	e := p.expression(p.acceptContextLowest())
+	p.tokenizer.MustMatch(TRightParen)
+	p.automaticSemicolonInsertion()
+	return &ExpressionImportCall{
+		Expression: e,
+	}, true
+}
+
 func (p *Parser) superCall() (*ExpressionSuperCall, bool) {
 	t := p.tokenizer.CurrentToken
 	if t.Type != TSuper {
@@ -1192,6 +1207,8 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 		e = super
 	} else if super, ok := p.superCall(); ok {
 		e = super
+	} else if i, ok := p.importCall(); ok {
+		e = i
 	} else if newExpression, ok := p.newExpression(); ok {
 		e = newExpression
 	} else {

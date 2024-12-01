@@ -597,7 +597,7 @@ func (i *IEvaluateSuperCall) String() string {
 	return "IEvaluateSuperCall"
 }
 
-// MARK: - Import Meta
+// MARK: - Import
 
 type IGetOrCreateImportMeta struct {
 	Instruction
@@ -605,6 +605,14 @@ type IGetOrCreateImportMeta struct {
 
 func (i *IGetOrCreateImportMeta) String() string {
 	return "GetOrCreateImportMeta"
+}
+
+type IImportCall struct {
+	Instruction
+}
+
+func (i *IImportCall) String() string {
+	return "IEvaluateImportCall"
 }
 
 // MARK: - Instruction Constant

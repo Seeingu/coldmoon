@@ -26,7 +26,7 @@ type HostHooks struct {
 	HostEnsureCanAddPrivateElement func()
 	HostGetImportMetaProperties    func(module *SourceTextModule) ImportMetaProperties
 	HostFinalizeImportMeta         func(meta ObjectType, module *SourceTextModule)
-	HostLoadImportedModule         func(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined any, payload ImportedModulePayload)
+	HostLoadImportedModule         func(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined *HostDefined, payload ImportedModulePayload)
 }
 
 var WellKnownSymbols = map[WellKnownSymbolsKey]*SymbolValue{}
@@ -78,6 +78,7 @@ func (a *Agent) ActiveFunctionObject() ObjectType {
 }
 
 // 9.4.1
+// return nil if there is no active script or module
 func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
 	if a.ExecutionContextStack.IsEmpty() {
 		return nil

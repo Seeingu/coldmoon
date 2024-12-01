@@ -65,7 +65,7 @@ func HostFinalizeImportMeta(meta ObjectType, module *SourceTextModule) {
 	// return UNUSED
 }
 
-func HostLoadImportedModule(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined any, payload ImportedModulePayload) {
+func HostLoadImportedModule(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined *HostDefined, payload ImportedModulePayload) {
 	result := NewCompletionModule(nil)
 	FinishLoadingImportedModule(agent, referrer, specifier, payload, result)
 }

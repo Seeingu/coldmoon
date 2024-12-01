@@ -17,6 +17,12 @@ type PromiseCapability struct {
 	Reject  ObjectType
 }
 
+func (p *PromiseCapability) ToImportedModulePayload() ImportedModulePayload {
+	return ImportedModulePayload{
+		PromiseCapability: p,
+	}
+}
+
 func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 	if !IsConstructor(constructor) {
 		panic("TypeError")
@@ -80,7 +86,7 @@ type PromiseReaction struct {
 
 type JobCallback struct {
 	Callback    ObjectType
-	HostDefined interface{}
+	HostDefined *HostDefined
 }
 
 type RemainingElements struct {

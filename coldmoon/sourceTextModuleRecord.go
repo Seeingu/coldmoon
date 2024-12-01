@@ -74,12 +74,19 @@ type SourceTextModule struct {
 	// [[StarExportEntries]]
 	StarExportEntries []ExportEntry
 	// [[HostDefined]]
-	HostDefined any
+	HostDefined *HostDefined
 	// [[HasTLA]]
 	HasTLA bool
 }
 
 func (s *SourceTextModule) _scriptOrModule() {}
+func (s *SourceTextModule) ToReferrer() ImportedModuleReferrer {
+	return ImportedModuleReferrer{
+		Script: nil,
+		Module: s,
+		Realm:  nil,
+	}
+}
 
 // [[BindingName]] union
 type BindingName struct {
@@ -100,7 +107,7 @@ func (s *SourceTextModule) ResolveExport(exportName string, resolveSet []*Module
 }
 
 // 16.2.1.6.1
-func ParseModule(sourceText string, realm *Realm, hostDefined any, ctx ParserContext) *SourceTextModule {
+func ParseModule(sourceText string, realm *Realm, hostDefined *HostDefined, ctx ParserContext) *SourceTextModule {
 	body := NewParser(sourceText, ctx).ParseModule()
 
 	return &SourceTextModule{

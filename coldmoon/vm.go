@@ -547,6 +547,27 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		} else {
 			vm.result = module.ImportMeta.ToValue()
 		}
+	case *IImportCall:
+		realm := agent.CurrentRealm()
+		var referrer ImportedModuleReferrer
+		if a := agent.GetActiveScriptOrModule(); a != nil {
+			referrer = a.toReferrer()
+		} else {
+			referrer = realm.ToReferrer()
+		}
+
+		specifier := vm.stack.Pop()
+		promiseCapability := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
+		specifierString := ToString(agent, specifier)
+
+		agent.HostHooks.HostLoadImportedModule(
+			agent,
+			referrer,
+			specifierString.Data,
+			nil,
+			promiseCapability.ToImportedModulePayload(),
+		)
+		vm.result = promiseCapability.Promise.ToValue()
 	}
 }
 

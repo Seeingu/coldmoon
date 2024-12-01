@@ -3,6 +3,7 @@ package coldmoon
 // 9.4
 type ScriptOrModule interface {
 	_scriptOrModule()
+	toReferrer() ImportedModuleReferrer
 }
 
 type ExecutionContextAdditionalState struct {
