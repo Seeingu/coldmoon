@@ -3389,6 +3389,7 @@ type ClassBody struct {
 	ClassElementList *ClassElementList
 }
 
+// 15.7.3
 func (c *ClassBody) ConstructorMethod() *MethodDefinition {
 	for _, item := range c.ClassElementList.Items {
 		if item.ClassElementKind() == ClassElementKindConstructorMethod {
@@ -3403,6 +3404,7 @@ func (c *ClassBody) PrivateBoundIdentifiers() (l []PrivateIdentifierName) {
 	return
 }
 
+// 15.7.5
 func (c *ClassBody) NonConstructorElements() (l []ClassElement) {
 	for _, item := range c.ClassElementList.Items {
 		if item.ClassElementKind() == ClassElementKindNonConstructorMethod {

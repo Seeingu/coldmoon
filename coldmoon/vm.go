@@ -289,7 +289,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		spread := vm.stack.Pop()
 		arrayValue := vm.stack.Pop()
 		array := MustGetObject(arrayValue)
-		iteratorRecord := GetIterator(vm.agent, spread, GetIteratorKindSync)
+		iteratorRecord := GetIterator(vm.agent, spread, GetIteratorKindSync).Data()
 		nextIndex, _ := ValueGetLength(arrayValue)
 		for {
 			next := iteratorRecord.IteratorStep()
@@ -719,7 +719,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 
 	DefineMethodProperty(proto, NewStringPropertyKey("constructor"), function, false)
 
-	elements := classTail.ClassBody.ClassElementList.Items
+	elements := classTail.ClassBody.NonConstructorElements()
 
 	instanceFields := make([]*ClassFieldDefinition, 0)
 

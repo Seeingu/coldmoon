@@ -30,7 +30,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		}
 		iteratorRecord := GetIterator(agent, iterable, GetIteratorKindSync)
 		for {
-			next := iteratorRecord.IteratorStep()
+			next := iteratorRecord.Data().IteratorStep()
 			if next.(*BooleanObject).Data == false {
 				return NewValueFromObject(s)
 			}

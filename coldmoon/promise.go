@@ -256,8 +256,121 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(PromiseResolve(agent, MustGetObject(C), resolution))
 	}
+	var race = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		iterable := arguments[0]
+		C := this
+		promiseCapability := NewPromiseCapability(agent, C)
+		promiseResolveCompletion := GetPromiseResolve(agent, MustGetObject(C))
+		if !IfAbruptRejectPromise(agent, promiseResolveCompletion, promiseCapability) {
+			return UndefinedValue
+		}
+		promiseResolve := promiseResolveCompletion.Data()
+
+		iteratorRecordCompletion := GetIterator(agent, iterable, GetIteratorKindSync)
+		if !IfAbruptRejectPromise(agent, iteratorRecordCompletion, promiseCapability) {
+			return UndefinedValue
+		}
+		iteratorRecord := iteratorRecordCompletion.Data()
+
+		result := PerformPromiseRace(agent, iteratorRecord, MustGetObject(C), promiseCapability, promiseResolve)
+		if result.IsAbrupt() {
+			if !iteratorRecord.Done {
+				iteratorRecord.IteratorClose()
+			}
+			if !IfAbruptRejectPromise(agent, result, promiseCapability) {
+				return UndefinedValue
+			}
+		}
+		return result.Data()
+	}
+	var all = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		iterable := arguments[0]
+		C := this
+		promiseCapability := NewPromiseCapability(agent, C)
+		promiseResolveCompletion := GetPromiseResolve(agent, MustGetObject(C))
+		if !IfAbruptRejectPromise(agent, promiseResolveCompletion, promiseCapability) {
+			return UndefinedValue
+		}
+		promiseResolve := promiseResolveCompletion.Data()
+
+		iteratorRecordCompletion := GetIterator(agent, iterable, GetIteratorKindSync)
+		if !IfAbruptRejectPromise(agent, iteratorRecordCompletion, promiseCapability) {
+			return UndefinedValue
+		}
+		iteratorRecord := iteratorRecordCompletion.Data()
+
+		result := PerformPromiseAll(agent, iteratorRecord, MustGetObject(C), promiseCapability, promiseResolve)
+		if result.IsAbrupt() {
+			if !iteratorRecord.Done {
+				iteratorRecord.IteratorClose()
+			}
+			if !IfAbruptRejectPromise(agent, result, promiseCapability) {
+				return UndefinedValue
+			}
+		}
+		return result.Data()
+	}
+	var allSettled = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		iterable := arguments[0]
+		C := this
+		promiseCapability := NewPromiseCapability(agent, C)
+		promiseResolveCompletion := GetPromiseResolve(agent, MustGetObject(C))
+		if !IfAbruptRejectPromise(agent, promiseResolveCompletion, promiseCapability) {
+			return UndefinedValue
+		}
+		promiseResolve := promiseResolveCompletion.Data()
+
+		iteratorRecordCompletion := GetIterator(agent, iterable, GetIteratorKindSync)
+		if !IfAbruptRejectPromise(agent, iteratorRecordCompletion, promiseCapability) {
+			return UndefinedValue
+		}
+		iteratorRecord := iteratorRecordCompletion.Data()
+
+		result := PerformPromiseAllSettled(agent, iteratorRecord, MustGetObject(C), promiseCapability, promiseResolve)
+		if result.IsAbrupt() {
+			if !iteratorRecord.Done {
+				iteratorRecord.IteratorClose()
+			}
+			if !IfAbruptRejectPromise(agent, result, promiseCapability) {
+				return UndefinedValue
+			}
+		}
+		return result.Data()
+	}
+	var promiseAny = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		iterable := arguments[0]
+		C := this
+		promiseCapability := NewPromiseCapability(agent, C)
+		promiseResolveCompletion := GetPromiseResolve(agent, MustGetObject(C))
+		if !IfAbruptRejectPromise(agent, promiseResolveCompletion, promiseCapability) {
+			return UndefinedValue
+		}
+		promiseResolve := promiseResolveCompletion.Data()
+
+		iteratorRecordCompletion := GetIterator(agent, iterable, GetIteratorKindSync)
+		if !IfAbruptRejectPromise(agent, iteratorRecordCompletion, promiseCapability) {
+			return UndefinedValue
+		}
+		iteratorRecord := iteratorRecordCompletion.Data()
+
+		result := PerformPromiseAny(agent, iteratorRecord, MustGetObject(C), promiseCapability, promiseResolve)
+		if result.IsAbrupt() {
+			if !iteratorRecord.Done {
+				iteratorRecord.IteratorClose()
+			}
+			if !IfAbruptRejectPromise(agent, result, promiseCapability) {
+				return UndefinedValue
+			}
+		}
+		return result.Data()
+
+	}
 	DefineBuiltinFunction(object, "reject", reject, 1, realm)
 	DefineBuiltinFunction(object, "resolve", resolve, 1, realm)
+	DefineBuiltinFunction(object, "race", race, 1, realm)
+	DefineBuiltinFunction(object, "all", all, 1, realm)
+	DefineBuiltinFunction(object, "allSettled", allSettled, 1, realm)
+	DefineBuiltinFunction(object, "any", promiseAny, 1, realm)
 
 	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return this
@@ -300,12 +413,12 @@ type AdditionalFields struct {
 	ClassConstructorFields     *ClassConstructorFields
 }
 
-func IfAbruptRejectPromise(agent *Agent, value CompletionValue, capability *PromiseCapability) Value {
+func IfAbruptRejectPromise[T any](agent *Agent, value Completion[T], capability *PromiseCapability) bool {
 	if value.IsAbrupt() {
 		capability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{value.Error()})
-		return capability.Promise.ToValue()
+		return false
 	}
-	return value.Data()
+	return true
 }
 
 // 27.2.1.3
@@ -557,6 +670,195 @@ func PerformPromiseThen(agent *Agent, promise ObjectType, onFulfilled Value, onR
 	}
 }
 
+func PerformPromiseAll(
+	agent *Agent,
+	iterator *IteratorRecord,
+	constructor ObjectType,
+	resultCapability *PromiseCapability,
+	promiseResolve ObjectType,
+) CompletionValue {
+	values := []Value{}
+	remainingElements := &RemainingElements{Value: 1}
+	var index int = 0
+	for {
+		next := iterator.IteratorStep()
+		if next == nil {
+			iterator.Done = true
+			remainingElements.Value--
+			if remainingElements.Value == 0 {
+				valuesArray := CreateArrayFromList(agent, values)
+				resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+			}
+			return NewCompletionValue(resultCapability.Promise.ToValue())
+		}
+
+		nextValue := IteratorValue(next)
+		values = append(values, nextValue)
+		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
+
+		// TODO: use slot
+		// [[AlreadyCalled]]
+		alreadyCalled := false
+
+		var steps = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			if alreadyCalled {
+				return UndefinedValue
+			}
+			alreadyCalled = true
+			values[index] = arguments[0]
+			remainingElements.Value--
+			if remainingElements.Value == 0 {
+				valuesArray := CreateArrayFromList(agent, values)
+				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+			}
+			return UndefinedValue
+		}
+		length := 1
+		onFulfilled := CreateBuiltinFunction(agent, steps, float64(length), "", builtinFunctionArgs{})
+
+		remainingElements.Value++
+		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
+		index++
+	}
+
+}
+
+func PerformPromiseAllSettled(
+	agent *Agent,
+	iterator *IteratorRecord,
+	constructor ObjectType,
+	resultCapability *PromiseCapability,
+	promiseResolve ObjectType,
+) CompletionValue {
+	values := []Value{}
+	remainingElements := &RemainingElements{Value: 1}
+	var index int = 0
+	for {
+		next := iterator.IteratorStep()
+		if next == nil {
+			iterator.Done = true
+			remainingElements.Value--
+			if remainingElements.Value == 0 {
+				valuesArray := CreateArrayFromList(agent, values)
+				resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+			}
+			return NewCompletionValue(resultCapability.Promise.ToValue())
+		}
+
+		nextValue := IteratorValue(next)
+		values = append(values, nextValue)
+		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
+
+		// [[AlreadyCalled]]
+		alreadyCalled := false
+
+		var stepsFulfilled = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			if alreadyCalled {
+				return UndefinedValue
+			}
+			alreadyCalled = true
+			obj := OrdinaryObjectCreate(agent, agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
+			obj.CreateDataPropertyOrThrow(NewStringPropertyKey("status"), NewStringValue("fulfilled"))
+			obj.CreateDataPropertyOrThrow(NewStringPropertyKey("value"), arguments[0])
+			values[index] = obj.ToValue()
+			remainingElements.Value--
+			if remainingElements.Value == 0 {
+				valuesArray := CreateArrayFromList(agent, values)
+				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+			}
+			return UndefinedValue
+		}
+		lengthFulfilled := 1
+		onFulfilled := CreateBuiltinFunction(agent, stepsFulfilled, float64(lengthFulfilled), "", builtinFunctionArgs{})
+
+		var stepsReject = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			if alreadyCalled {
+				return UndefinedValue
+			}
+			alreadyCalled = true
+			obj := OrdinaryObjectCreate(agent, agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
+			obj.CreateDataPropertyOrThrow(NewStringPropertyKey("status"), NewStringValue("rejected"))
+			obj.CreateDataPropertyOrThrow(NewStringPropertyKey("reason"), arguments[0])
+			values[index] = obj.ToValue()
+			remainingElements.Value--
+			if remainingElements.Value == 0 {
+				valuesArray := CreateArrayFromList(agent, values)
+				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+			}
+			return UndefinedValue
+		}
+		lengthRejected := 1
+		onRejected := CreateBuiltinFunction(agent, stepsReject, float64(lengthRejected), "", builtinFunctionArgs{})
+
+		remainingElements.Value++
+		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), onRejected.ToValue()})
+		index++
+	}
+}
+
+func PerformPromiseAny(
+	agent *Agent,
+	iterator *IteratorRecord,
+	constructor ObjectType,
+	resultCapability *PromiseCapability,
+	promiseResolve ObjectType,
+) CompletionValue {
+	var errors []Value
+	remainingElements := &RemainingElements{Value: 1}
+	var index int = 0
+	for {
+		next := iterator.IteratorStep()
+		if next == nil {
+			iterator.Done = true
+			remainingElements.Value--
+			if remainingElements.Value == 0 {
+				err := MustGetObject(agent.ThrowException(AggregateError, "No promises in Promise.any were resolved"))
+				err.DefinePropertyOrThrow(NewStringPropertyKey("errors"), &PropertyDescriptor{
+					Value:        CreateArrayFromList(agent, errors).ToValue(),
+					Writable:     true,
+					Enumerable:   false,
+					Configurable: true,
+				})
+				return NewCompletionValueError(err.ToValue())
+			}
+			return NewCompletionValue(resultCapability.Promise.ToValue())
+		}
+
+		nextValue := IteratorValue(next)
+		errors = append(errors, UndefinedValue)
+		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
+
+		// [[AlreadyCalled]]
+		alreadyCalled := false
+
+		var stepsRejected = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			if alreadyCalled {
+				return UndefinedValue
+			}
+			alreadyCalled = true
+			errors[index] = arguments[0]
+			remainingElements.Value--
+			if remainingElements.Value == 0 {
+				err := MustGetObject(agent.ThrowException(AggregateError, "All promises in Promise.any were rejected"))
+				err.DefinePropertyOrThrow(NewStringPropertyKey("errors"), &PropertyDescriptor{
+					Value:        CreateArrayFromList(agent, errors).ToValue(),
+					Writable:     true,
+					Enumerable:   false,
+					Configurable: true,
+				})
+				return resultCapability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{err.ToValue()})
+			}
+			return UndefinedValue
+		}
+		length := 1
+		onFulfilled := CreateBuiltinFunction(agent, stepsRejected, float64(length), "", builtinFunctionArgs{})
+
+		remainingElements.Value++
+		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
+		index++
+	}
+}
+
 // 27.2.2.2
 func NewPromiseResolveThenableJob(agent *Agent, promise *PromiseObject, thenable ObjectType, thenJobCallback *JobCallback) *PromiseReactionJob {
 	captures := &PromiseJobThenableReactionCaptures{
@@ -592,4 +894,33 @@ func NewPromiseResolveThenableJob(agent *Agent, promise *PromiseObject, thenable
 		Realm: thenRealm,
 		Job:   job,
 	}
+}
+
+func PerformPromiseRace(
+	agent *Agent,
+	iterator *IteratorRecord,
+	constructor ObjectType,
+	resultCapability *PromiseCapability,
+	promiseResolve ObjectType,
+) CompletionValue {
+	for {
+		next := iterator.IteratorStep()
+		if next == nil {
+			iterator.Done = true
+			return resultCapability.Promise.ToCompletion()
+		}
+
+		nextValue := IteratorValue(next)
+		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
+		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{resultCapability.Resolve.ToValue(), resultCapability.Reject.ToValue()})
+	}
+}
+
+// 27.2.4.1.1
+func GetPromiseResolve(agent *Agent, promiseConstructor ObjectType) CompletionObject {
+	promiseResolve := promiseConstructor.Get(NewStringPropertyKey("resolve"))
+	if !IsCallable(promiseResolve) {
+		return NewCompletionObjectError(agent.ThrowException(TypeError, "Promise.resolve is not callable"))
+	}
+	return NewCompletionObject(MustGetObject(promiseResolve))
 }

@@ -6,6 +6,10 @@ type IteratorRecord struct {
 	Done       bool
 }
 
+func (i *IteratorRecord) ToCompletion() Completion[*IteratorRecord] {
+	return NewNormalCompletion(i)
+}
+
 func NewIteratorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
@@ -38,7 +42,7 @@ const (
 	GetIteratorKindAsync
 )
 
-func GetIterator(agent *Agent, obj Value, kind GetIteratorKind) *IteratorRecord {
+func GetIterator(agent *Agent, obj Value, kind GetIteratorKind) Completion[*IteratorRecord] {
 	var method ObjectType
 	switch kind {
 	case GetIteratorKindSync:
@@ -51,13 +55,13 @@ func GetIterator(agent *Agent, obj Value, kind GetIteratorKind) *IteratorRecord 
 				panic("TypeError")
 			}
 			syncIteratorRecord := GetIteratorFromMethod(agent, obj, syncMethod)
-			return CreateAsyncFromSyncIterator(syncIteratorRecord)
+			return CreateAsyncFromSyncIterator(syncIteratorRecord).ToCompletion()
 		}
 	}
 	if method == nil {
-		panic("TypeError")
+		return NewThrowCompletion[*IteratorRecord](agent.ThrowException(TypeError, "No iterator method"))
 	}
-	return GetIteratorFromMethod(agent, obj, method)
+	return GetIteratorFromMethod(agent, obj, method).ToCompletion()
 }
 
 // 7.4.4

@@ -41,6 +41,7 @@ const (
 	SyntaxError
 	TypeError
 	URIError
+	AggregateError
 )
 
 func NewAgent() *Agent {
