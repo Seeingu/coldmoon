@@ -5,6 +5,10 @@ import (
 	"strconv"
 )
 
+type boundName interface {
+	BoundNames() (l []IdentifierName)
+}
+
 type ASTNode interface {
 	String() string
 	Bytecode(e *Executable, c *BytecodeContext)
@@ -1386,7 +1390,7 @@ func (e *ExpressionAssignmentExpression) Bytecode(ex *Executable, c *BytecodeCon
 			AssignmentOperatorBitwiseOr:          BinaryOperatorBitwiseOr,
 			AssignmentOperatorExponentiation:     BinaryOperatorExponentiation,
 		}
-		op, _ := operatorMap[e.Operator]
+		op := operatorMap[e.Operator]
 		ex.AddInstruction(&IApplyStringOrNumericBinaryOperator{
 			Operator: op,
 		})
@@ -2623,8 +2627,14 @@ func (f *FormalParameter) String() string {
 // - BindingIdentifier[?Yield, ?Await] Initializer[+In, ?Yield, ?Await] opt
 type SingleNameBinding struct {
 	ASTNode
+	boundName
 	BindingIdentifier IdentifierName
 	Initializer       Expression
+}
+
+func (s *SingleNameBinding) BoundNames() (l []IdentifierName) {
+	l = append(l, s.BindingIdentifier)
+	return
 }
 
 func (s *SingleNameBinding) String() string {
@@ -2732,8 +2742,29 @@ func (a *ArrayBindingPattern) String() string {
 
 // BindingPattern : ObjectBindingPattern | ArrayBindingPattern
 type BindingPattern struct {
+	boundName
 	ObjectBindingPattern *ObjectBindingPattern
 	ArrayBindingPattern  *ArrayBindingPattern
+}
+
+func (b *BindingPattern) BoundNames() (l []IdentifierName) {
+	if b.ObjectBindingPattern != nil {
+		for _, p := range b.ObjectBindingPattern.Properties {
+			for _, bp := range p.BindingPropertyList {
+				if bp.SingleNameBinding != nil {
+					l = append(l, bp.SingleNameBinding.BindingIdentifier)
+				}
+			}
+		}
+	}
+	if b.ArrayBindingPattern != nil {
+		for _, e := range b.ArrayBindingPattern.Elements {
+			if e.BindingElement != nil {
+				l = append(l, e.BindingElement.BoundNames()...)
+			}
+		}
+	}
+	return
 }
 
 func (b *BindingPattern) ContainsExpression() bool {
@@ -2773,8 +2804,10 @@ func (b *BindingElement) ContainsExpression() bool {
 }
 
 func (b *BindingElement) BoundNames() (l []IdentifierName) {
-	// TODO
-	return
+	if b.SingleNameBinding != nil {
+		return b.SingleNameBinding.BoundNames()
+	}
+	return b.BindingPattern.BoundNames()
 }
 
 func (b *BindingElement) String() string {

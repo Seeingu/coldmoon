@@ -15,6 +15,9 @@ func (s *Stack[T]) Push(v T) {
 
 // Pop a value from the stack
 func (s *Stack[T]) Pop() T {
+	if len(s.data) == 0 {
+		panic("stack is empty")
+	}
 	v := s.data[len(s.data)-1]
 	s.data = s.data[:len(s.data)-1]
 	return v

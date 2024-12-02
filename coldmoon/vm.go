@@ -108,7 +108,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		vm.ip = ins.Target
 	case *IJumpIfTrue:
 		value := vm.result
-		if value.ToBoolean() {
+		if value != nil && value.ToBoolean() {
 			vm.ip = ins.Target
 		} else {
 			vm.ip = ins.TargetElse

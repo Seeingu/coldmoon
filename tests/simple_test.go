@@ -21,6 +21,14 @@ func TestBaseline(t *testing.T) {
 	var sourceText string
 
 	sourceText = `
+let a = 1;
+let b = a + 1;
+let c = a + b + b;
+'hello' + a + "world";
+`
+	testSource(t, sourceText)
+
+	sourceText = `
 function a() {}
 a.b = 1;
 a.b;

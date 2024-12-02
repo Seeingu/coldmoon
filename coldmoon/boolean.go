@@ -18,6 +18,10 @@ func NewBooleanValue(data bool) *BooleanValue {
 
 var _ Value = (*BooleanValue)(nil)
 
+func (b *BooleanValue) ToCompletion() CompletionValue {
+	return NewCompletionValue(b)
+}
+
 func (b *BooleanValue) String() string {
 	if b.Data {
 		return "true"

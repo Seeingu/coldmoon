@@ -511,7 +511,7 @@ func (t *Tokenizer) comment(commentType string) string {
 // MARK: - String
 func (t *Tokenizer) string() Token {
 	// TODO: handle escape
-	start := t.Index
+	start := t.Index + 1
 	quote := t.SourceText[t.Index]
 	t.Index++
 	for t.Index < t.Length {
@@ -522,7 +522,7 @@ func (t *Tokenizer) string() Token {
 		}
 		t.Index++
 	}
-	value := string(t.SourceText[start:t.Index])
+	value := string(t.SourceText[start : t.Index-1])
 	return Token{Type: TString, Value: value}
 }
 
@@ -643,6 +643,10 @@ func (t *Tokenizer) matchString(s string) bool {
 }
 
 func (t *Tokenizer) tryToMatchRegularExpression() (token Token, ok bool) {
+	// TODO: auto insert semicolon
+	if t.NextToken.Type == TNumber || t.NextToken.Type == TString {
+		return
+	}
 	isRegExp := false
 	index := t.Index
 	for index < t.Length {

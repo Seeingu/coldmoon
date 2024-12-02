@@ -110,9 +110,7 @@ func PrepareForOrdinaryCall(agent *Agent, function *ECMAScriptFunction, newTarge
 			PrivateEnvironment:  function.PrivateEnvironment,
 		},
 	}
-
 	agent.ExecutionContextStack.Push(calleeContext)
-
 	return calleeContext
 }
 

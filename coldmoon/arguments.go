@@ -25,7 +25,7 @@ func DefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescrip
 	isMapped := ObjectHasOwnProperty(_map, key)
 	newArgDesc := desc
 	if isMapped && desc.IsDataDescriptor() {
-		if desc.Value == nil && desc.Writable == false {
+		if desc.Value == nil && !desc.Writable {
 			newArgDesc.Value = _map.Get(key)
 		}
 	}
@@ -40,7 +40,7 @@ func DefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescrip
 			if desc.Value != nil {
 				_map.Set(key, desc.Value, setThrowTypeIgnore)
 			}
-			if desc.Writable == false {
+			if !desc.Writable {
 				_map.InternalMethods().Delete(_map, key)
 			}
 		}

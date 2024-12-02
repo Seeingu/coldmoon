@@ -189,14 +189,14 @@ func ValidateAndApplyPropertyDescriptor(
 
 	if object != nil {
 		if current.IsDataDescriptor() && desc.IsAccessorDescriptor() {
-			// TODO: i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
+			// i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
 			//    else let configurable be current.[[Configurable]].
-			configurable := desc.Configurable
-			// TODO: ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
+			configurable := desc.Configurable || current.Configurable
+			// ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
 			//     let enumerable be current.[[Enumerable]].
-			enumerable := desc.Enumerable
+			enumerable := desc.Enumerable || current.Enumerable
 
-			// TODO: iii. Replace the property named P of object O with a data property whose
+			// iii. Replace the property named P of object O with a data property whose
 			//      [[Configurable]] and [[Enumerable]] attributes are set to configurable and
 			//      enumerable, respectively, and whose [[Value]] and [[Writable]] attributes are
 			//      set to the value of the corresponding field in Desc if Desc has that field, or
@@ -207,16 +207,57 @@ func ValidateAndApplyPropertyDescriptor(
 				Enumerable:   enumerable,
 				Configurable: configurable,
 			})
-		} else {
-			// TODO: i. For each field of Desc, set the corresponding attribute of the property named P
-			//    of object O to the value of the field.
+		} else if current.IsAccessorDescriptor() && desc.IsDataDescriptor() {
+
+			// i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
+			//    else let configurable be current.[[Configurable]].
+			configurable := desc.Configurable || current.Configurable
+
+			// ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
+			//     let enumerable be current.[[Enumerable]].
+			enumerable := desc.Enumerable || current.Enumerable
+
+			// iii. Replace the property named P of object O with a data property whose
+			//      [[Configurable]] and [[Enumerable]] attributes are set to configurable and
+			//      enumerable, respectively, and whose [[Value]] and [[Writable]] attributes are
+			//      set to the value of the corresponding field in Desc if Desc has that field, or
+			//      to the attribute's default value otherwise.
+			v := desc.Value
+			if v == nil {
+				v = UndefinedValue
+			}
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Value:        desc.Value,
+				Value:        v,
 				Writable:     desc.Writable,
-				Get:          desc.Get,
-				Set:          desc.Set,
-				Enumerable:   desc.Enumerable,
-				Configurable: desc.Configurable,
+				Enumerable:   enumerable,
+				Configurable: configurable,
+			})
+		} else {
+			// i. For each field of Desc, set the corresponding attribute of the property named P
+			//    of object O to the value of the field.
+			v := desc.Value
+			if v == nil {
+				v = current.Value
+			}
+			w := desc.Writable || current.Writable
+			e := desc.Enumerable || current.Enumerable
+			c := desc.Configurable || current.Configurable
+			g := desc.Get
+			if g == nil {
+				g = current.Get
+			}
+			s := desc.Set
+			if s == nil {
+				s = current.Set
+			}
+
+			object.PropertyStorage().Set(key, &PropertyDescriptor{
+				Value:        v,
+				Writable:     w,
+				Get:          g,
+				Set:          s,
+				Enumerable:   e,
+				Configurable: c,
 			})
 		}
 	}
