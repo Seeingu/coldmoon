@@ -275,7 +275,7 @@ func (o *Object) LengthOfArrayLike() uint64 {
 }
 
 // 7.3.22
-func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) *CompletionObject {
+func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) CompletionObject {
 	c := o.Get(NewStringPropertyKey("constructor"))
 	if c == UndefinedValue {
 		return NewCompletionObject(defaultConstructor)
@@ -294,8 +294,8 @@ func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) *CompletionOb
 	return NewCompletionObject(defaultConstructor)
 }
 
-func (o *Object) ToCompletion() *CompletionValue {
-	return NewNormalCompletion(NewValueFromObject(o))
+func (o *Object) ToCompletion() CompletionValue {
+	return NewValueFromObject(o).ToCompletion()
 }
 
 // MARK: - 7.3.23

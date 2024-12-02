@@ -28,28 +28,28 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
 
 	var dotAll = func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "s").Value
+		return RegExpHasFlag(agent, this, "s").Data()
 	}
 	var global = func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "g").Value
+		return RegExpHasFlag(agent, this, "g").Data()
 	}
 	var hasIndices = func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "d").Value
+		return RegExpHasFlag(agent, this, "d").Data()
 	}
 	var ignoreCase = func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "i").Value
+		return RegExpHasFlag(agent, this, "i").Data()
 	}
 	var multiline = func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "m").Value
+		return RegExpHasFlag(agent, this, "m").Data()
 	}
 	var sticky = func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "y").Value
+		return RegExpHasFlag(agent, this, "y").Data()
 	}
 	var unicode = func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "u").Value
+		return RegExpHasFlag(agent, this, "u").Data()
 	}
 	var unicodeSets = func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "v").Value
+		return RegExpHasFlag(agent, this, "v").Data()
 	}
 	var flags = func(this Value, arguments []Value, _ ObjectType) Value {
 		if !ValueIsObject(this) {
@@ -273,7 +273,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 }
 
 // 22.2.3.1
-func RegExpCreate(agent *Agent, pattern Value, flags Value) *CompletionObject {
+func RegExpCreate(agent *Agent, pattern Value, flags Value) CompletionObject {
 	realm := agent.CurrentRealm()
 
 	obj := RegExpAlloc(agent, realm.Intrinsics.RegExpConstructor)
@@ -281,7 +281,7 @@ func RegExpCreate(agent *Agent, pattern Value, flags Value) *CompletionObject {
 }
 
 // 22.2.6.4.1
-func RegExpHasFlag(agent *Agent, R Value, flag string) *CompletionValue {
+func RegExpHasFlag(agent *Agent, R Value, flag string) CompletionValue {
 	if !ValueIsObject(R) {
 		return agent.ThrowException(TypeError, "RegExpHasFlag: R is not an object").ToCompletion()
 	}
@@ -326,7 +326,7 @@ type MatchRecord struct {
 }
 
 // 22.2.7.1
-func RegExpExec(agent *Agent, regExp *RegExpObject, s string) *CompletionObject {
+func RegExpExec(agent *Agent, regExp *RegExpObject, s string) CompletionObject {
 	exec := regExp.Get(NewStringPropertyKey("exec"))
 	if IsCallable(exec) {
 		result := exec.CallAssumeCallable(regExp.ToValue(), []Value{NewStringValue(s)})
@@ -340,7 +340,7 @@ func RegExpExec(agent *Agent, regExp *RegExpObject, s string) *CompletionObject 
 
 // 22.2.7.2
 // return null, object, or throw
-func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) *CompletionObject {
+func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionObject {
 	length := len(s)
 	lastIndex := int(ToLength(agent, regExp.Get(NewStringPropertyKey("lastIndex"))))
 

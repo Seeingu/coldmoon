@@ -19,7 +19,7 @@ func (a *ArrayBufferObject) ToValue() Value {
 }
 
 // 25.1.3.1
-func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength uint64, maxByteLength uint64) *CompletionObject {
+func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength uint64, maxByteLength uint64) CompletionObject {
 	var allocatingResizableBuffer bool
 	if maxByteLength != 0 {
 		allocatingResizableBuffer = true

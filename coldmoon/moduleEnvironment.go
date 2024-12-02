@@ -25,7 +25,7 @@ func (m *ModuleEnvironment) CreateImportBinding(name string, module *SourceTextM
 }
 
 // 9.1.1.5.1
-func (m *ModuleEnvironment) GetBindingValue(agent *Agent, name string, strict bool) *CompletionValue {
+func (m *ModuleEnvironment) GetBindingValue(agent *Agent, name string, strict bool) CompletionValue {
 	Assert(strict)
 	Assert(m.HasBinding(name))
 	if binding, ok := m.IndirectBindings[name]; ok {

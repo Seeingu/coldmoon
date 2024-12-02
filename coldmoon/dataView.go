@@ -120,64 +120,64 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 	DefineBuiltinAccessor(realm, object, "byteOffset", byteOffset, nil)
 
 	var getBigInt64 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 8).Value
+		return GetViewValue(agent, this, args[0], args[1], 8).Data()
 	}
 	var getBigUint64 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 8).Value
+		return GetViewValue(agent, this, args[0], args[1], 8).Data()
 	}
 	var getFloat32 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 4).Value
+		return GetViewValue(agent, this, args[0], args[1], 4).Data()
 	}
 	var getFloat64 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 8).Value
+		return GetViewValue(agent, this, args[0], args[1], 8).Data()
 	}
 	var getInt8 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 1).Value
+		return GetViewValue(agent, this, args[0], args[1], 1).Data()
 	}
 	var getInt16 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 2).Value
+		return GetViewValue(agent, this, args[0], args[1], 2).Data()
 	}
 	var getInt32 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 4).Value
+		return GetViewValue(agent, this, args[0], args[1], 4).Data()
 	}
 	var getUint8 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 1).Value
+		return GetViewValue(agent, this, args[0], args[1], 1).Data()
 	}
 	var getUint16 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 2).Value
+		return GetViewValue(agent, this, args[0], args[1], 2).Data()
 	}
 	var getUint32 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 4).Value
+		return GetViewValue(agent, this, args[0], args[1], 4).Data()
 	}
 	var setBigInt64 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Data()
 	}
 	var setBigUint64 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Data()
 	}
 	var setFloat32 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Data()
 	}
 	var setFloat64 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Data()
 	}
 	var setInt8 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 1).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 1).Data()
 	}
 	var setInt16 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 2).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 2).Data()
 	}
 	var setInt32 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Data()
 	}
 	var setUint8 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 1).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 1).Data()
 	}
 	var setUint16 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 2).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 2).Data()
 	}
 	var setUint32 = func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Value
+		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Data()
 	}
 
 	DefineBuiltinFunction(object, "getBigInt64", getBigInt64, 2, realm)
@@ -200,7 +200,7 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "setUint8", setUint8, 3, realm)
 	DefineBuiltinFunction(object, "setUint16", setUint16, 3, realm)
 	DefineBuiltinFunction(object, "setUint32", setUint32, 3, realm)
-	
+
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("DataView"),
 		Writable:     false,
@@ -254,7 +254,7 @@ func GetViewByteLength(viewRecord *DataViewWithBufferWitnessRecord) int {
 }
 
 // 25.3.1.5
-func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEndian Value, size uint64) *CompletionValue {
+func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEndian Value, size uint64) CompletionValue {
 	view := RequireInternalSlot[*DataView](viewValue)
 	getIndex := ToIndex(agent, requestIndex)
 	isLittleEndianBool := isLittleEndian.ToBoolean()
@@ -273,7 +273,7 @@ func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEnd
 	return NewCompletionValue(NewNumberValue(float64(v)))
 }
 
-func SetViewValue(agent *Agent, viewValue Value, requestIndex Value, value Value, isLittleEndian Value, size uint64) *CompletionValue {
+func SetViewValue(agent *Agent, viewValue Value, requestIndex Value, value Value, isLittleEndian Value, size uint64) CompletionValue {
 	view := RequireInternalSlot[*DataView](viewValue)
 	setIndex := ToIndex(agent, requestIndex)
 	isLittleEndianBool := isLittleEndian.ToBoolean()

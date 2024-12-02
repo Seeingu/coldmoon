@@ -19,7 +19,7 @@ func NewNumberValue(v float64) *NumberValue {
 	}
 }
 
-func (n *NumberValue) ToCompletion() *CompletionValue {
+func (n *NumberValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(n)
 }
 

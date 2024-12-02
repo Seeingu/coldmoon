@@ -61,7 +61,7 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 	var linkAndEvaluateClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		link := module.Link()
 		if link.IsAbrupt() {
-			capability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{link.Error})
+			capability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{link.Error()})
 			return nil
 		}
 		evaluatePromise := module.Evaluate()

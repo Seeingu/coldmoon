@@ -14,7 +14,7 @@ func (o *ObjectValue) Call(this Value, argumentsList ArgumentsList) Value {
 	return o.CallAssumeCallable(this, argumentsList)
 }
 
-func (o *ObjectValue) ToCompletion() *CompletionValue {
+func (o *ObjectValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(o)
 }
 

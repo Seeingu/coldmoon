@@ -106,7 +106,9 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 		panic("unreachable")
 	} else {
 		base := r.Base.(*ReferenceRecordBaseEnvironment)
-		return base.Environment.GetBindingValue(agent, r.ReferencedName.(*ReferencedNameString).String, r.Strict).Value
+		name := r.ReferencedName.(*ReferencedNameString).String
+		c := base.Environment.GetBindingValue(agent, name, r.Strict)
+		return c.Data()
 	}
 }
 

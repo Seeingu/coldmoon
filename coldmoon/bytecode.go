@@ -24,7 +24,7 @@ func printValue(v Value) string {
 	}
 	return "value"
 }
-func GenerateAndRunBytecode(agent *Agent, node ASTNode) *CompletionValue {
+func GenerateAndRunBytecode(agent *Agent, node ASTNode) CompletionValue {
 	vm := NewVM(agent)
 	exe := NewExecutable()
 
@@ -39,8 +39,8 @@ func GenerateAndRunBytecode(agent *Agent, node ASTNode) *CompletionValue {
 	}
 	result := vm.Run(exe)
 	if Debug.PrintBytecode {
-		if result.Value != nil {
-			fmt.Println("Result: ", printValue(result.Value))
+		if result.Data() != nil {
+			fmt.Println("Result: ", printValue(result.Data()))
 		} else {
 			fmt.Println("Result: nil")
 		}

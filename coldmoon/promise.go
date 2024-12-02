@@ -300,12 +300,12 @@ type AdditionalFields struct {
 	ClassConstructorFields     *ClassConstructorFields
 }
 
-func IfAbruptRejectPromise(agent *Agent, value *CompletionValue, capability *PromiseCapability) Value {
+func IfAbruptRejectPromise(agent *Agent, value CompletionValue, capability *PromiseCapability) Value {
 	if value.IsAbrupt() {
-		capability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{value.Error})
+		capability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{value.Error()})
 		return capability.Promise.ToValue()
 	}
-	return value.Value
+	return value.Data()
 }
 
 // 27.2.1.3
@@ -450,12 +450,12 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 		promiseCapability := reaction.Capability
 		t := reaction.Type
 		handler := reaction.Handler
-		var handlerResult *CompletionValue
+		var handlerResult CompletionValue
 		if handler == nil {
 			if t == PromiseReactionTypeFulfill {
 				handlerResult = NewCompletionValue(argument)
 			} else {
-				handlerResult = NewThrowCompletion(agent.exception)
+				handlerResult = NewCompletionValueError(agent.exception)
 			}
 		} else {
 			handlerResult = NewCompletionValue(agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument}))
@@ -464,12 +464,12 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 			return UndefinedValue
 		}
 		if handlerResult.IsError() {
-			reason := handlerResult.Error
+			reason := handlerResult.Error()
 			return promiseCapability.Reject.ToValue().CallAssumeCallable(
 				UndefinedValue, []Value{reason},
 			)
 		} else {
-			value := handlerResult.Value
+			value := handlerResult.Data()
 			return promiseCapability.Resolve.ToValue().CallAssumeCallable(
 				UndefinedValue, []Value{value},
 			)

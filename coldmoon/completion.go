@@ -29,24 +29,24 @@ type completionDefaultImpl[T any] struct {
 	data        T
 }
 
-var _ Completion[any] = &completionDefaultImpl[any]{}
+var _ Completion[any] = completionDefaultImpl[any]{}
 
-func (c *completionDefaultImpl[T]) IsError() bool {
+func (c completionDefaultImpl[T]) IsError() bool {
 	return c.Type == CompletionTypeThrow
 }
-func (c *completionDefaultImpl[T]) IsUndefined() bool {
+func (c completionDefaultImpl[T]) IsUndefined() bool {
 	return c.isUndefined
 }
-func (c *completionDefaultImpl[T]) IsNull() bool {
+func (c completionDefaultImpl[T]) IsNull() bool {
 	return c.isNull
 }
-func (c *completionDefaultImpl[T]) IsAbrupt() bool {
+func (c completionDefaultImpl[T]) IsAbrupt() bool {
 	return c.Type != CompletionTypeNormal
 }
-func (c *completionDefaultImpl[T]) Data() T {
+func (c completionDefaultImpl[T]) Data() T {
 	return c.data
 }
-func (c *completionDefaultImpl[T]) Error() Value {
+func (c completionDefaultImpl[T]) Error() Value {
 	return c.err
 }
 
@@ -56,17 +56,17 @@ type completionNormalArgs[T any] struct {
 	data        T
 }
 
-func newCompletionNormal[T any](args completionNormalArgs[T]) *completionDefaultImpl[T] {
+func newCompletionNormal[T any](args completionNormalArgs[T]) completionDefaultImpl[T] {
 	c := completionDefaultImpl[T]{
 		Type:        CompletionTypeNormal,
 		isUndefined: args.isUndefined,
 		isNull:      args.isNull,
 		data:        args.data,
 	}
-	return &c
+	return c
 }
-func newCompletionError[T any](err Value) *completionDefaultImpl[T] {
-	return &completionDefaultImpl[T]{
+func newCompletionError[T any](err Value) completionDefaultImpl[T] {
+	return completionDefaultImpl[T]{
 		Type: CompletionTypeThrow,
 		err:  err,
 	}
@@ -76,117 +76,107 @@ func newCompletionError[T any](err Value) *completionDefaultImpl[T] {
 
 type CompletionPropertyDescriptor completionDefaultImpl[*PropertyDescriptor]
 
-func NewCompletionPropertyDescriptorUndefined() *CompletionPropertyDescriptor {
+func NewCompletionPropertyDescriptorUndefined() CompletionPropertyDescriptor {
 	c := newCompletionNormal(completionNormalArgs[*PropertyDescriptor]{
 		isUndefined: true,
 	})
-	return (*CompletionPropertyDescriptor)(c)
+	return CompletionPropertyDescriptor(c)
 }
-func NewCompletionPropertyDescriptor(desc *PropertyDescriptor) *CompletionPropertyDescriptor {
+func NewCompletionPropertyDescriptor(desc *PropertyDescriptor) CompletionPropertyDescriptor {
 	c := newCompletionNormal(completionNormalArgs[*PropertyDescriptor]{
 		data: desc,
 	})
-	return (*CompletionPropertyDescriptor)(c)
+	return CompletionPropertyDescriptor(c)
 }
 
 // MARK: - Object
 
-type CompletionObject completionDefaultImpl[ObjectType]
+type CompletionObject struct {
+	completionDefaultImpl[ObjectType]
+}
 
-func NewCompletionObject(obj ObjectType) *CompletionObject {
+func NewCompletionObject(obj ObjectType) CompletionObject {
 	c := newCompletionNormal(completionNormalArgs[ObjectType]{
 		data: obj,
 	})
-	return (*CompletionObject)(c)
+	return CompletionObject{c}
 }
-func NewCompletionObjectError(err Value) *CompletionObject {
+func NewCompletionObjectError(err Value) CompletionObject {
 	c := newCompletionError[ObjectType](err)
-	return (*CompletionObject)(c)
+	return CompletionObject{c}
 }
-func NewCompletionObjectNull() *CompletionObject {
-	return &CompletionObject{
-		Type:   CompletionTypeNormal,
+func NewCompletionObjectNull() CompletionObject {
+	c := newCompletionNormal(completionNormalArgs[ObjectType]{
 		isNull: true,
-	}
+	})
+	return CompletionObject{c}
 }
 
 // MARK: - Module
 
-type CompletionModule completionDefaultImpl[*ModuleRecord]
+type CompletionModule struct {
+	completionDefaultImpl[*ModuleRecord]
+}
 
 func NewCompletionModule(module *ModuleRecord) CompletionModule {
 	c := newCompletionNormal(completionNormalArgs[*ModuleRecord]{
 		data: module,
 	})
-	return CompletionModule(*c)
+	return CompletionModule{c}
 }
 func NewCompletionModuleError(err Value) CompletionModule {
 	c := newCompletionError[*ModuleRecord](err)
-	return CompletionModule(*c)
+	return CompletionModule{c}
 }
 
 // MARK: - Value
 
 type CompletionValue struct {
-	Completion[Value]
-	Type        CompletionType
-	Value       Value
-	isUndefined bool
-	Error       Value
+	completionDefaultImpl[Value]
 }
 
-func NewCompletionValue(value Value) *CompletionValue {
-	return &CompletionValue{
-		Type:  CompletionTypeNormal,
-		Value: value,
-	}
+func NewCompletionValue(value Value) CompletionValue {
+	c := newCompletionNormal(completionNormalArgs[Value]{
+		data: value,
+	})
+	return CompletionValue{c}
 }
-func NewCompletionReturnValue(value Value) *CompletionValue {
-	return &CompletionValue{
-		Type:  CompletionTypeReturn,
-		Value: value,
+func NewCompletionReturnValue(value Value) CompletionValue {
+	c := completionDefaultImpl[Value]{
+		Type: CompletionTypeReturn,
+		data: value,
 	}
+	return CompletionValue{c}
 }
 
-func NewCompletionValueError(value Value) *CompletionValue {
-	return &CompletionValue{
-		Type:  CompletionTypeThrow,
-		Error: value,
-	}
+func NewCompletionValueError(err Value) CompletionValue {
+	c := newCompletionError[Value](err)
+	return CompletionValue{c}
 }
-func NewCompletionValueUndefined() *CompletionValue {
-	return &CompletionValue{
-		Type:        CompletionTypeNormal,
+func NewCompletionValueUndefined() CompletionValue {
+	c := newCompletionNormal(completionNormalArgs[Value]{
 		isUndefined: true,
-	}
-}
-func (c *CompletionValue) IsUndefined() bool {
-	return c.isUndefined
-}
-func (c *CompletionValue) IsError() bool {
-	return c.Error != nil
-}
-func (c *CompletionValue) IsNull() bool {
-	return false
-}
-func (c *CompletionValue) IsAbrupt() bool {
-	return c.Type != CompletionTypeNormal && c.Type != CompletionTypeReturn
+	})
+	return CompletionValue{c}
 }
 
-func NewNormalCompletion(value Value) *CompletionValue {
-	return NewCompletionValue(value)
+func NewNormalCompletion[T any](value T) Completion[T] {
+	return NewCompletion[T](CompletionTypeNormal, value)
 }
-func NewCompletion(t CompletionType, value Value) *CompletionValue {
-	return &CompletionValue{
-		Type:  t,
-		Value: value,
+func NewReturnCompletion[T any](value T) Completion[T] {
+	return NewCompletion[T](CompletionTypeReturn, value)
+}
+func NewThrowCompletion[T any](err Value) Completion[T] {
+	return completionDefaultImpl[T]{
+		Type: CompletionTypeThrow,
+		err:  err,
+	}
+}
+func NewCompletion[T any](t CompletionType, value T) Completion[T] {
+	return completionDefaultImpl[T]{
+		Type: t,
+		data: value,
 	}
 }
 
 var UndefinedNormalCompletion = NewCompletionValueUndefined()
-
-func NewThrowCompletion(value Value) *CompletionValue {
-	return NewCompletionValueError(value)
-}
-
-var TypeErrorCompletion = NewThrowCompletion(NewStringValue("TypeError"))

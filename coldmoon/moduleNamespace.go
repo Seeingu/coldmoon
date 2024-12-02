@@ -102,7 +102,7 @@ func ModuleNamespaceCreate(agent *Agent, module *ModuleRecord, exports []string)
 			panic("ReferenceError")
 		}
 		bindingName := targetEnv.GetBindingValue(agent, binding.BindingName.String, true)
-		return bindingName.Value
+		return bindingName.Data()
 	}
 	internalMethods.Set = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool {
 		return false

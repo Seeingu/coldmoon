@@ -89,7 +89,7 @@ func (g *GlobalEnvironment) SetMutableBinding(name string, value Value, strict b
 }
 
 // 9.1.1.4.6
-func (g *GlobalEnvironment) GetBindingValue(agent *Agent, name string, strict bool) *CompletionValue {
+func (g *GlobalEnvironment) GetBindingValue(agent *Agent, name string, strict bool) CompletionValue {
 	DclRec := g.DeclarativeRecord
 	if DclRec.HasBinding(name) {
 		return DclRec.GetBindingValue(agent, name, strict)

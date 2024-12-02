@@ -6,7 +6,7 @@ type ArgumentsObject struct {
 }
 
 // 10.4.4.1
-func GetOwnProperty(object ObjectType, key PropertyKey) *CompletionPropertyDescriptor {
+func GetOwnProperty(object ObjectType, key PropertyKey) CompletionPropertyDescriptor {
 	desc := OrdinaryGetOwnProperty(object, key)
 	if desc == nil {
 		return NewCompletionPropertyDescriptorUndefined()
@@ -49,7 +49,7 @@ func DefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescrip
 }
 
 // 10.4.4.3
-func Get(object ObjectType, key PropertyKey, receiver Value) *CompletionValue {
+func Get(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	if !isMapped {
@@ -134,7 +134,7 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 	}
 	internalMethods.DefineOwnProperty = DefineOwnProperty
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
-		return Get(obj, p, receiver).Value
+		return Get(obj, p, receiver).Data()
 	}
 	internalMethods.Set = Set
 	internalMethods.Delete = Delete
@@ -201,7 +201,7 @@ func MakeArgGetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 	var getterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		function := agent.ActiveFunctionObject()
 		_captures := function.(*BuiltinFunction).AdditionalFields.ArgGetterSetterCaptures
-		return _captures.Env.GetBindingValue(agent, _captures.Name, false).Value
+		return _captures.Env.GetBindingValue(agent, _captures.Name, false).Data()
 	}
 	getter := CreateBuiltinFunction(agent, getterClosure, 1, "", builtinFunctionArgs{
 		additionalFields: &AdditionalFields{

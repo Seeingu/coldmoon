@@ -62,7 +62,7 @@ func (e *ECMAScriptFunction) SetClassFieldInitializerName(n ClassFieldInitialize
 	e.classFieldInitializerName = n
 }
 
-func (e *ECMAScriptFunction) EvaluateBody() *CompletionValue {
+func (e *ECMAScriptFunction) EvaluateBody() CompletionValue {
 	vm := NewVM(e.Agent())
 	return GenerateAndRunBytecode(vm.agent, e.ECMAScriptCode)
 }
@@ -91,7 +91,7 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Val
 	agent.ExecutionContextStack.Pop()
 
 	if result.Type == CompletionTypeReturn {
-		return result.Value
+		return result.Data()
 	}
 	return nil
 }
@@ -149,7 +149,7 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 }
 
 // 10.2.1.4
-func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
+func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	functionBody := function.ECMAScriptCode
 	switch functionBody.Type {
 	case FunctionTypeNormal:
@@ -164,7 +164,7 @@ func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argume
 	panic("unreachable")
 }
 
-func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
+func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	realm := agent.CurrentRealm()
 	promiseCapability := NewPromiseCapability(agent, NewValueFromObject(realm.Intrinsics.Promise))
 	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
@@ -178,29 +178,29 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 	} else {
 		// TODO
 	}
-	return NewCompletion(CompletionTypeReturn, NewValueFromObject(promiseCapability.Promise))
+	return NewCompletionReturnValue(NewValueFromObject(promiseCapability.Promise))
 }
 
-func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
+func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	functionBody := function.ECMAScriptCode
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	return GenerateAndRunBytecode(agent, functionBody)
 }
 
-func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
+func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	G := OrdinaryCreateFromConstructor(agent, function, "%AsyncGeneratorFunction.prototype.prototype%", nil)
 	return NewCompletionReturnValue(NewValueFromObject(G))
 }
 
-func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) *CompletionValue {
+func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	G := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
 	return NewCompletionReturnValue(NewValueFromObject(G))
 }
 
 // 10.2.11
-func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) *CompletionValue {
+func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) CompletionValue {
 	calleeContext := agent.runningExecutionContext()
 	code := function.ECMAScriptCode
 	strict := function.Strict
@@ -335,7 +335,7 @@ loop:
 				var initialValue Value
 				if !lo.Contains(parameterNames, varName) || lo.Contains(functionNames, varName) {
 				} else {
-					initialValue = env.GetBindingValue(agent, string(varName), false).Value
+					initialValue = env.GetBindingValue(agent, string(varName), false).Data()
 				}
 				varEnv.InitializeBinding(string(varName), initialValue)
 			}
@@ -398,13 +398,13 @@ func (e *ECMAScriptFunction) Construct(
 	agent.ExecutionContextStack.Pop()
 
 	if !result.IsError() {
-		if o, ok := result.Value.(*ObjectValue); ok {
+		if o, ok := result.Data().(*ObjectValue); ok {
 			return o.Object
 		}
 		if kind == ConstructorKindBase {
 			return thisArgument.(*ObjectValue).Object
 		}
-		if result.Value != UndefinedValue {
+		if result.Data() != UndefinedValue {
 			panic("TypeError")
 		}
 	} else {

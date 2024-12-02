@@ -604,7 +604,7 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 		}
 		propertyName := GenerateAndRunBytecode(vm.agent, methodDefinition.PropertyName)
 		vm.MethodDefinitionEvaluation(methodDefinitionArgs{
-			PropertyName:       propertyName.Value,
+			PropertyName:       propertyName.Data(),
 			FunctionExpression: methodDefinition.FunctionExpression,
 			MethodType:         methodDefinition.Type,
 		}, object, true)
@@ -641,7 +641,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 		agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
 		superclassRef := GenerateAndRunBytecode(agent, classTail.ClassHeritage)
 		agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
-		superclass := superclassRef.Value
+		superclass := superclassRef.Data()
 		if superclass == nil {
 			protoParent = nil
 			constructorParent = realm.Intrinsics.FunctionPrototype
@@ -961,8 +961,8 @@ func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, h
 	realm := agent.CurrentRealm()
 	var name PropertyKeyOrPrivateName
 	value := GenerateAndRunBytecode(agent, fieldDefinition.PropertyName)
-	if value.Value != nil {
-		name = ToPropertyKey(agent, value.Value)
+	if value.Data() != nil {
+		name = ToPropertyKey(agent, value.Data())
 	}
 	var initializer ObjectType
 	if fieldDefinition.Initializer != nil {
@@ -1237,16 +1237,19 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 	panic("unreachable")
 }
 
-func (vm *VM) Run(executable *Executable) *CompletionValue {
+func (vm *VM) Run(executable *Executable) CompletionValue {
 	for vm.ip < len(executable.Instructions) {
 		i := executable.Instructions[vm.ip]
 		vm.execute(executable, i)
 		if _, ok := i.(*IReturn); ok {
-			return NewNormalCompletion(vm.result)
+			return vm.result.ToCompletion()
 		}
 		vm.ip += 1
 	}
-	return NewNormalCompletion(vm.result)
+	if vm.result == nil {
+		return UndefinedValue.ToCompletion()
+	}
+	return vm.result.ToCompletion()
 }
 
 // 13.3.6.2
@@ -1311,7 +1314,7 @@ func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
 	if !IsCallable(target) {
 		panic("TypeError: target is not callable")
 	}
-	return OrdinaryHasInstance(target, value)
+	return OrdinaryHasInstance(agent, target, value).Data()
 }
 
 // 13.15.3

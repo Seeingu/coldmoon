@@ -41,7 +41,7 @@ type Value interface {
 	ToBoolean() bool
 	CallAssumeCallable(value Value, argumentsList ArgumentsList) Value
 	Call(this Value, argumentsList ArgumentsList) Value
-	ToCompletion() *CompletionValue
+	ToCompletion() CompletionValue
 }
 
 // MARK: - UndefinedValue
@@ -52,8 +52,8 @@ type undefinedValue struct {
 
 var _ Value = (*undefinedValue)(nil)
 
-func (u *undefinedValue) ToCompletion() *CompletionValue {
-	return NewNormalCompletion(u)
+func (u *undefinedValue) ToCompletion() CompletionValue {
+	return NewCompletionValue(u)
 }
 func (u *undefinedValue) String() string {
 	return "undefined"
@@ -85,6 +85,9 @@ type StringValue struct {
 
 var _ Value = (*StringValue)(nil)
 
+func (s *StringValue) ToCompletion() CompletionValue {
+	return NewCompletionValue(s)
+}
 func (s *StringValue) String() string {
 	return s.Data
 }
@@ -798,31 +801,31 @@ func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsLis
 }
 
 // 7.3.21
-func OrdinaryHasInstance(self Value, value Value) bool {
+func OrdinaryHasInstance(agent *Agent, self Value, value Value) Completion[bool] {
 	if IsCallable(self) {
-		return false
+		return NewNormalCompletion(false)
 	}
 	selfObject := self.(*ObjectValue).Object
 
 	objectValue, ok := value.(*ObjectValue)
 	if !ok {
-		return false
+		return NewNormalCompletion(false)
 	}
 
 	proto := selfObject.Get(NewStringPropertyKey("prototype"))
 	protoObject, ok := proto.(*ObjectValue)
 	if !ok {
-		panic("TypeError")
+		return NewThrowCompletion[bool](agent.ThrowException(TypeError, "prototype is not an object"))
 	}
 
 	object := objectValue.Object
 	for {
 		object = object.InternalMethods().GetPrototypeOf(object)
 		if object == nil {
-			return false
+			return NewNormalCompletion(false)
 		}
 		if protoObject.Object == object {
-			return true
+			return NewNormalCompletion(true)
 		}
 	}
 
@@ -871,7 +874,7 @@ func RegExpAlloc(agent *Agent, newTarget ObjectType) ObjectType {
 }
 
 // 22.2.3.3
-func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) *CompletionObject {
+func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) CompletionObject {
 	var p Value
 	if pattern == UndefinedValue {
 		p = NewStringValue("")

@@ -90,7 +90,7 @@ func (s *SourceTextModule) ToReferrer() ImportedModuleReferrer {
 
 func (s *SourceTextModule) Link() CompletionValue {
 	// TODO
-	return *NewCompletionValue(UndefinedValue)
+	return NewCompletionValue(UndefinedValue)
 }
 
 // 16.2.1.5.3
@@ -150,7 +150,7 @@ func (s *SourceTextModule) LoadRequestedModules(agent *Agent, hostDefined *HostD
 }
 
 // 16.2.1.6.4
-func (s *SourceTextModule) InitializeEnvironment() *CompletionValue {
+func (s *SourceTextModule) InitializeEnvironment() CompletionValue {
 	realm := s.Realm
 	agent := realm.Agent
 	env := NewModuleEnvironment(realm.GlobalEnv)
