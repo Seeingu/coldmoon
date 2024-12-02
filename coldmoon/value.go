@@ -801,18 +801,22 @@ func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsLis
 }
 
 // 7.3.21
-func OrdinaryHasInstance(agent *Agent, self Value, value Value) Completion[bool] {
-	if IsCallable(self) {
+func OrdinaryHasInstance(agent *Agent, c Value, value Value) Completion[bool] {
+	if IsCallable(c) {
 		return NewNormalCompletion(false)
 	}
-	selfObject := self.(*ObjectValue).Object
+	o := MustGetObject(c)
+	if b, ok := o.(*BoundFunctionObject); ok {
+		bc := b.BoundTargetFunction
+		return NewNormalCompletion(InstanceOfOperator(agent, value, bc.ToValue()))
+	}
 
 	objectValue, ok := value.(*ObjectValue)
 	if !ok {
 		return NewNormalCompletion(false)
 	}
 
-	proto := selfObject.Get(NewStringPropertyKey("prototype"))
+	proto := o.Get(NewStringPropertyKey("prototype"))
 	protoObject, ok := proto.(*ObjectValue)
 	if !ok {
 		return NewThrowCompletion[bool](agent.ThrowException(TypeError, "prototype is not an object"))

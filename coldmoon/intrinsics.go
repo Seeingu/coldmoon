@@ -109,6 +109,10 @@ type Intrinsics struct {
 	DecodeURI ObjectType
 	// %decodeURIComponent%
 	DecodeURIComponent ObjectType
+	// %encodeURI%
+	EncodeURI ObjectType
+	// %encodeURIComponent%
+	EncodeURIComponent ObjectType
 	// %RegExp%
 	RegExpConstructor ObjectType
 	// %RegExp.prototype%

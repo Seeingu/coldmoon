@@ -53,6 +53,9 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 		{"RegExp", NewValueFromObject(r.Intrinsics.RegExpConstructor)},
 		{"DataView", NewValueFromObject(r.Intrinsics.DataViewConstructor)},
 		{"decodeURI", NewValueFromObject(r.Intrinsics.DecodeURI)},
+		{"decodeURIComponent", NewValueFromObject(r.Intrinsics.DecodeURIComponent)},
+		{"encodeURI", NewValueFromObject(r.Intrinsics.EncodeURI)},
+		{"encodeURIComponent", NewValueFromObject(r.Intrinsics.EncodeURIComponent)},
 	}
 
 	var properties []constructorProperties
@@ -230,7 +233,39 @@ func NewDecodeURIComponent(realm *Realm) ObjectType {
 	})
 }
 
+func NewEncodeURI(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var encodeURI BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		uriString := ToString(agent, arguments[0]).String()
+		extraUnescaped := ";/?:@&=+$,#"
+		return NewStringValue(encode(agent, uriString, extraUnescaped))
+	}
+	return CreateBuiltinFunction(agent, encodeURI, 1, "encodeURI", builtinFunctionArgs{
+		realm: realm,
+	})
+}
+func NewEncodeURIComponent(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var encodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		uriString := ToString(agent, arguments[0]).String()
+		extraUnescaped := ""
+		return NewStringValue(encode(agent, uriString, extraUnescaped))
+	}
+	return CreateBuiltinFunction(agent, encodeURIComponent, 1, "encodeURIComponent", builtinFunctionArgs{
+		realm: realm,
+	})
+}
+
 func decode(agent *Agent, uriString string, reservedSet string) string {
 	// TODO:
 	return url.QueryEscape(uriString)
+}
+
+func encode(agent *Agent, s string, extraUnescaped string) string {
+	// TODO:
+	r, err := url.QueryUnescape(s)
+	if err != nil {
+		panic("url.QueryUnescape error")
+	}
+	return r
 }

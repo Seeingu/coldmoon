@@ -52,6 +52,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.ParseFloat = NewParseFloat(r)
 	r.Intrinsics.DecodeURI = NewDecodeURI(r)
 	r.Intrinsics.DecodeURIComponent = NewDecodeURIComponent(r)
+	r.Intrinsics.EncodeURI = NewEncodeURI(r)
+	r.Intrinsics.EncodeURIComponent = NewEncodeURIComponent(r)
 	r.Intrinsics.ObjectConstructor = NewObjectConstructor(r)
 	r.Intrinsics.FunctionConstructor = NewFunctionConstructor(r)
 	r.Intrinsics.ArrayPrototype = NewArrayPrototype(r)
