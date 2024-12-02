@@ -180,6 +180,30 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return NewStringValue(thisStringValue(agent, thisArgument))
 	}
+	var toLowerCase = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		s := thisStringValue(agent, this)
+		return NewStringValue(strings.ToLower(s))
+	}
+	var toUpperCase = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		s := thisStringValue(agent, this)
+		return NewStringValue(strings.ToUpper(s))
+	}
+	var trim = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		s := thisStringValue(agent, this)
+		return NewStringValue(strings.TrimSpace(s))
+	}
+	var trimEnd = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		s := thisStringValue(agent, this)
+		return NewStringValue(strings.TrimRightFunc(s, func(r rune) bool {
+			return strings.ContainsRune(" \t\n\v\f\r", r)
+		}))
+	}
+	var trimStart = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		s := thisStringValue(agent, this)
+		return NewStringValue(strings.TrimLeftFunc(s, func(r rune) bool {
+			return strings.ContainsRune(" \t\n\v\f\r", r)
+		}))
+	}
 	var charAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
@@ -463,6 +487,11 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	DefineBuiltinFunction(stringPrototype, "endsWith", endsWith, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "includes", includes, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "codePointAt", codePointAt, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "toLowerCase", toLowerCase, 0, realm)
+	DefineBuiltinFunction(stringPrototype, "toUpperCase", toUpperCase, 0, realm)
+	DefineBuiltinFunction(stringPrototype, "trim", trim, 0, realm)
+	DefineBuiltinFunction(stringPrototype, "trimEnd", trimEnd, 0, realm)
+	DefineBuiltinFunction(stringPrototype, "trimStart", trimStart, 0, realm)
 
 	return stringPrototype
 }

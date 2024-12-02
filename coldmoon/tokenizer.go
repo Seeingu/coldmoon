@@ -510,6 +510,7 @@ func (t *Tokenizer) comment(commentType string) string {
 
 // MARK: - String
 func (t *Tokenizer) string() Token {
+	// TODO: handle escape
 	start := t.Index
 	quote := t.SourceText[t.Index]
 	t.Index++
