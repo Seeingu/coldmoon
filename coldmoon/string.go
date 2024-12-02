@@ -340,6 +340,20 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		start := lo.Clamp(pos, 0, length)
 		return NewNumberValue(float64(StringIndexOf(s, searchStr.Data, start)))
 	}
+	var lastIndexOf = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		searchString := argumentsList[0]
+		position := ToIntegerOrInfinity(agent, argumentsList[1])
+		o := RequireObjectCoercible(agent, thisArgument)
+		s := o.String()
+		searchStr := ToString(agent, searchString).Data
+		pos := int(position)
+		searchLen := len(s)
+		start := lo.Clamp(pos, 0, searchLen)
+		if len(searchStr) == 0 {
+			return NewNumberValue(float64(start))
+		}
+		return NewNumberValue(float64(strings.LastIndex(s[start:], searchStr)))
+	}
 	var startsWith = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		searchString := argumentsList[0]
 		var position Value
@@ -470,6 +484,18 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewNumberValue(float64(s.Data[int(position)]))
 	}
+	var substring = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		start := ToIntegerOrInfinity(agent, argumentsList[0])
+		end := ToIntegerOrInfinity(agent, argumentsList[1])
+		o := RequireObjectCoercible(agent, this)
+		s := ToString(agent, o)
+		length := len(s.Data)
+		finalStart := lo.Clamp(start, 0, float64(length))
+		finalEnd := lo.Clamp(end, 0, float64(length))
+		from := math.Min(finalStart, finalEnd)
+		to := math.Max(finalStart, finalEnd)
+		return NewStringValue(s.Data[int(from):int(to)])
+	}
 
 	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "valueOf", valueOf, 0, realm)
@@ -483,6 +509,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	DefineBuiltinFunction(stringPrototype, "search", search, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "matchAll", matchAll, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "indexOf", indexOf, 1, realm)
+	DefineBuiltinFunction(stringPrototype, "lastIndexOf", lastIndexOf, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "startsWith", startsWith, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "endsWith", endsWith, 1, realm)
 	DefineBuiltinFunction(stringPrototype, "includes", includes, 1, realm)
@@ -492,6 +519,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	DefineBuiltinFunction(stringPrototype, "trim", trim, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "trimEnd", trimEnd, 0, realm)
 	DefineBuiltinFunction(stringPrototype, "trimStart", trimStart, 0, realm)
+	DefineBuiltinFunction(stringPrototype, "substring", substring, 2, realm)
 
 	return stringPrototype
 }
