@@ -577,6 +577,31 @@ func (p *Parser) tryStatement() *StatementTry {
 	}
 }
 
+func (p *Parser) bindingRestElement() (b BindingRestElement, ok bool) {
+	if !p.tokenizer.Match(TDotDotDot) {
+		return
+	}
+	identifier := p.bindingIdentifier()
+	b = &BindingRestElementIdentifier{
+		Identifier: identifier,
+	}
+	return b, true
+}
+func (p *Parser) bindingElement() (b *BindingElement, ok bool) {
+	identifier := p.bindingIdentifier()
+	var init Expression
+	if p.tokenizer.Match(TEquals) {
+		init = p.expression(p.acceptContextLowest())
+	}
+	b = &BindingElement{
+		SingleNameBinding: &SingleNameBinding{
+			BindingIdentifier: identifier,
+			Initializer:       init,
+		},
+	}
+	return b, true
+}
+
 func (p *Parser) formalParameters() *FormalParameters {
 	var items []FormalParametersItem
 	for {
@@ -584,23 +609,19 @@ func (p *Parser) formalParameters() *FormalParameters {
 		if t.Type == TRightParen {
 			break
 		}
-		if p.tokenizer.Match(TDotDotDot) {
-			identifier := p.bindingIdentifier()
+		if b, ok := p.bindingRestElement(); ok {
 			items = append(items, &FormalParameterFunctionRestParameter{
-				BindingRestElement: &BindingElement{
-					Identifier: identifier,
-				},
+				BindingRestElement: b,
 			})
 			p.tokenizer.Match(TComma)
 			break
-		} else {
-			identifier := p.bindingIdentifier()
+		} else if b, ok := p.bindingElement(); ok {
 			items = append(items, &FormalParameter{
-				BindingElement: &BindingElement{
-					Identifier: identifier,
-				},
+				BindingElement: b,
 			})
 			p.tokenizer.Match(TComma)
+		} else {
+			panic("formalParameters: expected binding element")
 		}
 	}
 
@@ -641,7 +662,9 @@ func (p *Parser) asyncArrowFunction() *PrimaryExpressionAsyncArrowFunction {
 			Items: []FormalParametersItem{
 				&FormalParameter{
 					BindingElement: &BindingElement{
-						Identifier: identifier,
+						SingleNameBinding: &SingleNameBinding{
+							BindingIdentifier: identifier,
+						},
 					},
 				},
 			},

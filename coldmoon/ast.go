@@ -2507,7 +2507,12 @@ type FormalParameters struct {
 
 func (f *FormalParameters) IsSimpleParameterList() bool {
 	for _, item := range f.Items {
-		if _, ok := item.(*FormalParameter); !ok {
+		switch f := item.(type) {
+		case *FormalParameter:
+			if !f.BindingElement.IsSimpleParameterList() {
+				return false
+			}
+		case *FormalParameterFunctionRestParameter:
 			return false
 		}
 	}
@@ -2515,8 +2520,15 @@ func (f *FormalParameters) IsSimpleParameterList() bool {
 }
 func (f *FormalParameters) ContainsExpression() bool {
 	for _, item := range f.Items {
-		if _, ok := item.(Expression); ok {
-			return true
+		switch p := item.(type) {
+		case *FormalParameter:
+			if p.BindingElement.ContainsExpression() {
+				return true
+			}
+		case *FormalParameterFunctionRestParameter:
+			if p.BindingRestElement.ContainsExpression() {
+				return true
+			}
 		}
 	}
 	return false
@@ -2527,7 +2539,8 @@ func (f *FormalParameters) BoundNames() (l []IdentifierName) {
 		var name IdentifierName
 		switch p := item.(type) {
 		case *FormalParameter:
-			name = p.BindingElement.Identifier
+			l = append(l, p.BindingElement.BoundNames()...)
+			continue
 		case *FormalParameterFunctionRestParameter:
 			name = p.BindingRestElement.(*BindingRestElementIdentifier).Identifier
 		}
@@ -2560,6 +2573,8 @@ func (f *FormalParameters) String() string {
 
 type FormalParametersItem interface {
 	ASTNode
+	_formalParametersItem()
+	ContainsExpression() bool
 }
 
 // MARK:-
@@ -2568,15 +2583,25 @@ type FormalParameterFunctionRestParameter struct {
 	BindingRestElement BindingRestElement
 }
 
+func (f *FormalParameterFunctionRestParameter) ContainsExpression() bool {
+	return f.BindingRestElement.ContainsExpression()
+}
+
 // MARK: - BindingRestElement
 
 type BindingRestElement interface {
+	ASTNode
+	_bindingRestElement()
+	ContainsExpression() bool
 }
 type BindingRestElementIdentifier struct {
 	BindingRestElement
 	Identifier IdentifierName
 }
 
+func (b *BindingRestElementIdentifier) ContainsExpression() bool {
+	return false
+}
 func (b *BindingRestElementIdentifier) String() string {
 	return "..." + string(b.Identifier)
 }
@@ -2592,12 +2617,171 @@ func (f *FormalParameter) String() string {
 	return f.BindingElement.String()
 }
 
+// MARK: - BindingElement
+
+// SingleNameBinding [Yield, Await] :
+// - BindingIdentifier[?Yield, ?Await] Initializer[+In, ?Yield, ?Await] opt
+type SingleNameBinding struct {
+	ASTNode
+	BindingIdentifier IdentifierName
+	Initializer       Expression
+}
+
+func (s *SingleNameBinding) String() string {
+	if s.Initializer != nil {
+		return string(s.BindingIdentifier) + " = " + s.Initializer.String()
+	}
+	return string(s.BindingIdentifier)
+}
+
+// BindingProperty [Yield, Await] :
+// - SingleNameBinding[?Yield, ?Await]
+// - PropertyName[?Yield, ?Await] : BindingElement[?Yield, ?Await]
+type BindingProperty struct {
+	ASTNode
+	SingleNameBinding             *SingleNameBinding
+	PropertyNameAndBindingElement *struct {
+		PropertyName   PropertyName
+		BindingElement *BindingElement
+	}
+}
+
+func (b *BindingProperty) String() string {
+	if b.SingleNameBinding != nil {
+		return b.SingleNameBinding.String()
+	}
+	return b.PropertyNameAndBindingElement.PropertyName.String() + " : " + b.PropertyNameAndBindingElement.BindingElement.String()
+}
+
+// BindingRestProperty [Yield, Await] :
+// - ... BindingIdentifier[?Yield, ?Await]
+type BindingRestProperty struct {
+	ASTNode
+	BindingIdentifier IdentifierName
+}
+
+func (b *BindingRestProperty) String() string {
+	return "..." + string(b.BindingIdentifier)
+}
+
+// ObjectBindingPattern : { }
+// ObjectBindingPattern : { BindingPropertyList, BindingRestProperty }
+type ObjectBindingPattern struct {
+	Properties []*struct {
+		BindingPropertyList []BindingProperty
+		BindingRestProperty *BindingRestProperty
+	}
+}
+
+func (o *ObjectBindingPattern) ContainsExpression() bool {
+	// TODO
+	return false
+}
+
+func (o *ObjectBindingPattern) String() string {
+	var sb string
+	for i, p := range o.Properties {
+		if i != 0 {
+			sb += ", "
+		}
+		for j, bp := range p.BindingPropertyList {
+			if j != 0 {
+				sb += ", "
+			}
+			sb += bp.String()
+		}
+		if p.BindingRestProperty != nil {
+			sb += ", " + p.BindingRestProperty.String()
+		}
+	}
+	return sb
+}
+
+// ArrayBindingPattern [Yield, Await] :
+// - [ Elision(opt) BindingRestElement[?Yield, ?Await] opt ]
+// - [ BindingElementList[?Yield, ?Await] ]
+// - [ BindingElementList[?Yield, ?Await] , Elision(opt)
+// - BindingRestElement[?Yield, ?Await] opt ]
+type ArrayBindingPattern struct {
+	Elements []*struct {
+		Elision            bool
+		BindingRestElement BindingRestElement
+		BindingElement     *BindingElement
+	}
+}
+
+func (a *ArrayBindingPattern) ContainsExpression() bool {
+	// TODO
+	return false
+}
+
+func (a *ArrayBindingPattern) String() string {
+	var sb string
+	for i, e := range a.Elements {
+		if i != 0 {
+			sb += ", "
+		}
+		if e.BindingElement != nil {
+			sb += e.BindingElement.String()
+		} else {
+			sb += e.BindingRestElement.String()
+		}
+	}
+	return sb
+}
+
+// BindingPattern : ObjectBindingPattern | ArrayBindingPattern
+type BindingPattern struct {
+	ObjectBindingPattern *ObjectBindingPattern
+	ArrayBindingPattern  *ArrayBindingPattern
+}
+
+func (b *BindingPattern) ContainsExpression() bool {
+	if b.ObjectBindingPattern != nil {
+		return b.ObjectBindingPattern.ContainsExpression()
+	}
+	return b.ArrayBindingPattern.ContainsExpression()
+}
+
+func (b *BindingPattern) String() string {
+	if b.ObjectBindingPattern != nil {
+		return b.ObjectBindingPattern.String()
+	}
+	return b.ArrayBindingPattern.String()
+}
+
+// BindingElement [Yield, Await] :
+// - SingleNameBinding[?Yield, ?Await]
+// - BindingPattern[?Yield, ?Await] Initializer[+In, ?Yield, ?Await] opt
 type BindingElement struct {
-	Identifier IdentifierName
+	BindingPattern    *BindingPattern
+	SingleNameBinding *SingleNameBinding
+}
+
+func (b *BindingElement) IsSimpleParameterList() bool {
+	return b.SingleNameBinding != nil && b.SingleNameBinding.Initializer == nil
+}
+
+func (b *BindingElement) ContainsExpression() bool {
+	if b.SingleNameBinding != nil {
+		return b.SingleNameBinding.Initializer != nil
+	}
+	if b.BindingPattern.ObjectBindingPattern != nil {
+		return b.BindingPattern.ContainsExpression()
+	}
+	panic("unreachable")
+}
+
+func (b *BindingElement) BoundNames() (l []IdentifierName) {
+	// TODO
+	return
 }
 
 func (b *BindingElement) String() string {
-	return string(b.Identifier)
+	if b.SingleNameBinding != nil {
+		return b.SingleNameBinding.String()
+	}
+	return b.BindingPattern.String()
 }
 
 // MARK: - IfStatement

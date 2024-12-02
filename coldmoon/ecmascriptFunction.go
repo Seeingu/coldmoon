@@ -282,9 +282,15 @@ loop:
 		e := env
 		switch param := item.(type) {
 		case *FormalParameter:
-			name := param.BindingElement.Identifier
+			name := param.BindingElement.SingleNameBinding.BindingIdentifier
+			initializer := param.BindingElement.SingleNameBinding.Initializer
 			value := argumentsList[i]
 			ref := agent.ResolveBinding(string(name), e, strict)
+			if initializer != nil {
+				value = GenerateAndRunBytecode(agent, &ExpressionStatement{
+					Expression: initializer,
+				}).Data()
+			}
 			if e == nil {
 				ref.PutValue(agent, value)
 			} else {
