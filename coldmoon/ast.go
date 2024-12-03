@@ -1682,14 +1682,14 @@ func (e *ExpressionConditionalExpression) Bytecode(ex *Executable, c *BytecodeCo
 	jump := &IJump{Target: 0}
 	ex.AddInstruction(jump)
 
-	jumpIfTrue.TargetElse = len(ex.Instructions)
+	jumpIfTrue.TargetElse = len(ex.Instructions) - 1
 	e.Alternate.Bytecode(ex, c)
 
 	if ExpressionAnalyze(e.Alternate, AnalyzeQueryIsReference) {
 		ex.AddInstruction(InsGetValue)
 	}
 
-	jump.Target = len(ex.Instructions)
+	jump.Target = len(ex.Instructions) - 1
 }
 
 func (e *ExpressionConditionalExpression) String() string {
@@ -1742,25 +1742,25 @@ func (e *ExpressionLogicalExpression) Bytecode(ex *Executable, c *BytecodeContex
 		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 		ex.AddInstruction(jumpIfTrue)
 
-		jumpIfTrue.Target = len(ex.Instructions)
+		jumpIfTrue.Target = len(ex.Instructions) - 1
 		e.Right.Bytecode(ex, c)
 
 		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
 			ex.AddInstruction(InsGetValue)
 		}
 
-		jumpIfTrue.TargetElse = len(ex.Instructions)
+		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
 	case LogicalOperatorOr:
 		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 		ex.AddInstruction(jumpIfTrue)
 
-		jumpIfTrue.TargetElse = len(ex.Instructions)
+		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
 		e.Right.Bytecode(ex, c)
 		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
 			ex.AddInstruction(InsGetValue)
 		}
 
-		jumpIfTrue.Target = len(ex.Instructions)
+		jumpIfTrue.Target = len(ex.Instructions) - 1
 	case LogicalOperatorNullishCoalescing:
 		ex.AddInstruction(InsLoad)
 
@@ -1773,7 +1773,7 @@ func (e *ExpressionLogicalExpression) Bytecode(ex *Executable, c *BytecodeContex
 		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 		ex.AddInstruction(jumpIfTrue)
 
-		jumpIfTrue.Target = len(ex.Instructions)
+		jumpIfTrue.Target = len(ex.Instructions) - 1
 		ex.AddInstruction(InsStore)
 
 		e.Right.Bytecode(ex, c)
@@ -1784,10 +1784,10 @@ func (e *ExpressionLogicalExpression) Bytecode(ex *Executable, c *BytecodeContex
 		jump := &IJump{Target: 0}
 		ex.AddInstruction(jump)
 
-		jumpIfTrue.TargetElse = len(ex.Instructions)
+		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
 		ex.AddInstruction(InsStore)
 
-		jump.Target = len(ex.Instructions)
+		jump.Target = len(ex.Instructions) - 1
 	}
 }
 
@@ -2847,20 +2847,20 @@ func (s *StatementIf) Bytecode(e *Executable, c *BytecodeContext) {
 	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 	e.AddInstruction(jumpIfTrue)
 
-	jumpIfTrue.Target = len(e.Instructions)
+	jumpIfTrue.Target = len(e.Instructions) - 1
 	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 	s.Consequent.Bytecode(e, c)
 	endJump := &IJump{Target: 0}
 	e.AddInstruction(endJump)
 
 	// else
-	jumpIfTrue.TargetElse = len(e.Instructions)
+	jumpIfTrue.TargetElse = len(e.Instructions) - 1
 	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 
 	if s.Alternate != nil {
 		s.Alternate.Bytecode(e, c)
 	}
-	endJump.Target = len(e.Instructions)
+	endJump.Target = len(e.Instructions) - 1
 }
 
 func (s *StatementIf) String() string {
@@ -2907,7 +2907,7 @@ func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
 	e.AddInstruction(jumpIfTrue)
 
-	jumpIfTrue.Target = len(e.Instructions)
+	jumpIfTrue.Target = len(e.Instructions) - 1
 	e.AddInstruction(InsStore)
 	s.Body.Bytecode(e, c)
 	bodyEndIndex := len(e.Instructions) - 1
@@ -2915,7 +2915,7 @@ func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
 
 	e.AddInstruction(&IJump{Target: conditionIndex})
 
-	jumpIfTrue.TargetElse = len(e.Instructions)
+	jumpIfTrue.TargetElse = len(e.Instructions) - 1
 	e.AddInstruction(InsStore)
 
 	for _, index := range c.continueJumpIndices.Data() {
@@ -2964,7 +2964,7 @@ func (s *StatementDoWhile) Bytecode(e *Executable, c *BytecodeContext) {
 
 	e.AddInstruction(InsLoad)
 	jumpIfTrue := &IJumpIfTrue{Target: bodyStartIndex, TargetElse: 0}
-	jumpIfTrue.TargetElse = len(e.Instructions)
+	jumpIfTrue.TargetElse = len(e.Instructions) - 1
 
 	e.AddInstruction(InsStore)
 

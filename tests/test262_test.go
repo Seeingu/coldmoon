@@ -34,6 +34,12 @@ func runTestHarness(realm *Realm, f string, debug bool) {
 	}
 }
 
+func testDataView(realm *Realm) {
+	dataViewDir := "./test262/test/built-ins/DataView/"
+	f := makeTest262Path(dataViewDir + "constructor.js")
+	ParseScript(mustReadFile(f), realm, nil).Evaluate()
+}
+
 func TestHarness(t *testing.T) {
 	files := []string{
 		"sta.js",
@@ -50,10 +56,8 @@ func TestHarness(t *testing.T) {
 		runTestHarness(realm, f, false)
 	}
 
+	testDataView(realm)
+
 	Debug.Enable()
-	dataViewDir := "./test262/test/built-ins/DataView/"
-	_ = dataViewDir
-	//f := makeTest262Path(dataViewDir + "constructor.js")
-	//ParseScript(mustReadFile(f), realm, nil).Evaluate()
 	Debug.Disable()
 }

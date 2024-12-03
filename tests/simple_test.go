@@ -21,10 +21,25 @@ func TestBaseline(t *testing.T) {
 	var sourceText string
 
 	sourceText = `
+new Error('error');
+`
+	testSource(t, sourceText)
+
+	sourceText = `
+function toString(a) {
+	return a;
+}
+let a = toString(10);
+a + 'hello';
+`
+	testSource(t, sourceText)
+
+	sourceText = `
 let a = 1;
 let b = a + 1;
 let c = a + b + b;
 'hello' + a + "world";
+c += a + b;
 `
 	testSource(t, sourceText)
 

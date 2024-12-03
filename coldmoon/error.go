@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/Seeingu/coldmoon/pkg"
+
 type ErrorObject struct {
 	*Object
 	Name    string
@@ -24,7 +26,7 @@ func NewErrorConstructor(realm *Realm) ObjectType {
 
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) Value {
 		message := argumentsList[0]
-		options := argumentsList[1]
+		options := pkg.SliceSafeGet(argumentsList, 1)
 
 		newTarget := _newTarget
 		if newTarget == nil {

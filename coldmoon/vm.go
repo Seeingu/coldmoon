@@ -1242,7 +1242,7 @@ func (vm *VM) Run(executable *Executable) CompletionValue {
 		i := executable.Instructions[vm.ip]
 		vm.execute(executable, i)
 		if _, ok := i.(*IReturn); ok {
-			return vm.result.ToCompletion()
+			return NewCompletionReturnValue(vm.result)
 		}
 		vm.ip += 1
 	}

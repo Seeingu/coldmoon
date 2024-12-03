@@ -26,6 +26,16 @@ func (b *BuiltinFunction) SetFields(f []*ClassFieldDefinition) {
 	b.AdditionalFields.ClassConstructorFields.Fields = f
 }
 
+func (b *BuiltinFunction) Construct(
+	argumentLists []Value,
+	newTarget ObjectType,
+) ObjectType {
+	if newTarget == nil {
+		newTarget = b
+	}
+	return b.InternalMethods().Construct(b, argumentLists, newTarget)
+}
+
 func (b *BuiltinFunction) ToObject() *Object {
 	return b.Object
 }
