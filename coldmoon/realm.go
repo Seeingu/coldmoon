@@ -96,6 +96,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.JSON = NewJSON(r)
 	r.Intrinsics.Reflect = NewReflectObject(r)
 	r.Intrinsics.Proxy = NewProxyConstructor(r)
+	r.Intrinsics.Intl = NewIntlObject(r)
 	r.Intrinsics.RegExpPrototype = NewRegExpPrototype(r)
 	r.Intrinsics.RegExpConstructor = NewRegExpConstructor(r)
 	r.Intrinsics.RegExpStringIteratorPrototype = NewRegExpStringIteratorPrototype(r)

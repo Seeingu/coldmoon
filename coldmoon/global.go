@@ -56,6 +56,7 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 		{"decodeURIComponent", NewValueFromObject(r.Intrinsics.DecodeURIComponent)},
 		{"encodeURI", NewValueFromObject(r.Intrinsics.EncodeURI)},
 		{"encodeURIComponent", NewValueFromObject(r.Intrinsics.EncodeURIComponent)},
+		{"Intl", NewValueFromObject(r.Intrinsics.Intl)},
 	}
 
 	var properties []constructorProperties

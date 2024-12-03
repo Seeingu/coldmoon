@@ -95,6 +95,8 @@ type Intrinsics struct {
 	SetPrototype ObjectType
 	// %SetIteratorPrototype%
 	SetIteratorPrototype ObjectType
+	// %Intl%
+	Intl ObjectType
 	// %IsFinite%
 	IsFinite ObjectType
 	// %isNaN%
