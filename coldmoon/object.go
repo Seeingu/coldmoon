@@ -537,7 +537,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.15
-	var ObjectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var objectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		arg1 := args[0]
 		arg2 := args[1]
 		return NewBooleanValue(SameValue(arg1, arg2))
@@ -713,6 +713,28 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		})
 		return NewValueFromObject(CreateArrayFromList(agent, symbolValues))
 	}
+	var fromEntries = func(this Value, args []Value, newTarget ObjectType) Value {
+		iterable := args[0]
+		RequireObjectCoercible(agent, iterable)
+		obj := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
+		type Captures struct {
+			object ObjectType
+		}
+		var closure BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+			f := agent.ActiveFunctionObject()
+			captures := f.(*BuiltinFunction).AdditionalFieldsV2.(*Captures)
+			k := args[0]
+			v := args[1]
+			propertyKey := ToPropertyKey(agent, k)
+			captures.object.CreateDataPropertyOrThrow(propertyKey, v)
+			return UndefinedValue
+		}
+
+		adder := CreateBuiltinFunction(agent, closure, 2, "", builtinFunctionArgs{
+			additionalFieldsV2: &Captures{object: obj},
+		})
+		return AddEntriesFromIterable(agent, obj, iterable, adder).ToValue()
+	}
 
 	DefineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm)
 	DefineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm)
@@ -724,7 +746,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "getOwnPropertyNames", getOwnPropertyNames, 1, realm)
 	DefineBuiltinFunction(object, "getOwnPropertySymbols", getOwnPropertySymbols, 1, realm)
 	DefineBuiltinFunction(object, "freeze", freeze, 1, realm)
-	DefineBuiltinFunction(object, "is", ObjectIs, 2, realm)
+	DefineBuiltinFunction(object, "is", objectIs, 2, realm)
 	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
 	DefineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm)
 	DefineBuiltinFunction(object, "isSealed", isSealed, 1, realm)
@@ -735,6 +757,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "keys", keys, 1, realm)
 	DefineBuiltinFunction(object, "values", values, 1, realm)
 	DefineBuiltinFunction(object, "assign", assign, 2, realm)
+	DefineBuiltinFunction(object, "fromEntries", fromEntries, 1, realm)
 
 	// 20.1.3.1
 	DefineBuiltinPropertyV(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
