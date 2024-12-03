@@ -5,11 +5,12 @@ type BuiltinFunction struct {
 	*Object
 	InternalSlotPrivateMethods
 	InternalSlotFields
-	Realm            *Realm
-	InitialName      string
-	Behavior         BehaviorFn
-	RevocableProxy   ObjectType
-	AdditionalFields *AdditionalFields
+	Realm              *Realm
+	InitialName        string
+	Behavior           BehaviorFn
+	RevocableProxy     ObjectType
+	AdditionalFields   *AdditionalFields
+	AdditionalFieldsV2 any
 }
 
 var _ InternalSlotPrivateMethods = (*BuiltinFunction)(nil)
@@ -70,12 +71,13 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 }
 
 type builtinFunctionArgs struct {
-	realm            *Realm
-	prototype        ObjectType
-	prefix           string
-	isConstructor    bool
-	revocableProxy   ObjectType
-	additionalFields *AdditionalFields
+	realm              *Realm
+	prototype          ObjectType
+	prefix             string
+	isConstructor      bool
+	revocableProxy     ObjectType
+	additionalFields   *AdditionalFields
+	additionalFieldsV2 any
 }
 
 // 10.3.4
@@ -102,12 +104,13 @@ func CreateBuiltinFunction(
 	object := NewObject(agent, prototype.ToObject())
 	object.SetExtensible(true)
 	function := &BuiltinFunction{
-		Object:           object,
-		Realm:            realm,
-		Behavior:         behavior,
-		InitialName:      "",
-		RevocableProxy:   args.revocableProxy,
-		AdditionalFields: args.additionalFields,
+		Object:             object,
+		Realm:              realm,
+		Behavior:           behavior,
+		InitialName:        "",
+		RevocableProxy:     args.revocableProxy,
+		AdditionalFields:   args.additionalFields,
+		AdditionalFieldsV2: args.additionalFieldsV2,
 	}
 	function.InternalMethods().Call = BuiltinCall
 	if args.isConstructor {

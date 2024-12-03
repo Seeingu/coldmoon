@@ -670,6 +670,16 @@ func PerformPromiseThen(agent *Agent, promise ObjectType, onFulfilled Value, onR
 	}
 }
 
+type promiseAdditionalFields struct {
+	// [[AlreadyCalled]]
+	alreadyCalled bool
+	index         uint64
+	// [[Values]] or [[Errors]] in Promise.any
+	values            []Value
+	capability        *PromiseCapability
+	RemainingElements *RemainingElements
+}
+
 func PerformPromiseAll(
 	agent *Agent,
 	iterator *IteratorRecord,
@@ -696,25 +706,34 @@ func PerformPromiseAll(
 		values = append(values, nextValue)
 		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
 
-		// TODO: use slot
-		// [[AlreadyCalled]]
-		alreadyCalled := false
-
 		var steps = func(this Value, arguments []Value, newTarget ObjectType) Value {
-			if alreadyCalled {
+			F := agent.ActiveFunctionObject()
+			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
+			if additionalFields.alreadyCalled {
 				return UndefinedValue
 			}
-			alreadyCalled = true
-			values[index] = arguments[0]
+			additionalFields.alreadyCalled = true
+			_index := additionalFields.index
+			_values := additionalFields.values
+
+			_values[_index] = arguments[0]
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
-				valuesArray := CreateArrayFromList(agent, values)
+				valuesArray := CreateArrayFromList(agent, _values)
 				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
 			return UndefinedValue
 		}
 		length := 1
-		onFulfilled := CreateBuiltinFunction(agent, steps, float64(length), "", builtinFunctionArgs{})
+		onFulfilled := CreateBuiltinFunction(agent, steps, float64(length), "", builtinFunctionArgs{
+			additionalFieldsV2: &promiseAdditionalFields{
+				alreadyCalled:     false,
+				index:             uint64(index),
+				values:            values,
+				capability:        resultCapability,
+				RemainingElements: remainingElements,
+			},
+		})
 
 		remainingElements.Value++
 		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
@@ -749,46 +768,67 @@ func PerformPromiseAllSettled(
 		values = append(values, nextValue)
 		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
 
-		// [[AlreadyCalled]]
-		alreadyCalled := false
-
 		var stepsFulfilled = func(this Value, arguments []Value, newTarget ObjectType) Value {
-			if alreadyCalled {
+			F := agent.ActiveFunctionObject()
+			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
+			if additionalFields.alreadyCalled {
 				return UndefinedValue
 			}
-			alreadyCalled = true
+			additionalFields.alreadyCalled = true
+			_index := additionalFields.index
+			_values := additionalFields.values
 			obj := OrdinaryObjectCreate(agent, agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
 			obj.CreateDataPropertyOrThrow(NewStringPropertyKey("status"), NewStringValue("fulfilled"))
 			obj.CreateDataPropertyOrThrow(NewStringPropertyKey("value"), arguments[0])
-			values[index] = obj.ToValue()
+			_values[_index] = obj.ToValue()
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
-				valuesArray := CreateArrayFromList(agent, values)
+				valuesArray := CreateArrayFromList(agent, _values)
 				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
 			return UndefinedValue
 		}
 		lengthFulfilled := 1
-		onFulfilled := CreateBuiltinFunction(agent, stepsFulfilled, float64(lengthFulfilled), "", builtinFunctionArgs{})
+		onFulfilled := CreateBuiltinFunction(agent, stepsFulfilled, float64(lengthFulfilled), "", builtinFunctionArgs{
+			additionalFieldsV2: &promiseAdditionalFields{
+				alreadyCalled:     false,
+				index:             uint64(index),
+				values:            values,
+				capability:        resultCapability,
+				RemainingElements: remainingElements,
+			},
+		})
 
 		var stepsReject = func(this Value, arguments []Value, newTarget ObjectType) Value {
-			if alreadyCalled {
+			F := agent.ActiveFunctionObject()
+			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
+			if additionalFields.alreadyCalled {
 				return UndefinedValue
 			}
-			alreadyCalled = true
+			additionalFields.alreadyCalled = true
+			_index := additionalFields.index
+			_values := additionalFields.values
 			obj := OrdinaryObjectCreate(agent, agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
 			obj.CreateDataPropertyOrThrow(NewStringPropertyKey("status"), NewStringValue("rejected"))
 			obj.CreateDataPropertyOrThrow(NewStringPropertyKey("reason"), arguments[0])
-			values[index] = obj.ToValue()
+			_values[_index] = obj.ToValue()
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
-				valuesArray := CreateArrayFromList(agent, values)
+				valuesArray := CreateArrayFromList(agent, _values)
 				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
 			return UndefinedValue
 		}
 		lengthRejected := 1
-		onRejected := CreateBuiltinFunction(agent, stepsReject, float64(lengthRejected), "", builtinFunctionArgs{})
+		onRejected := CreateBuiltinFunction(agent, stepsReject, float64(lengthRejected), "", builtinFunctionArgs{
+			additionalFieldsV2: &promiseAdditionalFields{
+				alreadyCalled:     false,
+				index:             uint64(index),
+				values:            values,
+				capability:        resultCapability,
+				RemainingElements: remainingElements,
+			},
+		})
 
 		remainingElements.Value++
 		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), onRejected.ToValue()})
@@ -828,20 +868,21 @@ func PerformPromiseAny(
 		errors = append(errors, UndefinedValue)
 		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
 
-		// [[AlreadyCalled]]
-		alreadyCalled := false
-
 		var stepsRejected = func(this Value, arguments []Value, newTarget ObjectType) Value {
-			if alreadyCalled {
+			F := agent.ActiveFunctionObject()
+			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
+			if additionalFields.alreadyCalled {
 				return UndefinedValue
 			}
-			alreadyCalled = true
-			errors[index] = arguments[0]
+			additionalFields.alreadyCalled = true
+			_index := additionalFields.index
+			_errors := additionalFields.values
+			_errors[_index] = arguments[0]
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				err := MustGetObject(agent.ThrowException(AggregateError, "All promises in Promise.any were rejected"))
 				err.DefinePropertyOrThrow(NewStringPropertyKey("errors"), &PropertyDescriptor{
-					Value:        CreateArrayFromList(agent, errors).ToValue(),
+					Value:        CreateArrayFromList(agent, _errors).ToValue(),
 					Writable:     true,
 					Enumerable:   false,
 					Configurable: true,
@@ -851,7 +892,15 @@ func PerformPromiseAny(
 			return UndefinedValue
 		}
 		length := 1
-		onFulfilled := CreateBuiltinFunction(agent, stepsRejected, float64(length), "", builtinFunctionArgs{})
+		onFulfilled := CreateBuiltinFunction(agent, stepsRejected, float64(length), "", builtinFunctionArgs{
+			additionalFieldsV2: &promiseAdditionalFields{
+				alreadyCalled:     false,
+				index:             uint64(index),
+				values:            errors,
+				capability:        resultCapability,
+				RemainingElements: remainingElements,
+			},
+		})
 
 		remainingElements.Value++
 		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
