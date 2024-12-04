@@ -184,7 +184,7 @@ func NewParseInt(realm *Realm) ObjectType {
 			}
 			mathInt = mathInt*int64(R) + int64(c)
 		}
-		return NewNumberValue(float64(sign) * float64(mathInt))
+		return NewNumberValue(JSNumber(sign) * JSNumber(mathInt))
 	}
 
 	return CreateBuiltinFunction(agent, parseInt, 2, "parseInt", builtinFunctionArgs{
@@ -203,7 +203,7 @@ func NewParseFloat(realm *Realm) ObjectType {
 		if err != nil {
 			return NaNValue
 		}
-		return NewNumberValue(f)
+		return NewNumberValue(JSNumber(f))
 	}
 	return CreateBuiltinFunction(agent, parseFloat, 1, "parseFloat", builtinFunctionArgs{
 		realm: realm,

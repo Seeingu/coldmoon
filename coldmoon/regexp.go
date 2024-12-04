@@ -178,7 +178,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
 		matcher := c.Data().Construct([]Value{this, _flags}, nil)
 		lastIndex := ToLength(agent, r.Get(NewStringPropertyKey("lastIndex")))
-		matcher.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(float64(lastIndex)), setThrowTypeThrow)
+		matcher.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(JSNumber(lastIndex)), setThrowTypeThrow)
 		_global := strings.Contains(_flags.Data, "g")
 		_fullUnicode := strings.Contains(_flags.Data, "u") || strings.Contains(_flags.Data, "v")
 		return CreateRegExpStringIterator(agent, matcher.(*RegExpObject), s.Data, _global, _fullUnicode).ToValue()
@@ -321,8 +321,8 @@ func EscapeRegExpPattern(P string, F string) string {
 }
 
 type MatchRecord struct {
-	StartIndex int
-	EndIndex   int
+	StartIndex JSInt
+	EndIndex   JSInt
 }
 
 // 22.2.7.1
@@ -384,8 +384,8 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 		} else {
 			matchSucceeded = true
 			matchRecord = &MatchRecord{
-				StartIndex: match.Index,
-				EndIndex:   match.Index + match.Length,
+				StartIndex: JSInt(match.Index),
+				EndIndex:   JSInt(match.Index + match.Length),
 			}
 		}
 	}
@@ -394,15 +394,15 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 		// TODO: GetStringIndex
 	}
 	if global || sticky {
-		regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(float64(e)), setThrowTypeIgnore)
+		regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(JSNumber(e)), setThrowTypeIgnore)
 	}
-	n := len(match.Captures)
+	n := JSInt(len(match.Captures))
 	Assert(float64(n) < POW_2_32-1)
 
-	A := ArrayCreate(agent, float64(n)+1, nil)
+	A := ArrayCreate(agent, n+1, nil)
 	A.CreateDataPropertyOrThrow(
 		NewStringPropertyKey("index"),
-		NewNumberValue(float64(matchRecord.StartIndex)))
+		NewNumberValue(matchRecord.StartIndex.ToNumber()))
 	A.CreateDataPropertyOrThrow(NewStringPropertyKey("input"), NewStringValue(s))
 
 	indices := make([]*MatchRecord, n)
@@ -422,18 +422,18 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 	}
 
 	A.CreateDataPropertyOrThrow(NewStringPropertyKey("groups"), groups)
-	i := 1
+	i := JSInt(1)
 	groupNames := make([]string, n-1)
 	for i < n {
 		var captureI *MatchRecord
 		var capturedValue Value
-		if i >= len(match.Captures) {
+		if i >= JSInt(len(match.Captures)) {
 			indices = append(indices, nil)
 			capturedValue = UndefinedValue
 		} else {
 			captureI = &MatchRecord{
-				StartIndex: match.Captures[i].Index,
-				EndIndex:   match.Captures[i].Index + match.Captures[i].Length,
+				StartIndex: JSInt(match.Captures[i].Index),
+				EndIndex:   JSInt(match.Captures[i].Index + match.Captures[i].Length),
 			}
 			capturedValue = NewStringValue(GetMatchString(agent, s, captureI))
 			indices = append(indices, captureI)
@@ -459,17 +459,17 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 }
 
 // 22.2.7.3
-func AdvanceStringIndex(s string, index uint64, unicode bool) uint64 {
+func AdvanceStringIndex(s string, index JSInt, unicode bool) JSInt {
 	if !unicode {
 		return index + 1
 	}
-	length := len(s)
-	if index+1 >= uint64(length) {
+	length := JSInt(len(s))
+	if index+1 >= length {
 		return index + 1
 	}
 	// TODO: code point at
 	cp := s[index]
-	return uint64(cp) + index
+	return JSInt(cp) + index
 }
 
 // 22.2.7.6
@@ -482,8 +482,8 @@ func GetMatchString(agent *Agent, s string, match *MatchRecord) string {
 func GetMatchIndexPair(agent *Agent, s string, match *MatchRecord) ObjectType {
 	Assert(match.StartIndex <= match.EndIndex)
 	return CreateArrayFromList(agent, []Value{
-		NewNumberValue(float64(match.StartIndex)),
-		NewNumberValue(float64(match.EndIndex)),
+		NewNumberValue(JSNumber(match.StartIndex)),
+		NewNumberValue(JSNumber(match.EndIndex)),
 	})
 }
 

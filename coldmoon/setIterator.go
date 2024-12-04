@@ -31,7 +31,7 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 		}
 		var value Value
 		for index < numEntries {
-			if _, ok := entries[NewNumberValue(float64(index))]; ok {
+			if _, ok := entries[NewNumberValue(JSNumber(index))]; ok {
 				break
 			}
 			index++
@@ -40,7 +40,7 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 			return NewValueFromObject(CreateIterResultObject(realm.Agent, UndefinedValue, true))
 		}
 		setIterator.Index = index
-		key := NewNumberValue(float64(index))
+		key := NewNumberValue(JSNumber(index))
 		value = entries[key]
 		var result Value
 		switch kind {

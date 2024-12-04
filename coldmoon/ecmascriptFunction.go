@@ -300,7 +300,7 @@ loop:
 			array := ArrayCreate(agent, 0, nil)
 			rest := argumentsList[i:]
 			for j, value := range rest {
-				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(j), value)
+				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(JSInt(j)), value)
 			}
 			if e == nil {
 				ref.PutValue(agent, array.ToValue())
@@ -464,7 +464,7 @@ func OrdinaryFunctionCreate(
 	function.InternalMethods().Call = call
 
 	length := parameterList.ExpectedArgumentCount()
-	SetFunctionLength(function.Object, float64(length))
+	SetFunctionLength(function.Object, length)
 
 	return function
 }
@@ -614,12 +614,12 @@ func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 }
 
 // 10.2.10
-func SetFunctionLength(function ObjectType, length float64) {
+func SetFunctionLength(function ObjectType, length JSInt) {
 	Assert(function.IsExtensible())
 	Assert(!function.PropertyStorage().Has(NewStringPropertyKey("length")))
 
 	function.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
-		Value:        NewNumberValue(length),
+		Value:        NewNumberValue(length.ToNumber()),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,

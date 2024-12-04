@@ -4,7 +4,7 @@ type MapIteratorObject struct {
 	*Object
 	Map   *MapObject
 	Kind  objectOwnPropertiesKind
-	Index uint64
+	Index JSInt
 }
 
 // 24.1.5.1
@@ -27,13 +27,13 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 		kind := mapIterator.Kind
 
 		entries := m.MapValue.Data
-		numEntries := uint64(len(entries))
+		numEntries := JSInt(len(entries))
 		if index >= numEntries {
 			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
 		}
 
 		for index < numEntries {
-			if _, ok := entries[NewNumberValue(float64(index))]; ok {
+			if _, ok := entries[NewNumberValue(index.ToNumber())]; ok {
 				break
 			}
 			index++
@@ -42,7 +42,7 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
 		}
 		mapIterator.Index = index
-		key := NewNumberValue(float64(index))
+		key := NewNumberValue(index.ToNumber())
 		value := entries[key]
 
 		var result Value

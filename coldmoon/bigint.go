@@ -203,7 +203,7 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 
 		x := thisBigIntValue(this)
 
-		var radixMV float64
+		var radixMV JSInt
 		if radix == nil {
 			radixMV = 10
 		} else {

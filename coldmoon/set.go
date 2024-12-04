@@ -97,7 +97,7 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		if set.SetValue == nil {
 			panic("TypeError")
 		}
-		return NewNumberValue(float64(len(set.SetValue.Data)))
+		return NewNumberValue(JSNumber(len(set.SetValue.Data)))
 	}
 	var setAdd BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
@@ -127,7 +127,7 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		numEntries := uint64(len(entries))
 		index := uint64(0)
 		for index < numEntries {
-			if v, ok := entries[NewNumberValue(float64(index))]; ok {
+			if v, ok := entries[NewNumberValue(JSNumber(index))]; ok {
 				callbackFn.CallAssumeCallable(thisArg, []Value{v, v, thisValue})
 			}
 			numEntries = uint64(len(entries))

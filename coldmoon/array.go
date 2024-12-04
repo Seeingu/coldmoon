@@ -12,14 +12,14 @@ type ArrayObject struct {
 	*Object
 }
 
-func getArrayLength(array ObjectType) float64 {
+func getArrayLength(array ObjectType) JSInt {
 	lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
 	Assert(lengthDesc.IsDataDescriptor())
-	return lengthDesc.Value.(*NumberValue).Data
+	return lengthDesc.Value.(*NumberValue).Data.ToInt()
 }
 
 // 10.4.2.2
-func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
+func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) ObjectType {
 	realm := agent.CurrentRealm()
 	// 10.4.2.1
 	var defineOwnProperty = func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
@@ -27,23 +27,23 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 		if ok && propertyKeyString.Value == "length" {
 			return ArraySetLength(agent, array, desc)
 		}
-		var index float64
+		var index JSInt
 		if propertyKeyIndex, err := strconv.ParseFloat(propertyKeyString.Value, 64); err != nil {
 			intValue, ok := p.(IntegerIndexPropertyKey)
 			if !ok {
 				panic("unexpected")
 			}
-			index = float64(intValue.Value)
+			index = intValue.Value
 		} else {
-			index = propertyKeyIndex
+			index = JSInt(propertyKeyIndex)
 		}
 		lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
 		Assert(lengthDesc.IsDataDescriptor())
 		Assert(!lengthDesc.Configurable)
 
 		lengthValue := lengthDesc.Value
-		length := lengthValue.(*NumberValue).Data
-		Assert(math.IsInf(length, 0) || length >= 0)
+		length := lengthValue.(*NumberValue).Data.ToInt()
+		Assert(length.IsInf() || length >= 0)
 
 		if index >= length && !lengthDesc.Writable {
 			return false
@@ -56,7 +56,7 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 		}
 
 		if index >= length {
-			lengthDesc.Value = NewNumberValue(float64(index) + 1)
+			lengthDesc.Value = NewNumberValue((index + 1).ToNumber())
 
 			succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), lengthDesc)
 			Assert(succeeded)
@@ -64,7 +64,7 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 		return true
 	}
 
-	if length > POW_2_32-1 {
+	if float64(length) > POW_2_32-1 {
 		panic("RangeError")
 	}
 
@@ -77,7 +77,7 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 	}
 	arr.Object.InternalMethods().DefineOwnProperty = defineOwnProperty
 	OrdinaryDefineOwnProperty(arr, NewStringPropertyKey("length"), &PropertyDescriptor{
-		Value:        NewNumberValue(length),
+		Value:        NewNumberValue(length.ToNumber()),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: false,
@@ -86,7 +86,7 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 }
 
 // 10.4.2.3
-func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length float64) ObjectType {
+func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) ObjectType {
 	isArray := IsArray(NewValueFromObject(originalArray))
 	if !isArray {
 		return ArrayCreate(agent, length, nil)
@@ -117,7 +117,7 @@ func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length float64) 
 		panic("TypeError")
 	}
 
-	return constructorObject.Object.Construct([]Value{NewNumberValue(length)}, nil)
+	return constructorObject.Object.Construct([]Value{NewNumberValue(length.ToNumber())}, nil)
 }
 
 // 10.4.2.4
@@ -128,19 +128,19 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 	newLenDesc := desc
 
 	newLenValue := desc.Value
-	newLen := newLenValue.(*NumberValue).Data
+	newLen := JSInt(newLenValue.(*NumberValue).Data)
 	numberLen := ToNumber(agent, newLenValue)
 
-	if numberLen.Data != newLen {
+	if JSInt(numberLen.Data) != newLen {
 		panic("RangeError")
 	}
 
-	newLenDesc.Value = NewNumberValue(newLen)
+	newLenDesc.Value = NewNumberValue(newLen.ToNumber())
 
 	oldLenDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
 	Assert(oldLenDesc.IsDataDescriptor())
 	Assert(!oldLenDesc.Configurable)
-	oldLen := oldLenDesc.Value.(*NumberValue).Data
+	oldLen := JSInt(oldLenDesc.Value.(*NumberValue).Data)
 
 	if newLen >= oldLen {
 		return OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), newLenDesc)
@@ -165,9 +165,9 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 	}
 
 	for k := oldLen - 1; k >= newLen; k-- {
-		deleteSucceeded := array.InternalMethods().Delete(array, NewIntegerIndexPropertyKey(int(k)))
+		deleteSucceeded := array.InternalMethods().Delete(array, NewIntegerIndexPropertyKey(k))
 		if !deleteSucceeded {
-			newLenDesc.Value = NewNumberValue(float64(k) + 1)
+			newLenDesc.Value = NewNumberValue(JSNumber(k) + 1)
 			if !newWritable {
 				succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), &PropertyDescriptor{
 					Writable: false,
@@ -197,38 +197,38 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 
 		proto := GetPrototypeFromConstructor(newTarget, "%Array.prototype%")
 
-		numberOfArgs := len(args)
+		numberOfArgs := JSInt(len(args))
 		if numberOfArgs == 0 {
 			return NewValueFromObject(ArrayCreate(agent, 0, proto))
 		} else if numberOfArgs == 1 {
 			length := args[0]
 			array := ArrayCreate(agent, 0, proto)
 
-			var intLen uint32
+			var intLen JSNumber
 			if _, ok := length.(*NumberValue); ok {
 				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(0), length)
 				intLen = 1
 			} else {
-				intLen = ToUint32(agent, length)
+				intLen = ToUint32(agent, length).ToNumber()
 			}
 
 			array.Set(
 				NewStringPropertyKey("length"),
-				NewNumberValue(float64(intLen)),
+				NewNumberValue(intLen),
 				setThrowTypeThrow,
 			)
 
 			return NewValueFromObject(array)
 		} else {
 			Assert(numberOfArgs >= 2)
-			array := ArrayCreate(agent, float64(numberOfArgs), proto)
+			array := ArrayCreate(agent, numberOfArgs, proto)
 
 			for k := range numberOfArgs {
 				propertyKey := NewIntegerIndexPropertyKey(k)
 				array.CreateDataPropertyOrThrow(propertyKey, args[k])
 			}
 
-			Assert(getArrayLength(array) == float64(numberOfArgs))
+			Assert(getArrayLength(array) == numberOfArgs)
 			return NewValueFromObject(array)
 		}
 	}
@@ -238,19 +238,19 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		return NewBooleanValue(IsArray(arg))
 	}
 	var of BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		length := len(args)
-		lenNumber := NewNumberValue(float64(length))
+		length := JSInt(len(args))
+		lenNumber := NewNumberValue(length.ToNumber())
 
 		constructor := this
 		var array ObjectType
 		if IsConstructor(constructor) {
 			array = MustGetObject(constructor).Construct(args, nil)
 		} else {
-			array = ArrayCreate(realm.Agent, float64(length), nil)
+			array = ArrayCreate(realm.Agent, length, nil)
 		}
 
 		for k := range args {
-			propertyKey := NewIntegerIndexPropertyKey(k)
+			propertyKey := NewIntegerIndexPropertyKey(JSInt(k))
 			array.CreateDataPropertyOrThrow(propertyKey, args[k])
 		}
 
@@ -308,12 +308,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 
-		A := ArraySpeciesCreate(agent, array, float64(length))
+		A := ArraySpeciesCreate(agent, array, length)
 		for k := range length {
-			pk := NewIntegerIndexPropertyKey(int(k))
+			pk := NewIntegerIndexPropertyKey(k)
 			mappedValue := callbackFn.CallAssumeCallable(
 				thisArg,
-				[]Value{array.Get(pk), NewNumberValue(float64(k)), this},
+				[]Value{array.Get(pk), NewNumberValue(k.ToNumber()), this},
 			)
 
 			A.CreateDataPropertyOrThrow(pk, mappedValue)
@@ -331,7 +331,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		var elements []string
 		for k := range length {
-			element := array.Get(NewIntegerIndexPropertyKey(int(k)))
+			element := array.Get(NewIntegerIndexPropertyKey(k))
 
 			var next string
 			if element == nil || element == UndefinedValue || element == NullValue {
@@ -364,13 +364,13 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 
 		for k := range length {
-			pk := NewIntegerIndexPropertyKey(int(k))
+			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := array.HasProperty(pk)
 			if kPresent {
 				kValue := array.Get(pk)
 				callbackFn.CallAssumeCallable(
 					thisArg,
-					[]Value{kValue, NewNumberValue(float64(k)), this},
+					[]Value{kValue, NewNumberValue(k.ToNumber()), this},
 				)
 			}
 		}
@@ -381,12 +381,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		length := array.LengthOfArrayLike()
 		argCount := len(args)
 		for i := 0; i < argCount; i++ {
-			array.Set(NewIntegerIndexPropertyKey(int(length)), args[i], setThrowTypeThrow)
+			array.Set(NewIntegerIndexPropertyKey(length), args[i], setThrowTypeThrow)
 			length++
 		}
 
-		array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
-		return NewNumberValue(float64(length))
+		array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
+		return NewNumberValue(length.ToNumber())
 	}
 	var pop BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		array := MustGetObject(this)
@@ -396,12 +396,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			return UndefinedValue
 		}
 		length--
-		element := array.Get(NewIntegerIndexPropertyKey(int(length)))
-		deleteSucceeded := array.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(int(length)))
+		element := array.Get(NewIntegerIndexPropertyKey(length))
+		deleteSucceeded := array.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(length))
 		if !deleteSucceeded {
 			panic("TypeError")
 		}
-		array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
+		array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
 		return element
 	}
 	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -410,7 +410,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		separator := ", "
 		var elements []string
 		for k := range length {
-			nextElement := array.Get(NewIntegerIndexPropertyKey(int(k)))
+			nextElement := array.Get(NewIntegerIndexPropertyKey(k))
 			if nextElement == nil || nextElement == UndefinedValue {
 				elements = append(elements, "")
 			} else {
@@ -432,18 +432,18 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if fromIndex == UndefinedValue {
 			Assert(n == 0)
 		}
-		if n == math.Inf(1) {
+		if n.IsPositiveInf() {
 			return FalseValue
-		} else if n == math.Inf(-1) {
+		} else if n.IsNegInf() {
 			n = 0
 		}
 
-		k := int(n)
+		k := n
 		if k < 0 {
-			k = int(math.Max(float64(length)+float64(k), 0))
+			k = (length + k).Max(0)
 		}
 
-		for k < int(length) {
+		for k < length {
 			elementK := o.Get(NewIntegerIndexPropertyKey(k))
 			if SameValueZero(searchElement, elementK) {
 				return TrueValue
@@ -464,23 +464,23 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if fromIndex == UndefinedValue {
 			Assert(n == 0)
 		}
-		if n == math.Inf(1) {
+		if n.IsPositiveInf() {
 			return NewNumberValue(-1)
-		} else if n == math.Inf(-1) {
+		} else if n.IsNegInf() {
 			n = 0
 		}
 
-		k := int(math.Max(n, 0))
+		k := n.Max(0)
 		if k < 0 {
-			k = int(math.Max(float64(length)+float64(k), 0))
+			k = (length + k).Max(0)
 		}
 
-		for k < int(length) {
+		for k < length {
 			kPresent := o.HasProperty(NewIntegerIndexPropertyKey(k))
 			if kPresent {
 				elementK := o.Get(NewIntegerIndexPropertyKey(k))
 				if IsStrictlyEqual(searchElement, elementK) {
-					return NewNumberValue(float64(k))
+					return NewNumberValue(k.ToNumber())
 				}
 			}
 			k++
@@ -492,7 +492,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		thisArg := args[1]
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionAscending, predicate, thisArg)
+		findRec := o.(*ArrayObject).findViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return findRec.value
 	}
 	var findIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -500,15 +500,15 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		thisArg := args[1]
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionAscending, predicate, thisArg)
-		return NewNumberValue(float64(findRec.index))
+		findRec := o.(*ArrayObject).findViaPredicate(length, DirectionAscending, predicate, thisArg)
+		return NewNumberValue(findRec.index.ToNumber())
 	}
 	var findLast BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionDescending, predicate, thisArg)
+		findRec := o.(*ArrayObject).findViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return findRec.value
 	}
 	var findLastIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -516,8 +516,8 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		thisArg := args[1]
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		findRec := o.(*ArrayObject).findViaPredicate(int(length), DirectionDescending, predicate, thisArg)
-		return NewNumberValue(float64(findRec.index))
+		findRec := o.(*ArrayObject).findViaPredicate(length, DirectionDescending, predicate, thisArg)
+		return NewNumberValue(findRec.index.ToNumber())
 	}
 	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		searchElement := args[0]
@@ -527,24 +527,24 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if length == 0 {
 			return NewNumberValue(-1)
 		}
-		var n float64
+		var n JSInt
 		if len(args) > 1 {
 			n = ToIntegerOrInfinity(agent, fromIndex)
 		} else {
-			n = float64(length - 1)
+			n = length - 1
 		}
 
-		if n == math.Inf(-1) {
+		if n.IsNegInf() {
 			return NewNumberValue(-1)
 		}
 
-		k := int(math.Min(math.Max(n, 0), float64(length-1)))
+		k := n.Max(0).Min(length - 1)
 		for k >= 0 {
 			kPresent := o.HasProperty(NewIntegerIndexPropertyKey(k))
 			if kPresent {
 				elementK := o.Get(NewIntegerIndexPropertyKey(k))
 				if IsStrictlyEqual(searchElement, elementK) {
-					return NewNumberValue(float64(k))
+					return NewNumberValue(k.ToNumber())
 				}
 			}
 			k--
@@ -556,9 +556,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
 		relativeIndex := ToIntegerOrInfinity(agent, index)
-		k := int(relativeIndex)
+		k := relativeIndex
 		if k < 0 {
-			k += int(length)
+			k += length
 		}
 		return o.Get(NewIntegerIndexPropertyKey(k))
 	}
@@ -572,12 +572,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 
-		for k := 0; k < int(length); k++ {
+		for k := JSInt(0); k < length; k++ {
 			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				testResult := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k)), this})
+				testResult := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
 				if !testResult.ToBoolean() {
 					return FalseValue
 				}
@@ -595,12 +595,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 
-		for k := 0; k < int(length); k++ {
+		for k := JSInt(0); k < length; k++ {
 			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				testResult := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k)), this})
+				testResult := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
 				if testResult.ToBoolean() {
 					return TrueValue
 				}
@@ -615,13 +615,13 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		length := o.LengthOfArrayLike()
 		relativeIndex := ToIntegerOrInfinity(agent, index)
 
-		actualIndex := int(relativeIndex)
+		actualIndex := relativeIndex
 		if actualIndex < 0 {
-			actualIndex += int(length)
+			actualIndex += length
 		}
 
-		array := ArrayCreate(agent, float64(length), nil)
-		for k := 0; k < int(length); k++ {
+		array := ArrayCreate(agent, length, nil)
+		for k := JSInt(0); k < length; k++ {
 			pk := NewIntegerIndexPropertyKey(k)
 			if k == actualIndex {
 				array.CreateDataPropertyOrThrow(pk, value)
@@ -657,18 +657,18 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 			iteratorRecord := GetIteratorFromMethod(agent, items, usingIterator)
 
-			for k := 0; ; k++ {
+			for k := JSInt(0); ; k++ {
 				pk := NewIntegerIndexPropertyKey(k)
 				next := iteratorRecord.IteratorStep()
 				if next == nil {
-					a.Set(NewStringPropertyKey("length"), NewNumberValue(float64(k)), setThrowTypeThrow)
+					a.Set(NewStringPropertyKey("length"), NewNumberValue(k.ToNumber()), setThrowTypeThrow)
 					return NewValueFromObject(a)
 				}
 
 				nextValue := IteratorValue(next)
 				var mappedValue Value
 				if mapping {
-					mappedValue = mapFn.CallAssumeCallable(thisArg, []Value{nextValue, NewNumberValue(float64(k))})
+					mappedValue = mapFn.CallAssumeCallable(thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())})
 				} else {
 					mappedValue = nextValue
 				}
@@ -680,23 +680,23 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		length := arrayLike.LengthOfArrayLike()
 		var a ObjectType
 		if IsConstructor(c) {
-			a = MustGetObject(c).Construct([]Value{NewNumberValue(float64(length))}, nil)
+			a = MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil)
 		} else {
-			a = ArrayCreate(agent, float64(length), nil)
+			a = ArrayCreate(agent, length, nil)
 		}
 
-		for k := 0; k < int(length); k++ {
+		for k := JSInt(0); k < length; k++ {
 			pk := NewIntegerIndexPropertyKey(k)
 			kValue := arrayLike.Get(pk)
 			var mappedValue Value
 			if mapping {
-				mappedValue = mapFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k))})
+				mappedValue = mapFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber())})
 			} else {
 				mappedValue = kValue
 			}
 			a.CreateDataPropertyOrThrow(pk, mappedValue)
 		}
-		a.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
+		a.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
 		return NewValueFromObject(a)
 	}
 	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -719,7 +719,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			return UndefinedValue
 		}
 		first := o.Get(NewIntegerIndexPropertyKey(0))
-		for k := 1; k < int(length); k++ {
+		for k := JSInt(1); k < length; k++ {
 			from := NewIntegerIndexPropertyKey(k)
 			to := NewIntegerIndexPropertyKey(k - 1)
 			fromPresent := o.HasProperty(from)
@@ -730,22 +730,22 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				o.DeletePropertyOrThrow(to)
 			}
 		}
-		deleteSucceeded := o.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(int(length - 1)))
+		deleteSucceeded := o.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(length - 1))
 		if !deleteSucceeded {
 			panic("TypeError")
 		}
-		o.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length-1)), setThrowTypeThrow)
+		o.Set(NewStringPropertyKey("length"), NewNumberValue((length - 1).ToNumber()), setThrowTypeThrow)
 		return first
 	}
 	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		argCount := len(args)
+		argCount := JSInt(len(args))
 		if argCount == 0 {
-			return NewNumberValue(float64(length))
+			return NewNumberValue(length.ToNumber())
 		}
 
-		k := int(length)
+		k := length
 		for k > 0 {
 			k--
 			from := NewIntegerIndexPropertyKey(k - 1)
@@ -759,11 +759,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 		}
 		for j, arg := range args {
-			key := NewIntegerIndexPropertyKey(j)
+			key := NewIntegerIndexPropertyKey(JSInt(j))
 			o.Set(key, arg, setThrowTypeThrow)
 		}
-		o.Set(NewStringPropertyKey("length"), NewNumberValue(float64(int(length)+argCount)), setThrowTypeThrow)
-		return NewNumberValue(float64(int(length) + argCount))
+		newLength := (length + argCount).ToNumber()
+		o.Set(NewStringPropertyKey("length"), NewNumberValue(newLength), setThrowTypeThrow)
+		return NewNumberValue(newLength)
 	}
 	var filter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		callbackFn := args[0]
@@ -774,14 +775,14 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		A := ArraySpeciesCreate(agent, o, 0)
-		k := 0
-		to := 0
-		for k < int(length) {
+		k := JSInt(0)
+		to := JSInt(0)
+		for k < length {
 			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				selected := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k)), this})
+				selected := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
 				if selected.ToBoolean() {
 					A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(to), kValue)
 					to++
@@ -802,7 +803,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if length == 0 && initialValue == UndefinedValue {
 			panic("TypeError")
 		}
-		k := 0
+		k := JSInt(0)
 		var accumulator Value
 		if initialValue == UndefinedValue {
 			kPresent := false
@@ -815,19 +816,19 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 					break
 				}
 				k++
-				if k >= int(length) {
+				if k >= length {
 					panic("TypeError")
 				}
 			}
 		} else {
 			accumulator = initialValue
 		}
-		for k < int(length) {
+		for k < length {
 			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				accumulator = callbackFn.CallAssumeCallable(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(float64(k)), this})
+				accumulator = callbackFn.CallAssumeCallable(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this})
 			}
 			k++
 		}
@@ -844,7 +845,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if length == 0 && initialValue == UndefinedValue {
 			panic("TypeError")
 		}
-		k := int(length) - 1
+		k := JSInt(length) - 1
 		var accumulator Value
 		if initialValue == UndefinedValue {
 			kPresent := false
@@ -869,7 +870,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				accumulator = callbackFn.CallAssumeCallable(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(float64(k)), this})
+				accumulator = callbackFn.CallAssumeCallable(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this})
 			}
 			k--
 		}
@@ -878,7 +879,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var concat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
 		A := ArraySpeciesCreate(agent, o, 0)
-		n := 0
+		n := JSInt(0)
 
 		for index := range len(args) + 1 {
 			var element Value
@@ -895,8 +896,8 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 					panic("TypeError")
 				}
 
-				k := 0
-				for k < int(length) {
+				k := JSInt(0)
+				for k < length {
 					pk := NewIntegerIndexPropertyKey(k)
 					kPresent := MustGetObject(element).HasProperty(pk)
 					if kPresent {
@@ -912,7 +913,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 		}
 
-		A.Set(NewStringPropertyKey("length"), NewNumberValue(float64(n)), setThrowTypeThrow)
+		A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow)
 		return NewValueFromObject(A)
 	}
 	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -923,36 +924,36 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		relativeStart := ToIntegerOrInfinity(agent, start)
 
-		var k float64
-		if relativeStart == math.Inf(-1) {
+		var k JSInt
+		if relativeStart.IsNegInf() {
 			k = 0
 		} else if relativeStart < 0 {
-			k = math.Max(float64(length)+relativeStart, 0)
+			k = (length + relativeStart).Max(0)
 		} else {
-			k = math.Min(relativeStart, float64(length))
+			k = relativeStart.Min(length)
 		}
 
-		var relativeEnd float64
+		var relativeEnd JSInt
 		if end == UndefinedValue {
-			relativeEnd = float64(length)
+			relativeEnd = length
 		} else {
 			relativeEnd = ToIntegerOrInfinity(agent, end)
 		}
 
-		var final float64
-		if relativeEnd == math.Inf(-1) {
+		var final JSInt
+		if relativeEnd.IsNegInf() {
 			final = 0
 		} else if relativeEnd < 0 {
-			final = math.Max(float64(length)+relativeEnd, 0)
+			final = JSInt(math.Max(float64(length+relativeEnd), 0))
 		} else {
-			final = math.Min(relativeEnd, float64(length))
+			final = JSInt(math.Min(float64(relativeEnd), float64(length)))
 		}
-		count := math.Max(final-k, 0)
+		count := (final - k).Max(0)
 
-		n := 0
+		n := JSInt(0)
 		A := ArraySpeciesCreate(agent, o, count)
 		for k < final {
-			pk := NewIntegerIndexPropertyKey(int(k))
+			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
@@ -961,7 +962,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			k++
 			n++
 		}
-		A.Set(NewStringPropertyKey("length"), NewNumberValue(float64(n)), setThrowTypeThrow)
+		A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow)
 		return NewValueFromObject(A)
 	}
 	var fill BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -972,27 +973,27 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		length := o.LengthOfArrayLike()
 
 		relativeStart := ToIntegerOrInfinity(agent, start)
-		k := math.Max(relativeStart, 0)
+		k := relativeStart.Max(0)
 		if end == UndefinedValue {
-			end = NewNumberValue(float64(length))
+			end = NewNumberValue(length.ToNumber())
 		}
-		var relativeEnd float64
+		var relativeEnd JSInt
 		if end == UndefinedValue {
-			relativeEnd = float64(length)
+			relativeEnd = length
 		} else {
 			relativeEnd = ToIntegerOrInfinity(agent, end)
 		}
 
-		var final float64
-		if relativeEnd == math.Inf(-1) {
+		var final JSInt
+		if relativeEnd.IsNegInf() {
 			final = 0
 		} else if relativeEnd < 0 {
-			final = math.Max(float64(length)+relativeEnd, 0)
+			final = (length + relativeEnd).Max(0)
 		} else {
-			final = math.Min(relativeEnd, float64(length))
+			final = relativeEnd.Min(length)
 		}
 		for k < final {
-			pk := NewIntegerIndexPropertyKey(int(k))
+			pk := NewIntegerIndexPropertyKey(k)
 			o.Set(pk, value, setThrowTypeThrow)
 			k++
 		}
@@ -1006,42 +1007,42 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		length := o.LengthOfArrayLike()
 
 		relativeTarget := ToIntegerOrInfinity(agent, target)
-		var to float64
-		if relativeTarget == math.Inf(-1) {
+		var to JSInt
+		if relativeTarget.IsNegInf() {
 			to = 0
 		} else if relativeTarget < 0 {
-			to = math.Max(float64(length)+relativeTarget, 0)
+			to = (length + relativeTarget).Max(0)
 		} else {
-			to = math.Min(relativeTarget, float64(length))
+			to = relativeTarget.Min(length)
 		}
 
 		relativeStart := ToIntegerOrInfinity(agent, start)
-		var from float64
-		if relativeStart == math.Inf(-1) {
+		var from JSInt
+		if relativeStart.IsNegInf() {
 			from = 0
 		} else if relativeStart < 0 {
-			from = math.Max(float64(length)+relativeStart, 0)
+			from = (length + relativeStart).Max(0)
 		} else {
-			from = math.Min(relativeStart, float64(length))
+			from = relativeStart.Min(length)
 		}
 
-		var relativeEnd float64
+		var relativeEnd JSInt
 		if end == UndefinedValue {
-			relativeEnd = float64(length)
+			relativeEnd = length
 		} else {
 			relativeEnd = ToIntegerOrInfinity(agent, end)
 		}
 
-		var final float64
-		if relativeEnd == math.Inf(-1) {
+		var final JSInt
+		if relativeEnd.IsNegInf() {
 			final = 0
 		} else if relativeEnd < 0 {
-			final = math.Max(float64(length)+relativeEnd, 0)
+			final = (length + relativeEnd).Max(0)
 		} else {
-			final = math.Min(relativeEnd, float64(length))
+			final = relativeEnd.Min(length)
 		}
 
-		count := math.Min(final-from, float64(length)-to)
+		count := (final - from).Min(length - to)
 
 		var direction int
 		if from < to && to < from+count {
@@ -1053,8 +1054,8 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 
 		for count > 0 {
-			fromKey := NewIntegerIndexPropertyKey(int(from))
-			toKey := NewIntegerIndexPropertyKey(int(to))
+			fromKey := NewIntegerIndexPropertyKey(from)
+			toKey := NewIntegerIndexPropertyKey(to)
 			fromPresent := o.HasProperty(fromKey)
 			if fromPresent {
 				fromValue := o.Get(fromKey)
@@ -1062,8 +1063,8 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			} else {
 				o.DeletePropertyOrThrow(toKey)
 			}
-			from += float64(direction)
-			to += float64(direction)
+			from += JSInt(direction)
+			to += JSInt(direction)
 			count--
 		}
 		return NewValueFromObject(o)
@@ -1071,10 +1072,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var reverse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		middle := int(length / 2)
-		lower := 0
+		middle := length / 2
+		lower := JSInt(0)
 		for lower < middle {
-			upper := int(length) - lower - 1
+			upper := length - lower - 1
 			lowerP := NewIntegerIndexPropertyKey(lower)
 			upperP := NewIntegerIndexPropertyKey(upper)
 			lowerExists := o.HasProperty(lowerP)
@@ -1105,9 +1106,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var toReversed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		A := ArrayCreate(agent, float64(length), nil)
-		for k := 0; k < int(length); k++ {
-			from := NewIntegerIndexPropertyKey(int(length) - k - 1)
+		A := ArrayCreate(agent, length, nil)
+		for k := JSInt(0); k < length; k++ {
+			from := NewIntegerIndexPropertyKey(length - k - 1)
 			fromValue := o.Get(from)
 			pk := NewIntegerIndexPropertyKey(k)
 			A.CreateDataPropertyOrThrow(pk, fromValue)
@@ -1129,14 +1130,14 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			},
 		}
 
-		sortedList := SortIndexedProperties(agent, obj, float64(length), sortCompare, sortHolesTypeSkipHoles)
-		itemCount := len(sortedList)
+		sortedList := SortIndexedProperties(agent, obj, length, sortCompare, sortHolesTypeSkipHoles)
+		itemCount := JSInt(len(sortedList))
 
-		j := 0
+		j := JSInt(0)
 		for ; j < itemCount; j++ {
 			obj.Set(NewIntegerIndexPropertyKey(j), sortedList[j], setThrowTypeThrow)
 		}
-		for ; j < int(length); j++ {
+		for ; j < length; j++ {
 			obj.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(j))
 		}
 		return NewValueFromObject(obj)
@@ -1156,10 +1157,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			},
 		}
 
-		sortedList := SortIndexedProperties(agent, obj, float64(length), sortCompare, sortHolesTypeReadThroughHoles)
-		A := ArrayCreate(agent, float64(length), nil)
+		sortedList := SortIndexedProperties(agent, obj, length, sortCompare, sortHolesTypeReadThroughHoles)
+		A := ArrayCreate(agent, length, nil)
 		for k, v := range sortedList {
-			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(k), v)
+			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(JSInt(k)), v)
 		}
 		return NewValueFromObject(A)
 	}
@@ -1167,7 +1168,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		depth := args[0]
 		o := ValueToObject(agent, this)
 		sourceLen := o.LengthOfArrayLike()
-		var depthNum float64 = 1
+		var depthNum JSInt = 1
 		if depth != UndefinedValue {
 			depthNum = ToIntegerOrInfinity(agent, depth)
 			if depthNum < 0 {
@@ -1175,7 +1176,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 		}
 		A := ArraySpeciesCreate(agent, o, 0)
-		FlattenIntoArray(agent, A, o, float64(sourceLen), 0, depthNum, nil, nil)
+		FlattenIntoArray(agent, A, o, sourceLen, 0, depthNum, nil, nil)
 		return NewValueFromObject(A)
 	}
 	var flatMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -1187,7 +1188,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		A := ArraySpeciesCreate(agent, o, 0)
-		FlattenIntoArray(agent, A, o, float64(sourceLen), 0, 1, MustGetObject(mapperFunction), thisArg)
+		FlattenIntoArray(agent, A, o, sourceLen, 0, 1, MustGetObject(mapperFunction), thisArg)
 		return NewValueFromObject(A)
 	}
 	var splice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -1200,47 +1201,47 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
 
-		var relativeStart float64 = 0
+		var relativeStart JSInt = 0
 		if start != nil {
 			relativeStart = ToIntegerOrInfinity(agent, start)
 		}
-		var actualStart float64
-		if relativeStart == math.Inf(-1) {
+		var actualStart JSInt
+		if relativeStart.IsNegInf() {
 			actualStart = 0
 		} else if relativeStart < 0 {
-			actualStart = math.Max(float64(length)+relativeStart, 0)
+			actualStart = (length + relativeStart).Max(0)
 		} else {
-			actualStart = math.Min(relativeStart, float64(length))
+			actualStart = relativeStart.Min(length)
 		}
-		itemCount := len(items)
-		var actualDeleteCount float64
+		itemCount := JSInt(len(items))
+		var actualDeleteCount JSInt
 		if start == nil {
 			actualDeleteCount = 0
 		} else if deleteCount == nil {
-			actualDeleteCount = float64(length) - actualStart
+			actualDeleteCount = length - actualStart
 		} else {
 			actualDeleteCount = ToIntegerOrInfinity(agent, deleteCount)
 		}
 
-		if float64(length)+float64(itemCount)-actualDeleteCount > POW_2_53-1 {
+		if float64(length+itemCount-actualDeleteCount) > POW_2_53-1 {
 			panic("TypeError")
 		}
 
 		A := ArraySpeciesCreate(agent, o, actualDeleteCount)
-		for k := 0; k < int(actualDeleteCount); k++ {
-			from := NewIntegerIndexPropertyKey(int(actualStart + float64(k)))
+		for k := JSInt(0); k < actualDeleteCount; k++ {
+			from := NewIntegerIndexPropertyKey(actualStart + k)
 			fromPresent := o.HasProperty(from)
 			if fromPresent {
 				fromValue := o.Get(from)
 				A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(k), fromValue)
 			}
 		}
-		A.Set(NewStringPropertyKey("length"), NewNumberValue(actualDeleteCount), setThrowTypeThrow)
-		if itemCount < int(actualDeleteCount) {
+		A.Set(NewStringPropertyKey("length"), NewNumberValue(actualDeleteCount.ToNumber()), setThrowTypeThrow)
+		if itemCount < actualDeleteCount {
 			k := actualStart
-			for k < float64(length)-actualDeleteCount {
-				from := NewIntegerIndexPropertyKey(int(k + actualDeleteCount))
-				to := NewIntegerIndexPropertyKey(int(k + float64(itemCount)))
+			for k < length-actualDeleteCount {
+				from := NewIntegerIndexPropertyKey(k + actualDeleteCount)
+				to := NewIntegerIndexPropertyKey(k + itemCount)
 				fromPresent := o.HasProperty(from)
 				if fromPresent {
 					fromValue := o.Get(from)
@@ -1250,16 +1251,16 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				}
 				k++
 			}
-			k = float64(length)
-			for k > float64(length)-actualDeleteCount+float64(itemCount) {
+			k = length
+			for k > length-actualDeleteCount+itemCount {
 				k--
-				o.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(int(k)))
+				o.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(k))
 			}
-		} else if itemCount > int(actualDeleteCount) {
-			k := float64(length) - actualDeleteCount
+		} else if itemCount > actualDeleteCount {
+			k := length - actualDeleteCount
 			for k > actualStart {
-				from := NewIntegerIndexPropertyKey(int(k + actualDeleteCount - 1))
-				to := NewIntegerIndexPropertyKey(int(k + float64(itemCount) - 1))
+				from := NewIntegerIndexPropertyKey(k + actualDeleteCount - 1)
+				to := NewIntegerIndexPropertyKey(k + itemCount - 1)
 				fromPresent := o.HasProperty(from)
 				if fromPresent {
 					fromValue := o.Get(from)
@@ -1272,10 +1273,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		k := actualStart
 		for _, E := range items {
-			o.Set(NewIntegerIndexPropertyKey(int(k)), E, setThrowTypeThrow)
+			o.Set(NewIntegerIndexPropertyKey(k), E, setThrowTypeThrow)
 			k++
 		}
-		o.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)-actualDeleteCount+float64(itemCount)), setThrowTypeThrow)
+		o.Set(NewStringPropertyKey("length"), NewNumberValue((length - actualDeleteCount + itemCount).ToNumber()), setThrowTypeThrow)
 		return NewValueFromObject(A)
 	}
 	var toSpliced BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -1288,35 +1289,35 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
 
-		var relativeStart float64 = 0
+		var relativeStart JSInt = 0
 		if start != nil {
 			relativeStart = ToIntegerOrInfinity(agent, start)
 		}
-		var actualStart float64
-		if relativeStart == math.Inf(-1) {
+		var actualStart JSInt
+		if relativeStart.IsNegInf() {
 			actualStart = 0
 		} else if relativeStart < 0 {
-			actualStart = math.Max(float64(length)+relativeStart, 0)
+			actualStart = (length + relativeStart).Max(0)
 		} else {
-			actualStart = math.Min(relativeStart, float64(length))
+			actualStart = relativeStart.Min(length)
 		}
-		insertCount := len(items)
-		var actualSkipCount float64
+		insertCount := JSInt(len(items))
+		var actualSkipCount JSInt
 		if start == nil {
 			actualSkipCount = 0
 		} else if skipCount == nil {
-			actualSkipCount = float64(length) - actualStart
+			actualSkipCount = length - actualStart
 		} else {
 			sc := ToIntegerOrInfinity(agent, skipCount)
-			actualSkipCount = lo.Clamp(sc, 0, float64(length)-actualStart)
+			actualSkipCount = lo.Clamp(sc, 0, length-actualStart)
 		}
 
-		newLen := float64(length) + float64(insertCount) - actualSkipCount
+		newLen := length + insertCount - actualSkipCount
 
 		A := ArrayCreate(agent, newLen, nil)
-		i := 0
+		i := JSInt(0)
 		r := actualStart + actualSkipCount
-		for ; i < int(actualStart); i++ {
+		for ; i < actualStart; i++ {
 			from := NewIntegerIndexPropertyKey(i)
 			fromValue := o.Get(from)
 			A.CreateDataPropertyOrThrow(from, fromValue)
@@ -1325,8 +1326,8 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), E)
 			i++
 		}
-		for ; i < int(newLen); i++ {
-			from := NewIntegerIndexPropertyKey(int(r))
+		for ; i < newLen; i++ {
+			from := NewIntegerIndexPropertyKey(r)
 			fromValue := o.Get(from)
 			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), fromValue)
 			r++
@@ -1418,12 +1419,12 @@ const (
 )
 
 type FoundResult struct {
-	index int
+	index JSInt
 	value Value
 }
 
 func (a *ArrayObject) findViaPredicate(
-	len int,
+	len JSInt,
 	direction direction,
 	predicate Value,
 	thisArg Value,
@@ -1432,7 +1433,7 @@ func (a *ArrayObject) findViaPredicate(
 		panic("TypeError")
 	}
 
-	var k int
+	var k JSInt
 	if direction == DirectionAscending {
 		k = 0
 	} else {
@@ -1448,7 +1449,7 @@ func (a *ArrayObject) findViaPredicate(
 		}
 		pk := NewIntegerIndexPropertyKey(k)
 		kValue := a.Get(pk)
-		testResult := predicate.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(float64(k)), NewValueFromObject(a)})
+		testResult := predicate.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), NewValueFromObject(a)})
 
 		if testResult.ToBoolean() {
 			return FoundResult{
@@ -1508,9 +1509,9 @@ func InsertionSort(agent *Agent, items []Value, sortCompare SortCompare) {
 }
 
 // 23.1.3.30.1
-func SortIndexedProperties(agent *Agent, obj ObjectType, length float64, sortCompare SortCompare, holes sortHolesType) (items []Value) {
-	k := 0
-	for k < int(length) {
+func SortIndexedProperties(agent *Agent, obj ObjectType, length JSInt, sortCompare SortCompare, holes sortHolesType) (items []Value) {
+	k := JSInt(0)
+	for k < length {
 		pk := NewIntegerIndexPropertyKey(k)
 		var kRead bool
 		if holes == sortHolesTypeSkipHoles {
@@ -1566,7 +1567,7 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) int {
 	return 0
 }
 
-func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen float64, start, depth float64, mapperFunction ObjectType, thisArg Value) float64 {
+func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen JSInt, start, depth JSInt, mapperFunction ObjectType, thisArg Value) JSInt {
 	if mapperFunction != nil {
 		Assert(IsCallable(NewValueFromObject(mapperFunction)))
 		Assert(thisArg != nil)
@@ -1574,8 +1575,8 @@ func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen float64
 	}
 
 	targetIndex := start
-	sourceIndex := 0
-	for sourceIndex < int(sourceLen) {
+	sourceIndex := JSInt(0)
+	for sourceIndex < sourceLen {
 		p := NewIntegerIndexPropertyKey(sourceIndex)
 		exists := source.HasProperty(p)
 		if exists {
@@ -1583,7 +1584,7 @@ func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen float64
 			if mapperFunction != nil {
 				element = NewValueFromObject(mapperFunction).CallAssumeCallable(
 					thisArg,
-					[]Value{element, NewNumberValue(float64(sourceIndex)), NewValueFromObject(source)},
+					[]Value{element, NewNumberValue(sourceIndex.ToNumber()), NewValueFromObject(source)},
 				)
 			}
 
@@ -1592,19 +1593,19 @@ func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen float64
 				shouldFlatten = IsArray(element)
 			}
 			if shouldFlatten {
-				var newDepth float64
-				if depth == math.Inf(1) {
-					newDepth = math.Inf(1)
+				var newDepth JSInt
+				if depth.IsPositiveInf() {
+					newDepth = JSInt(math.Inf(1))
 				} else {
 					newDepth = depth - 1
 				}
 				elementLen := MustGetObject(element).LengthOfArrayLike()
-				targetIndex = FlattenIntoArray(agent, target, MustGetObject(element), float64(elementLen), targetIndex, newDepth, mapperFunction, thisArg)
+				targetIndex = FlattenIntoArray(agent, target, MustGetObject(element), elementLen, targetIndex, newDepth, mapperFunction, thisArg)
 			} else {
-				if targetIndex >= POW_2_53-1 {
+				if float64(targetIndex) >= POW_2_53-1 {
 					panic("TypeError")
 				}
-				target.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(int(targetIndex)), element)
+				target.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(targetIndex), element)
 				targetIndex++
 			}
 		}

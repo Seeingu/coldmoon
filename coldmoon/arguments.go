@@ -87,21 +87,21 @@ func Delete(object ObjectType, key PropertyKey) bool {
 func CreateUnmappedArgumentsObject(agent *Agent, argumentsList []Value) ObjectType {
 	realm := agent.CurrentRealm()
 
-	length := len(argumentsList)
+	length := JSInt(len(argumentsList))
 
 	obj := &ArgumentsObject{
 		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype),
 	}
 
 	obj.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
-		Value:        NewNumberValue(float64(length)),
+		Value:        NewNumberValue(length.ToNumber()),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,
 	})
 
 	for index, value := range argumentsList {
-		pk := NewIntegerIndexPropertyKey(index)
+		pk := NewIntegerIndexPropertyKey(JSInt(index))
 		obj.CreateDataPropertyOrThrow(pk, value)
 	}
 
@@ -124,7 +124,7 @@ func CreateUnmappedArgumentsObject(agent *Agent, argumentsList []Value) ObjectTy
 // 10.4.4.7
 func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *FormalParameters, argumentsList []Value, env EnvironmentRecord) ObjectType {
 	realm := agent.CurrentRealm()
-	length := len(argumentsList)
+	length := JSInt(len(argumentsList))
 	obj := &ArgumentsObject{
 		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype),
 	}
@@ -142,14 +142,14 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 	_map := OrdinaryObjectCreate(agent, nil, nil)
 	obj.ParameterMap = _map
 	parameterNames := formals.BoundNames()
-	numberOfParameters := len(parameterNames)
-	for i := 0; i < numberOfParameters; i++ {
+	numberOfParameters := JSInt(len(parameterNames))
+	for i := JSInt(0); i < numberOfParameters; i++ {
 		value := argumentsList[i]
 		obj.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), value)
 	}
 
 	obj.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
-		Value:        NewNumberValue(float64(length)),
+		Value:        NewNumberValue(length.ToNumber()),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,

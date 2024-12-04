@@ -51,7 +51,7 @@ const (
 	ResizeArrayBufferHandledUnhandled
 )
 
-func HostResizeArrayBuffer(buffer *ArrayBufferObject, newByteLength uint64) ResizeArrayBufferHandled {
+func HostResizeArrayBuffer(buffer *ArrayBufferObject, newByteLength JSInt) ResizeArrayBufferHandled {
 	return ResizeArrayBufferHandledUnhandled
 }
 

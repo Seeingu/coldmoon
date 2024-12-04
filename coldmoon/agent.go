@@ -22,7 +22,7 @@ type HostHooks struct {
 	HostCallJobCallback            func(callback *JobCallback, this Value, arguments []Value) Value
 	HostEnqueuePromiseJob          func(agent *Agent, job *Job, realm *Realm)
 	HostPromiseRejectionTracker    func(promise *PromiseObject, operation PromiseRejectionTrackerOperation)
-	HostResizeArrayBuffer          func(buffer *ArrayBufferObject, newByteLength uint64) ResizeArrayBufferHandled
+	HostResizeArrayBuffer          func(buffer *ArrayBufferObject, newByteLength JSInt) ResizeArrayBufferHandled
 	HostEnsureCanAddPrivateElement func()
 	HostGetImportMetaProperties    func(module *SourceTextModule) ImportMetaProperties
 	HostFinalizeImportMeta         func(meta ObjectType, module *SourceTextModule)

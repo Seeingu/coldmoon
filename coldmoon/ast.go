@@ -798,7 +798,7 @@ func (l *LiteralNumeric) NumericValue() (Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewNumberValue(num), nil
+	return NewNumberValue(JSNumber(num)), nil
 }
 
 func (l *LiteralNumeric) Bytecode(e *Executable, c *BytecodeContext) {
@@ -2554,8 +2554,8 @@ func (f *FormalParameters) BoundNames() (l []IdentifierName) {
 }
 
 // 15.1.5
-func (f *FormalParameters) ExpectedArgumentCount() int {
-	l := len(f.Items)
+func (f *FormalParameters) ExpectedArgumentCount() JSInt {
+	l := JSInt(len(f.Items))
 	if l > 0 {
 		if _, ok := f.Items[l-1].(*FormalParameterFunctionRestParameter); ok {
 			return l - 1

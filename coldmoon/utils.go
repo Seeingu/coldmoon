@@ -5,7 +5,7 @@ import "strings"
 func DefineBuiltinFunction(object ObjectType,
 	name string,
 	fn BehaviorFn,
-	length float64,
+	length JSInt,
 	realm *Realm,
 ) {
 	var functionName = name
@@ -25,7 +25,7 @@ func DefineBuiltinFunction(object ObjectType,
 func DefineBuiltinFunctionWithAttributes(object ObjectType,
 	name string,
 	fn BehaviorFn,
-	length float64,
+	length JSInt,
 	realm *Realm,
 	attr PropertyDescriptorAttributes,
 ) {

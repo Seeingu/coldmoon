@@ -17,7 +17,7 @@ func NewStringPropertyKey(value string) StringPropertyKey {
 func NewSymbolPropertyKey(value *SymbolValue) SymbolPropertyKey {
 	return SymbolPropertyKey{Value: value}
 }
-func NewIntegerIndexPropertyKey(value int) IntegerIndexPropertyKey {
+func NewIntegerIndexPropertyKey(value JSInt) IntegerIndexPropertyKey {
 	return IntegerIndexPropertyKey{Value: value}
 }
 
@@ -54,7 +54,7 @@ func (s SymbolPropertyKey) ToReference() ReferencedName {
 
 type IntegerIndexPropertyKey struct {
 	PropertyKey
-	Value int
+	Value JSInt
 }
 
 func (i IntegerIndexPropertyKey) Hash() string {

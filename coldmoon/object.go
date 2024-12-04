@@ -270,7 +270,7 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 }
 
 // 7.3.19
-func (o *Object) LengthOfArrayLike() uint64 {
+func (o *Object) LengthOfArrayLike() JSInt {
 	return ToLength(o.Agent(), o.Get(NewStringPropertyKey("length")))
 }
 

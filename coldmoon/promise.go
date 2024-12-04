@@ -457,12 +457,12 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		agent.HostHooks.HostEnqueuePromiseJob(agent, job.Job, job.Realm)
 		return UndefinedValue
 	}
-	lengthResolve := 1
+	lengthResolve := JSInt(1)
 	resolveAdditionalFields := &AdditionalFields{
 		Promise:         promise,
 		AlreadyResolved: alreadyResolved,
 	}
-	resolve := CreateBuiltinFunction(agent, stepsResolve, float64(lengthResolve), "", builtinFunctionArgs{
+	resolve := CreateBuiltinFunction(agent, stepsResolve, lengthResolve, "", builtinFunctionArgs{
 		realm:            realm,
 		additionalFields: resolveAdditionalFields,
 	})
@@ -476,12 +476,12 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		promise.PromiseResult = arguments[0]
 		return UndefinedValue
 	}
-	lengthReject := 1
+	lengthReject := JSInt(1)
 	rejectAdditionalFields := &AdditionalFields{
 		Promise:         promise,
 		AlreadyResolved: alreadyResolved,
 	}
-	reject := CreateBuiltinFunction(agent, stepsReject, float64(lengthReject), "", builtinFunctionArgs{
+	reject := CreateBuiltinFunction(agent, stepsReject, lengthReject, "", builtinFunctionArgs{
 		realm:            realm,
 		additionalFields: rejectAdditionalFields,
 	})
@@ -724,8 +724,8 @@ func PerformPromiseAll(
 			}
 			return UndefinedValue
 		}
-		length := 1
-		onFulfilled := CreateBuiltinFunction(agent, steps, float64(length), "", builtinFunctionArgs{
+		length := JSInt(1)
+		onFulfilled := CreateBuiltinFunction(agent, steps, length, "", builtinFunctionArgs{
 			additionalFieldsV2: &promiseAdditionalFields{
 				alreadyCalled:     false,
 				index:             uint64(index),
@@ -788,8 +788,8 @@ func PerformPromiseAllSettled(
 			}
 			return UndefinedValue
 		}
-		lengthFulfilled := 1
-		onFulfilled := CreateBuiltinFunction(agent, stepsFulfilled, float64(lengthFulfilled), "", builtinFunctionArgs{
+		lengthFulfilled := JSInt(1)
+		onFulfilled := CreateBuiltinFunction(agent, stepsFulfilled, lengthFulfilled, "", builtinFunctionArgs{
 			additionalFieldsV2: &promiseAdditionalFields{
 				alreadyCalled:     false,
 				index:             uint64(index),
@@ -819,8 +819,8 @@ func PerformPromiseAllSettled(
 			}
 			return UndefinedValue
 		}
-		lengthRejected := 1
-		onRejected := CreateBuiltinFunction(agent, stepsReject, float64(lengthRejected), "", builtinFunctionArgs{
+		lengthRejected := JSInt(1)
+		onRejected := CreateBuiltinFunction(agent, stepsReject, lengthRejected, "", builtinFunctionArgs{
 			additionalFieldsV2: &promiseAdditionalFields{
 				alreadyCalled:     false,
 				index:             uint64(index),
@@ -891,8 +891,8 @@ func PerformPromiseAny(
 			}
 			return UndefinedValue
 		}
-		length := 1
-		onFulfilled := CreateBuiltinFunction(agent, stepsRejected, float64(length), "", builtinFunctionArgs{
+		length := JSInt(1)
+		onFulfilled := CreateBuiltinFunction(agent, stepsRejected, length, "", builtinFunctionArgs{
 			additionalFieldsV2: &promiseAdditionalFields{
 				alreadyCalled:     false,
 				index:             uint64(index),

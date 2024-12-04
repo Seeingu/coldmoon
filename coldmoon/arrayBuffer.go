@@ -9,9 +9,9 @@ import (
 type ArrayBufferObject struct {
 	*Object
 	ArrayBufferData          DataBlock
-	ArrayBufferByteLength    uint64
+	ArrayBufferByteLength    JSInt
 	ArrayBufferDetachKey     Value
-	ArrayBufferMaxByteLength uint64
+	ArrayBufferMaxByteLength JSInt
 }
 
 func (a *ArrayBufferObject) ToValue() Value {
@@ -19,7 +19,7 @@ func (a *ArrayBufferObject) ToValue() Value {
 }
 
 // 25.1.3.1
-func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength uint64, maxByteLength uint64) CompletionObject {
+func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength JSInt, maxByteLength JSInt) CompletionObject {
 	var allocatingResizableBuffer bool
 	if maxByteLength != 0 {
 		allocatingResizableBuffer = true
@@ -38,8 +38,20 @@ func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength uint64
 	return NewCompletionObject(arrayBuffer)
 }
 
+// 25.1.3.6
+// return either an ArrayBufferObject or a throw completion
+func CloneArrayBuffer(agent *Agent, srcBuffer *ArrayBufferObject, srcByteOffset JSInt, srcLength JSInt) CompletionObject {
+	realm := agent.CurrentRealm()
+	Assert(!IsDetachedBuffer(srcBuffer))
+	targetBuffer := AllocateArrayBuffer(agent, realm.Intrinsics.ArrayBufferConstructor, srcLength, 0)
+	srcBlock := srcBuffer.ArrayBufferData
+	targetBlock := targetBuffer.Data().(*ArrayBufferObject).ArrayBufferData
+	CopyDataBlockBytes(targetBlock, 0, srcBlock, srcByteOffset, srcLength)
+	return targetBuffer
+}
+
 // 25.1.3.7
-func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (l uint64) {
+func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (l JSInt) {
 	if !ValueIsObject(options) {
 		return
 	}
@@ -51,7 +63,7 @@ func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (l uint64) {
 	return ToIndex(agent, maxByteLength)
 }
 
-func IsBigIntElementType(size uint64) bool {
+func IsBigIntElementType(size JSInt) bool {
 	return size == 8
 }
 
@@ -74,7 +86,7 @@ const (
 	Relaxed
 )
 
-func ArrayBufferByteLength(buffer *ArrayBufferObject, memoryOrder MemoryOrder) uint64 {
+func ArrayBufferByteLength(buffer *ArrayBufferObject, memoryOrder MemoryOrder) JSInt {
 	return buffer.ArrayBufferByteLength
 }
 
@@ -83,7 +95,7 @@ func IsFixedLengthArrayBuffer(buffer *ArrayBufferObject) bool {
 	return buffer.ArrayBufferMaxByteLength == 0
 }
 
-func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferObject, byteIndex uint64, size uint64, isTypedArray bool, order MemoryOrder, isLittleEndian bool) uint64 {
+func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferObject, byteIndex JSInt, size JSInt, isTypedArray bool, order MemoryOrder, isLittleEndian bool) JSInt {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	Assert(byteIndex+size <= arrayBuffer.ArrayBufferByteLength)
 	block := arrayBuffer.ArrayBufferData
@@ -104,7 +116,7 @@ func IsSharedArrayBuffer(buffer *ArrayBufferObject) bool {
 }
 
 // 25.1.3.17
-func NumericToRawBytes(value uint64, size uint64, isLittleEndian bool) []byte {
+func NumericToRawBytes(value JSInt, size JSInt, isLittleEndian bool) []byte {
 	buf := &bytes.Buffer{}
 	var endian binary.ByteOrder
 	if isLittleEndian {
@@ -119,18 +131,18 @@ func NumericToRawBytes(value uint64, size uint64, isLittleEndian bool) []byte {
 	return buf.Bytes()
 }
 
-func SetValueInBuffer(agent *Agent, arrayBuffer *ArrayBufferObject, byteIndex uint64, value uint64, size uint64, isTypedArray bool, order MemoryOrder, isLittleEndian bool) {
+func SetValueInBuffer(agent *Agent, arrayBuffer *ArrayBufferObject, byteIndex JSInt, value JSInt, size JSInt, isTypedArray bool, order MemoryOrder, isLittleEndian bool) {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	Assert(byteIndex+size <= arrayBuffer.ArrayBufferByteLength)
 	block := arrayBuffer.ArrayBufferData
 	elementSize := size
 
 	rawValue := NumericToRawBytes(value, elementSize, isLittleEndian)
-	CopyDataBlockBytes(block, int(byteIndex), rawValue, 0, int(elementSize))
+	CopyDataBlockBytes(block, byteIndex, rawValue, 0, elementSize)
 }
 
 // 25.1.3.14
-func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) uint64 {
+func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) JSInt {
 	buf := &bytes.Buffer{}
 	var endian binary.ByteOrder
 	if isLittleEndian {
@@ -142,7 +154,7 @@ func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) uint64 {
 	if err != nil {
 		panic(err)
 	}
-	t := uint64(0)
+	t := JSInt(0)
 	err = binary.Read(buf, endian, &t)
 	if err != nil {
 		panic(err)
@@ -202,7 +214,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 			return NewNumberValue(0)
 		}
 		length := o.ArrayBufferByteLength
-		return NewNumberValue(float64(length))
+		return NewNumberValue(length.ToNumber())
 	}
 	var slice = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		start := arguments[0]
@@ -213,28 +225,28 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		}
 		length := o.ArrayBufferByteLength
 		relativeStart := ToIntegerOrInfinity(agent, start)
-		var first float64
-		if math.IsInf(relativeStart, -1) {
+		var first JSInt
+		if relativeStart.IsNegInf() {
 			first = 0
 		} else if relativeStart < 0 {
-			first = math.Max(float64(length)+relativeStart, 0)
+			first = JSInt(math.Max(float64(length+relativeStart), 0))
 		} else {
-			first = math.Min(relativeStart, float64(length))
+			first = JSInt(math.Min(float64(relativeStart), float64(length)))
 		}
 
 		relativeEnd := ToIntegerOrInfinity(agent, end)
-		var final float64
-		if math.IsInf(relativeEnd, -1) {
+		var final JSInt
+		if math.IsInf(float64(relativeEnd), -1) {
 			final = 0
 		} else if relativeEnd < 0 {
-			final = math.Max(float64(length)+relativeEnd, 0)
+			final = JSInt(math.Max(float64(length+relativeEnd), 0))
 		} else {
-			final = math.Min(relativeEnd, float64(length))
+			final = JSInt(math.Min(float64(relativeEnd), float64(length)))
 		}
 
-		newLen := math.Max(final-first, 0)
+		newLen := JSInt(math.Max(float64(final-first), 0))
 		ctor := o.SpeciesConstructor(realm.Intrinsics.ArrayBufferConstructor)
-		newObject := ctor.Data().Construct([]Value{NewNumberValue(newLen)}, nil)
+		newObject := ctor.Data().Construct([]Value{NewNumberValue(JSNumber(newLen))}, nil)
 		_new := RequireInternalSlot[*ArrayBufferObject](NewValueFromObject(newObject))
 		if IsDetachedBuffer(_new) {
 			panic("TypeError")
@@ -242,7 +254,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		if _new == o {
 			panic("TypeError")
 		}
-		if _new.ArrayBufferByteLength < uint64(newLen) {
+		if _new.ArrayBufferByteLength < newLen {
 			panic("TypeError")
 		}
 		if IsDetachedBuffer(o) {
@@ -251,9 +263,9 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		fromBuf := o.ArrayBufferData
 		toBuf := _new.ArrayBufferData
 		currentLen := o.ArrayBufferByteLength
-		if first < float64(currentLen) {
-			count := math.Min(newLen, float64(currentLen)-first)
-			CopyDataBlockBytes(toBuf, 0, fromBuf, int(first), int(count))
+		if first < currentLen {
+			count := JSInt(math.Min(float64(newLen), float64(currentLen-first)))
+			CopyDataBlockBytes(toBuf, 0, fromBuf, first, count)
 		}
 		return NewValueFromObject(_new)
 	}
@@ -262,13 +274,13 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		if IsDetachedBuffer(o) {
 			return NewNumberValue(0)
 		}
-		var length uint64
+		var length JSInt
 		if IsFixedLengthArrayBuffer(o) {
 			length = o.ArrayBufferByteLength
 		} else {
 			length = o.ArrayBufferMaxByteLength
 		}
-		return NewNumberValue(float64(length))
+		return NewNumberValue(length.ToNumber())
 	}
 	var resizable = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*ArrayBufferObject](this)

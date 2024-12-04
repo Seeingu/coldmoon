@@ -15,7 +15,7 @@ func (ps *PropertyStorage) Keys() []string {
 		case SymbolPropertyKey:
 			keys = append(keys, "Symbol: "+k.Value.Description)
 		case IntegerIndexPropertyKey:
-			keys = append(keys, "Index: "+strconv.Itoa(k.Value))
+			keys = append(keys, "Index: "+strconv.Itoa(int(k.Value)))
 		}
 	}
 	return keys

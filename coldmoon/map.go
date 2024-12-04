@@ -113,7 +113,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	}
 	var size BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)
-		return NewNumberValue(float64(len(m.MapValue.Data)))
+		return NewNumberValue(JSNumber(len(m.MapValue.Data)))
 	}
 	var mapEntries BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindKeyAndValue))
@@ -135,8 +135,8 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		numEntries := len(m.MapValue.Data)
 		index := 0
 		for ; index < numEntries; index++ {
-			if v, ok := entries[NewNumberValue(float64(index))]; ok {
-				callbackFn.CallAssumeCallable(thisArg, []Value{v, NewNumberValue(float64(index)), this})
+			if v, ok := entries[NewNumberValue(JSNumber(index))]; ok {
+				callbackFn.CallAssumeCallable(thisArg, []Value{v, NewNumberValue(JSNumber(index)), this})
 			}
 			numEntries = len(m.MapValue.Data)
 		}

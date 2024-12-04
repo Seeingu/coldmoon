@@ -7,7 +7,7 @@ import (
 
 type DateObject struct {
 	*Object
-	Data float64
+	Data JSNumber
 }
 
 func NewDatePrototype(realm *Realm) ObjectType {
@@ -52,7 +52,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var toISOString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if !math.IsInf(tv, 0) {
+		if !tv.IsInf() {
 			panic("RangeError")
 		}
 
@@ -93,7 +93,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var toDateString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := MustGetObject(this).(*DateObject)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
+		if tv.IsNaN() {
 			return NewStringValue("Invalid Date")
 		}
 		return NewStringValue(DateString(LocalTime(tv)))
@@ -101,7 +101,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var toTimeString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := MustGetObject(this).(*DateObject)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
+		if tv.IsNaN() {
 			return NewStringValue("Invalid Date")
 		}
 		return NewStringValue(TimeString(LocalTime(tv)) + TimeZoneString(tv))
@@ -118,72 +118,72 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var getTimezoneOffset BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(tv - LocalTime(tv)/MS_PER_MIN)
 	}
 	var getDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(DateFromTime(tv))
 	}
 	var getDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(WeekDay(tv))
 	}
 	var getFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(YearFromTime(LocalTime(tv)))
 	}
 	var getHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(HourFromTime(LocalTime(tv)))
 	}
 	var getMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(msFromTime(LocalTime(tv)))
 	}
 	var getMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(MinFromTime(LocalTime(tv)))
 	}
 	var getMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(MonthFromTime(LocalTime(tv)))
 	}
 	var getSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(SecFromTime(LocalTime(tv)))
 	}
@@ -195,64 +195,64 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var getUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(DateFromTime(tv))
 	}
 	var getUTCDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(WeekDay(tv))
 	}
 	var getUTCFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(YearFromTime(tv))
 	}
 	var getUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(HourFromTime(tv))
 	}
 	var getUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(msFromTime(tv))
 	}
 	var getUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(MinFromTime(tv))
 	}
 	var getUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(MonthFromTime(tv))
 	}
 	var getUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		return NewNumberValue(SecFromTime(tv))
 	}
@@ -260,8 +260,8 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		date := ToNumber(agent, args[0]).Data
-		if math.IsNaN(tv) {
-			return NewNumberValue(math.NaN())
+		if tv.IsNaN() {
+			return NaNValue
 		}
 		t := LocalTime(tv)
 		newDate := MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), date), TimeWithinDay(t))
@@ -273,8 +273,8 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		year := ToNumber(agent, args[0]).Data
-		month := 0.0
-		date := 1.0
+		month := JSNumber(0.0)
+		date := JSNumber(1.0)
 		if len(args) >= 2 {
 			month = ToNumber(agent, args[1]).Data
 		}
@@ -292,9 +292,9 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		hour := ToNumber(agent, args[0]).Data
-		minute := 0.0
-		sec := 0.0
-		ms := 0.0
+		minute := JSNumber(0.0)
+		sec := JSNumber(0.0)
+		ms := JSNumber(0.0)
 		if len(args) >= 2 {
 			minute = ToNumber(agent, args[1]).Data
 		}
@@ -322,12 +322,12 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setMinustes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		minute := ToNumber(agent, args[0]).Data
-		sec := 0.0
-		ms := 0.0
+		sec := JSNumber(0.0)
+		ms := JSNumber(0.0)
 		if len(args) >= 2 {
 			sec = ToNumber(agent, args[1]).Data
 		}
@@ -345,7 +345,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		month := ToNumber(agent, args[0]).Data
-		date := 1.0
+		date := JSNumber(1.0)
 		if len(args) >= 2 {
 			date = ToNumber(agent, args[1]).Data
 		}
@@ -359,7 +359,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		sec := ToNumber(agent, args[0]).Data
-		ms := 0.0
+		ms := JSNumber(0.0)
 		if len(args) >= 2 {
 			ms = ToNumber(agent, args[1]).Data
 		}
@@ -390,9 +390,9 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		hour := ToNumber(agent, args[0]).Data
-		minute := 0.0
-		sec := 0.0
-		ms := 0.0
+		minute := JSNumber(0.0)
+		sec := JSNumber(0.0)
+		ms := JSNumber(0.0)
 		if len(args) >= 2 {
 			minute = ToNumber(agent, args[1]).Data
 		}
@@ -424,8 +424,8 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		minute := ToNumber(agent, args[0]).Data
-		sec := 0.0
-		ms := 0.0
+		sec := JSNumber(0.0)
+		ms := JSNumber(0.0)
 		if len(args) >= 2 {
 			sec = ToNumber(agent, args[1]).Data
 		}
@@ -443,7 +443,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		month := ToNumber(agent, args[0]).Data
-		date := 1.0
+		date := JSNumber(1.0)
 		if len(args) >= 2 {
 			date = ToNumber(agent, args[1]).Data
 		}
@@ -457,7 +457,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		sec := ToNumber(agent, args[0]).Data
-		ms := 0.0
+		ms := JSNumber(0.0)
 		if len(args) >= 2 {
 			ms = ToNumber(agent, args[1]).Data
 		}
@@ -501,7 +501,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "setFullYear", setFullYear, 3, realm)
 	DefineBuiltinFunction(object, "setHours", setHours, 4, realm)
 	DefineBuiltinFunction(object, "setMilliseconds", setMilliseconds, 1, realm)
-	DefineBuiltinFunction(object, "setMinutes", setMinustes, 3, realm)
+	DefineBuiltinFunction(object, "setMinutes", setMinutes, 3, realm)
 	DefineBuiltinFunction(object, "setMonth", setMonth, 2, realm)
 	DefineBuiltinFunction(object, "setSeconds", setSeconds, 2, realm)
 	DefineBuiltinFunction(object, "setTime", setTime, 1, realm)
@@ -520,42 +520,42 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	return object
 }
 
-const MS_PER_DAY = 86400000
-const MS_PER_MIN = 60000
+const MS_PER_DAY = JSNumber(86400000)
+const MS_PER_MIN = JSNumber(60000)
 
 // 21.4.1.3
-func Day(t float64) float64 {
+func Day(t JSNumber) JSNumber {
 	// FIXME: use time package
 	msPerDay := MS_PER_DAY
-	return t / float64(msPerDay)
+	return t / msPerDay
 }
 
-func TimeWithinDay(t float64) float64 {
-	return math.Mod(t, MS_PER_DAY)
+func TimeWithinDay(t JSNumber) JSNumber {
+	return t.Mod(MS_PER_DAY)
 }
 
-func DaysInYear(y float64) float64 {
-	if math.Mod(y, 4) != 0 {
+func DaysInYear(y JSNumber) JSNumber {
+	if y.Mod(4) != 0 {
 		return 365
 	}
-	if math.Mod(y, 100) != 0 {
+	if y.Mod(100) != 0 {
 		return 366
 	}
-	if math.Mod(y, 400) != 0 {
+	if y.Mod(400) != 0 {
 		return 365
 	}
 	return 366
 }
 
-func DayFromYear(y float64) float64 {
-	return 365*(y-1970) + math.Floor((y-1969)/4) - math.Floor((y-1901)/100) + math.Floor((y-1601)/400)
+func DayFromYear(y JSNumber) JSNumber {
+	return 365*(y-1970) + ((y - 1969) / 4).Floor() - ((y - 1901) / 100).Floor() + ((y - 1601) / 400).Floor()
 }
 
-func TimeFromYear(y float64) float64 {
+func TimeFromYear(y JSNumber) JSNumber {
 	return MS_PER_DAY * DayFromYear(y)
 }
 
-func YearFromTime(t float64) float64 {
+func YearFromTime(t JSNumber) JSNumber {
 	year := t / ((365.2425 * MS_PER_DAY) + 1970)
 	t2 := TimeFromYear(year)
 	if t2 > t {
@@ -567,18 +567,18 @@ func YearFromTime(t float64) float64 {
 	return year
 }
 
-func DayWithinYear(t float64) float64 {
+func DayWithinYear(t JSNumber) JSNumber {
 	return Day(t) - DayFromYear(YearFromTime(t))
 }
 
-func InLeapYear(t float64) bool {
+func InLeapYear(t JSNumber) bool {
 	if DaysInYear(YearFromTime(t)) == 366 {
 		return true
 	}
 	return false
 }
 
-func MonthFromTime(t float64) float64 {
+func MonthFromTime(t JSNumber) JSNumber {
 	day := DayWithinYear(t)
 	if InLeapYear(t) {
 		if day < 31 {
@@ -652,11 +652,11 @@ func MonthFromTime(t float64) float64 {
 	return 11
 }
 
-func DateFromTime(t float64) float64 {
+func DateFromTime(t JSNumber) JSNumber {
 	day := DayWithinYear(t)
 	month := MonthFromTime(t)
 
-	var inLeapYear float64 = 0
+	var inLeapYear JSNumber = 0
 	if InLeapYear(t) {
 		inLeapYear = 1
 	}
@@ -689,24 +689,24 @@ func DateFromTime(t float64) float64 {
 	return 0
 }
 
-func WeekDay(t float64) float64 {
-	return math.Mod(Day(t)+4, 7)
+func WeekDay(t JSNumber) JSNumber {
+	return (Day(t) + 4).Mod(7)
 }
 
-func HourFromTime(t float64) float64 {
-	return math.Mod(math.Floor(t/3600000), 24)
+func HourFromTime(t JSNumber) JSNumber {
+	return (t / 3600000).Floor().Mod(24)
 }
 
-func MinFromTime(t float64) float64 {
-	return math.Mod(math.Floor(t/MS_PER_MIN), 60)
+func MinFromTime(t JSNumber) JSNumber {
+	return (t / MS_PER_MIN).Floor().Mod(60)
 }
 
-func SecFromTime(t float64) float64 {
-	return math.Mod(math.Floor(t/1000), 60)
+func SecFromTime(t JSNumber) JSNumber {
+	return JSNumber(math.Mod(math.Floor(t.ToFloat()/1000), 60))
 }
 
-func msFromTime(t float64) float64 {
-	return math.Mod(t, 1000)
+func msFromTime(t JSNumber) JSNumber {
+	return t.Mod(1000)
 }
 
 func GetNamedTimeZoneOffsetNanoseconds(tz string, t float64) int {
@@ -720,34 +720,34 @@ func SystemTimeZoneIdentifier() string {
 }
 
 // 21.4.1.26
-func UTC(t float64) float64 {
-	if math.IsInf(t, 0) {
-		return math.NaN()
+func UTC(t JSNumber) JSNumber {
+	if t.IsInf() {
+		return JSNumberNaN
 	}
 	offsetNs := 0
 	offsetMs := math.Trunc(float64(offsetNs) / 1e6)
-	return t - offsetMs
+	return t - JSNumber(offsetMs)
 }
 
 // 21.4.1.27
-func MakeTime(hour, min, sec, ms float64) float64 {
+func MakeTime(hour, min, sec, ms JSNumber) JSNumber {
 	return hour*60*60*1000 + min*60*1000 + sec*1000 + ms
 }
 
 // 21.4.1.28
-func MakeDay(year, month, date float64) float64 {
+func MakeDay(year, month, date JSNumber) JSNumber {
 	return year*12 + month*30 + date
 }
 
 // 21.4.1.29
-func MakeDate(day, time float64) float64 {
+func MakeDate(day, time JSNumber) JSNumber {
 	return day*MS_PER_DAY + time
 }
 
 // 21.4.1.30
-func MakeFullYear(year float64) float64 {
-	if math.IsNaN(year) {
-		return math.NaN()
+func MakeFullYear(year JSNumber) JSNumber {
+	if year.IsNaN() {
+		return JSNumberNaN
 	}
 	// TODO
 	truncated := year
@@ -757,11 +757,11 @@ func MakeFullYear(year float64) float64 {
 	return truncated
 }
 
-func TimeClip(time float64) float64 {
-	if math.IsInf(time, 0) {
-		return math.NaN()
+func TimeClip(time JSNumber) JSNumber {
+	if time.IsInf() {
+		return JSNumberNaN
 	}
-	return math.Round(time)
+	return JSNumber(math.Round(time.ToFloat()))
 }
 
 func NewDateConstructor(realm *Realm) ObjectType {
@@ -769,15 +769,15 @@ func NewDateConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		if newTarget == nil {
 			now := time.Now().UTC()
-			return NewStringValue(ToDateString(float64(now.UnixNano())))
+			return NewStringValue(ToDateString(JSNumber(now.UnixNano())))
 		}
 		numberOfArgs := len(args)
-		var dv float64
+		var dv JSNumber
 		if numberOfArgs == 0 {
-			dv = float64(time.Now().UnixNano())
+			dv = JSNumber(time.Now().UnixNano())
 		} else if numberOfArgs == 1 {
 			value := args[0]
-			var tv float64
+			var tv JSNumber
 
 			if o, ok := ValueGetObject(value); ok {
 				if date, ok := o.(*DateObject); ok {
@@ -798,10 +798,10 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			year := ToNumber(agent, args[0]).Data
 			month := ToNumber(agent, args[1]).Data
 			date := ToNumber(agent, args[2]).Data
-			hour := 0.0
-			minute := 0.0
-			sec := 0.0
-			ms := 0.0
+			hour := JSNumber(0.0)
+			minute := JSNumber(0.0)
+			sec := JSNumber(0.0)
+			ms := JSNumber(0.0)
 			if numberOfArgs >= 3 {
 				hour = ToNumber(agent, args[3]).Data
 			}
@@ -835,15 +835,15 @@ func NewDateConstructor(realm *Realm) ObjectType {
 	var utc BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		numberOfArgs := len(args)
 		if numberOfArgs < 1 {
-			return NewNumberValue(math.NaN())
+			return NaNValue
 		}
 		year := ToNumber(agent, args[0]).Data
-		month := 0.0
-		date := 1.0
-		hour := 0.0
-		minute := 0.0
-		sec := 0.0
-		ms := 0.0
+		month := JSNumber(0.0)
+		date := JSNumber(1.0)
+		hour := JSNumber(0.0)
+		minute := JSNumber(0.0)
+		sec := JSNumber(0.0)
+		ms := JSNumber(0.0)
 		if numberOfArgs >= 2 {
 			month = ToNumber(agent, args[1]).Data
 		}
@@ -870,15 +870,15 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		return NewNumberValue(dv)
 	}
 	var now BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		return NewNumberValue(float64(time.Now().UnixNano()))
+		return NewNumberValue(JSNumber(time.Now().UnixNano()))
 	}
 	var parse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		s := args[0].String()
 		t, err := time.Parse(time.RFC3339, s)
 		if err != nil {
-			return NewNumberValue(math.NaN())
+			return NaNValue
 		}
-		return NewNumberValue(float64(t.UnixNano()) / 1e6)
+		return NewNumberValue(JSNumber(t.UnixNano()) / 1e6)
 	}
 
 	DefineBuiltinFunction(object, "UTC", utc, 7, realm)
@@ -897,32 +897,32 @@ func NewDateConstructor(realm *Realm) ObjectType {
 }
 
 // 21.4.1.25
-func LocalTime(tv float64) float64 {
+func LocalTime(tv JSNumber) JSNumber {
 	// TODO
 	return tv
 }
 
-func DateTimeStringFormat(s string) float64 {
+func DateTimeStringFormat(s string) JSNumber {
 	// TODO
 	return 0
 }
 
-func DateString(t float64) string {
+func DateString(t JSNumber) string {
 	// TODO
 	return ""
 }
-func TimeString(t float64) string {
+func TimeString(t JSNumber) string {
 	// TODO
 	return ""
 }
-func TimeZoneString(tv float64) string {
+func TimeZoneString(tv JSNumber) string {
 	// TODO
 	return ""
 }
 
 // 21.4.4.41.4
-func ToDateString(tv float64) string {
-	if math.IsNaN(tv) {
+func ToDateString(tv JSNumber) string {
+	if tv.IsNaN() {
 		return "Invalid Date"
 	}
 	t := LocalTime(tv)

@@ -7,7 +7,7 @@ import (
 // ByteLength Enum
 type ByteLength struct {
 	Auto  bool
-	Value int
+	Value JSInt
 }
 
 type DataView struct {
@@ -17,7 +17,7 @@ type DataView struct {
 	// [[ByteLength]]
 	ByteLength *ByteLength
 	// [[ByteOffset]]
-	ByteOffset int
+	ByteOffset JSInt
 }
 
 func NewDataViewConstructor(realm *Realm) ObjectType {
@@ -45,12 +45,12 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 			if bufferIsFixedLength {
 				viewByteLength.Auto = true
 			} else {
-				viewByteLength.Value = int(bufferByteLength - offset)
+				viewByteLength.Value = bufferByteLength - offset
 			}
 		} else {
-			viewByteLength.Value = int(ToIndex(agent, byteLength))
+			viewByteLength.Value = ToIndex(agent, byteLength)
 			if bufferIsFixedLength {
-				if viewByteLength.Value > int(bufferByteLength-offset) {
+				if viewByteLength.Value > bufferByteLength-offset {
 					panic("RangeError")
 				}
 			}
@@ -70,7 +70,7 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 
 		dataView.ViewedArrayBuffer = buffer
 		dataView.ByteLength = viewByteLength
-		dataView.ByteOffset = int(offset)
+		dataView.ByteOffset = offset
 		return dataView.ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "DataView", builtinFunctionArgs{
@@ -105,7 +105,7 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 			panic("RangeError")
 		}
 		size := GetViewByteLength(viewRecord)
-		return NewNumberValue(float64(size))
+		return NewNumberValue(size.ToNumber())
 	}
 	DefineBuiltinAccessor(realm, object, "byteLength", byteLength, nil)
 	var byteOffset = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -115,7 +115,7 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 			panic("RangeError")
 		}
 		offset := o.ByteOffset
-		return NewNumberValue(float64(offset))
+		return NewNumberValue(offset.ToNumber())
 	}
 	DefineBuiltinAccessor(realm, object, "byteOffset", byteOffset, nil)
 
@@ -214,7 +214,7 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 // CachedBufferByteLength Enum
 type CachedBufferByteLength struct {
 	Detached bool
-	Value    int
+	Value    JSInt
 }
 type DataViewWithBufferWitnessRecord struct {
 	// [[Object]]
@@ -229,7 +229,7 @@ func MakeDataViewWithBufferWitnessRecord(object *DataView, order MemoryOrder) *D
 	if IsDetachedBuffer(buffer) {
 		byteLength.Detached = true
 	} else {
-		byteLength.Value = int(ArrayBufferByteLength(buffer, order))
+		byteLength.Value = ArrayBufferByteLength(buffer, order)
 	}
 	return &DataViewWithBufferWitnessRecord{
 		Object:                 object,
@@ -237,7 +237,7 @@ func MakeDataViewWithBufferWitnessRecord(object *DataView, order MemoryOrder) *D
 	}
 }
 
-func GetViewByteLength(viewRecord *DataViewWithBufferWitnessRecord) int {
+func GetViewByteLength(viewRecord *DataViewWithBufferWitnessRecord) JSInt {
 	Assert(!IsViewOutOfBounds(viewRecord))
 
 	view := viewRecord.Object
@@ -254,7 +254,7 @@ func GetViewByteLength(viewRecord *DataViewWithBufferWitnessRecord) int {
 }
 
 // 25.3.1.5
-func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEndian Value, size uint64) CompletionValue {
+func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEndian Value, size JSInt) CompletionValue {
 	view := RequireInternalSlot[*DataView](viewValue)
 	getIndex := ToIndex(agent, requestIndex)
 	isLittleEndianBool := isLittleEndian.ToBoolean()
@@ -265,36 +265,36 @@ func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEnd
 	}
 	viewSize := GetViewByteLength(viewRecord)
 	elementSize := size
-	if getIndex+elementSize > uint64(viewSize) {
+	if getIndex+elementSize > viewSize {
 		return NewCompletionValueError(agent.ThrowException(RangeError, "DataView is out of bounds"))
 	}
-	bufferIndex := getIndex + uint64(viewOffset)
+	bufferIndex := getIndex + viewOffset
 	v := GetValueFromBuffer(agent, view.ViewedArrayBuffer, bufferIndex, size, false, SeqCst, isLittleEndianBool)
-	return NewCompletionValue(NewNumberValue(float64(v)))
+	return NewCompletionValue(NewNumberValue(v.ToNumber()))
 }
 
-func SetViewValue(agent *Agent, viewValue Value, requestIndex Value, value Value, isLittleEndian Value, size uint64) CompletionValue {
+func SetViewValue(agent *Agent, viewValue Value, requestIndex Value, value Value, isLittleEndian Value, size JSInt) CompletionValue {
 	view := RequireInternalSlot[*DataView](viewValue)
 	setIndex := ToIndex(agent, requestIndex)
 	isLittleEndianBool := isLittleEndian.ToBoolean()
 	viewOffset := view.ByteOffset
 	viewRecord := MakeDataViewWithBufferWitnessRecord(view, SeqCst)
-	var numberValue uint64
+	var numberValue JSNumber
 	if IsBigIntElementType(size) {
-		numberValue = ToBigInt(agent, value).Data.Uint64()
+		numberValue = JSNumber(ToBigInt(agent, value).Data.Uint64())
 	} else {
-		numberValue = uint64(ToNumber(agent, value).Data)
+		numberValue = ToNumber(agent, value).Data
 	}
 	if IsViewOutOfBounds(viewRecord) {
 		return NewCompletionValue(agent.ThrowException(RangeError, "DataView is out of bounds"))
 	}
 	viewSize := GetViewByteLength(viewRecord)
 	elementSize := size
-	if setIndex+elementSize > uint64(viewSize) {
+	if setIndex+elementSize > viewSize {
 		return NewCompletionValue(agent.ThrowException(RangeError, "DataView is out of bounds"))
 	}
-	bufferIndex := setIndex + uint64(viewOffset)
-	SetValueInBuffer(agent, view.ViewedArrayBuffer, bufferIndex, size, numberValue, false, SeqCst, isLittleEndianBool)
+	bufferIndex := setIndex + viewOffset
+	SetValueInBuffer(agent, view.ViewedArrayBuffer, bufferIndex, size, numberValue.ToInt(), false, SeqCst, isLittleEndianBool)
 	return NewCompletionValue(UndefinedValue)
 }
 
@@ -304,7 +304,7 @@ func IsViewOutOfBounds(viewRecord *DataViewWithBufferWitnessRecord) bool {
 	Assert(IsDetachedBuffer(view.ViewedArrayBuffer) == bufferByteLength.Detached)
 
 	byteOffsetStart := view.ByteOffset
-	var byteOffsetEnd int
+	var byteOffsetEnd JSInt
 	if view.ByteLength.Auto {
 		byteOffsetEnd = bufferByteLength.Value
 	} else {

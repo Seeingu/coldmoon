@@ -94,7 +94,7 @@ type builtinFunctionArgs struct {
 func CreateBuiltinFunction(
 	agent *Agent,
 	behavior BehaviorFn,
-	length float64,
+	length JSInt,
 	name string,
 	args builtinFunctionArgs,
 ) ObjectType {

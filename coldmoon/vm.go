@@ -249,7 +249,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			}
 		case IntegerIndexPropertyKey:
 			referencedName = &ReferencedNameString{
-				String: strconv.Itoa(p.Value),
+				String: strconv.Itoa(int(p.Value)),
 			}
 		}
 		vm.reference = &ReferenceRecord{
@@ -284,11 +284,11 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IArrayCreate:
 		vm.result = NewValueFromObject(ArrayCreate(vm.agent, 0, nil))
 	case *IArraySetLength:
-		length := ins.Length
+		length := JSInt(ins.Length)
 		array := vm.result.(*ObjectValue).Object
-		array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
+		array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
 	case *IArraySetValue:
-		index := ins.Index
+		index := JSInt(ins.Index)
 		initValue := vm.stackPop()
 		array := vm.stackPop().(*ObjectValue).Object
 		array.CreateDataPropertyOrThrow(
@@ -302,7 +302,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		array := arrayValue.(*ObjectValue).Object
 		length, _ := ValueGetLength(arrayValue)
 		array.CreateDataPropertyOrThrow(
-			NewIntegerIndexPropertyKey(int(length)),
+			NewIntegerIndexPropertyKey(length),
 			initValue,
 		)
 		vm.result = NewValueFromObject(array)
@@ -319,7 +319,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			}
 			nextValue := IteratorValue(next)
 			array.CreateDataPropertyOrThrow(
-				NewIntegerIndexPropertyKey(int(nextIndex)),
+				NewIntegerIndexPropertyKey(nextIndex),
 				nextValue,
 			)
 			nextIndex++

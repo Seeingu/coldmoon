@@ -35,7 +35,7 @@ func decodeJSON(agent *Agent, d *json.Decoder) Value {
 		switch t {
 		case '[':
 			arr := ArrayCreate(agent, 0, nil)
-			var i int
+			var i JSInt
 			for d.More() {
 				arr.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), decodeJSON(agent, d))
 				i++
@@ -56,7 +56,7 @@ func decodeJSON(agent *Agent, d *json.Decoder) Value {
 	case bool:
 		return NewBooleanValue(t)
 	case float64:
-		return NewNumberValue(t)
+		return NewNumberValue(JSNumber(t))
 	case string:
 		return NewStringValue(t)
 	case nil:
@@ -119,7 +119,7 @@ func NewJSON(realm *Realm) *JSON {
 				if isArray {
 					length := obj.LengthOfArrayLike()
 					for k := range length {
-						prop := NewIntegerIndexPropertyKey(int(k))
+						prop := NewIntegerIndexPropertyKey(k)
 						v := obj.Get(prop)
 						var item string
 						switch vv := v.(type) {
@@ -194,7 +194,7 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 		isArray := IsArray(value)
 		if isArray {
 			length := obj.LengthOfArrayLike()
-			for i := 0; i < int(length); i++ {
+			for i := JSInt(0); i < length; i++ {
 				prop := NewIntegerIndexPropertyKey(i)
 				newElement := InternalizeJSONProperty(agent, obj, prop, reviver)
 				if newElement == UndefinedValue {
@@ -358,7 +358,7 @@ func SerializeJSONArray(agent *Agent, state *JSONSerializationRecord, value Obje
 
 	var partial []string
 	length := value.LengthOfArrayLike()
-	for i := 0; i < int(length); i++ {
+	for i := JSInt(0); i < length; i++ {
 		strI := SerializeJSONProperty(agent, state, NewIntegerIndexPropertyKey(i), value)
 		if strI == "" {
 			strI = "null"

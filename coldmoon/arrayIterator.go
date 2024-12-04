@@ -4,7 +4,7 @@ type ArrayIteratorObject struct {
 	*Object
 	Array *ArrayObject
 	Kind  objectOwnPropertiesKind
-	Index uint64
+	Index JSInt
 }
 
 func NewArrayIteratorPrototype(realm *Realm) ObjectType {
@@ -21,12 +21,12 @@ func NewArrayIteratorPrototype(realm *Realm) ObjectType {
 		if index >= length {
 			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
 		}
-		indexNumber := NewNumberValue(float64(index))
+		indexNumber := NewNumberValue(index.ToNumber())
 		var result Value
 		if kind == objectOwnPropertiesKindKey {
 			result = indexNumber
 		} else {
-			elementKey := NewIntegerIndexPropertyKey(int(index))
+			elementKey := NewIntegerIndexPropertyKey(index)
 			elementValue := array.Get(elementKey)
 			if kind == objectOwnPropertiesKindValue {
 				result = elementValue

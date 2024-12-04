@@ -71,20 +71,20 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		}
 		targetObject := MustGetObject(target)
 		F := BoundFunctionCreate(realm.Agent, targetObject, thisArg, args)
-		var L float64 = 0
+		var L JSInt = 0
 		targetHasLength := targetObject.HasProperty(NewStringPropertyKey("length"))
 		if targetHasLength {
 			targetLen := targetObject.Get(NewStringPropertyKey("length"))
 			if n, ok := ValueGet[*NumberValue](targetLen); ok {
 				if n.IsPositiveInf() {
-					L = math.Inf(1)
+					L = JSInt(math.Inf(1))
 				} else if n.IsNegativeInf() {
 					L = 0
 				} else {
 					targetLenAsInt := ToIntegerOrInfinity(agent, targetLen)
-					Assert(!math.IsInf(targetLenAsInt, 0))
-					argCount := len(args)
-					L = math.Max(0, targetLenAsInt-float64(argCount))
+					Assert(!targetLenAsInt.IsInf())
+					argCount := JSInt(len(args))
+					L = (targetLenAsInt - argCount).Max(0)
 				}
 			}
 		}

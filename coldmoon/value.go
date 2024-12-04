@@ -105,10 +105,10 @@ func NewStringValue(value string) *StringValue {
 
 var NullValue = &nullValue{}
 
-var NaNValue = &NumberValue{Data: math.NaN()}
+var NaNValue = &NumberValue{Data: JSNumberNaN}
 
-var InfinityValue = &NumberValue{Data: math.Inf(1)}
-var NegativeInfinityValue = NumberValue{Data: math.Inf(-1)}
+var InfinityValue = &NumberValue{Data: JSNumberInf}
+var NegativeInfinityValue = &NumberValue{Data: JSNumberNegInf}
 
 // Deprecated: use object.ToValue() instead
 func NewValueFromObject(object ObjectType) Value {
@@ -242,18 +242,18 @@ func ToNumeric(agent *Agent, value Value) Value {
 	return ToNumber(agent, primValue)
 }
 
-func ToIntegerOrInfinity(agent *Agent, value Value) float64 {
+func ToIntegerOrInfinity(agent *Agent, value Value) JSInt {
 	number := ToNumber(agent, value)
 	if number.IsNaN() {
 		return 0
 	}
 	if number.IsPositiveInf() {
-		return math.Inf(1)
+		return JSInt(math.Inf(1))
 	}
 	if number.IsNegativeInf() {
-		return math.Inf(-1)
+		return JSInt(math.Inf(-1))
 	}
-	return number.Truncate()
+	return JSInt(number.Truncate())
 }
 
 var POW_2_53 = math.Pow(2, 53)
@@ -264,7 +264,7 @@ var POW_2_15 = math.Pow(2, 15)
 var POW_2_8 = math.Pow(2, 8)
 var POW_2_7 = math.Pow(2, 7)
 
-func ToInt32(agent *Agent, value Value) int32 {
+func ToInt32(agent *Agent, value Value) JSInt {
 	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
@@ -272,15 +272,15 @@ func ToInt32(agent *Agent, value Value) int32 {
 
 	intData := number.Truncate()
 
-	int32bit := math.Mod(intData, POW_2_32)
+	int32bit := math.Mod(float64(intData), POW_2_32)
 	if int32bit >= POW_2_31 {
-		return int32(int32bit - POW_2_32)
+		return JSInt(int32(int32bit - POW_2_32))
 	} else {
-		return int32(int32bit)
+		return JSInt(int32(int32bit))
 	}
 
 }
-func ToUint32(agent *Agent, value Value) uint32 {
+func ToUint32(agent *Agent, value Value) JSInt {
 	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
@@ -288,8 +288,8 @@ func ToUint32(agent *Agent, value Value) uint32 {
 
 	intData := number.Truncate()
 
-	int32bit := math.Mod(intData, POW_2_32)
-	return uint32(int32bit)
+	int32bit := math.Mod(float64(intData), POW_2_32)
+	return JSInt(uint32(int32bit))
 }
 func ToInt16(value Value, agent *Agent) int16 {
 	number := ToNumber(agent, value)
@@ -299,7 +299,7 @@ func ToInt16(value Value, agent *Agent) int16 {
 
 	intData := number.Truncate()
 
-	int16bit := math.Mod(intData, POW_2_16)
+	int16bit := math.Mod(float64(intData), POW_2_16)
 
 	if int16bit >= POW_2_15 {
 		return int16(int16bit - POW_2_16)
@@ -313,7 +313,7 @@ func ToUint16(value Value, agent *Agent) uint16 {
 		return 0
 	}
 	intData := number.Truncate()
-	int16bit := math.Mod(intData, POW_2_16)
+	int16bit := math.Mod(float64(intData), POW_2_16)
 	return uint16(int16bit)
 }
 func ToInt8(value Value, agent *Agent) int8 {
@@ -322,7 +322,7 @@ func ToInt8(value Value, agent *Agent) int8 {
 		return 0
 	}
 	intData := number.Truncate()
-	int8bit := math.Mod(intData, POW_2_8)
+	int8bit := math.Mod(float64(intData), POW_2_8)
 	if int8bit >= POW_2_7 {
 		return int8(int8bit - POW_2_8)
 	} else {
@@ -335,7 +335,7 @@ func ToUint8(value Value, agent *Agent) uint8 {
 		return 0
 	}
 	intData := number.Truncate()
-	int8bit := math.Mod(intData, POW_2_8)
+	int8bit := math.Mod(float64(intData), POW_2_8)
 	return uint8(int8bit)
 }
 func ToUint8Clamp(value Value, agent *Agent) uint8 {
@@ -350,13 +350,13 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 		return 255
 	}
 
-	f := math.Floor(number.Data)
+	f := math.Floor(number.Data.ToFloat())
 	fInt := uint8(f)
 
-	if f+0.5 < number.Data {
+	if f+0.5 < number.Data.ToFloat() {
 		return fInt + 1
 	}
-	if number.Data < f+0.5 {
+	if number.Data.ToFloat() < f+0.5 {
 		return fInt
 	}
 
@@ -441,7 +441,7 @@ func StringToNumber(value *StringValue) *NumberValue {
 		return NaNValue
 	}
 
-	return &NumberValue{Data: n}
+	return &NumberValue{Data: JSNumber(n)}
 }
 
 // 7.1.14
@@ -477,27 +477,27 @@ func ToPropertyKey(agent *Agent, value Value) PropertyKey {
 }
 
 // 7.1.20
-func ToLength(agent *Agent, value Value) uint64 {
+func ToLength(agent *Agent, value Value) JSInt {
 	length := ToIntegerOrInfinity(agent, value)
 
 	if length <= 0 {
 		return 0
 	}
 
-	return uint64(math.Min(length, POW_2_53-1))
+	return JSInt(math.Min(float64(length), POW_2_53-1))
 }
 
 // 7.1.22
-func ToIndex(agent *Agent, value Value) uint64 {
+func ToIndex(agent *Agent, value Value) JSInt {
 	if value == UndefinedValue {
 		return 0
 	}
 
 	integer := ToIntegerOrInfinity(agent, value)
-	if integer < 0 || integer >= POW_2_53 {
+	if integer < 0 || float64(integer) >= POW_2_53 {
 		panic("RangeError")
 	}
-	return uint64(integer)
+	return integer
 }
 
 // 7.2.1
@@ -758,12 +758,12 @@ func GetMethod(agent *Agent, value Value, key PropertyKey) ObjectType {
 
 // 7.3.18
 func CreateArrayFromList(agent *Agent, elements []Value) ObjectType {
-	array := ArrayCreate(agent, float64(len(elements)), nil)
+	array := ArrayCreate(agent, JSInt(len(elements)), nil)
 
 	for i, element := range elements {
 		var propKey PropertyKey
 		if float64(i) <= POW_2_53 {
-			propKey = NewIntegerIndexPropertyKey(i)
+			propKey = NewIntegerIndexPropertyKey(JSInt(i))
 		} else {
 			propKey = NewStringPropertyKey(string(rune(i)))
 		}
@@ -785,8 +785,8 @@ func CreateListFromArrayLike(agent *Agent, self Value) []Value {
 	length := objectValue.Object.LengthOfArrayLike()
 
 	var list []Value
-	for i := uint64(0); i < length; i++ {
-		index := NewIntegerIndexPropertyKey(int(i))
+	for i := JSInt(0); i < length; i++ {
+		index := NewIntegerIndexPropertyKey(i)
 		next := GetV(agent, self, index)
 		list = append(list, next)
 	}
@@ -1035,12 +1035,12 @@ func ValueGet[Type Value](value Value) (Type, bool) {
 	return v, ok
 }
 
-func ValueGetLength(v Value) (l uint64, ok bool) {
+func ValueGetLength(v Value) (l JSInt, ok bool) {
 	if !ValueIsObject(v) {
 		return
 	}
 	o := MustGetObject(v)
 	length := o.PropertyStorage().Get(NewStringPropertyKey("length"))
-	l = uint64(MustGetObject(length.Value).(*NumberObject).Data)
+	l = JSInt(MustGetObject(length.Value).(*NumberObject).Data)
 	return l, true
 }

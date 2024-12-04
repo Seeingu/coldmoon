@@ -2,7 +2,6 @@ package coldmoon
 
 import (
 	"github.com/samber/lo"
-	"math"
 	"sort"
 	"strings"
 )
@@ -20,7 +19,7 @@ func StringGetOwnProperty(s *StringObject, p PropertyKey) *PropertyDescriptor {
 	index := intIndex.Value
 
 	str := s.Data
-	l := len(str)
+	l := JSInt(len(str))
 	if l <= index {
 		return nil
 	}
@@ -57,8 +56,8 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 	var ownPropertyKeys = func(o ObjectType) []PropertyKey {
 		propertiesMap := o.PropertyStorage().Properties
 		str := o.(*StringObject).Data
-		length := len(str)
-		keys := make([]PropertyKey, length+len(propertiesMap))
+		length := JSInt(len(str))
+		keys := make([]PropertyKey, length+JSInt(len(propertiesMap)))
 		for i := range length {
 			keys[i] = NewIntegerIndexPropertyKey(i)
 		}
@@ -96,9 +95,9 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 	stringObject.InternalMethods().DefineOwnProperty = defineOwnProperty
 	stringObject.InternalMethods().OwnPropertyKeys = ownPropertyKeys
 
-	length := uint64(len(s))
+	length := JSInt(len(s))
 	stringObject.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
-		Value:        NewNumberValue(float64(length)),
+		Value:        NewNumberValue(length.ToNumber()),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
@@ -220,9 +219,9 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		position := int(ToIntegerOrInfinity(agent, argumentsList[0]))
 		size := len(s)
 		if position < 0 || position >= size {
-			return NewNumberValue(math.NaN())
+			return NaNValue
 		}
-		return NewNumberValue(float64(s[position]))
+		return NewNumberValue(JSNumber(s[position]))
 	}
 	var iterator BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -250,24 +249,24 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
-		length := len(s)
+		length := JSInt(len(s))
 
-		var from float64
-		if intStart == math.Inf(-1) {
+		var from JSInt
+		if intStart.IsNegInf() {
 			from = 0
 		} else if intStart < 0 {
-			from = math.Max(float64(length)+intStart, 0)
+			from = (length + intStart).Max(0)
 		} else {
-			from = math.Min(intStart, float64(length))
+			from = intStart.Min(length)
 		}
 
-		var to float64
-		if intEnd == math.Inf(-1) {
+		var to JSInt
+		if intEnd.IsNegInf() {
 			to = 0
 		} else if intEnd < 0 {
-			to = math.Max(float64(length)+intEnd, 0)
+			to = (length + intEnd).Max(0)
 		} else {
-			to = math.Min(intEnd, float64(length))
+			to = intEnd.Min(length)
 		}
 		if from >= to {
 			return NewStringValue("")
@@ -278,7 +277,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		n := ToIntegerOrInfinity(agent, argumentsList[0])
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
-		if n < 0 || n == math.Inf(1) {
+		if n < 0 || n.IsInf() {
 			panic("RangeError")
 		}
 		if n == 0 {
@@ -338,7 +337,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		pos := int(position)
 		length := len(s)
 		start := lo.Clamp(pos, 0, length)
-		return NewNumberValue(float64(StringIndexOf(s, searchStr.Data, start)))
+		return NewNumberValue(JSNumber(StringIndexOf(s, searchStr.Data, start)))
 	}
 	var lastIndexOf = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		searchString := argumentsList[0]
@@ -350,9 +349,9 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		searchLen := len(s)
 		start := lo.Clamp(pos, 0, searchLen)
 		if len(searchStr) == 0 {
-			return NewNumberValue(float64(start))
+			return NewNumberValue(JSNumber(start))
 		}
-		return NewNumberValue(float64(strings.LastIndex(s[start:], searchStr)))
+		return NewNumberValue(JSNumber(strings.LastIndex(s[start:], searchStr)))
 	}
 	var startsWith = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		searchString := argumentsList[0]
@@ -482,18 +481,18 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		if position < 0 || int(position) >= size {
 			return UndefinedValue
 		}
-		return NewNumberValue(float64(s.Data[int(position)]))
+		return NewNumberValue(JSNumber(s.Data[int(position)]))
 	}
 	var substring = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		start := ToIntegerOrInfinity(agent, argumentsList[0])
 		end := ToIntegerOrInfinity(agent, argumentsList[1])
 		o := RequireObjectCoercible(agent, this)
 		s := ToString(agent, o)
-		length := len(s.Data)
-		finalStart := lo.Clamp(start, 0, float64(length))
-		finalEnd := lo.Clamp(end, 0, float64(length))
-		from := math.Min(finalStart, finalEnd)
-		to := math.Max(finalStart, finalEnd)
+		length := JSInt(len(s.Data))
+		finalStart := lo.Clamp(start, 0, length)
+		finalEnd := lo.Clamp(end, 0, length)
+		from := finalStart.Min(finalEnd)
+		to := finalStart.Max(finalEnd)
 		return NewStringValue(s.Data[int(from):int(to)])
 	}
 

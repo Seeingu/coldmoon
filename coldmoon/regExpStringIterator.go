@@ -45,7 +45,7 @@ func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 		if matchStr.Data == "" {
 			thisIndex := ToLength(agent, iterator.RegExp.Get(NewStringPropertyKey("lastIndex")))
 			nextIndex := AdvanceStringIndex(iterator.String, thisIndex, iterator.FullUnicode)
-			iterator.RegExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(float64(nextIndex)), setThrowTypeThrow)
+			iterator.RegExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(nextIndex.ToNumber()), setThrowTypeThrow)
 		}
 		return NewValueFromObject(CreateIterResultObject(agent, match.Data().ToValue(), false))
 	}
