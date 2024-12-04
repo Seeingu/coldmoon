@@ -90,20 +90,21 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 		panic("ReferenceError")
 	}
 	if r.IsPropertyReference() {
-		baseObj := r.Base.(*ReferenceRecordBaseValue).Value.(*ObjectValue).Object
+		baseObj := MustGetObject(r.Base.(*ReferenceRecordBaseValue).Value)
 		if r.IsPrivateReference() {
 			panic("implement me")
 		}
 
+		var propKey PropertyKey
 		switch referencedName := r.ReferencedName.(type) {
 		case *ReferencedNameString:
-			return baseObj.Get(NewStringPropertyKey(referencedName.String))
+			propKey = NewStringPropertyKey(referencedName.String)
 		case *ReferencedNameSymbol:
-			return baseObj.Get(NewSymbolPropertyKey(referencedName.Symbol))
+			propKey = NewSymbolPropertyKey(referencedName.Symbol)
 		case *ReferencedNamePrivateName:
 			panic("unreachable")
 		}
-		panic("unreachable")
+		return baseObj.InternalMethods().Get(baseObj, propKey, r.GetThisValue())
 	} else {
 		base := r.Base.(*ReferenceRecordBaseEnvironment)
 		name := r.ReferencedName.(*ReferencedNameString).String
@@ -118,9 +119,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 		if r.Strict {
 			panic("ReferenceError")
 		}
-
 		globalObj := agent.GetGlobalObject()
-
 		globalObj.Set(NewStringPropertyKey(r.ReferencedName.(*ReferencedNameString).String), value, setThrowTypeIgnore)
 		return
 	}

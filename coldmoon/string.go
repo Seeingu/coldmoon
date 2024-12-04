@@ -13,7 +13,7 @@ type StringObject struct {
 }
 
 func StringGetOwnProperty(s *StringObject, p PropertyKey) *PropertyDescriptor {
-	intIndex, ok := p.(*IntegerIndexPropertyKey)
+	intIndex, ok := p.(IntegerIndexPropertyKey)
 	if !ok {
 		return nil
 	}
