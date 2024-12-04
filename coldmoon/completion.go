@@ -178,5 +178,11 @@ func NewCompletion[T any](t CompletionType, value T) Completion[T] {
 		data: value,
 	}
 }
+func NewCompletionUndefined[T any]() Completion[T] {
+	return completionDefaultImpl[T]{
+		Type:        CompletionTypeNormal,
+		isUndefined: true,
+	}
+}
 
 var UndefinedNormalCompletion = NewCompletionValueUndefined()

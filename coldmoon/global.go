@@ -57,6 +57,18 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 		{"encodeURI", NewValueFromObject(r.Intrinsics.EncodeURI)},
 		{"encodeURIComponent", NewValueFromObject(r.Intrinsics.EncodeURIComponent)},
 		{"Intl", NewValueFromObject(r.Intrinsics.Intl)},
+		{"JSON", NewValueFromObject(r.Intrinsics.JSON)},
+		{"BigInt64Array", NewValueFromObject(r.Intrinsics.BigInt64ArrayConstructor)},
+		{"BigUint64Array", NewValueFromObject(r.Intrinsics.BigUint64ArrayConstructor)},
+		{"Int8Array", NewValueFromObject(r.Intrinsics.Int8ArrayConstructor)},
+		{"Uint8Array", NewValueFromObject(r.Intrinsics.Uint8ArrayConstructor)},
+		{"Uint8ClampedArray", NewValueFromObject(r.Intrinsics.Uint8ClampedArrayConstructor)},
+		{"Int16Array", NewValueFromObject(r.Intrinsics.Int16ArrayConstructor)},
+		{"Uint16Array", NewValueFromObject(r.Intrinsics.Uint16ArrayConstructor)},
+		{"Int32Array", NewValueFromObject(r.Intrinsics.Int32ArrayConstructor)},
+		{"Uint32Array", NewValueFromObject(r.Intrinsics.Uint32ArrayConstructor)},
+		{"Float32Array", NewValueFromObject(r.Intrinsics.Float32ArrayConstructor)},
+		{"Float64Array", NewValueFromObject(r.Intrinsics.Float64ArrayConstructor)},
 	}
 
 	var properties []constructorProperties

@@ -10,6 +10,16 @@ type ByteLength struct {
 	Value JSInt
 }
 
+func NewByteLength(v JSInt) *ByteLength {
+	return &ByteLength{
+		Value: v,
+	}
+}
+func (b *ByteLength) toAuto() {
+	b.Auto = true
+	b.Value = 0
+}
+
 type DataView struct {
 	*Object
 	// [[ViewedArrayBuffer]]
@@ -294,7 +304,7 @@ func SetViewValue(agent *Agent, viewValue Value, requestIndex Value, value Value
 		return NewCompletionValue(agent.ThrowException(RangeError, "DataView is out of bounds"))
 	}
 	bufferIndex := setIndex + viewOffset
-	SetValueInBuffer(agent, view.ViewedArrayBuffer, bufferIndex, size, numberValue.ToInt(), false, SeqCst, isLittleEndianBool)
+	SetValueInBuffer(agent, view.ViewedArrayBuffer, bufferIndex, NewNumberValue(numberValue), size, false, SeqCst, isLittleEndianBool)
 	return NewCompletionValue(UndefinedValue)
 }
 

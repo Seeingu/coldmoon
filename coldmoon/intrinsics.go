@@ -97,6 +97,54 @@ type Intrinsics struct {
 	SetIteratorPrototype ObjectType
 	// %Intl%
 	Intl ObjectType
+	// %TypedArray%
+	TypedArrayConstructor ObjectType
+	// %TypedArray.prototype%
+	TypedArrayPrototype ObjectType
+	// %BigInt64Array%
+	BigInt64ArrayConstructor ObjectType
+	// %BigInt64Array.prototype%
+	BigInt64ArrayPrototype ObjectType
+	// %BigUint64Array%
+	BigUint64ArrayConstructor ObjectType
+	// %BigUint64Array.prototype%
+	BigUint64ArrayPrototype ObjectType
+	// %Float32Array%
+	Float32ArrayConstructor ObjectType
+	// %Float32Array.prototype%
+	Float32ArrayPrototype ObjectType
+	// %Float64Array%
+	Float64ArrayConstructor ObjectType
+	// %Float64Array.prototype%
+	Float64ArrayPrototype ObjectType
+	// %Int8Array%
+	Int8ArrayConstructor ObjectType
+	// %Int8Array.prototype%
+	Int8ArrayPrototype ObjectType
+	// %Int16Array%
+	Int16ArrayConstructor ObjectType
+	// %Int16Array.prototype%
+	Int16ArrayPrototype ObjectType
+	// %Int32Array%
+	Int32ArrayConstructor ObjectType
+	// %Int32Array.prototype%
+	Int32ArrayPrototype ObjectType
+	// %Uint8Array%
+	Uint8ArrayConstructor ObjectType
+	// %Uint8Array.prototype%
+	Uint8ArrayPrototype ObjectType
+	// %Uint8ClampedArray%
+	Uint8ClampedArrayConstructor ObjectType
+	// %Uint8ClampedArray.prototype%
+	Uint8ClampedArrayPrototype ObjectType
+	// %Uint16Array%
+	Uint16ArrayConstructor ObjectType
+	// %Uint16Array.prototype%
+	Uint16ArrayPrototype ObjectType
+	// %Uint32Array%
+	Uint32ArrayConstructor ObjectType
+	// %Uint32Array.prototype%
+	Uint32ArrayPrototype ObjectType
 	// %IsFinite%
 	IsFinite ObjectType
 	// %isNaN%
@@ -199,7 +247,52 @@ func (i *Intrinsics) Get(key string) ObjectType {
 		return i.BigIntPrototype
 	case "%BigInt%":
 		return i.BigIntConstructor
-
+	case "%JSON%":
+		return i.JSON
+	case "%BigInt64Array%":
+		return i.BigInt64ArrayConstructor
+	case "%BigInt64Array.prototype%":
+		return i.BigInt64ArrayPrototype
+	case "%BigUint64Array%":
+		return i.BigUint64ArrayConstructor
+	case "%BigUint64Array.prototype%":
+		return i.BigUint64ArrayPrototype
+	case "%Float32Array%":
+		return i.Float32ArrayConstructor
+	case "%Float32Array.prototype%":
+		return i.Float32ArrayPrototype
+	case "%Float64Array%":
+		return i.Float64ArrayConstructor
+	case "%Float64Array.prototype%":
+		return i.Float64ArrayPrototype
+	case "%Int8Array%":
+		return i.Int8ArrayConstructor
+	case "%Int8Array.prototype%":
+		return i.Int8ArrayPrototype
+	case "%Int16Array%":
+		return i.Int16ArrayConstructor
+	case "%Int16Array.prototype%":
+		return i.Int16ArrayPrototype
+	case "%Int32Array%":
+		return i.Int32ArrayConstructor
+	case "%Int32Array.prototype%":
+		return i.Int32ArrayPrototype
+	case "%Uint8Array%":
+		return i.Uint8ArrayConstructor
+	case "%Uint8Array.prototype%":
+		return i.Uint8ArrayPrototype
+	case "%Uint8ClampedArray%":
+		return i.Uint8ClampedArrayConstructor
+	case "%Uint8ClampedArray.prototype%":
+		return i.Uint8ClampedArrayPrototype
+	case "%Uint16Array%":
+		return i.Uint16ArrayConstructor
+	case "%Uint16Array.prototype%":
+		return i.Uint16ArrayPrototype
+	case "%Uint32Array%":
+		return i.Uint32ArrayConstructor
+	case "%Uint32Array.prototype%":
+		return i.Uint32ArrayPrototype
 	case "%EvalError%":
 		return i.EvalErrorConstructor
 	case "%EvalError.prototype%":

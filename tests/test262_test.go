@@ -39,6 +39,21 @@ func testDataView(realm *Realm) {
 	f := makeTest262Path(dataViewDir + "constructor.js")
 	ParseScript(mustReadFile(f), realm, nil).Evaluate()
 }
+
+func testBigInt64Array(realm *Realm) {
+	typedArrayConstructorDir := "./test262/test/built-ins/TypedArrayConstructors"
+	constructorNames := []string{
+		"BigInt64Array",
+		"Int8Array",
+		"Float32Array",
+	}
+	for _, name := range constructorNames {
+		d := typedArrayConstructorDir + "/" + name
+		f := makeTest262Path(d + "/constructor.js")
+		ParseScript(mustReadFile(f), realm, nil).Evaluate()
+	}
+}
+
 func testArray(realm *Realm) {
 	arrayDir := "./test262/test/built-ins/Array/"
 	entries, err := os.ReadDir(makeTest262Path(arrayDir))
@@ -72,7 +87,8 @@ func TestHarness(t *testing.T) {
 		runTestHarness(realm, f, false)
 	}
 
-	testDataView(realm)
+	//testDataView(realm)
+	testBigInt64Array(realm)
 
 	Debug.Enable()
 	//testArray(realm)

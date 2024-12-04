@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"fmt"
+	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
 )
 
@@ -282,7 +283,10 @@ loop:
 		case *FormalParameter:
 			name := param.BindingElement.SingleNameBinding.BindingIdentifier
 			initializer := param.BindingElement.SingleNameBinding.Initializer
-			value := argumentsList[i]
+			value := pkg.SliceSafeGet(argumentsList, i)
+			if value == nil {
+				value = UndefinedValue
+			}
 			ref := agent.ResolveBinding(string(name), e, strict)
 			if initializer != nil {
 				value = GenerateAndRunBytecode(agent, &ExpressionStatement{

@@ -116,7 +116,8 @@ func IsSharedArrayBuffer(buffer *ArrayBufferObject) bool {
 }
 
 // 25.1.3.17
-func NumericToRawBytes(value JSInt, size JSInt, isLittleEndian bool) []byte {
+func NumericToRawBytes(value Value, size JSInt, isLittleEndian bool) []byte {
+	// TODO: convert value to bytes
 	buf := &bytes.Buffer{}
 	var endian binary.ByteOrder
 	if isLittleEndian {
@@ -131,14 +132,21 @@ func NumericToRawBytes(value JSInt, size JSInt, isLittleEndian bool) []byte {
 	return buf.Bytes()
 }
 
-func SetValueInBuffer(agent *Agent, arrayBuffer *ArrayBufferObject, byteIndex JSInt, value JSInt, size JSInt, isTypedArray bool, order MemoryOrder, isLittleEndian bool) {
+func SetValueInBuffer(
+	agent *Agent,
+	arrayBuffer *ArrayBufferObject,
+	byteIndex JSInt,
+	value Value,
+	size JSInt,
+	isTypedArray bool,
+	order MemoryOrder,
+	isLittleEndian bool) {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	Assert(byteIndex+size <= arrayBuffer.ArrayBufferByteLength)
 	block := arrayBuffer.ArrayBufferData
 	elementSize := size
-
-	rawValue := NumericToRawBytes(value, elementSize, isLittleEndian)
-	CopyDataBlockBytes(block, byteIndex, rawValue, 0, elementSize)
+	rawBytes := NumericToRawBytes(value, elementSize, isLittleEndian)
+	CopyDataBlockBytes(block, byteIndex, rawBytes, 0, size)
 }
 
 // 25.1.3.14

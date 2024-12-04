@@ -2,7 +2,7 @@ package coldmoon
 
 type ArrayIteratorObject struct {
 	*Object
-	Array *ArrayObject
+	Array ObjectType
 	Kind  objectOwnPropertiesKind
 	Index JSInt
 }
@@ -17,7 +17,16 @@ func NewArrayIteratorPrototype(realm *Realm) ObjectType {
 		index := arrayIterator.Index
 		kind := arrayIterator.Kind
 
-		length := array.LengthOfArrayLike()
+		var length JSInt
+		if typedArray, ok := array.(*TypedArrayObject); ok {
+			taRecord := MakeTypedArrayWithBufferWitnessRecord(typedArray, SeqCst)
+			if IsTypedArrayOutOfBounds(taRecord) {
+				panic("TypeError")
+			}
+			length = TypedArrayLength(taRecord)
+		} else {
+			length = array.LengthOfArrayLike()
+		}
 		if index >= length {
 			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
 		}
@@ -48,7 +57,7 @@ func NewArrayIteratorPrototype(realm *Realm) ObjectType {
 }
 
 // 23.1.5.1
-func CreateArrayIterator(agent *Agent, array *ArrayObject, kind objectOwnPropertiesKind) *ArrayIteratorObject {
+func CreateArrayIterator(agent *Agent, array ObjectType, kind objectOwnPropertiesKind) *ArrayIteratorObject {
 	return &ArrayIteratorObject{
 		Object: NewObject(agent, agent.CurrentRealm().Intrinsics.ArrayIteratorPrototype),
 		Array:  array,
