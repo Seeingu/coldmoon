@@ -4,6 +4,7 @@ import (
 	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -22,38 +23,43 @@ func ArrayCreate(agent *Agent, length float64, proto ObjectType) ObjectType {
 	realm := agent.CurrentRealm()
 	// 10.4.2.1
 	var defineOwnProperty = func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
-		propertyKeyString, ok := p.(*StringPropertyKey)
+		propertyKeyString, ok := p.(StringPropertyKey)
 		if ok && propertyKeyString.Value == "length" {
 			return ArraySetLength(agent, array, desc)
 		}
-		propertyKeyIndex, ok := p.(*IntegerIndexPropertyKey)
-		if ok {
-			lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
-			Assert(lengthDesc.IsDataDescriptor())
-			Assert(!lengthDesc.Configurable)
-
-			lengthValue := lengthDesc.Value
-			length := lengthValue.(*NumberValue).Data
-			Assert(math.IsInf(length, 0) || length >= 0)
-
-			index := propertyKeyIndex.Value
-
-			if index >= int(length) && !lengthDesc.Writable {
-				return false
+		var index float64
+		if propertyKeyIndex, err := strconv.ParseFloat(propertyKeyString.Value, 64); err != nil {
+			intValue, ok := p.(IntegerIndexPropertyKey)
+			if !ok {
+				panic("unexpected")
 			}
+			index = float64(intValue.Value)
+		} else {
+			index = propertyKeyIndex
+		}
+		lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
+		Assert(lengthDesc.IsDataDescriptor())
+		Assert(!lengthDesc.Configurable)
 
-			succeeded := OrdinaryDefineOwnProperty(array, p, desc)
+		lengthValue := lengthDesc.Value
+		length := lengthValue.(*NumberValue).Data
+		Assert(math.IsInf(length, 0) || length >= 0)
 
-			if !succeeded {
-				return false
-			}
+		if index >= length && !lengthDesc.Writable {
+			return false
+		}
 
-			if index >= int(length) {
-				lengthDesc.Value = NewNumberValue(float64(index) + 1)
+		succeeded := OrdinaryDefineOwnProperty(array, p, desc)
 
-				succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), lengthDesc)
-				Assert(succeeded)
-			}
+		if !succeeded {
+			return false
+		}
+
+		if index >= length {
+			lengthDesc.Value = NewNumberValue(float64(index) + 1)
+
+			succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), lengthDesc)
+			Assert(succeeded)
 		}
 		return true
 	}

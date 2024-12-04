@@ -49,7 +49,11 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 	}
 	DefineBuiltinFunction(f, "toString", toString, 0, realm)
 
+	// 20.2.3.3
 	var call = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		if len(argumentsList) == 0 {
+			panic("")
+		}
 		thisArg := argumentsList[0]
 		args := argumentsList[1:]
 		fun := this
