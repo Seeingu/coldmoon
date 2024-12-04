@@ -39,6 +39,22 @@ func testDataView(realm *Realm) {
 	f := makeTest262Path(dataViewDir + "constructor.js")
 	ParseScript(mustReadFile(f), realm, nil).Evaluate()
 }
+func testArray(realm *Realm) {
+	arrayDir := "./test262/test/built-ins/Array/"
+	entries, err := os.ReadDir(makeTest262Path(arrayDir))
+	if err != nil {
+		panic(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		f := makeTest262Path(arrayDir + entry.Name())
+		println("Testing file: ", entry.Name())
+		ParseScript(mustReadFile(f), realm, nil).Evaluate()
+	}
+
+}
 
 func TestHarness(t *testing.T) {
 	files := []string{
@@ -59,5 +75,6 @@ func TestHarness(t *testing.T) {
 	testDataView(realm)
 
 	Debug.Enable()
+	//testArray(realm)
 	Debug.Disable()
 }

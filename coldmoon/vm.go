@@ -2,6 +2,7 @@ package coldmoon
 
 import "C"
 import (
+	"fmt"
 	"github.com/Seeingu/coldmoon/pkg"
 	"math/big"
 	"reflect"
@@ -25,21 +26,41 @@ func NewVM(agent *Agent) *VM {
 	}
 }
 
+func (vm *VM) stackPush(v Value, m string) {
+	if v == nil {
+		return
+	}
+	if o, ok := vm.result.(*ObjectValue); ok {
+		if oo, ok := o.Object.(*Object); ok && oo == nil {
+			panic("TypeError: Cannot push undefined")
+		}
+	}
+	vm.stack.Push(v)
+	vm.debugPrintStack(m)
+}
+
+// stackPop pops a value from the stack.
+// if the stack is empty, it returns undefined.
+func (vm *VM) stackPop() Value {
+	if vm.stack.IsEmpty() {
+		if Debug.PrintBytecode {
+			fmt.Printf("VM stack is empty, ip: %d\n", vm.ip)
+		}
+		return UndefinedValue
+	}
+	defer vm.debugPrintStack("stackPop")
+	return vm.stack.Pop()
+}
+
 func (vm *VM) execute(executable *Executable, i Instruction) {
 	agent := vm.agent
 	switch ins := i.(type) {
 	case *ILoad:
-		if vm.result != nil {
-			vm.stack.Push(vm.result)
-		}
+		vm.stackPush(vm.result, "ILoad")
 	case *ILoadConstant:
-		vm.stack.Push(ins.Value)
+		vm.stackPush(ins.Value, "ILoadConstant")
 	case *IStore:
-		if vm.stack.Len() > 0 {
-			vm.result = vm.stack.Pop()
-		} else {
-			vm.result = UndefinedValue
-		}
+		vm.result = vm.stackPop()
 	case *IStoreConstant:
 		vm.result = ins.Value
 	case *IResolveBinding:
@@ -49,10 +70,10 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		arguments := make([]Value, argumentCount)
 		strict := ins.Strict
 		for i := argumentCount - 1; i >= 0; i-- {
-			arguments[i] = vm.stack.Pop()
+			arguments[i] = vm.stackPop()
 		}
-		this := vm.stack.Pop()
-		function := vm.stack.Pop()
+		this := vm.stackPop()
+		function := vm.stackPop()
 
 		realm := vm.agent.CurrentRealm()
 		eval := realm.Intrinsics.Eval
@@ -78,15 +99,15 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		)
 	case *ILoadThisValue:
 		this := evaluateCallGetThisValue(vm.referenceStack.Peek())
-		vm.stack.Push(this)
+		vm.stackPush(this, "ILoadThisValue")
 	case *ILoadThisValueSuper:
 		env := agent.GetThisEnvironment()
 		actualThis := env.GetThisBinding()
-		vm.stack.Push(actualThis)
+		vm.stackPush(actualThis, "ILoadThisValueSuper")
 	case *IMakeSuperPropertyReference:
-		propertyNameValue := vm.stack.Pop()
+		propertyNameValue := vm.stackPop()
 		strict := ins.Strict
-		actualThis := vm.stack.Pop()
+		actualThis := vm.stackPop()
 		propertyKey := ToPropertyKey(vm.agent, propertyNameValue)
 		env := agent.GetThisEnvironment()
 		Assert(env.HasSuperBinding())
@@ -193,9 +214,9 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		object := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
 		vm.result = NewValueFromObject(object)
 	case *IObjectSetProperty:
-		value := vm.stack.Pop()
-		propertyKey := ToPropertyKey(vm.agent, vm.stack.Pop())
-		object := vm.stack.Pop().(*ObjectValue).Object
+		value := vm.stackPop()
+		propertyKey := ToPropertyKey(vm.agent, vm.stackPop())
+		object := vm.stackPop().(*ObjectValue).Object
 		object.CreateDataPropertyOrThrow(propertyKey, value)
 		vm.result = NewValueFromObject(object)
 	case *IBitwiseNot:
@@ -210,9 +231,10 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		}
 	case *IEvaluatePropertyAccessWithExpressionKey:
 		// 13.3.3
-		propertyNameValue := vm.stack.Pop()
+		propertyNameValue := vm.stackPop()
 		strict := ins.Strict
-		baseValue := vm.stack.Pop()
+		baseValue := vm.stackPop()
+		Assert(baseValue != nil)
 		propertyKey := ToPropertyKey(vm.agent, propertyNameValue)
 
 		var referencedName ReferencedName
@@ -242,8 +264,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		// 13.3.4
 		propertyNameString := ins.Name
 		strict := ins.Strict
-		baseValue := vm.stack.Pop()
-
+		baseValue := vm.stackPop()
 		referencedName := &ReferencedNameString{
 			String: string(propertyNameString),
 		}
@@ -268,16 +289,16 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		array.Set(NewStringPropertyKey("length"), NewNumberValue(float64(length)), setThrowTypeThrow)
 	case *IArraySetValue:
 		index := ins.Index
-		initValue := vm.stack.Pop()
-		array := vm.stack.Pop().(*ObjectValue).Object
+		initValue := vm.stackPop()
+		array := vm.stackPop().(*ObjectValue).Object
 		array.CreateDataPropertyOrThrow(
 			NewIntegerIndexPropertyKey(index),
 			initValue,
 		)
 		vm.result = NewValueFromObject(array)
 	case *IArrayPushValue:
-		initValue := vm.stack.Pop()
-		arrayValue := vm.stack.Pop()
+		initValue := vm.stackPop()
+		arrayValue := vm.stackPop()
 		array := arrayValue.(*ObjectValue).Object
 		length, _ := ValueGetLength(arrayValue)
 		array.CreateDataPropertyOrThrow(
@@ -286,8 +307,8 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		)
 		vm.result = NewValueFromObject(array)
 	case *IArraySpread:
-		spread := vm.stack.Pop()
-		arrayValue := vm.stack.Pop()
+		spread := vm.stackPop()
+		arrayValue := vm.stackPop()
 		array := MustGetObject(arrayValue)
 		iteratorRecord := GetIterator(vm.agent, spread, GetIteratorKindSync).Data()
 		nextIndex, _ := ValueGetLength(arrayValue)
@@ -305,28 +326,28 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		}
 		vm.result = NewValueFromObject(array)
 	case *IGreaterThan:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		r := IsLessThan(vm.agent, left, right, IsLessThanOrderRightFirst)
 		vm.result = NewBooleanValue(r)
 	case *IGreaterThanEquals:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		r := IsLessThan(vm.agent, left, right, IsLessThanOrderRightFirst)
 		vm.result = NewBooleanValue(!r)
 	case *ILessThan:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		r := IsLessThan(vm.agent, left, right, IsLessThanOrderLeftFirst)
 		vm.result = NewBooleanValue(r)
 	case *ILessThanEquals:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		r := IsLessThan(vm.agent, left, right, IsLessThanOrderLeftFirst)
 		vm.result = NewBooleanValue(!r)
 	case *IHasProperty:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		rightObject, ok := right.(*ObjectValue)
 		if !ok {
 			panic("TypeError: right is not an object")
@@ -334,22 +355,22 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		vm.result = NewBooleanValue(
 			rightObject.Object.HasProperty(ToPropertyKey(vm.agent, left)))
 	case *IInstanceOf:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		vm.result = NewBooleanValue(
 			InstanceOfOperator(vm.agent, left, right),
 		)
 	case *ILooselyEqual:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		vm.result = NewBooleanValue(IsLooselyEqual(vm.agent, right, left))
 	case *IStrictlyEqual:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		vm.result = NewBooleanValue(IsStrictlyEqual(right, left))
 	case *IApplyStringOrNumericBinaryOperator:
-		right := vm.stack.Pop()
-		left := vm.stack.Pop()
+		right := vm.stackPop()
+		left := vm.stackPop()
 		operator := ins.Operator
 		vm.result = applyStringOrNumericBinaryOperator(
 			vm.agent, left, right, operator,
@@ -358,9 +379,9 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		argumentCount := ins.ArgumentCount
 		arguments := make([]Value, argumentCount)
 		for i := argumentCount - 1; i >= 0; i-- {
-			arguments[i] = vm.stack.Pop()
+			arguments[i] = vm.stackPop()
 		}
-		constructor := vm.stack.Pop()
+		constructor := vm.stackPop()
 		vm.result = evaluateNew(vm.agent, constructor, arguments)
 	case *IPushExceptionJumpTarget:
 		jumpTarget := ins.Target
@@ -1265,7 +1286,7 @@ func evaluateCall(agent *Agent, function Value, this Value, arguments []Value) V
 
 func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
 	if reference == nil {
-		return nil
+		return UndefinedValue
 	}
 	if reference.IsPropertyReference() {
 		return reference.GetThisValue()
@@ -1274,7 +1295,7 @@ func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
 	if o := refEnv.WithBaseObject(); o != nil {
 		return NewValueFromObject(o)
 	}
-	return nil
+	return UndefinedValue
 }
 
 func directEval(agent *Agent, arguments []Value, strict bool) Value {
@@ -1536,5 +1557,18 @@ func DefineMethod(agent *Agent, functionExpression *PrimaryExpressionFunctionExp
 	return &DefineMethodRecord{
 		Key:     propKey,
 		Closure: closure,
+	}
+}
+
+// MARK: - Debug
+
+func (vm *VM) debugPrintStack(msg string) {
+	if !Debug.PrintBytecode {
+		return
+	}
+	fmt.Printf("Stack(%s): size: %d\n", msg, vm.stack.Len())
+
+	for i, v := range vm.stack.Data() {
+		fmt.Printf("%d: %s\n", i, printValue(v))
 	}
 }
