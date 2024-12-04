@@ -166,6 +166,9 @@ func InitializeHostDefinedRealm(
 	agent.ExecutionContextStack.Push(newContext)
 
 	global := globalObject
+	if global == nil {
+		global = OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
+	}
 
 	realm.SetRealmGlobalObject(global, nil)
 
