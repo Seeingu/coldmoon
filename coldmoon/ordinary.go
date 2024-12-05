@@ -410,10 +410,10 @@ func OrdinaryDelete(object ObjectType, key PropertyKey) bool {
 }
 
 func InternalOwnPropertyKeys(object ObjectType) []PropertyKey {
-	return OrdinaryOwnPropertyKeys(object.(*Object))
+	return OrdinaryOwnPropertyKeys(object)
 }
 
-func OrdinaryOwnPropertyKeys(object *Object) []PropertyKey {
+func OrdinaryOwnPropertyKeys(object ObjectType) []PropertyKey {
 	var keys []PropertyKey
 
 	for key := range object.PropertyStorage().Properties {

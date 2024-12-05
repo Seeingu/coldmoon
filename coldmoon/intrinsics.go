@@ -81,6 +81,8 @@ type Intrinsics struct {
 	Proxy ObjectType
 	// %IteratorPrototype%
 	IteratorPrototype ObjectType
+	// %ForInIteratorPrototype%
+	ForInIteratorPrototype ObjectType
 	// %Math%
 	Math ObjectType
 	// %Map%

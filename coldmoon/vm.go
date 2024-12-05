@@ -18,6 +18,7 @@ type VM struct {
 	referenceStack           pkg.Stack[*ReferenceRecord]
 	exceptionJumpTargetStack pkg.Stack[int]
 	exception                Value
+	iterator                 *IteratorRecord
 }
 
 func NewVM(agent *Agent) *VM {
@@ -78,8 +79,8 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		realm := vm.agent.CurrentRealm()
 		eval := realm.Intrinsics.Eval
 
-		ref := vm.referenceStack.Peek()
-		if ref != nil {
+		if !vm.referenceStack.IsEmpty() {
+			ref := vm.referenceStack.Peek()
 			refName, ok :=
 				ref.ReferencedName.(*ReferencedNameString)
 			if ref.IsPropertyReference() &&
@@ -310,7 +311,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		spread := vm.stackPop()
 		arrayValue := vm.stackPop()
 		array := MustGetObject(arrayValue)
-		iteratorRecord := GetIterator(vm.agent, spread, GetIteratorKindSync).Data()
+		iteratorRecord := GetIterator(vm.agent, spread, IteratorKindSync).Data()
 		nextIndex, _ := ValueGetLength(arrayValue)
 		for {
 			next := iteratorRecord.IteratorStep()
@@ -394,6 +395,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			panic("CompletionTypeThrow")
 		}
 	case *IPushReference:
+		Assert(vm.reference != nil)
 		vm.referenceStack.Push(vm.reference)
 	case *IPopReference:
 		vm.referenceStack.Pop()
@@ -589,6 +591,20 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			promiseCapability.ToImportedModulePayload(),
 		)
 		vm.result = promiseCapability.Promise.ToValue()
+	case *IForInIterator:
+		value := vm.result
+		obj := MustGetObject(value)
+		iterator := CreateForInIterator(agent, obj)
+		nextMethod := iterator.Get(NewStringPropertyKey("next"))
+		vm.iterator = &IteratorRecord{
+			Iterator:   iterator,
+			NextMethod: nextMethod,
+		}
+	case *IGetIterator:
+		vm.iterator = GetIterator(agent, vm.result, ins.IteratorKind).Data()
+	case *ILoadIterator:
+		vm.stackPush(vm.iterator.NextMethod, "ILoadIterator")
+		vm.stackPush(NewValueFromObject(vm.iterator.Iterator), "ILoadIterator")
 	}
 }
 
@@ -1563,7 +1579,7 @@ func DefineMethod(agent *Agent, functionExpression *PrimaryExpressionFunctionExp
 // MARK: - Debug
 
 func (vm *VM) debugPrintStack(msg string) {
-	if !Debug.PrintBytecode {
+	if !Debug.PrintBytecode || true {
 		return
 	}
 	fmt.Printf("Stack(%s): size: %d\n", msg, vm.stack.Len())

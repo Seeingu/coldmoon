@@ -28,7 +28,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		if !IsCallable(adder) {
 			panic("TypeError")
 		}
-		iteratorRecord := GetIterator(agent, iterable, GetIteratorKindSync)
+		iteratorRecord := GetIterator(agent, iterable, IteratorKindSync)
 		for {
 			next := iteratorRecord.Data().IteratorStep()
 			if next.(*BooleanObject).Data == false {

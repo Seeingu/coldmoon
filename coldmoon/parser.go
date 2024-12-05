@@ -485,7 +485,7 @@ func (p *Parser) statement() Statement {
 		return &StatementDebugger{}
 	case TIf:
 		return p.ifStatement()
-	case TWhile, TDo:
+	case TWhile, TDo, TFor:
 		return p.breakableStatement()
 	case TThrow:
 		return p.throwStatement()
@@ -884,11 +884,11 @@ func (p *Parser) fieldDefinition() *FieldDefinition {
 
 func (p *Parser) lexicalDeclaration() *DeclarationLexical {
 	t := p.tokenizer.CurrentToken
-	var lexicalType LexicalDeclarationType
+	var lexicalType LetOrConst
 	if t.Type == TLet {
-		lexicalType = LexicalDeclarationTypeLet
+		lexicalType = LetOrConstLet
 	} else if t.Type == TConst {
-		lexicalType = LexicalDeclarationTypeConst
+		lexicalType = LetOrConstConst
 	} else {
 		panic("lexicalDeclaration: expected let or const")
 	}
@@ -1048,12 +1048,90 @@ func (p *Parser) iterationStatement() IterationStatement {
 		p.inIteration = inIteration
 	}()
 
-	if t.Type == TDo {
+	switch t.Type {
+	case TDo:
 		return p.doWhileStatement()
-	} else if t.Type == TWhile {
+	case TWhile:
 		return p.whileStatement()
+	case TFor:
+		if e, ok := parserRecoverOk(p, p.forInOfStatement); ok {
+			return e
+		}
+		return p.forStatement()
+	default:
+		panic("iterationStatement: expected do, while or for")
 	}
-	return p.forStatement()
+}
+
+func (p *Parser) forInOfStatement() *ForInOfStatement {
+	p.tokenizer.MustMatch(TFor)
+	var isAwait bool
+	if p.tokenizer.Match(TAwait) {
+		isAwait = true
+	}
+	p.tokenizer.MustMatch(TLeftParen)
+	init := &ForInOfStatementInitializer{}
+	if p.tokenizer.Match(TVar) {
+		init.ForBinding = p.forBinding()
+	} else if p.tokenizer.Match(TLet) || p.tokenizer.Match(TConst) {
+		init.ForDeclaration = p.forDeclaration()
+	} else {
+		init.LeftHandSideExpression = p.expression(p.acceptContextLowest())
+	}
+
+	var statementType ForInOfStatementType
+	if p.tokenizer.Match(TIn) {
+		statementType = ForInOfStatementTypeIn
+	} else if p.tokenizer.Match(TOf) {
+		statementType = ForInOfStatementTypeOf
+	} else {
+		panic("forInOfStatement: expected in or of")
+	}
+
+	expression := p.expression(p.acceptContextLowest())
+	p.tokenizer.MustMatch(TRightParen)
+	body := p.statement()
+
+	return &ForInOfStatement{
+		Type:        statementType,
+		IsAwait:     isAwait,
+		Initializer: init,
+		Expression:  expression,
+		Body:        body,
+	}
+}
+
+func (p *Parser) forDeclaration() *ForDeclaration {
+	var letOrConst LetOrConst
+	if p.tokenizer.Match(TLet) {
+		letOrConst = LetOrConstLet
+	} else if p.tokenizer.Match(TConst) {
+		letOrConst = LetOrConstConst
+	} else {
+		panic("forDeclaration: expected let or const")
+	}
+	return &ForDeclaration{
+		LetOrConst: letOrConst,
+		ForBinding: p.forBinding(),
+	}
+}
+
+func (p *Parser) forBinding() *ForBinding {
+	f := &ForBinding{}
+	if identifier, ok := parserRecoverOk(p, p.bindingIdentifier); ok {
+		f.BindingIdentifier = identifier
+	} else {
+		f.BindingPattern = p.bindingPattern()
+	}
+
+	return f
+}
+
+func (p *Parser) bindingPattern() *BindingPattern {
+	b := &BindingPattern{}
+	// TODO:
+	panic("unimplemented")
+	return b
 }
 
 func (p *Parser) forStatement() *StatementFor {
@@ -1074,7 +1152,8 @@ func (p *Parser) forStatement() *StatementFor {
 			Expression: p.expression(p.acceptContextLowest()),
 		}
 	}
-	p.tokenizer.MustMatch(TSemicolon)
+	// semicolon has been consumed by initializer
+	//p.tokenizer.Match(TSemicolon)
 	var condition Expression
 	if p.tokenizer.CurrentToken.Type != TSemicolon {
 		condition = p.expression(p.acceptContextLowest())
@@ -1211,7 +1290,7 @@ func (p *Parser) superCall() (*ExpressionSuperCall, bool) {
 	}, true
 }
 
-func (p *Parser) newExpression() (*ExpressionNewExpression, bool) {
+func (p *Parser) newExpression() (*NewExpression, bool) {
 	t := p.tokenizer.CurrentToken
 
 	previous := p.callExpressionForbidden
@@ -1229,7 +1308,7 @@ func (p *Parser) newExpression() (*ExpressionNewExpression, bool) {
 	p.callExpressionForbidden = previous
 	args := p.arguments()
 	p.automaticSemicolonInsertion()
-	return &ExpressionNewExpression{
+	return &NewExpression{
 		Callee:    expr,
 		Arguments: args,
 	}, true
@@ -1467,11 +1546,11 @@ func (p *Parser) optionalExpression(left Expression) *OptionalExpression {
 	}
 }
 
-func (p *Parser) assignmentExpression(left Expression, accept *acceptContext) *ExpressionAssignmentExpression {
+func (p *Parser) assignmentExpression(left Expression, accept *acceptContext) *AssignmentExpression {
 	t := p.tokenizer.CurrentToken
 	p.tokenizer.Next()
 	right := p.expression(accept)
-	return &ExpressionAssignmentExpression{
+	return &AssignmentExpression{
 		Operator: operatorAssignmentMap[t.Type],
 		Left:     left,
 		Right:    right,
@@ -2131,7 +2210,6 @@ func (p *Parser) variableDeclarationList() *VariableDeclarationList {
 		}
 	}
 	return &VariableDeclarationList{Items: list}
-
 }
 
 func (p *Parser) variableDeclaration() *VariableDeclaration {
@@ -2170,6 +2248,8 @@ func parserRecoverOk[T any](p *Parser, f func() T) (r T, ok bool) {
 			fmt.Println("parser recovered from: ", pkg.GetFunctionName(f), r)
 			p.tokenizer.restore()
 			ok = false
+		} else {
+			p.tokenizer.popCachedState()
 		}
 	}()
 	return f(), true

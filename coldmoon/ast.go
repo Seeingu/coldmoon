@@ -1335,18 +1335,18 @@ var operatorAssignmentMap = map[TokenType]AssignmentOperator{
 	TQuestionQuestionEquals:   AssignmentOperatorNullishCoalescing,
 }
 
-type ExpressionAssignmentExpression struct {
+type AssignmentExpression struct {
 	Expression
 	Left     Expression
 	Operator AssignmentOperator
 	Right    Expression
 }
 
-func (e *ExpressionAssignmentExpression) AssignmentTargetType() AssignmentTargetType {
+func (e *AssignmentExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (e *ExpressionAssignmentExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+func (e *AssignmentExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 	if e.Operator == AssignmentOperatorAssign {
 		e.Left.Bytecode(ex, c)
 		ex.AddInstruction(&IPushReference{})
@@ -1486,23 +1486,23 @@ func (e *ExpressionAssignmentExpression) Bytecode(ex *Executable, c *BytecodeCon
 	}
 }
 
-func (e *ExpressionAssignmentExpression) String() string {
+func (e *AssignmentExpression) String() string {
 	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
 }
 
 // MARK: - NewExpression
 
-type ExpressionNewExpression struct {
+type NewExpression struct {
 	Expression
 	Callee    Expression
 	Arguments Arguments
 }
 
-func (e *ExpressionNewExpression) AssignmentTargetType() AssignmentTargetType {
+func (e *NewExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (e *ExpressionNewExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+func (e *NewExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 	e.Callee.Bytecode(ex, c)
 	if ExpressionAnalyze(e.Callee, AnalyzeQueryIsReference) {
 		ex.AddInstruction(InsGetValue)
@@ -1519,7 +1519,7 @@ func (e *ExpressionNewExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 	ex.AddInstruction(&INew{ArgumentCount: len(e.Arguments)})
 }
 
-func (e *ExpressionNewExpression) String() string {
+func (e *NewExpression) String() string {
 	sb := "new " + e.Callee.String() + "("
 	for i, arg := range e.Arguments {
 		if i != 0 {
@@ -2110,6 +2110,7 @@ func (c *CallExpression) String() string {
 type Statement interface {
 	ASTNode
 	VarScopedDeclarations() []*VariableDeclaration
+	VarDeclaredNames() []IdentifierName
 	_statement()
 }
 
@@ -2120,6 +2121,9 @@ type StatementDefaultImpl struct {
 func (s *StatementDefaultImpl) _statement() {}
 func (s *StatementDefaultImpl) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return nil
+}
+func (s *StatementDefaultImpl) VarDeclaredNames() (l []IdentifierName) {
+	return
 }
 
 func (s *StatementDefaultImpl) Bytecode(e *Executable, c *BytecodeContext) {
@@ -2234,7 +2238,7 @@ func (v *VariableDeclaration) String() string {
 // MARK: - BlockStatement
 
 type StatementBlock struct {
-	Statement
+	*StatementDefaultImpl
 	BlockStatement BlockStatement
 }
 
@@ -2242,6 +2246,9 @@ var _ Statement = (*StatementBlock)(nil)
 
 func (s *StatementBlock) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return s.BlockStatement.VarScopedDeclarations()
+}
+func (s *StatementBlock) VarDeclaredNames() (l []IdentifierName) {
+	return s.BlockStatement.VarDeclaredNames()
 }
 func (s *StatementBlock) _statement() {}
 func (s *StatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
@@ -3113,6 +3120,319 @@ func (s *StatementFor) String() string {
 	return sb
 }
 
+// MARK: - ForInOfStatement
+
+type ForInOfStatementType int
+
+const (
+	ForInOfStatementTypeIn ForInOfStatementType = iota
+	ForInOfStatementTypeOf
+)
+
+// ForInOfStatement [Yield, Await, Return] :
+// - for ( [lookahead ≠ let [] LeftHandSideExpression[?Yield, ?Await] in
+//   - Expression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//
+// - for ( var ForBinding[?Yield, ?Await] in Expression[+In, ?Yield, ?Await] )
+//   - Statement[?Yield, ?Await, ?Return]
+//
+// - for ( ForDeclaration[?Yield, ?Await] in Expression[+In, ?Yield, ?Await] )
+//   - Statement[?Yield, ?Await, ?Return]
+//
+// - for ( [lookahead ∉ { let, async of}] LeftHandSideExpression[?Yield, ?Await] of
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//
+// - for ( var ForBinding[?Yield, ?Await] of AssignmentExpression[+In, ?Yield, ?Await]
+//   - ) Statement[?Yield, ?Await, ?Return]
+//
+// - for ( ForDeclaration[?Yield, ?Await] of AssignmentExpression[+In, ?Yield, ?Await]
+//   - ) Statement[?Yield, ?Await, ?Return]
+//
+// - [+Await] for await ( [lookahead ≠ let] LeftHandSideExpression[?Yield, ?Await] of
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//
+// - [+Await] for await ( var ForBinding[?Yield, ?Await] of
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//
+// - [+Await] for await ( ForDeclaration[?Yield, ?Await] of
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+type ForInOfStatement struct {
+	IterationStatement
+	Type        ForInOfStatementType
+	IsAwait     bool
+	Body        Statement
+	Initializer *ForInOfStatementInitializer
+	// Expression is Expression, LeftHandSideExpression or AssignmentExpression
+	Expression Expression
+}
+
+func (f *ForInOfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	l = append(l, f.Body.VarScopedDeclarations()...)
+	return
+}
+func (f *ForInOfStatement) BoundNames() (l []IdentifierName) {
+	if f.Initializer.ForBinding != nil {
+		l = append(l, f.Initializer.ForBinding.BoundNames()...)
+		l = append(l, f.Body.VarDeclaredNames()...)
+	}
+	return
+}
+
+type ForInOfIterationKind int
+
+const (
+	ForInOfIterationKindEnumerate ForInOfIterationKind = iota
+	ForInOfIterationKindIterate
+	ForInOfIterationKindAsyncIterate
+)
+
+type ForInOfLhsKind int
+
+const (
+	ForInOfLhsKindAssignment ForInOfLhsKind = iota
+	ForInOfLhsKindVarBinding
+	ForInOfLhsKindLexicalBinding
+)
+
+func (f *ForInOfStatement) Bytecode(e *Executable, c *BytecodeContext) {
+	var iterationKind ForInOfIterationKind
+	if f.Type == ForInOfStatementTypeIn {
+		iterationKind = ForInOfIterationKindEnumerate
+	} else {
+		if f.IsAwait {
+			iterationKind = ForInOfIterationKindAsyncIterate
+		} else {
+			iterationKind = ForInOfIterationKindIterate
+		}
+	}
+	var lhsKind ForInOfLhsKind
+	if f.Initializer.ForBinding != nil {
+		lhsKind = ForInOfLhsKindVarBinding
+	} else if f.Initializer.ForDeclaration != nil {
+		lhsKind = ForInOfLhsKindLexicalBinding
+	} else {
+		lhsKind = ForInOfLhsKindAssignment
+	}
+	var iteratorKind IteratorKind
+	if iterationKind == ForInOfIterationKindAsyncIterate {
+		iteratorKind = IteratorKindAsync
+	} else {
+		iteratorKind = IteratorKindSync
+	}
+
+	index := f.forInOfHeadEvaluation(e, c, f.Expression, iterationKind, iteratorKind)
+	f.forInOfBodyEvaluation(e, c, index, lhsKind, iteratorKind)
+}
+
+// ForIn/OfHeadEvaluation
+func (f *ForInOfStatement) forInOfHeadEvaluation(e *Executable, c *BytecodeContext, expr Expression, iterationKind ForInOfIterationKind, iteratorKind IteratorKind) *IJumpIfTrue {
+	// TODO: BoundNames of expr
+
+	expr.Bytecode(e, c)
+	if ExpressionAnalyze(expr, AnalyzeQueryIsReference) {
+		e.AddInstruction(InsGetValue)
+	}
+	if iterationKind == ForInOfIterationKindEnumerate {
+		e.AddInstruction(InsLoad)
+		// a. If exprValue is either undefined or null, then
+		//     i. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
+		e.AddInstruction(InsLooselyEqual)
+		jumpIfTrue := &IJumpIfTrue{}
+		e.AddInstruction(jumpIfTrue)
+		jumpIfTrue.TargetElse = len(e.Instructions) - 1
+
+		e.AddInstruction(InsStore)
+		e.AddInstruction(&IForInIterator{})
+		return jumpIfTrue
+	} else {
+		e.AddInstruction(&IGetIterator{
+			IteratorKind: iteratorKind,
+		})
+		return nil
+	}
+}
+
+func (f *ForInOfStatement) IsDestructuring() bool {
+	// TODO:
+	return f.Initializer.ForBinding != nil && f.Initializer.ForBinding.BindingPattern != nil
+}
+
+// ForIn/OfBodyEvaluation
+func (f *ForInOfStatement) forInOfBodyEvaluation(
+	e *Executable,
+	c *BytecodeContext,
+	jumpIndex *IJumpIfTrue,
+	lhsKind ForInOfLhsKind,
+	iteratorKind IteratorKind) {
+	body := f.Body
+	e.AddInstruction(InsPushLexicalEnvironment)
+	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
+
+	destructuring := f.IsDestructuring()
+	lhs := f.Initializer
+
+	if destructuring && lhsKind == ForInOfLhsKindAssignment {
+		// TODO
+	}
+
+	startIndex := len(e.Instructions) - 1
+	e.AddInstruction(&ILoadIterator{})
+	e.AddInstruction(&ICall{})
+
+	if iteratorKind == IteratorKindAsync {
+		//e.AddInstruction(InsAwait)
+	}
+
+	e.AddInstruction(InsLoad)
+
+	e.AddInstruction(InsLoad)
+	e.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKey{
+		Name:   "done",
+		Strict: false,
+	})
+	e.AddInstruction(InsGetValue)
+
+	jumpIfTrue := &IJumpIfTrue{}
+	e.AddInstruction(jumpIfTrue)
+
+	jumpIfTrue.TargetElse = len(e.Instructions) - 1
+
+	e.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKey{
+		Name:   "value",
+		Strict: false,
+	})
+	e.AddInstruction(InsGetValue)
+
+	if lhsKind == ForInOfLhsKindAssignment || lhsKind == ForInOfLhsKindVarBinding {
+		if destructuring {
+			if lhsKind == ForInOfLhsKindAssignment {
+				// TODO
+			} else {
+				// TODO
+			}
+		} else {
+			if lhs.LeftHandSideExpression != nil {
+				lhs.LeftHandSideExpression.Bytecode(e, c)
+			} else if lhs.ForBinding != nil {
+				e.AddInstruction(&IResolveBinding{
+					Name: lhs.ForBinding.BindingIdentifier,
+				})
+			} else {
+				panic("unreachable")
+			}
+			e.AddInstruction(InsPutValue)
+		}
+	} else {
+		// TODO
+	}
+
+	e.AddInstruction(InsStore)
+	body.Bytecode(e, c)
+	continueIndex := len(e.Instructions) - 1
+	e.AddInstruction(InsLoad)
+	e.AddInstruction(InsRestoreLexicalEnvironment)
+
+	e.AddInstruction(&IJump{Target: startIndex})
+	jumpIfTrue.Target = len(e.Instructions) - 1
+	e.AddInstruction(InsStore)
+	e.AddInstruction(InsStore)
+	for _, index := range c.continueJumpIndices.Data() {
+		index.Target = continueIndex
+	}
+	c.continueJumpIndices.Clear()
+	for _, index := range c.breakJumpIndices.Data() {
+		index.Target = len(e.Instructions) - 1
+	}
+	c.breakJumpIndices.Clear()
+
+	if jumpIndex != nil {
+		skipJump := &IJump{}
+		e.AddInstruction(skipJump)
+		jumpIndex.Target = len(e.Instructions) - 1
+
+		e.AddInstruction(InsStore)
+		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
+		skipJump.Target = len(e.Instructions) - 1
+	}
+}
+
+func (f *ForInOfStatement) String() string {
+	var s = "ForInOfStatement "
+	if f.IsAwait {
+		s += "await "
+	}
+	s += f.Initializer.String() + " "
+	if f.Type == ForInOfStatementTypeIn {
+		s += "In "
+	} else {
+		s += "Of "
+	}
+	s += f.Expression.String() + " " + f.Body.String()
+	return s
+}
+
+// ForInOfStatementInitializer Enum
+type ForInOfStatementInitializer struct {
+	// LeftHandSideExpression [Yield, Await] :
+	// - NewExpression[?Yield, ?Await]
+	// - CallExpression[?Yield, ?Await]
+	// - OptionalExpression[?Yield, ?Await]
+	LeftHandSideExpression Expression
+	ForBinding             *ForBinding
+	ForDeclaration         *ForDeclaration
+}
+
+func (f *ForInOfStatementInitializer) String() string {
+	if f.ForBinding != nil {
+		return f.ForBinding.String()
+	} else if f.ForDeclaration != nil {
+		return f.ForDeclaration.String()
+	} else {
+		return f.LeftHandSideExpression.String()
+	}
+}
+
+// ForBinding [Yield, Await] :
+// - BindingIdentifier[?Yield, ?Await]
+// - BindingPattern[?Yield, ?Await]
+type ForBinding struct {
+	BindingIdentifier IdentifierName
+	BindingPattern    *BindingPattern
+}
+
+func (f *ForBinding) String() string {
+	if f.BindingPattern != nil {
+		return f.BindingPattern.String()
+	}
+	return string(f.BindingIdentifier)
+}
+
+func (f *ForBinding) BoundNames() (l []IdentifierName) {
+	if f.BindingPattern != nil {
+		return f.BindingPattern.BoundNames()
+	}
+	return []IdentifierName{f.BindingIdentifier}
+}
+
+// ForDeclaration [Yield, Await] :
+// - LetOrConst ForBinding[?Yield, ?Await]
+type ForDeclaration struct {
+	LetOrConst LetOrConst
+	ForBinding *ForBinding
+}
+
+func (f *ForDeclaration) String() string {
+	var letOrConst string
+	if f.LetOrConst == LetOrConstLet {
+		letOrConst = "Let"
+	} else {
+		letOrConst = "Const"
+	}
+	return letOrConst + " " + f.ForBinding.String()
+}
+
 // MARK: - BreakStatement
 
 type StatementBreak struct {
@@ -3589,16 +3909,16 @@ func (c *ClassElementMethodDefinition) String() string {
 
 // MARK: - LexicalDeclaration
 
-type LexicalDeclarationType int
+type LetOrConst int
 
 const (
-	LexicalDeclarationTypeLet LexicalDeclarationType = iota
-	LexicalDeclarationTypeConst
+	LetOrConstLet LetOrConst = iota
+	LetOrConstConst
 )
 
 type DeclarationLexical struct {
 	Declaration
-	Type        LexicalDeclarationType
+	Type        LetOrConst
 	BindingList *BindingList
 }
 
@@ -3704,12 +4024,15 @@ type BlockStatement interface {
 }
 
 type BlockStatementBlock struct {
-	BlockStatement
+	*StatementDefaultImpl
 	Block *Block
 }
 
 func (b *BlockStatementBlock) VarScopedDeclarations() []*VariableDeclaration {
 	return b.Block.StatementList.VarScopedDeclarations()
+}
+func (b *BlockStatementBlock) VarDeclaredNames() []IdentifierName {
+	return b.Block.StatementList.VarDeclaredNames()
 }
 
 func (b *BlockStatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
@@ -3738,6 +4061,13 @@ type StatementList []StatementListItem
 func (s StatementList) VarScopedDeclarations() (l []*VariableDeclaration) {
 	for _, item := range s {
 		l = append(l, item.VarScopedDeclarations()...)
+	}
+	return
+}
+
+func (s StatementList) VarDeclaredNames() (l []IdentifierName) {
+	for _, item := range s {
+		l = append(l, item.VarDeclaredNames()...)
 	}
 	return
 }
@@ -3781,6 +4111,7 @@ func (s StatementList) String() string {
 type StatementListItem interface {
 	ASTNode
 	VarScopedDeclarations() []*VariableDeclaration
+	VarDeclaredNames() []IdentifierName
 }
 
 func StatementListItemAnalyze(s StatementListItem, a AnalyzeQuery) bool {
@@ -3799,6 +4130,10 @@ type StatementListItemStatement struct {
 }
 
 var _ ASTNode = (*StatementListItemStatement)(nil)
+
+func (s *StatementListItemStatement) VarDeclaredNames() (l []IdentifierName) {
+	return s.Statement.VarDeclaredNames()
+}
 
 func (s *StatementListItemStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	vars := s.Statement.VarScopedDeclarations()
@@ -3822,6 +4157,10 @@ type StatementListItemDeclaration struct {
 }
 
 var _ ASTNode = (*StatementListItemDeclaration)(nil)
+
+func (s *StatementListItemDeclaration) VarDeclaredNames() (l []IdentifierName) {
+	return
+}
 
 func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDeclaration) {
 	switch d := s.Declaration.(type) {

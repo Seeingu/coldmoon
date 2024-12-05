@@ -21,6 +21,18 @@ func TestBaseline(t *testing.T) {
 	var sourceText string
 
 	sourceText = `
+let a = 1;
+for (var i = 0; i < 3; i++) {
+	a += i;
+}
+for (var i in [1, 2, 3]) {
+	a += i;
+}
+a;
+`
+	testSource(t, sourceText)
+
+	sourceText = `
 var a = [];
 a[4294967295] = "not an array element";
 a[4294967295];

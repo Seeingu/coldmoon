@@ -1,6 +1,9 @@
 package coldmoon
 
-import lo "github.com/samber/lo"
+import (
+	"github.com/Seeingu/coldmoon/pkg"
+	lo "github.com/samber/lo"
+)
 
 type TokenType int
 
@@ -148,7 +151,7 @@ type Tokenizer struct {
 	line         int
 	CurrentToken Token
 	NextToken    Token
-	cachedState  *cachedState
+	cachedStates pkg.Stack[*cachedState]
 	isTemplate   bool
 }
 
@@ -166,22 +169,26 @@ func NewTokenizer(sourceText string) *Tokenizer {
 }
 
 func (t *Tokenizer) store() {
-	t.cachedState = &cachedState{
+	t.cachedStates.Push(&cachedState{
 		index:        t.Index,
 		line:         t.line,
 		currentToken: t.CurrentToken,
 		nextToken:    t.NextToken,
-	}
+	})
+}
+
+func (t *Tokenizer) popCachedState() {
+	t.cachedStates.Pop()
 }
 func (t *Tokenizer) restore() {
-	if t.cachedState == nil {
+	if t.cachedStates.IsEmpty() {
 		panic("no cached state")
 	}
-	t.Index = t.cachedState.index
-	t.line = t.cachedState.line
-	t.CurrentToken = t.cachedState.currentToken
-	t.NextToken = t.cachedState.nextToken
-	t.cachedState = nil
+	cachedState := t.cachedStates.Pop()
+	t.Index = cachedState.index
+	t.line = cachedState.line
+	t.CurrentToken = cachedState.currentToken
+	t.NextToken = cachedState.nextToken
 }
 
 func (t *Tokenizer) peek() Token {

@@ -47,10 +47,16 @@ func testBigInt64Array(realm *Realm) {
 		"Int8Array",
 		"Float32Array",
 	}
+	fileNames := []string{
+		"constructor.js",
+		"BYTES_PER_ELEMENT.js",
+	}
 	for _, name := range constructorNames {
-		d := typedArrayConstructorDir + "/" + name
-		f := makeTest262Path(d + "/constructor.js")
-		ParseScript(mustReadFile(f), realm, nil).Evaluate()
+		for _, fileName := range fileNames {
+			d := typedArrayConstructorDir + "/" + name
+			f := makeTest262Path(d + "/" + fileName)
+			ParseScript(mustReadFile(f), realm, nil).Evaluate()
+		}
 	}
 }
 
@@ -78,6 +84,7 @@ func TestHarness(t *testing.T) {
 		"isConstructor.js",
 		"nans.js",
 		"assertRelativeDateMs.js",
+		"propertyHelper.js",
 	}
 
 	agent := NewAgent()

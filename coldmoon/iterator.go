@@ -6,6 +6,13 @@ type IteratorRecord struct {
 	Done       bool
 }
 
+type IteratorKind int
+
+const (
+	IteratorKindSync IteratorKind = iota
+	IteratorKindAsync
+)
+
 func (i *IteratorRecord) ToCompletion() Completion[*IteratorRecord] {
 	return NewNormalCompletion(i)
 }
@@ -35,19 +42,13 @@ func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *Itera
 }
 
 // 7.4.3
-type GetIteratorKind int
 
-const (
-	GetIteratorKindSync GetIteratorKind = iota
-	GetIteratorKindAsync
-)
-
-func GetIterator(agent *Agent, obj Value, kind GetIteratorKind) Completion[*IteratorRecord] {
+func GetIterator(agent *Agent, obj Value, kind IteratorKind) Completion[*IteratorRecord] {
 	var method ObjectType
 	switch kind {
-	case GetIteratorKindSync:
+	case IteratorKindSync:
 		method = GetMethod(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
-	case GetIteratorKindAsync:
+	case IteratorKindAsync:
 		method = GetMethod(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsAsyncIterator]))
 		if method == nil {
 			syncMethod := GetMethod(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))

@@ -615,6 +615,51 @@ func (i *IImportCall) String() string {
 	return "IEvaluateImportCall"
 }
 
+// MARK: - Iteration
+
+type IForInIterator struct {
+	Instruction
+}
+
+func (i *IForInIterator) String() string {
+	return "IForInIterator"
+}
+
+type IGetIterator struct {
+	Instruction
+	IteratorKind IteratorKind
+}
+
+func (i *IGetIterator) String() string {
+	return "IGetIterator"
+}
+
+type ILoadIterator struct {
+	Instruction
+}
+
+func (i *ILoadIterator) String() string {
+	return "ILoadIterator"
+}
+
+// MARK: - Env
+
+type IRestoreLexicalEnvironment struct {
+	Instruction
+}
+
+func (i *IRestoreLexicalEnvironment) String() string {
+	return "IRestoreLexicalEnvironment"
+}
+
+type IPushLexicalEnvironment struct {
+	Instruction
+}
+
+func (i *IPushLexicalEnvironment) String() string {
+	return "IPushLexicalEnvironment"
+}
+
 // MARK: - Instruction Constant
 
 var InsLoad = &ILoad{}
@@ -642,3 +687,5 @@ var InsPopReference = &IPopReference{}
 var InsPutValue = &IPutValue{}
 var InsGetNewTarget = &IGetNewTarget{}
 var InsRegExpCreate = &IRegExpCreate{}
+var InsRestoreLexicalEnvironment = &IRestoreLexicalEnvironment{}
+var InsPushLexicalEnvironment = &IPushLexicalEnvironment{}

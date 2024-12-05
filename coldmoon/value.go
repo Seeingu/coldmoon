@@ -110,7 +110,6 @@ var NaNValue = &NumberValue{Data: JSNumberNaN}
 var InfinityValue = &NumberValue{Data: JSNumberInf}
 var NegativeInfinityValue = &NumberValue{Data: JSNumberNegInf}
 
-// Deprecated: use object.ToValue() instead
 func NewValueFromObject(object ObjectType) Value {
 	return &ObjectValue{Object: object}
 }

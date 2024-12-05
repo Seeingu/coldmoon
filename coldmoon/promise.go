@@ -266,7 +266,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		promiseResolve := promiseResolveCompletion.Data()
 
-		iteratorRecordCompletion := GetIterator(agent, iterable, GetIteratorKindSync)
+		iteratorRecordCompletion := GetIterator(agent, iterable, IteratorKindSync)
 		if !IfAbruptRejectPromise(agent, iteratorRecordCompletion, promiseCapability) {
 			return UndefinedValue
 		}
@@ -293,7 +293,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		promiseResolve := promiseResolveCompletion.Data()
 
-		iteratorRecordCompletion := GetIterator(agent, iterable, GetIteratorKindSync)
+		iteratorRecordCompletion := GetIterator(agent, iterable, IteratorKindSync)
 		if !IfAbruptRejectPromise(agent, iteratorRecordCompletion, promiseCapability) {
 			return UndefinedValue
 		}
@@ -320,7 +320,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		promiseResolve := promiseResolveCompletion.Data()
 
-		iteratorRecordCompletion := GetIterator(agent, iterable, GetIteratorKindSync)
+		iteratorRecordCompletion := GetIterator(agent, iterable, IteratorKindSync)
 		if !IfAbruptRejectPromise(agent, iteratorRecordCompletion, promiseCapability) {
 			return UndefinedValue
 		}
@@ -347,7 +347,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		promiseResolve := promiseResolveCompletion.Data()
 
-		iteratorRecordCompletion := GetIterator(agent, iterable, GetIteratorKindSync)
+		iteratorRecordCompletion := GetIterator(agent, iterable, IteratorKindSync)
 		if !IfAbruptRejectPromise(agent, iteratorRecordCompletion, promiseCapability) {
 			return UndefinedValue
 		}

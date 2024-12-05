@@ -11,7 +11,7 @@ type MapObject struct {
 }
 
 func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, adder ObjectType) ObjectType {
-	iteratorRecord := GetIterator(agent, iterable, GetIteratorKindSync).Data()
+	iteratorRecord := GetIterator(agent, iterable, IteratorKindSync).Data()
 	for {
 		next := iteratorRecord.IteratorStep()
 		if next.(*BooleanObject).Data == false {
