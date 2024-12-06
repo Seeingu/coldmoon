@@ -6,25 +6,15 @@ type ArgumentsObject struct {
 }
 
 func (a *ArgumentsObject) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
-	return a.InternalMethods().DefineOwnProperty(a, key, desc)
+	return DefinePropertyOrThrow(a, key, desc)
 }
 
 func (a *ArgumentsObject) CreateDataProperty(key PropertyKey, value Value) bool {
-	newDesc := a.InternalMethods().DefineOwnProperty(a, key, &PropertyDescriptor{
-		Value:        value,
-		Writable:     true,
-		Enumerable:   true,
-		Configurable: true,
-	})
-	return newDesc
+	return CreateDataProperty(a, key, value)
 }
 
 func (a *ArgumentsObject) CreateDataPropertyOrThrow(key PropertyKey, value Value) bool {
-	success := a.CreateDataProperty(key, value)
-	if !success {
-		a.Agent().ThrowException(TypeError, "CreateDataPropertyOrThrow failed")
-	}
-	return success
+	return CreateDataPropertyOrThrow(a, key, value)
 }
 
 // 10.4.4.1
