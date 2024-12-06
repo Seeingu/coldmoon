@@ -28,7 +28,9 @@ const a = {
   enumerable: false,
   configurable: false
 };
+delete a.b;
 let b = 2;
+a.b = b;
 a.b;
 `
 	testSource(t, sourceText)

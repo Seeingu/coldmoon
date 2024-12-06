@@ -626,6 +626,7 @@ var keywordsMap = map[string]TokenType{
 	"enum":       TEnum,
 	"async":      TAsync,
 	"static":     TStatic,
+	"delete":     TDelete,
 }
 
 func (t *Tokenizer) keyword() (token Token, ok bool) {

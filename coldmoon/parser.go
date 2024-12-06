@@ -1260,10 +1260,7 @@ func (p *Parser) ifStatement() *StatementIf {
 
 func (p *Parser) expressionStatement() *StatementExpression {
 	expr := p.expression(p.acceptContextLowest())
-	t := p.tokenizer.CurrentToken
-	if t.Type == TSemicolon {
-		p.tokenizer.Next()
-	}
+	p.automaticSemicolonInsertion()
 	if expr == nil {
 		panic("expressionStatement: expected expression")
 	}

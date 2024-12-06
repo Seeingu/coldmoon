@@ -126,6 +126,7 @@ func CreateDataProperty(o ObjectType, key PropertyKey, value Value) bool {
 	})
 	return newDesc
 }
+
 func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 	return CreateDataProperty(o, key, value)
 }
@@ -167,6 +168,7 @@ func DefinePropertyOrThrow(o ObjectType, key PropertyKey, desc *PropertyDescript
 	}
 	return success
 }
+
 func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
 	return DefinePropertyOrThrow(o, key, desc)
 }
