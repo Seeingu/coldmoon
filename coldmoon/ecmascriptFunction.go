@@ -323,7 +323,7 @@ loop:
 			instantiatedVarNames[IdentifierName(paramBinding)] = true
 		}
 		for _, declaration := range varDeclarations {
-			varName := declaration.Identifier
+			varName := declaration.BindingIdentifier
 			if _, exists := instantiatedVarNames[varName]; !exists {
 				instantiatedVarNames[varName] = true
 				env.CreateMutableBinding(string(varName), false)
@@ -336,7 +336,7 @@ loop:
 		calleeContext.ECMAScriptCode.VariableEnvironment = varEnv
 		instantiatedVarNames := make(map[IdentifierName]bool)
 		for _, declaration := range varDeclarations {
-			varName := declaration.Identifier
+			varName := declaration.BindingIdentifier
 			if _, exists := instantiatedVarNames[varName]; !exists {
 				instantiatedVarNames[varName] = true
 				varEnv.CreateMutableBinding(string(varName), false)

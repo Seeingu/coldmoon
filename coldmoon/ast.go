@@ -2199,10 +2199,12 @@ func (v *VariableDeclarationList) String() string {
 	return sb
 }
 
+// VariableDeclaration [In] :
+// - BindingIdentifier Initializer[?In]
 type VariableDeclaration struct {
 	ASTNode
-	Identifier  IdentifierName
-	Initializer Expression
+	BindingIdentifier IdentifierName
+	Initializer       Expression
 }
 
 func (v *VariableDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
@@ -2212,7 +2214,7 @@ func (v *VariableDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IResolveBinding{
-		Name: v.Identifier,
+		Name: v.BindingIdentifier,
 	})
 	_ = c.containedInStrictCode
 	e.AddInstruction(InsPushReference)
@@ -2230,9 +2232,9 @@ func (v *VariableDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 
 func (v *VariableDeclaration) String() string {
 	if v.Initializer != nil {
-		return string(v.Identifier) + " = " + v.Initializer.String()
+		return string(v.BindingIdentifier) + " = " + v.Initializer.String()
 	}
-	return string(v.Identifier)
+	return string(v.BindingIdentifier)
 }
 
 // MARK: - BlockStatement
@@ -3961,8 +3963,8 @@ type LexicalBinding struct {
 
 func (l *LexicalBinding) Bytecode(e *Executable, c *BytecodeContext) {
 	variableDecl := &VariableDeclaration{
-		Identifier:  l.Identifier,
-		Initializer: l.Initializer,
+		BindingIdentifier: l.Identifier,
+		Initializer:       l.Initializer,
 	}
 	variableDecl.Bytecode(e, c)
 }
@@ -4170,8 +4172,8 @@ func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDec
 	case *DeclarationLexical:
 		for _, bindingItem := range d.BindingList.Items {
 			l = append(l, &VariableDeclaration{
-				Identifier:  bindingItem.Identifier,
-				Initializer: bindingItem.Initializer,
+				BindingIdentifier: bindingItem.Identifier,
+				Initializer:       bindingItem.Initializer,
 			})
 		}
 	default:

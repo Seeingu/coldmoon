@@ -2220,8 +2220,8 @@ func (p *Parser) variableDeclaration() *VariableDeclaration {
 		init = p.expression(p.acceptContext(TYield))
 	}
 	return &VariableDeclaration{
-		Identifier:  identifier,
-		Initializer: init,
+		BindingIdentifier: identifier,
+		Initializer:       init,
 	}
 }
 

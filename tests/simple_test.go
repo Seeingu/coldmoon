@@ -54,6 +54,8 @@ let b = a + 1;
 let c = a + b + b;
 'hello' + a + "world";
 c += a + b;
+a ? b : c;
+1 && 2 ? 3 :4;
 `
 	testSource(t, sourceText)
 

@@ -202,7 +202,7 @@ func (s *SourceTextModule) InitializeEnvironment() CompletionValue {
 	declaredVarNames := make(map[string]bool)
 
 	for _, varDeclaration := range varDeclarations {
-		varName := string(varDeclaration.Identifier)
+		varName := string(varDeclaration.BindingIdentifier)
 		if _, ok := declaredVarNames[varName]; !ok {
 			env.CreateMutableBinding(varName, false)
 			env.InitializeBinding(varName, UndefinedValue)

@@ -59,7 +59,7 @@ func (s *ScriptRecord) Evaluate() Value {
 	varScopedDeclarations := script.StatementList.VarScopedDeclarations()
 	seen := make(map[IdentifierName]bool)
 	for _, decl := range varScopedDeclarations {
-		varName := decl.Identifier
+		varName := decl.BindingIdentifier
 		if _, ok := seen[varName]; !ok {
 			globalEnv.CreateGlobalVarBinding(string(varName), true)
 			seen[varName] = true
