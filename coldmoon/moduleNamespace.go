@@ -2,14 +2,16 @@ package coldmoon
 
 import "github.com/samber/lo"
 
-type Exports []string
-type ModuleNamespace struct {
-	*Object
-	// [[Module]]
-	Module *ModuleRecord
-	// [[Exports]]
-	Exports Exports
-}
+type (
+	Exports         []string
+	ModuleNamespace struct {
+		*Object
+		// [[Module]]
+		Module *ModuleRecord
+		// [[Exports]]
+		Exports Exports
+	}
+)
 
 func ModuleNamespaceCreate(agent *Agent, module *ModuleRecord, exports []string) ObjectType {
 	Assert(module.SourceTextModule == nil)

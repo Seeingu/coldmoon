@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"fmt"
+
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
@@ -323,7 +324,6 @@ func InternalSet(object ObjectType, key PropertyKey, value Value, receiver Value
 func OrdinarySet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
 	ownDesc := object.InternalMethods().GetOwnProperty(object, key)
 	return OrdinarySetWithOwnDescriptor(object, key, value, receiver, ownDesc)
-
 }
 
 // 10.1.9.2
@@ -454,5 +454,4 @@ func GetPrototypeFromConstructor(constructor ObjectType, intrinsicDefaultProto s
 		realm := constructor.GetFunctionRealm()
 		return realm.Intrinsics.Get(intrinsicDefaultProto)
 	}
-
 }

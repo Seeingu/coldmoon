@@ -3,10 +3,11 @@ package coldmoon
 import "C"
 import (
 	"fmt"
-	"github.com/Seeingu/coldmoon/pkg"
 	"math/big"
 	"reflect"
 	"strconv"
+
+	"github.com/Seeingu/coldmoon/pkg"
 )
 
 type VM struct {
@@ -81,8 +82,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 
 		if !vm.referenceStack.IsEmpty() {
 			ref := vm.referenceStack.Peek()
-			refName, ok :=
-				ref.ReferencedName.(*ReferencedNameString)
+			refName, ok := ref.ReferencedName.(*ReferencedNameString)
 			if ref.IsPropertyReference() &&
 				ok &&
 				refName.String == "eval" &&
@@ -162,7 +162,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 				return
 			}
 		}
-		var value = vm.result
+		value := vm.result
 		if vm.reference != nil {
 			value = vm.reference.GetValue(agent)
 		}
@@ -1006,7 +1006,7 @@ func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, h
 		formalParameterList := &FormalParameters{}
 		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
-		var sourceText = ""
+		sourceText := ""
 		functionBody := &FunctionBody{
 			StatementList: StatementList{
 				&StatementListItemStatement{
@@ -1098,7 +1098,6 @@ func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *Primary
 		})
 		return closure
 	}
-
 }
 
 type methodDefinitionArgs struct {
@@ -1361,8 +1360,8 @@ func applyStringOrNumericBinaryOperator(
 	rhs Value,
 	op BinaryOperator,
 ) Value {
-	var finalLval = lhs
-	var finalRval = rhs
+	finalLval := lhs
+	finalRval := rhs
 	if op == BinaryOperatorAddition {
 		lprim := ToPrimitive(agent, lhs, PreferredTypeDefault)
 		rprim := ToPrimitive(agent, rhs, PreferredTypeDefault)

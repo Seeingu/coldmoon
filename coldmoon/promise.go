@@ -64,7 +64,6 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 		Resolve: MustGetObject(additionalFields.ResolvingFunctions.Resolve),
 		Reject:  MustGetObject(additionalFields.ResolvingFunctions.Reject),
 	}
-
 }
 
 // MARK: - PromiseReaction
@@ -145,7 +144,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 				OnFinally:   onFinally,
 				Constructor: C.Data(),
 			}
-			var thenFinallyClosure = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			thenFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
 				function := agent.ActiveFunctionObject()
 				_captures := function.(*BuiltinFunction).AdditionalFields.PromiseThenFinallyCaptures
 				onFinally := _captures.OnFinally
@@ -160,7 +159,8 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 				valueThunk := CreateBuiltinFunction(agent, returnValue, 0, "", builtinFunctionArgs{
 					additionalFields: &AdditionalFields{
 						Value: arguments[0],
-					}})
+					},
+				})
 				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{NewValueFromObject(valueThunk)})
 			}
 
@@ -171,7 +171,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 					},
 				}))
 
-			var catchFinallyClosure = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			catchFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
 				function := agent.ActiveFunctionObject()
 				_captures := function.(*BuiltinFunction).AdditionalFields.PromiseThenFinallyCaptures
 				onFinally := _captures.OnFinally
@@ -189,7 +189,8 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 				thrower := CreateBuiltinFunction(agent, throwReason, 0, "", builtinFunctionArgs{
 					additionalFields: &AdditionalFields{
 						Value: reason,
-					}})
+					},
+				})
 				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{NewValueFromObject(thrower)})
 			}
 			catchFinally = NewValueFromObject(
@@ -256,7 +257,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(PromiseResolve(agent, MustGetObject(C), resolution))
 	}
-	var race = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	race := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		iterable := arguments[0]
 		C := this
 		promiseCapability := NewPromiseCapability(agent, C)
@@ -283,7 +284,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return result.Data()
 	}
-	var all = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	all := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		iterable := arguments[0]
 		C := this
 		promiseCapability := NewPromiseCapability(agent, C)
@@ -310,7 +311,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return result.Data()
 	}
-	var allSettled = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	allSettled := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		iterable := arguments[0]
 		C := this
 		promiseCapability := NewPromiseCapability(agent, C)
@@ -337,7 +338,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return result.Data()
 	}
-	var promiseAny = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	promiseAny := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		iterable := arguments[0]
 		C := this
 		promiseCapability := NewPromiseCapability(agent, C)
@@ -363,7 +364,6 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 			}
 		}
 		return result.Data()
-
 	}
 	DefineBuiltinFunction(object, "reject", reject, 1, realm)
 	DefineBuiltinFunction(object, "resolve", resolve, 1, realm)
@@ -489,7 +489,6 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		Resolve: NewValueFromObject(resolve),
 		Reject:  NewValueFromObject(reject),
 	}
-
 }
 
 // 27.2.1.4
@@ -555,7 +554,7 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 		Argument: argument,
 	}
 
-	var fun = func(_captures interface{}) Value {
+	fun := func(_captures interface{}) Value {
 		captures := _captures.(*PromiseJobReactionCaptures)
 		agent := captures.Agent
 		reaction := captures.Reaction
@@ -706,7 +705,7 @@ func PerformPromiseAll(
 		values = append(values, nextValue)
 		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
 
-		var steps = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		steps := func(this Value, arguments []Value, newTarget ObjectType) Value {
 			F := agent.ActiveFunctionObject()
 			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
 			if additionalFields.alreadyCalled {
@@ -739,7 +738,6 @@ func PerformPromiseAll(
 		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
 		index++
 	}
-
 }
 
 func PerformPromiseAllSettled(
@@ -768,7 +766,7 @@ func PerformPromiseAllSettled(
 		values = append(values, nextValue)
 		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
 
-		var stepsFulfilled = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		stepsFulfilled := func(this Value, arguments []Value, newTarget ObjectType) Value {
 			F := agent.ActiveFunctionObject()
 			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
 			if additionalFields.alreadyCalled {
@@ -799,7 +797,7 @@ func PerformPromiseAllSettled(
 			},
 		})
 
-		var stepsReject = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		stepsReject := func(this Value, arguments []Value, newTarget ObjectType) Value {
 			F := agent.ActiveFunctionObject()
 			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
 			if additionalFields.alreadyCalled {
@@ -868,7 +866,7 @@ func PerformPromiseAny(
 		errors = append(errors, UndefinedValue)
 		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
 
-		var stepsRejected = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		stepsRejected := func(this Value, arguments []Value, newTarget ObjectType) Value {
 			F := agent.ActiveFunctionObject()
 			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
 			if additionalFields.alreadyCalled {
@@ -916,7 +914,7 @@ func NewPromiseResolveThenableJob(agent *Agent, promise *PromiseObject, thenable
 		Thenable:         thenable,
 		ThenJobCallback:  thenJobCallback,
 	}
-	var fun = func(_captures interface{}) Value {
+	fun := func(_captures interface{}) Value {
 		captures := _captures.(*PromiseJobThenableReactionCaptures)
 		agent := captures.Agent
 		promiseToResolve := captures.PromiseToResolve

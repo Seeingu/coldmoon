@@ -43,9 +43,11 @@ func (m *ModuleEnvironment) GetBindingValue(agent *Agent, name string, strict bo
 func (m *ModuleEnvironment) DeleteBinding(name string) bool {
 	panic("unreachable")
 }
+
 func (m *ModuleEnvironment) HasThisBinding() bool {
 	return false
 }
+
 func (m *ModuleEnvironment) GetThisBinding() Value {
 	return UndefinedValue
 }

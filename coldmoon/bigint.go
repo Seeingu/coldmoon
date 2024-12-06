@@ -198,7 +198,7 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
 
-	var toString = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toString := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		radix := arguments[0]
 
 		x := thisBigIntValue(this)
@@ -216,10 +216,10 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 
 		return NewStringValue(x.String())
 	}
-	var valueOf = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	valueOf := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return thisBigIntValue(this)
 	}
-	var toLocaleString = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toLocaleString := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return toString(thisBigIntValue(this), nil, nil)
 	}
 

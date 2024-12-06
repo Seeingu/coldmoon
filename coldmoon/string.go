@@ -1,9 +1,10 @@
 package coldmoon
 
 import (
-	"github.com/samber/lo"
 	"sort"
 	"strings"
+
+	"github.com/samber/lo"
 )
 
 type StringObject struct {
@@ -53,7 +54,7 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 		return OrdinaryDefineOwnProperty(o, p, desc)
 	}
 	// 10.4.3.3
-	var ownPropertyKeys = func(o ObjectType) []PropertyKey {
+	ownPropertyKeys := func(o ObjectType) []PropertyKey {
 		propertiesMap := o.PropertyStorage().Properties
 		str := o.(*StringObject).Data
 		length := JSInt(len(str))
@@ -62,24 +63,23 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 			keys[i] = NewIntegerIndexPropertyKey(i)
 		}
 
-		keysGreaterThanLength :=
-			lo.Filter(lo.Keys(propertiesMap), func(pk PropertyKey, index int) bool {
-				if index, ok := pk.(IntegerIndexPropertyKey); ok {
-					return index.Value >= length
-				}
-				return false
-			})
+		keysGreaterThanLength := lo.Filter(lo.Keys(propertiesMap), func(pk PropertyKey, index int) bool {
+			if index, ok := pk.(IntegerIndexPropertyKey); ok {
+				return index.Value >= length
+			}
+			return false
+		})
 		sort.Slice(keysGreaterThanLength, func(i, j int) bool {
 			return keysGreaterThanLength[i].(IntegerIndexPropertyKey).Value < keysGreaterThanLength[j].(IntegerIndexPropertyKey).Value
 		})
 		copy(keys[length:], keysGreaterThanLength)
 
-		for pk, _ := range propertiesMap {
+		for pk := range propertiesMap {
 			if _, ok := pk.(StringPropertyKey); ok {
 				keys = append(keys, pk)
 			}
 		}
-		for pk, _ := range propertiesMap {
+		for pk := range propertiesMap {
 			if _, ok := pk.(SymbolPropertyKey); ok {
 				keys = append(keys, pk)
 			}
@@ -179,25 +179,25 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return NewStringValue(thisStringValue(agent, thisArgument))
 	}
-	var toLowerCase = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	toLowerCase := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		s := thisStringValue(agent, this)
 		return NewStringValue(strings.ToLower(s))
 	}
-	var toUpperCase = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	toUpperCase := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		s := thisStringValue(agent, this)
 		return NewStringValue(strings.ToUpper(s))
 	}
-	var trim = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	trim := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		s := thisStringValue(agent, this)
 		return NewStringValue(strings.TrimSpace(s))
 	}
-	var trimEnd = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	trimEnd := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		s := thisStringValue(agent, this)
 		return NewStringValue(strings.TrimRightFunc(s, func(r rune) bool {
 			return strings.ContainsRune(" \t\n\v\f\r", r)
 		}))
 	}
-	var trimStart = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	trimStart := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		s := thisStringValue(agent, this)
 		return NewStringValue(strings.TrimLeftFunc(s, func(r rune) bool {
 			return strings.ContainsRune(" \t\n\v\f\r", r)
@@ -328,7 +328,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		rx := RegExpCreate(agent, regexp, UndefinedValue)
 		return ValueInvoke(agent, rx.Data().ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatchAll]), []Value{s})
 	}
-	var indexOf = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	indexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		searchString := argumentsList[0]
 		position := ToIntegerOrInfinity(agent, argumentsList[1])
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -339,7 +339,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		start := lo.Clamp(pos, 0, length)
 		return NewNumberValue(JSNumber(StringIndexOf(s, searchStr.Data, start)))
 	}
-	var lastIndexOf = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	lastIndexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		searchString := argumentsList[0]
 		position := ToIntegerOrInfinity(agent, argumentsList[1])
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -353,7 +353,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewNumberValue(JSNumber(strings.LastIndex(s[start:], searchStr)))
 	}
-	var startsWith = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	startsWith := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		searchString := argumentsList[0]
 		var position Value
 		if len(argumentsList) > 1 {
@@ -393,7 +393,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 		return FalseValue
 	}
-	var endsWith = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	endsWith := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		searchString := argumentsList[0]
 		var position Value
 		if len(argumentsList) > 1 {
@@ -483,7 +483,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewNumberValue(JSNumber(s.Data[int(position)]))
 	}
-	var substring = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	substring := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		start := ToIntegerOrInfinity(agent, argumentsList[0])
 		end := ToIntegerOrInfinity(agent, argumentsList[1])
 		o := RequireObjectCoercible(agent, this)

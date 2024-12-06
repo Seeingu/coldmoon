@@ -1,8 +1,9 @@
 package coldmoon
 
 import (
-	"github.com/dlclark/regexp2"
 	"strings"
+
+	"github.com/dlclark/regexp2"
 )
 
 type RegExpObject struct {
@@ -27,31 +28,31 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
 
-	var dotAll = func(this Value, arguments []Value, _ ObjectType) Value {
+	dotAll := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "s").Data()
 	}
-	var global = func(this Value, arguments []Value, _ ObjectType) Value {
+	global := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "g").Data()
 	}
-	var hasIndices = func(this Value, arguments []Value, _ ObjectType) Value {
+	hasIndices := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "d").Data()
 	}
-	var ignoreCase = func(this Value, arguments []Value, _ ObjectType) Value {
+	ignoreCase := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "i").Data()
 	}
-	var multiline = func(this Value, arguments []Value, _ ObjectType) Value {
+	multiline := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "m").Data()
 	}
-	var sticky = func(this Value, arguments []Value, _ ObjectType) Value {
+	sticky := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "y").Data()
 	}
-	var unicode = func(this Value, arguments []Value, _ ObjectType) Value {
+	unicode := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "u").Data()
 	}
-	var unicodeSets = func(this Value, arguments []Value, _ ObjectType) Value {
+	unicodeSets := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "v").Data()
 	}
-	var flags = func(this Value, arguments []Value, _ ObjectType) Value {
+	flags := func(this Value, arguments []Value, _ ObjectType) Value {
 		if !ValueIsObject(this) {
 			return agent.ThrowException(TypeError, "RegExp.prototype.flags: 'this' is not an object")
 		}
@@ -86,7 +87,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return NewStringValue(f)
 	}
-	var source = func(this Value, arguments []Value, _ ObjectType) Value {
+	source := func(this Value, arguments []Value, _ ObjectType) Value {
 		if !ValueIsObject(this) {
 			return agent.ThrowException(TypeError, "RegExp.prototype.source: 'this' is not an object")
 		}
@@ -98,7 +99,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		_flags := r.OriginalFlags
 		return NewStringValue(EscapeRegExpPattern(src, _flags))
 	}
-	var toString = func(this Value, arguments []Value, _ ObjectType) Value {
+	toString := func(this Value, arguments []Value, _ ObjectType) Value {
 		if !ValueIsObject(this) {
 			return agent.ThrowException(TypeError, "RegExp.prototype.toString: 'this' is not an object")
 		}
@@ -110,7 +111,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
 		return NewStringValue("/" + EscapeRegExpPattern(src.String(), _flags.String()) + "/")
 	}
-	var exec = func(this Value, arguments []Value, _ ObjectType) Value {
+	exec := func(this Value, arguments []Value, _ ObjectType) Value {
 		if !ValueIsObject(this) {
 			return agent.ThrowException(TypeError, "RegExp.prototype.exec: 'this' is not an object")
 		}
@@ -128,7 +129,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 			return result.Data().ToValue()
 		}
 	}
-	var test = func(this Value, arguments []Value, _ ObjectType) Value {
+	test := func(this Value, arguments []Value, _ ObjectType) Value {
 		if !ValueIsObject(this) {
 			return agent.ThrowException(TypeError, "RegExp.prototype.test: 'this' is not an object")
 		}
@@ -143,7 +144,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return TrueValue
 	}
-	var search = func(this Value, arguments []Value, _ ObjectType) Value {
+	search := func(this Value, arguments []Value, _ ObjectType) Value {
 		rx := this
 		if !ValueIsObject(rx) {
 			panic("TypeError")
@@ -164,7 +165,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return result.Data().Get(NewStringPropertyKey("index"))
 	}
-	var matchAll = func(this Value, arguments []Value, _ ObjectType) Value {
+	matchAll := func(this Value, arguments []Value, _ ObjectType) Value {
 		if !ValueIsObject(this) {
 			panic("TypeError")
 		}
@@ -247,7 +248,6 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 		return NewValueFromObject(
 			RegExpInitialize(agent, o, p, f).Data(),
 		)
-
 	}
 	object := CreateBuiltinFunction(agent, behavior, 2, "RegExp", builtinFunctionArgs{
 		realm:         realm,
@@ -255,7 +255,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 		prototype:     realm.Intrinsics.FunctionPrototype,
 	})
 
-	var getter = func(this Value, arguments []Value, _ ObjectType) Value {
+	getter := func(this Value, arguments []Value, _ ObjectType) Value {
 		return this
 	}
 

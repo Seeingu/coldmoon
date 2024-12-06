@@ -1,10 +1,11 @@
 package tests
 
 import (
-	. "github.com/Seeingu/coldmoon/coldmoon"
 	"os"
 	"path"
 	"testing"
+
+	. "github.com/Seeingu/coldmoon/coldmoon"
 )
 
 func makeTest262Path(p string) string {
@@ -74,7 +75,6 @@ func testArray(realm *Realm) {
 		println("Testing file: ", entry.Name())
 		ParseScript(mustReadFile(f), realm, nil).Evaluate()
 	}
-
 }
 
 func TestHarness(t *testing.T) {
@@ -94,10 +94,10 @@ func TestHarness(t *testing.T) {
 		runTestHarness(realm, f, false)
 	}
 
-	//testDataView(realm)
+	// testDataView(realm)
 	testBigInt64Array(realm)
 
 	Debug.Enable()
-	//testArray(realm)
+	// testArray(realm)
 	Debug.Disable()
 }

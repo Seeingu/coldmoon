@@ -1,11 +1,12 @@
 package coldmoon
 
 import (
-	"github.com/Seeingu/coldmoon/pkg"
-	"github.com/samber/lo"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/Seeingu/coldmoon/pkg"
+	"github.com/samber/lo"
 )
 
 type ArrayObject struct {
@@ -22,7 +23,7 @@ func getArrayLength(array ObjectType) JSInt {
 func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) ObjectType {
 	realm := agent.CurrentRealm()
 	// 10.4.2.1
-	var defineOwnProperty = func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
+	defineOwnProperty := func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
 		propertyKeyString, ok := p.(StringPropertyKey)
 		if ok && propertyKeyString.Value == "length" {
 			return ArraySetLength(agent, array, desc)
@@ -150,7 +151,7 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 		return false
 	}
 
-	var newWritable = false
+	newWritable := false
 	// TODO: nil
 	if newLenDesc.Writable {
 		newWritable = true
@@ -324,7 +325,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		array := MustGetObject(this)
 		length := array.LengthOfArrayLike()
-		var sep = ","
+		sep := ","
 		if len(args) > 0 {
 			sep = args[0].String()
 		}

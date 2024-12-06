@@ -180,6 +180,7 @@ func (t *Tokenizer) store() {
 func (t *Tokenizer) popCachedState() {
 	t.cachedStates.Pop()
 }
+
 func (t *Tokenizer) restore() {
 	if t.cachedStates.IsEmpty() {
 		panic("no cached state")
@@ -436,7 +437,6 @@ func (t *Tokenizer) peek() Token {
 		}
 	}
 	panic("unhandled token: " + string(ch))
-
 }
 
 func (t *Tokenizer) templateMiddleOrTail() Token {
@@ -560,8 +560,10 @@ func (t *Tokenizer) number() Token {
 }
 
 // MARK: - Identifier, Keyword
-var identifierStartCharset = append(lo.LettersCharset, []rune{'$', '_'}...)
-var identifierCharset = append(identifierStartCharset, lo.NumbersCharset...)
+var (
+	identifierStartCharset = append(lo.LettersCharset, []rune{'$', '_'}...)
+	identifierCharset      = append(identifierStartCharset, lo.NumbersCharset...)
+)
 
 func (t *Tokenizer) identifierOrKeyword() Token {
 	start := t.Index
@@ -635,8 +637,8 @@ func (t *Tokenizer) keyword() (token Token, ok bool) {
 		}
 	}
 	return
-
 }
+
 func (t *Tokenizer) matchString(s string) bool {
 	endIndex := t.Index + len(s)
 	if endIndex > t.Length {
@@ -722,8 +724,10 @@ func (t *Tokenizer) MustMatch(tokenType TokenType) {
 }
 
 // 12.3
-var lineTerminators = []rune{'\n', '\r', '\u2028', '\u2029'}
-var whitespace = []rune{' ', '\t', '\v', '\f', '\u00A0', '\uFEFF', '\u1680', '\u180E', '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005', '\u2006', '\u2007', '\u2008', '\u2009', '\u200A', '\u202F', '\u205F', '\u3000', '\u200B', '\u200C', '\u200D', '\u2060', '\uFEFF'}
+var (
+	lineTerminators = []rune{'\n', '\r', '\u2028', '\u2029'}
+	whitespace      = []rune{' ', '\t', '\v', '\f', '\u00A0', '\uFEFF', '\u1680', '\u180E', '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005', '\u2006', '\u2007', '\u2008', '\u2009', '\u200A', '\u202F', '\u205F', '\u3000', '\u200B', '\u200C', '\u200D', '\u2060', '\uFEFF'}
+)
 
 func (t *Tokenizer) skipWhiteSpace() {
 	for t.Index < t.Length {

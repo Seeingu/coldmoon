@@ -140,7 +140,8 @@ func SetValueInBuffer(
 	size JSInt,
 	isTypedArray bool,
 	order MemoryOrder,
-	isLittleEndian bool) {
+	isLittleEndian bool,
+) {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	Assert(byteIndex+size <= arrayBuffer.ArrayBufferByteLength)
 	block := arrayBuffer.ArrayBufferData
@@ -216,7 +217,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 
 		return FalseValue
 	}
-	var byteLength = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	byteLength := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*ArrayBufferObject](this)
 		if IsDetachedBuffer(o) {
 			return NewNumberValue(0)
@@ -224,7 +225,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		length := o.ArrayBufferByteLength
 		return NewNumberValue(length.ToNumber())
 	}
-	var slice = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	slice := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		start := arguments[0]
 		end := arguments[1]
 		o := RequireInternalSlot[*ArrayBufferObject](this)
@@ -277,7 +278,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		}
 		return NewValueFromObject(_new)
 	}
-	var maxByteLength = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	maxByteLength := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*ArrayBufferObject](this)
 		if IsDetachedBuffer(o) {
 			return NewNumberValue(0)
@@ -290,11 +291,11 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(length.ToNumber())
 	}
-	var resizable = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	resizable := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*ArrayBufferObject](this)
 		return NewBooleanValue(IsFixedLengthArrayBuffer(o))
 	}
-	var resize = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	resize := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		newByteLength := ToIndex(agent, arguments[0])
 		o := RequireInternalSlot[*ArrayBufferObject](this)
 		if o.ArrayBufferMaxByteLength == 0 {

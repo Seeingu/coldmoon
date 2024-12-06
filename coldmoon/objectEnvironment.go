@@ -47,7 +47,6 @@ func (o *ObjectEnvironment) CreateMutableBinding(name string, deletable bool) {
 		Enumerable:   true,
 		Configurable: deletable,
 	})
-
 }
 
 // 9.1.1.2.4
@@ -63,12 +62,11 @@ func (o *ObjectEnvironment) SetMutableBinding(name string, value Value, strict b
 		panic("ReferenceError")
 	}
 
-	var throw = setThrowTypeIgnore
+	throw := setThrowTypeIgnore
 	if strict {
 		throw = setThrowTypeThrow
 	}
 	bindingObject.Set(NewStringPropertyKey(name), value, throw)
-
 }
 
 // 9.1.1.2.6

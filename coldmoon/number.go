@@ -16,12 +16,15 @@ func (n JSNumber) ToInt() JSInt {
 func (n JSNumber) IsNegInf() bool {
 	return n == JSNumber(math.Inf(-1))
 }
+
 func (n JSNumber) IsPositiveInf() bool {
 	return n == JSNumber(math.Inf(1))
 }
+
 func (n JSNumber) IsInf() bool {
 	return n == JSNumber(math.Inf(0))
 }
+
 func (n JSNumber) IsNaN() bool {
 	return math.IsNaN(float64(n))
 }
@@ -41,13 +44,16 @@ func (n JSNumber) ToFloat() float64 {
 func (n JSNumber) Mod(b JSNumber) JSNumber {
 	return JSNumber(math.Mod(float64(n), float64(b)))
 }
+
 func (n JSNumber) Floor() JSNumber {
 	return JSNumber(math.Floor(float64(n)))
 }
 
-var JSNumberInf = JSNumber(math.Inf(1))
-var JSNumberNegInf = JSNumber(math.Inf(-1))
-var JSNumberNaN = JSNumber(math.NaN())
+var (
+	JSNumberInf    = JSNumber(math.Inf(1))
+	JSNumberNegInf = JSNumber(math.Inf(-1))
+	JSNumberNaN    = JSNumber(math.NaN())
+)
 
 // MARK: - NumberValue
 
@@ -89,7 +95,6 @@ func (n *NumberValue) ToString(radix JSInt) string {
 		return "0"
 	}
 	return strconv.FormatFloat(n.Data.ToFloat(), 'f', -1, 64)
-
 }
 
 func (n *NumberValue) ToBoolean() bool {
@@ -372,7 +377,6 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 			Data:   JSNumber(n.Data),
 		}
 		return NewValueFromObject(numberObject)
-
 	}
 	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "Number", builtinFunctionArgs{
 		realm:     realm,

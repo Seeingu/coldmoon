@@ -183,16 +183,16 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 func NewSymbolPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
 
-	var toString = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toString := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		symbol := thisSymbolValue(this)
 
 		return NewStringValue(symbol.SymbolDescriptiveString())
 	}
-	var valueOf = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	valueOf := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		symbol := thisSymbolValue(this)
 		return symbol
 	}
-	var toPrimitive = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toPrimitive := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return this
 	}
 

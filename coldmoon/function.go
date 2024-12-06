@@ -1,8 +1,9 @@
 package coldmoon
 
 import (
-	"github.com/samber/lo"
 	"math"
+
+	"github.com/samber/lo"
 )
 
 func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
@@ -26,7 +27,7 @@ func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
 func initFunctionMethods(f ObjectType, realm *Realm) {
 	agent := realm.Agent
 	// 20.2.3.5 toString
-	var toString = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	toString := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		o, ok := this.(*ObjectValue)
 		if ok {
 			ecmascriptFunction, ok := o.Object.(*ECMAScriptFunction)
@@ -50,7 +51,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 	DefineBuiltinFunction(f, "toString", toString, 0, realm)
 
 	// 20.2.3.3
-	var call = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	call := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		if len(argumentsList) == 0 {
 			panic("")
 		}
@@ -62,7 +63,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		}
 		return fun.CallAssumeCallable(thisArg, args)
 	}
-	var bind = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	bind := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		thisArg := argumentsList[0]
 		args := argumentsList[1:]
 		target := this
@@ -101,7 +102,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 	DefineBuiltinFunction(f, "call", call, 1, realm)
 	DefineBuiltinFunction(f, "bind", bind, 1, realm)
 
-	var apply = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	apply := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		thisArg := argumentsList[0]
 		argArray := argumentsList[1]
 		fun := this
@@ -145,7 +146,7 @@ func CreateDynamicFunction(
 	currentRealm := realm
 	agent.HostHooks.HostEnsureCanCompileStrings(currentRealm)
 
-	var newTarget = _newTarget
+	newTarget := _newTarget
 	if _newTarget == nil {
 		newTarget = constructor
 	}

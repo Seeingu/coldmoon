@@ -143,7 +143,6 @@ func ToString(agent *Agent, v Value) *StringValue {
 		Assert(!ValueIsObject(primValue))
 		return ToString(agent, primValue)
 	}
-
 }
 
 // 19.2.5
@@ -257,6 +256,7 @@ func NewEncodeURI(realm *Realm) ObjectType {
 		realm: realm,
 	})
 }
+
 func NewEncodeURIComponent(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var encodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {

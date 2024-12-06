@@ -18,7 +18,6 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 				parameterArgs,
 				bodyArg,
 			))
-
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "GeneratorFunction", builtinFunctionArgs{
 		realm:     realm,

@@ -6,8 +6,7 @@ type ModuleRecord struct {
 	*SourceTextModule
 }
 
-type GraphLoadingState struct {
-}
+type GraphLoadingState struct{}
 
 // ImportedModuleReferrer Enum
 type ImportedModuleReferrer struct {
@@ -84,7 +83,8 @@ func FinishLoadingImportedModule(
 	referrer ImportedModuleReferrer,
 	specifier string,
 	payload ImportedModulePayload,
-	result CompletionModule) {
+	result CompletionModule,
+) {
 	if result.Type == CompletionTypeNormal {
 		module := result.Data()
 		if referrer.Script != nil {
@@ -101,5 +101,4 @@ func FinishLoadingImportedModule(
 	} else {
 		panic("unreachable")
 	}
-
 }

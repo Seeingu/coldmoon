@@ -54,7 +54,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 				r := iterator.RemainingKeys[0]
 				iterator.RemainingKeys = iterator.RemainingKeys[1:]
 				if _, ok := iterator.VisitedKeys[r]; !ok {
-					//Let desc be ? object.[[GetOwnProperty]](r).
+					// Let desc be ? object.[[GetOwnProperty]](r).
 					desc := obj.InternalMethods().GetOwnProperty(obj, r)
 					if desc != nil {
 						iterator.VisitedKeys[r] = true

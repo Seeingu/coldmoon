@@ -11,6 +11,7 @@ func printObject(object ObjectType) string {
 	}
 	return "object"
 }
+
 func printValue(v Value) string {
 	switch vv := v.(type) {
 	case *undefinedValue, *nullValue:
@@ -24,6 +25,7 @@ func printValue(v Value) string {
 	}
 	return "value"
 }
+
 func GenerateAndRunBytecode(agent *Agent, node ASTNode) CompletionValue {
 	vm := NewVM(agent)
 	exe := NewExecutable()

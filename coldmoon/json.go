@@ -2,10 +2,11 @@ package coldmoon
 
 import (
 	"encoding/json"
-	"github.com/Seeingu/coldmoon/pkg"
-	"github.com/samber/lo"
 	"strconv"
 	"strings"
+
+	"github.com/Seeingu/coldmoon/pkg"
+	"github.com/samber/lo"
 )
 
 type JSONSerializationRecord struct {
@@ -97,7 +98,7 @@ func NewJSON(realm *Realm) *JSON {
 			return unfiltered
 		}
 	}
-	var stringify = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	stringify := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		value := argumentsList[0]
 		var replacer Value = UndefinedValue
 		var space Value = UndefinedValue

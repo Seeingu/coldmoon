@@ -520,8 +520,10 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	return object
 }
 
-const MS_PER_DAY = JSNumber(86400000)
-const MS_PER_MIN = JSNumber(60000)
+const (
+	MS_PER_DAY = JSNumber(86400000)
+	MS_PER_MIN = JSNumber(60000)
+)
 
 // 21.4.1.3
 func Day(t JSNumber) JSNumber {
@@ -783,7 +785,6 @@ func NewDateConstructor(realm *Realm) ObjectType {
 				if date, ok := o.(*DateObject); ok {
 					tv = date.Data
 				} else {
-
 				}
 			} else {
 				v := ToPrimitive(agent, value, PreferredTypeNumber)
@@ -911,10 +912,12 @@ func DateString(t JSNumber) string {
 	// TODO
 	return ""
 }
+
 func TimeString(t JSNumber) string {
 	// TODO
 	return ""
 }
+
 func TimeZoneString(tv JSNumber) string {
 	// TODO
 	return ""

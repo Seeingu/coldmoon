@@ -1,8 +1,9 @@
 package coldmoon
 
 import (
-	"github.com/Seeingu/coldmoon/pkg"
 	"strconv"
+
+	"github.com/Seeingu/coldmoon/pkg"
 )
 
 type boundName interface {
@@ -68,9 +69,11 @@ func (p *PrimaryExpressionClassExpression) _primaryExpression() {}
 func (p *PrimaryExpressionClassExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (p *PrimaryExpressionClassExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IClassDefinitionEvaluation{ClassExpression: p})
 }
+
 func (p *PrimaryExpressionClassExpression) String() string {
 	return "ClassExpression"
 }
@@ -87,14 +90,17 @@ func (p *PrimaryExpressionRegularExpressionLiteral) _primaryExpression() {}
 func (p *PrimaryExpressionRegularExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (p *PrimaryExpressionRegularExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: NewStringValue(p.Pattern)})
 	e.AddInstruction(&ILoadConstant{Value: NewStringValue(p.Flags)})
 	e.AddInstruction(&IRegExpCreate{})
 }
+
 func (p *PrimaryExpressionRegularExpressionLiteral) String() string {
 	return "/" + p.Pattern + "/" + p.Flags
 }
+
 func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLiteral() bool {
 	// TODO
 	return true
@@ -102,12 +108,14 @@ func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLite
 
 // MARK: - IdentifierReference
 
-type IdentifierName string
-type PrivateIdentifierName string
-type PrimaryExpressionIdentifierReference struct {
-	PrimaryExpression
-	Identifier IdentifierName
-}
+type (
+	IdentifierName                       string
+	PrivateIdentifierName                string
+	PrimaryExpressionIdentifierReference struct {
+		PrimaryExpression
+		Identifier IdentifierName
+	}
+)
 
 func (p *PrimaryExpressionIdentifierReference) _primaryExpression() {}
 func (p *PrimaryExpressionIdentifierReference) AssignmentTargetType() AssignmentTargetType {
@@ -117,6 +125,7 @@ func (p *PrimaryExpressionIdentifierReference) AssignmentTargetType() Assignment
 func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IResolveBinding{Name: p.Identifier, Strict: c.containedInStrictCode})
 }
+
 func (p *PrimaryExpressionIdentifierReference) String() string {
 	return string(p.Identifier)
 }
@@ -136,6 +145,7 @@ func (p *PrimaryExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
 func (p *PrimaryExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
 	p.Literal.Bytecode(e, c)
 }
+
 func (p *PrimaryExpressionLiteral) String() string {
 	return p.Literal.String()
 }
@@ -154,11 +164,13 @@ func (p *PrimaryExpressionAsyncFunctionExpression) _primaryExpression() {}
 func (p *PrimaryExpressionAsyncFunctionExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (p *PrimaryExpressionAsyncFunctionExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
 	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateAsyncFunctionExpression{FunctionExpression: p})
 }
+
 func (p *PrimaryExpressionAsyncFunctionExpression) String() string {
 	return "AsyncFunctionExpression"
 }
@@ -202,11 +214,13 @@ func (p *PrimaryExpressionAsyncGeneratorExpression) _primaryExpression() {}
 func (p *PrimaryExpressionAsyncGeneratorExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (p *PrimaryExpressionAsyncGeneratorExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
 	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateAsyncGeneratorFunctionExpression{FunctionExpression: p})
 }
+
 func (p *PrimaryExpressionAsyncGeneratorExpression) String() string {
 	return "AsyncGeneratorExpression"
 }
@@ -225,6 +239,7 @@ func (p *PrimaryExpressionThis) AssignmentTargetType() AssignmentTargetType {
 func (p *PrimaryExpressionThis) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IResolveThisBinding{})
 }
+
 func (p *PrimaryExpressionThis) String() string {
 	return "this"
 }
@@ -260,8 +275,7 @@ func (p *PrimaryExpressionParenthesizedExpression) String() string {
 
 // MARK: - ArrayLiteral
 
-type ArrayElement interface {
-}
+type ArrayElement interface{}
 type ArrayElementElision struct {
 	ArrayElement
 }
@@ -400,6 +414,7 @@ func (p *PropertyDefinitionIdentifierReference) Bytecode(e *Executable, c *Bytec
 	e.AddInstruction(&IObjectSetProperty{})
 	e.AddInstruction(InsLoad)
 }
+
 func (p *PropertyDefinitionIdentifierReference) String() string {
 	return p.IdentifierReference.String()
 }
@@ -440,6 +455,7 @@ func (p *PropertyDefinitionSpread) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IObjectSpreadValue{})
 }
+
 func (p *PropertyDefinitionSpread) String() string {
 	return "..." + p.Spread.String()
 }
@@ -513,6 +529,7 @@ func (p *PropertyNameLiteralIdentifier) LiteralString() string {
 func (p *PropertyNameLiteralIdentifier) String() string {
 	return string(p.Identifier)
 }
+
 func (p *PropertyNameLiteralIdentifier) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: NewStringValue(string(p.Identifier))})
 }
@@ -525,6 +542,7 @@ type PropertyNameLiteralString struct {
 func (p *PropertyNameLiteralString) LiteralString() string {
 	return p.StringLiteral.Value
 }
+
 func (p *PropertyNameLiteralString) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: p.StringLiteral.StringValue()})
 }
@@ -545,6 +563,7 @@ func (p *PropertyNameLiteralNumeric) Bytecode(e *Executable, c *BytecodeContext)
 func (p *PropertyNameLiteralNumeric) String() string {
 	return p.NumericLiteral.String()
 }
+
 func (p *PropertyNameLiteralNumeric) LiteralString() string {
 	return p.NumericLiteral.Value
 }
@@ -557,6 +576,7 @@ type PropertyNameComputed struct {
 func (p *PropertyNameComputed) String() string {
 	return p.Expression.String()
 }
+
 func (p *PropertyNameComputed) Bytecode(e *Executable, c *BytecodeContext) {
 	p.Expression.Bytecode(e, c)
 	if ExpressionAnalyze(p.Expression, AnalyzeQueryIsReference) {
@@ -599,11 +619,13 @@ type PrimaryExpressionAsyncArrowFunction struct {
 func (p *PrimaryExpressionAsyncArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (p *PrimaryExpressionAsyncArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
 	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateAsyncArrowFunctionExpression{FunctionExpression: p})
 }
+
 func (p *PrimaryExpressionAsyncArrowFunction) String() string {
 	return "AsyncArrowFunction"
 }
@@ -738,6 +760,7 @@ var _ Literal = (*LiteralUndefined)(nil)
 func (l *LiteralUndefined) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 }
+
 func (l *LiteralUndefined) String() string {
 	return "undefined"
 }
@@ -894,6 +917,7 @@ func (i *ExpressionImportCall) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IImportCall{})
 }
+
 func (i *ExpressionImportCall) String() string {
 	return "import(" + i.Expression.String() + ")"
 }
@@ -909,6 +933,7 @@ type OptionalExpression struct {
 func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (o *OptionalExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	o.Expr.Bytecode(e, c)
 	if o.Property.Arguments != nil {
@@ -971,6 +996,7 @@ func (o *OptionalExpression) Bytecode(e *Executable, c *BytecodeContext) {
 
 	endJump.Target = len(e.Instructions) - 1
 }
+
 func (o *OptionalExpression) String() string {
 	return o.Expr.String() + "?." + o.Property.String()
 }
@@ -1005,9 +1031,11 @@ type MetaPropertyNewTarget struct {
 func (m *MetaPropertyNewTarget) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (m *MetaPropertyNewTarget) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsGetNewTarget)
 }
+
 func (m *MetaPropertyNewTarget) String() string {
 	return "new.target"
 }
@@ -1019,9 +1047,11 @@ type MetaPropertyImportMeta struct {
 func (m *MetaPropertyImportMeta) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (m *MetaPropertyImportMeta) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IGetOrCreateImportMeta{})
 }
+
 func (m *MetaPropertyImportMeta) String() string {
 	return "import.meta"
 }
@@ -1043,6 +1073,7 @@ func (s *SuperPropertyExpression) _superProperty() {}
 func (s *SuperPropertyExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
 }
+
 func (s *SuperPropertyExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsLoadThisValueSuper)
 	s.Expression.Bytecode(e, c)
@@ -1056,6 +1087,7 @@ func (s *SuperPropertyExpression) Bytecode(e *Executable, c *BytecodeContext) {
 		Strict: strict,
 	})
 }
+
 func (s *SuperPropertyExpression) String() string {
 	return "super." + s.Expression.String()
 }
@@ -1069,6 +1101,7 @@ func (s *SuperPropertyIdentifier) _superProperty() {}
 func (s *SuperPropertyIdentifier) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
 }
+
 func (s *SuperPropertyIdentifier) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsLoadThisValueSuper)
 	e.AddInstruction(&ILoadConstant{
@@ -1079,6 +1112,7 @@ func (s *SuperPropertyIdentifier) Bytecode(e *Executable, c *BytecodeContext) {
 		Strict: strict,
 	})
 }
+
 func (s *SuperPropertyIdentifier) String() string {
 	return "super." + string(s.IdentifierName)
 }
@@ -1093,6 +1127,7 @@ type ExpressionSuperCall struct {
 func (e *ExpressionSuperCall) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
+
 func (e *ExpressionSuperCall) Bytecode(ex *Executable, c *BytecodeContext) {
 	e.Arguments.Bytecode(ex, c)
 	ex.AddInstruction(&IEvaluateSuperCall{
@@ -1220,6 +1255,7 @@ type ExpressionUpdate struct {
 func (e *ExpressionUpdate) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
 }
+
 func (e *ExpressionUpdate) Bytecode(ex *Executable, c *BytecodeContext) {
 	e.Operand.Bytecode(ex, c)
 	ex.AddInstruction(InsPushReference)
@@ -1248,6 +1284,7 @@ func (e *ExpressionUpdate) Bytecode(ex *Executable, c *BytecodeContext) {
 		ex.AddInstruction(InsStore)
 	}
 }
+
 func (e *ExpressionUpdate) String() string {
 	if e.Type == UpdateExpressionTypePrefix {
 		return e.Operator.String() + e.Operand.String()
@@ -1376,7 +1413,7 @@ func (e *AssignmentExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 		}
 		ex.AddInstruction(InsLoad)
 
-		var operatorMap = map[AssignmentOperator]BinaryOperator{
+		operatorMap := map[AssignmentOperator]BinaryOperator{
 			AssignmentOperatorAddition:           BinaryOperatorAddition,
 			AssignmentOperatorSubtraction:        BinaryOperatorSubtraction,
 			AssignmentOperatorMultiplication:     BinaryOperatorMultiplication,
@@ -2122,6 +2159,7 @@ func (s *StatementDefaultImpl) _statement() {}
 func (s *StatementDefaultImpl) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return nil
 }
+
 func (s *StatementDefaultImpl) VarDeclaredNames() (l []IdentifierName) {
 	return
 }
@@ -2249,6 +2287,7 @@ var _ Statement = (*StatementBlock)(nil)
 func (s *StatementBlock) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return s.BlockStatement.VarScopedDeclarations()
 }
+
 func (s *StatementBlock) VarDeclaredNames() (l []IdentifierName) {
 	return s.BlockStatement.VarDeclaredNames()
 }
@@ -2278,6 +2317,7 @@ func (s *StatementEmpty) VarScopedDeclarations() (l []*VariableDeclaration) {
 func (s *StatementEmpty) Bytecode(e *Executable, c *BytecodeContext) {
 	// empty
 }
+
 func (s *StatementEmpty) String() string {
 	return ""
 }
@@ -2407,6 +2447,7 @@ var _ Statement = (*StatementDebugger)(nil)
 func (s *StatementDebugger) Bytecode(e *Executable, c *BytecodeContext) {
 	// TODO: implement
 }
+
 func (s *StatementDebugger) String() string {
 	return "debugger"
 }
@@ -2531,6 +2572,7 @@ func (f *FormalParameters) IsSimpleParameterList() bool {
 	}
 	return true
 }
+
 func (f *FormalParameters) ContainsExpression() bool {
 	for _, item := range f.Items {
 		switch p := item.(type) {
@@ -2615,6 +2657,7 @@ type BindingRestElementIdentifier struct {
 func (b *BindingRestElementIdentifier) ContainsExpression() bool {
 	return false
 }
+
 func (b *BindingRestElementIdentifier) String() string {
 	return "..." + string(b.Identifier)
 }
@@ -3046,6 +3089,7 @@ func (s *StatementFor) VarScopedDeclarations() (l []*VariableDeclaration) {
 	l = append(l, s.Body.VarScopedDeclarations()...)
 	return
 }
+
 func (s *StatementFor) Bytecode(e *Executable, c *BytecodeContext) {
 	if s.Initializer != nil {
 		switch initializer := s.Initializer.(type) {
@@ -3172,6 +3216,7 @@ func (f *ForInOfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	l = append(l, f.Body.VarScopedDeclarations()...)
 	return
 }
+
 func (f *ForInOfStatement) BoundNames() (l []IdentifierName) {
 	if f.Initializer.ForBinding != nil {
 		l = append(l, f.Initializer.ForBinding.BoundNames()...)
@@ -3267,7 +3312,8 @@ func (f *ForInOfStatement) forInOfBodyEvaluation(
 	c *BytecodeContext,
 	jumpIndex *IJumpIfTrue,
 	lhsKind ForInOfLhsKind,
-	iteratorKind IteratorKind) {
+	iteratorKind IteratorKind,
+) {
 	body := f.Body
 	e.AddInstruction(InsPushLexicalEnvironment)
 	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
@@ -3284,7 +3330,7 @@ func (f *ForInOfStatement) forInOfBodyEvaluation(
 	e.AddInstruction(&ICall{})
 
 	if iteratorKind == IteratorKindAsync {
-		//e.AddInstruction(InsAwait)
+		// e.AddInstruction(InsAwait)
 	}
 
 	e.AddInstruction(InsLoad)
@@ -3364,7 +3410,7 @@ func (f *ForInOfStatement) forInOfBodyEvaluation(
 }
 
 func (f *ForInOfStatement) String() string {
-	var s = "ForInOfStatement "
+	s := "ForInOfStatement "
 	if f.IsAwait {
 		s += "await "
 	}
@@ -3457,6 +3503,7 @@ func (s *StatementBreak) Bytecode(e *Executable, c *BytecodeContext) {
 		c.breakJumpIndices.Push(jump)
 	}
 }
+
 func (s *StatementBreak) String() string {
 	if s.Label != "" {
 		return "Break " + string(s.Label)
@@ -3483,6 +3530,7 @@ func (s *StatementContinue) Bytecode(e *Executable, c *BytecodeContext) {
 		c.continueJumpIndices.Push(jump)
 	}
 }
+
 func (s *StatementContinue) String() string {
 	if s.Label != "" {
 		return "Continue " + string(s.Label)
@@ -3560,6 +3608,7 @@ func (d *DeclarationHoistableAsyncFunction) _declaration() {}
 func (d *DeclarationHoistableAsyncFunction) Bytecode(e *Executable, c *BytecodeContext) {
 	d.AsyncFunctionDeclaration.Bytecode(e, c)
 }
+
 func (d *DeclarationHoistableAsyncFunction) String() string {
 	return d.AsyncFunctionDeclaration.String()
 }
@@ -3578,6 +3627,7 @@ func (d *AsyncFunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	function := d.instantiateAsyncFunctionObject(c.agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
 }
+
 func (d *AsyncFunctionDeclaration) instantiateAsyncFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
 	realm := agent.CurrentRealm()
 	name := d.Identifier
@@ -3595,6 +3645,7 @@ func (d *AsyncFunctionDeclaration) instantiateAsyncFunctionObject(agent *Agent, 
 	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
 	return function
 }
+
 func (d *AsyncFunctionDeclaration) String() string {
 	return "AsyncFunctionDeclaration " + string(d.Identifier)
 }
@@ -3609,6 +3660,7 @@ type DeclarationHoistableAsyncGenerator struct {
 func (d *DeclarationHoistableAsyncGenerator) Bytecode(e *Executable, c *BytecodeContext) {
 	d.AsyncGeneratorDeclaration.Bytecode(e, c)
 }
+
 func (d *DeclarationHoistableAsyncGenerator) String() string {
 	return d.AsyncGeneratorDeclaration.String()
 }
@@ -3653,6 +3705,7 @@ func (d *AsyncGeneratorDeclaration) instantiateAsyncGeneratorFunctionObject(agen
 	})
 	return function
 }
+
 func (d *AsyncGeneratorDeclaration) String() string {
 	return "AsyncGeneratorDeclaration " + string(d.Identifier)
 }
@@ -3667,6 +3720,7 @@ type DeclarationHoistableGenerator struct {
 func (d *DeclarationHoistableGenerator) Bytecode(e *Executable, c *BytecodeContext) {
 	d.GeneratorDeclaration.Bytecode(e, c)
 }
+
 func (d *DeclarationHoistableGenerator) String() string {
 	return d.GeneratorDeclaration.String()
 }
@@ -3733,6 +3787,7 @@ func (d *DeclarationClass) Bytecode(e *Executable, c *BytecodeContext) {
 	})
 	e.AddInstruction(InsStore)
 }
+
 func (d *DeclarationClass) String() string {
 	return "ClassDeclaration " + string(d.IdentifierName)
 }
@@ -3780,6 +3835,7 @@ func (c *ClassBody) Bytecode(e *Executable, cx *BytecodeContext) {
 	}()
 	c.ClassElementList.Bytecode(e, cx)
 }
+
 func (c *ClassBody) String() string {
 	return c.ClassElementList.String()
 }
@@ -3796,6 +3852,7 @@ func (c *ClassElementList) Bytecode(e *Executable, cx *BytecodeContext) {
 		item.Bytecode(e, cx)
 	}
 }
+
 func (c *ClassElementList) String() string {
 	var sb string
 	for i, item := range c.Items {
@@ -3906,6 +3963,7 @@ func (c *ClassElementMethodDefinition) ClassElementKind() ClassElementKind {
 func (c *ClassElementMethodDefinition) Bytecode(e *Executable, cx *BytecodeContext) {
 	c.MethodDefinition.Bytecode(e, cx)
 }
+
 func (c *ClassElementMethodDefinition) String() string {
 	return c.MethodDefinition.String()
 }
@@ -3930,6 +3988,7 @@ type DeclarationLexical struct {
 func (d *DeclarationLexical) Bytecode(e *Executable, c *BytecodeContext) {
 	d.BindingList.Bytecode(e, c)
 }
+
 func (d *DeclarationLexical) String() string {
 	return "LexicalDeclaration " + d.BindingList.String()
 }
@@ -3944,6 +4003,7 @@ func (b *BindingList) Bytecode(e *Executable, c *BytecodeContext) {
 		item.Bytecode(e, c)
 	}
 }
+
 func (b *BindingList) String() string {
 	var sb string
 	for i, item := range b.Items {
@@ -3968,6 +4028,7 @@ func (l *LexicalBinding) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 	variableDecl.Bytecode(e, c)
 }
+
 func (l *LexicalBinding) String() string {
 	if l.Initializer != nil {
 		return string(l.Identifier) + " = " + l.Initializer.String()
@@ -4036,6 +4097,7 @@ type BlockStatementBlock struct {
 func (b *BlockStatementBlock) VarScopedDeclarations() []*VariableDeclaration {
 	return b.Block.StatementList.VarScopedDeclarations()
 }
+
 func (b *BlockStatementBlock) VarDeclaredNames() []IdentifierName {
 	return b.Block.StatementList.VarDeclaredNames()
 }
@@ -4343,5 +4405,4 @@ type ImportClause struct {
 	NamedImports           ImportsList
 }
 
-type ImportsList struct {
-}
+type ImportsList struct{}

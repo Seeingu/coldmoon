@@ -48,6 +48,7 @@ var EmptyObject = &Object{}
 func (o *Object) Prototype() ObjectType {
 	return o.data.prototype
 }
+
 func (o *Object) SetPrototype(p ObjectType) {
 	o.data.prototype = p
 }
@@ -55,6 +56,7 @@ func (o *Object) SetPrototype(p ObjectType) {
 func (o *Object) Extensible() bool {
 	return o.data.extensible
 }
+
 func (o *Object) SetExtensible(v bool) {
 	o.data.extensible = v
 }
@@ -466,7 +468,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return NewValueFromObject(objectDefineProperties(agent, MustGetObject(o), properties))
 	}
 
-	var defineProperty = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	defineProperty := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		o := arguments[0]
 		property := arguments[1]
 		attributes := arguments[2]
@@ -713,7 +715,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		})
 		return NewValueFromObject(CreateArrayFromList(agent, symbolValues))
 	}
-	var fromEntries = func(this Value, args []Value, newTarget ObjectType) Value {
+	fromEntries := func(this Value, args []Value, newTarget ObjectType) Value {
 		iterable := args[0]
 		RequireObjectCoercible(agent, iterable)
 		obj := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
@@ -763,7 +765,6 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinPropertyV(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
 
 	return object
-
 }
 
 // NewObjectPrototypeSkeleton init %Object.prototype% at first
@@ -774,16 +775,15 @@ func NewObjectPrototypeSkeleton(realm *Realm) ObjectType {
 
 func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	agent := realm.Agent
-	object.InternalMethods().SetPrototypeOf =
-		ImmutableSetPrototypeOf
+	object.InternalMethods().SetPrototypeOf = ImmutableSetPrototypeOf
 	realm.Intrinsics.ObjectPrototype = object
 
-	var valueOf = func(this Value, args []Value, newTarget ObjectType) Value {
+	valueOf := func(this Value, args []Value, newTarget ObjectType) Value {
 		return NewValueFromObject(ValueToObject(agent, this))
 	}
 
 	// 20.1.3.6 toString
-	var toString = func(this Value, args []Value, newTarget ObjectType) Value {
+	toString := func(this Value, args []Value, newTarget ObjectType) Value {
 		if this == UndefinedValue {
 			return NewStringValue("[object Undefined]")
 		}
@@ -824,12 +824,12 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 		return NewStringValue("[object " + tag + "]")
 	}
-	var hasOwnProperty = func(this Value, args []Value, newTarget ObjectType) Value {
+	hasOwnProperty := func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
 		p := ToPropertyKey(agent, args[0])
 		return NewBooleanValue(ObjectHasOwnProperty(o, p))
 	}
-	var isPrototypeOf = func(this Value, args []Value, newTarget ObjectType) Value {
+	isPrototypeOf := func(this Value, args []Value, newTarget ObjectType) Value {
 		v := args[0]
 		if !ValueIsObject(v) {
 			return NewBooleanValue(false)
@@ -846,7 +846,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 			}
 		}
 	}
-	var propertyIsEnumerable = func(this Value, args []Value, newTarget ObjectType) Value {
+	propertyIsEnumerable := func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
 		p := ToPropertyKey(agent, args[0])
 		desc := o.InternalMethods().GetOwnProperty(o, p)
@@ -855,7 +855,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 		return NewBooleanValue(desc.Enumerable)
 	}
-	var toLocaleString = func(this Value, args []Value, newTarget ObjectType) Value {
+	toLocaleString := func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
 		return ValueInvoke(agent, NewValueFromObject(o), NewStringPropertyKey("toString"), []Value{})
 	}

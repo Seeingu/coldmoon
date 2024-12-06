@@ -23,7 +23,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		Handler: MustGetObject(handler),
 	}
 
-	var getPrototypeOf = func(o ObjectType) ObjectType {
+	getPrototypeOf := func(o ObjectType) ObjectType {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 
@@ -60,7 +60,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 
 		return handlerProtoObject.Object
 	}
-	var setPrototypeOf = func(object ObjectType, prototype ObjectType) bool {
+	setPrototypeOf := func(object ObjectType, prototype ObjectType) bool {
 		proxy := object.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -87,7 +87,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return true
 	}
-	var isExtensible = func(o ObjectType) bool {
+	isExtensible := func(o ObjectType) bool {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -107,7 +107,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return booleanTrapResult
 	}
-	var preventExtensions = func(o ObjectType) bool {
+	preventExtensions := func(o ObjectType) bool {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -129,7 +129,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return booleanTrapResult
 	}
-	var getOwnProperty = func(o ObjectType, pk PropertyKey) *PropertyDescriptor {
+	getOwnProperty := func(o ObjectType, pk PropertyKey) *PropertyDescriptor {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -163,7 +163,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return nil
 	}
-	var defineOwnProperty = func(o ObjectType, pk PropertyKey, desc *PropertyDescriptor) bool {
+	defineOwnProperty := func(o ObjectType, pk PropertyKey, desc *PropertyDescriptor) bool {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -208,7 +208,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return true
 	}
-	var hasProperty = func(o ObjectType, pk PropertyKey) bool {
+	hasProperty := func(o ObjectType, pk PropertyKey) bool {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -235,7 +235,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return booleanTrapResult
 	}
-	var get = func(o ObjectType, pk PropertyKey, receiver Value) Value {
+	get := func(o ObjectType, pk PropertyKey, receiver Value) Value {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -264,7 +264,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return trapResult
 	}
-	var set = func(o ObjectType, pk PropertyKey, v Value, receiver Value) bool {
+	set := func(o ObjectType, pk PropertyKey, v Value, receiver Value) bool {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -296,7 +296,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return true
 	}
-	var proxyDelete = func(o ObjectType, pk PropertyKey) bool {
+	proxyDelete := func(o ObjectType, pk PropertyKey) bool {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -326,7 +326,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return true
 	}
-	var ownPropertyKeys = func(o ObjectType) []PropertyKey {
+	ownPropertyKeys := func(o ObjectType) []PropertyKey {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -343,7 +343,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 
 		elements := CreateListFromArrayLike(agent, trapResultArray)
 		var trapResult []PropertyKey
-		var uniquePropertyKeys = make(map[PropertyKey]struct{})
+		uniquePropertyKeys := make(map[PropertyKey]struct{})
 		for _, element := range elements {
 			var pk PropertyKey
 			switch el := element.(type) {
@@ -405,7 +405,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return trapResult
 	}
-	var call = func(o ObjectType, this Value, arguments []Value) Value {
+	call := func(o ObjectType, this Value, arguments []Value) Value {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -421,7 +421,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			[]Value{NewValueFromObject(t), this, NewValueFromObject(argArray)},
 		)
 	}
-	var construct = func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
+	construct := func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target

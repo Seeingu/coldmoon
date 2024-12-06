@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"fmt"
+
 	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
 )
@@ -50,6 +51,7 @@ func (p *Parser) module() *Module {
 		ModuleItemList: moduleItemList,
 	}
 }
+
 func (p *Parser) moduleItemList() ModuleItemList {
 	var items ModuleItemList
 	for {
@@ -61,6 +63,7 @@ func (p *Parser) moduleItemList() ModuleItemList {
 	}
 	return items
 }
+
 func (p *Parser) moduleItem() ModuleItem {
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
@@ -116,6 +119,7 @@ func (p *Parser) exportFrom() *ExportFrom {
 		ModuleSpecifier:  moduleSpecifier,
 	}
 }
+
 func (p *Parser) exportFromClause() (e *ExportFromClause) {
 	if p.tokenizer.Match(TStar) {
 		if p.tokenizer.Match(TAs) {
@@ -155,6 +159,7 @@ func (p *Parser) namedExports() (n *NamedExports, ok bool) {
 		ExportsList: specifiers,
 	}, true
 }
+
 func (p *Parser) exportSpecifierList() (s *ExportsList, ok bool) {
 	p.tokenizer.MustMatch(TLeftBrace)
 	var items []*ExportSpecifier
@@ -175,8 +180,8 @@ func (p *Parser) exportSpecifierList() (s *ExportsList, ok bool) {
 	return &ExportsList{
 		Items: items,
 	}, true
-
 }
+
 func (p *Parser) exportSpecifier() (s *ExportSpecifier, ok bool) {
 	name, ok := p.moduleExportName()
 	if !ok {
@@ -227,8 +232,10 @@ type ParserContext struct {
 
 // MARK: - Precedence
 
-type precedence int
-type precedenceAssociativityAlt int
+type (
+	precedence                 int
+	precedenceAssociativityAlt int
+)
 
 const (
 	precAssocNewArgs precedenceAssociativityAlt = iota
@@ -587,6 +594,7 @@ func (p *Parser) bindingRestElement() (b BindingRestElement, ok bool) {
 	}
 	return b, true
 }
+
 func (p *Parser) bindingElement() (b *BindingElement, ok bool) {
 	identifier := p.bindingIdentifier()
 	var init Expression
@@ -795,6 +803,7 @@ func (p *Parser) classDeclaration() *DeclarationClass {
 		SourceText:     sourceText,
 	}
 }
+
 func (p *Parser) classTail() *ClassTail {
 	var classHeritage Expression
 	if p.tokenizer.Match(TExtends) {
@@ -828,6 +837,7 @@ func (p *Parser) classBody() *ClassBody {
 		},
 	}
 }
+
 func (p *Parser) classElement() ClassElement {
 	defer func() {
 		p.tokenizer.Match(TSemicolon)
@@ -900,6 +910,7 @@ func (p *Parser) lexicalDeclaration() *DeclarationLexical {
 		BindingList: list,
 	}
 }
+
 func (p *Parser) bindingList() *BindingList {
 	var items []*LexicalBinding
 	for {
@@ -915,6 +926,7 @@ func (p *Parser) bindingList() *BindingList {
 		Items: items,
 	}
 }
+
 func (p *Parser) lexicalBinding() *LexicalBinding {
 	identifier := p.bindingIdentifier()
 	var init Expression
@@ -1153,7 +1165,7 @@ func (p *Parser) forStatement() *StatementFor {
 		}
 	}
 	// semicolon has been consumed by initializer
-	//p.tokenizer.Match(TSemicolon)
+	// p.tokenizer.Match(TSemicolon)
 	var condition Expression
 	if p.tokenizer.CurrentToken.Type != TSemicolon {
 		condition = p.expression(p.acceptContextLowest())
@@ -1172,7 +1184,6 @@ func (p *Parser) forStatement() *StatementFor {
 		Increment:   increment,
 		Body:        body,
 	}
-
 }
 
 func (p *Parser) doWhileStatement() *StatementDoWhile {
@@ -1923,6 +1934,7 @@ func (p *Parser) objectLiteral() *PrimaryExpressionObjectLiteral {
 		PropertyList: list,
 	}
 }
+
 func (p *Parser) propertyDefinitionList() *PropertyDefinitionList {
 	var list []PropertyDefinition
 	for {
@@ -2020,7 +2032,7 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 	body := p.functionBody(FunctionTypeNormal)
 	p.tokenizer.MustMatch(TRightBrace)
 	sourceText := p.SourceText[start:p.tokenizer.Index]
-	var m = MethodDefinitionTypeMethod
+	m := MethodDefinitionTypeMethod
 	if methodType != MethodDefinitionTypeNil {
 		m = methodType
 	}
@@ -2192,6 +2204,7 @@ func (p *Parser) variableStatement() *StatementVariable {
 		DeclarationList: list,
 	}
 }
+
 func (p *Parser) variableDeclarationList() *VariableDeclarationList {
 	var list []*VariableDeclaration
 	for {

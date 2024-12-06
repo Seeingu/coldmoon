@@ -57,5 +57,4 @@ func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 		Configurable: true,
 	})
 	return object
-
 }

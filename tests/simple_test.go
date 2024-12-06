@@ -1,8 +1,9 @@
 package tests
 
 import (
-	. "github.com/Seeingu/coldmoon/coldmoon"
 	"testing"
+
+	. "github.com/Seeingu/coldmoon/coldmoon"
 )
 
 func testSource(t *testing.T, s string) {
@@ -10,7 +11,7 @@ func testSource(t *testing.T, s string) {
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	//sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
+	// sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
 	sourceText := s
 	script := ParseScript(sourceText, realm, nil)
 	_ = script.Evaluate()

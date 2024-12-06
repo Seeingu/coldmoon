@@ -8,7 +8,7 @@ func DefineBuiltinFunction(object ObjectType,
 	length JSInt,
 	realm *Realm,
 ) {
-	var functionName = name
+	functionName := name
 	if strings.HasPrefix(name, "@@") {
 		functionName = name[2:]
 	}
@@ -29,7 +29,7 @@ func DefineBuiltinFunctionWithAttributes(object ObjectType,
 	realm *Realm,
 	attr PropertyDescriptorAttributes,
 ) {
-	var functionName = name
+	functionName := name
 	if strings.HasPrefix(name, "@@") {
 		functionName = name[2:]
 	}
@@ -51,6 +51,7 @@ func DefineBuiltinFunctionWithAttributes(object ObjectType,
 func DefineBuiltinPropertyP(object ObjectType, name string, p *PropertyDescriptor) {
 	object.DefinePropertyOrThrow(NewStringPropertyKey(name), p)
 }
+
 func DefineBuiltinPropertyV(object ObjectType, name string, value Value) {
 	descriptor := &PropertyDescriptor{
 		Value:        value,

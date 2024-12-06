@@ -1,27 +1,33 @@
 package coldmoon
 
-type BehaviorFn func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value
-type BuiltinFunction struct {
-	*Object
-	InternalSlotPrivateMethods
-	InternalSlotFields
-	Realm              *Realm
-	InitialName        string
-	Behavior           BehaviorFn
-	RevocableProxy     ObjectType
-	AdditionalFields   *AdditionalFields
-	AdditionalFieldsV2 any
-}
+type (
+	BehaviorFn      func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value
+	BuiltinFunction struct {
+		*Object
+		InternalSlotPrivateMethods
+		InternalSlotFields
+		Realm              *Realm
+		InitialName        string
+		Behavior           BehaviorFn
+		RevocableProxy     ObjectType
+		AdditionalFields   *AdditionalFields
+		AdditionalFieldsV2 any
+	}
+)
 
-var _ InternalSlotPrivateMethods = (*BuiltinFunction)(nil)
-var _ InternalSlotFields = (*BuiltinFunction)(nil)
+var (
+	_ InternalSlotPrivateMethods = (*BuiltinFunction)(nil)
+	_ InternalSlotFields         = (*BuiltinFunction)(nil)
+)
 
 func (b *BuiltinFunction) PrivateMethods() []*PrivateMethodDefinition {
 	return b.AdditionalFields.ClassConstructorFields.PrivateMethods
 }
+
 func (b *BuiltinFunction) Fields() []*ClassFieldDefinition {
 	return b.AdditionalFields.ClassConstructorFields.Fields
 }
+
 func (b *BuiltinFunction) SetFields(f []*ClassFieldDefinition) {
 	b.AdditionalFields.ClassConstructorFields.Fields = f
 }

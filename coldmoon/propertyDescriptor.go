@@ -98,7 +98,6 @@ func (p *PropertyDescriptor) CompletePropertyDescriptor() {
 	if p.Configurable == false {
 		p.Configurable = like.Configurable
 	}
-
 }
 
 func (p *PropertyDescriptor) IsFullyPopulated() bool {

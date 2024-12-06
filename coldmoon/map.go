@@ -50,7 +50,6 @@ func NewMapConstructor(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		return NewValueFromObject(AddEntriesFromIterable(agent, m, iterable, MustGetObject(adder)))
-
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, "Map", builtinFunctionArgs{
 		prototype: realm.Intrinsics.FunctionPrototype,

@@ -104,7 +104,7 @@ func (d *DeclarativeEnvironment) SetMutableBinding(name string, value Value, str
 		return
 	}
 
-	var s = strict
+	s := strict
 	if binding.Strict {
 		s = binding.Strict
 	}
@@ -120,5 +120,4 @@ func (d *DeclarativeEnvironment) SetMutableBinding(name string, value Value, str
 			panic("ReferenceError")
 		}
 	}
-
 }

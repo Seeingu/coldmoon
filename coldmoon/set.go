@@ -11,7 +11,7 @@ type SetObject struct {
 
 func NewSetConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	behavior := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		iterable := argumentsList[0]
 		if newTarget == nil {
 			panic("TypeError")
@@ -38,7 +38,6 @@ func NewSetConstructor(realm *Realm) ObjectType {
 			NewValueFromObject(MustGetObject(adder)).CallAssumeCallable(NewValueFromObject(s), []Value{nextItem})
 		}
 		return NewValueFromObject(s)
-
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, "SetObject", builtinFunctionArgs{
 		prototype: realm.Intrinsics.FunctionPrototype,

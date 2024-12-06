@@ -28,7 +28,6 @@ type ImportNameAllButDefault struct {
 }
 
 func (i ImportNameAllButDefault) _importName() {
-
 }
 
 type ImportEntry struct {
@@ -232,9 +231,7 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 		GenerateAndRunBytecode(agent, s.ECMAScriptCode)
 		agent.ExecutionContextStack.Pop()
 	} else {
-
 	}
-
 }
 
 func InnerModuleLoading(agent *Agent, state *GraphLoadingState, capability *PromiseCapability) {

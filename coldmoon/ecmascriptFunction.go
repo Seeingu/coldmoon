@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"fmt"
+
 	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
 )
@@ -43,22 +44,28 @@ type ECMAScriptFunction struct {
 	IsClassConstructor        bool
 }
 
-var _ InternalSlotPrivateMethods = (*ECMAScriptFunction)(nil)
-var _ InternalSlotFields = (*ECMAScriptFunction)(nil)
-var _ InternalSlotClassFieldInitializerName = (*ECMAScriptFunction)(nil)
+var (
+	_ InternalSlotPrivateMethods            = (*ECMAScriptFunction)(nil)
+	_ InternalSlotFields                    = (*ECMAScriptFunction)(nil)
+	_ InternalSlotClassFieldInitializerName = (*ECMAScriptFunction)(nil)
+)
 
 func (e *ECMAScriptFunction) PrivateMethods() []*PrivateMethodDefinition {
 	return e.privateMethods
 }
+
 func (e *ECMAScriptFunction) Fields() []*ClassFieldDefinition {
 	return e.fields
 }
+
 func (e *ECMAScriptFunction) SetFields(f []*ClassFieldDefinition) {
 	e.fields = f
 }
+
 func (e *ECMAScriptFunction) ClassFieldInitializerName() ClassFieldInitializerName {
 	return e.classFieldInitializerName
 }
+
 func (e *ECMAScriptFunction) SetClassFieldInitializerName(n ClassFieldInitializerName) {
 	e.classFieldInitializerName = n
 }
@@ -219,7 +226,7 @@ loop:
 	simpleParameterList := formals.IsSimpleParameterList()
 	hasParameterExpressions := formals.ContainsExpression()
 
-	//var varNames []IdentifierName
+	// var varNames []IdentifierName
 	varDeclarations := code.VarScopedDeclarations()
 	var lexicalNames []IdentifierName
 	var functionNames []IdentifierName
@@ -425,6 +432,7 @@ func (e *ECMAScriptFunction) Construct(
 
 	return thisBindingObject.Object
 }
+
 func ECMAScriptFunctionConstruct(
 	object ObjectType,
 	argumentsList []Value,
@@ -462,7 +470,7 @@ func OrdinaryFunctionCreate(
 		HomeObject:         nil,
 		ConstructorKind:    ConstructorKindBase,
 	}
-	var call = func(o ObjectType, this Value, arguments []Value) Value {
+	call := func(o ObjectType, this Value, arguments []Value) Value {
 		return o.(*ECMAScriptFunction).Call(this, arguments)
 	}
 	function.InternalMethods().Call = call
@@ -490,7 +498,6 @@ func AddRestrictedFunctionProperties(F ObjectType, realm *Realm) {
 		Enumerable:   false,
 		Configurable: true,
 	})
-
 }
 
 func MakeClassConstructor(function *ECMAScriptFunction) {
@@ -546,8 +553,7 @@ func MakeMethod(F *ECMAScriptFunction, homeObject ObjectType) {
 	F.HomeObject = homeObject
 }
 
-type PropertyKeyOrPrivateName interface {
-}
+type PropertyKeyOrPrivateName interface{}
 type PropertyKeyOrPrivateNameName struct {
 	PropertyKeyOrPrivateName
 	PrivateName PrivateName
@@ -614,7 +620,6 @@ func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 		Enumerable:   false,
 		Configurable: true,
 	})
-
 }
 
 // 10.2.10

@@ -142,7 +142,6 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.EvalErrorConstructor = NewNativeErrorConstructor(r, "EvalError")
 	r.Intrinsics.AggregateErrorPrototype = NewAggregateErrorPrototype(r)
 	r.Intrinsics.AggregateErrorConstructor = NewAggregateErrorConstructor(r)
-
 }
 
 // 9.3.3

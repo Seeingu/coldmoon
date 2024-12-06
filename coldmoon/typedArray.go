@@ -146,7 +146,6 @@ func AllocateTypedArray(agent *Agent, constructorName string, newTarget ObjectTy
 		AllocateTypedArrayBuffer(agent, obj, length)
 	}
 	return obj
-
 }
 
 func TypedArrayCreate(agent *Agent, name string, proto ObjectType) *TypedArrayObject {
@@ -332,6 +331,7 @@ func getTypedArraySizeFromName(name string) JSInt {
 		panic("unreachable")
 	}
 }
+
 func TypedArrayElementSize(O *TypedArrayObject) JSInt {
 	return getTypedArraySizeFromName(O.TypedArrayName)
 }

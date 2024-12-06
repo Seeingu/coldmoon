@@ -20,7 +20,7 @@ func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Val
 		BoundArguments:      args,
 	}
 
-	var call = func(o ObjectType, this Value, arguments []Value) Value {
+	call := func(o ObjectType, this Value, arguments []Value) Value {
 		b := o.(*BoundFunctionObject)
 		_target := b.BoundTargetFunction
 		_boundThis := b.BoundThis
@@ -30,7 +30,7 @@ func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Val
 	}
 	boundFunction.InternalMethods().Call = call
 	if IsConstructor(NewValueFromObject(target)) {
-		var construct = func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
+		construct := func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
 			b := o.(*BoundFunctionObject)
 			_target := b.BoundTargetFunction
 			_boundArgs := b.BoundArguments
@@ -44,5 +44,4 @@ func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Val
 		boundFunction.InternalMethods().Construct = construct
 	}
 	return boundFunction
-
 }

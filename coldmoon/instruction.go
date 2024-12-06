@@ -662,30 +662,32 @@ func (i *IPushLexicalEnvironment) String() string {
 
 // MARK: - Instruction Constant
 
-var InsLoad = &ILoad{}
-var InsThrow = &IThrow{}
-var InsLoadThisValue = &ILoadThisValue{}
-var InsLoadThisValueSuper = &ILoadThisValueSuper{}
-var InsGetValue = &IGetValue{}
-var InsTypeof = &ITypeof{}
-var InsToNumber = &IToNumber{}
-var InsToNumeric = &IToNumeric{}
-var InsUnaryMinus = &IUnaryMinus{}
-var InsReturn = &IReturn{}
-var InsStore = &IStore{}
-var InsLessThan = &ILessThan{}
-var InsLessThanEquals = &ILessThanEquals{}
-var InsGreaterThan = &IGreaterThan{}
-var InsGreaterThanEquals = &IGreaterThanEquals{}
-var InsInstanceOf = &IInstanceOf{}
-var InsHasProperty = &IHasProperty{}
-var InsStrictlyEqual = &IStrictlyEqual{}
-var InsLooselyEqual = &ILooselyEqual{}
-var InsLogicalNot = &ILogicalNot{}
-var InsPushReference = &IPushReference{}
-var InsPopReference = &IPopReference{}
-var InsPutValue = &IPutValue{}
-var InsGetNewTarget = &IGetNewTarget{}
-var InsRegExpCreate = &IRegExpCreate{}
-var InsRestoreLexicalEnvironment = &IRestoreLexicalEnvironment{}
-var InsPushLexicalEnvironment = &IPushLexicalEnvironment{}
+var (
+	InsLoad                      = &ILoad{}
+	InsThrow                     = &IThrow{}
+	InsLoadThisValue             = &ILoadThisValue{}
+	InsLoadThisValueSuper        = &ILoadThisValueSuper{}
+	InsGetValue                  = &IGetValue{}
+	InsTypeof                    = &ITypeof{}
+	InsToNumber                  = &IToNumber{}
+	InsToNumeric                 = &IToNumeric{}
+	InsUnaryMinus                = &IUnaryMinus{}
+	InsReturn                    = &IReturn{}
+	InsStore                     = &IStore{}
+	InsLessThan                  = &ILessThan{}
+	InsLessThanEquals            = &ILessThanEquals{}
+	InsGreaterThan               = &IGreaterThan{}
+	InsGreaterThanEquals         = &IGreaterThanEquals{}
+	InsInstanceOf                = &IInstanceOf{}
+	InsHasProperty               = &IHasProperty{}
+	InsStrictlyEqual             = &IStrictlyEqual{}
+	InsLooselyEqual              = &ILooselyEqual{}
+	InsLogicalNot                = &ILogicalNot{}
+	InsPushReference             = &IPushReference{}
+	InsPopReference              = &IPopReference{}
+	InsPutValue                  = &IPutValue{}
+	InsGetNewTarget              = &IGetNewTarget{}
+	InsRegExpCreate              = &IRegExpCreate{}
+	InsRestoreLexicalEnvironment = &IRestoreLexicalEnvironment{}
+	InsPushLexicalEnvironment    = &IPushLexicalEnvironment{}
+)

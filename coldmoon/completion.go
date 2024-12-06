@@ -34,18 +34,23 @@ var _ Completion[any] = completionDefaultImpl[any]{}
 func (c completionDefaultImpl[T]) IsError() bool {
 	return c.Type == CompletionTypeThrow
 }
+
 func (c completionDefaultImpl[T]) IsUndefined() bool {
 	return c.isUndefined
 }
+
 func (c completionDefaultImpl[T]) IsNull() bool {
 	return c.isNull
 }
+
 func (c completionDefaultImpl[T]) IsAbrupt() bool {
 	return c.Type != CompletionTypeNormal
 }
+
 func (c completionDefaultImpl[T]) Data() T {
 	return c.data
 }
+
 func (c completionDefaultImpl[T]) Error() Value {
 	return c.err
 }
@@ -65,6 +70,7 @@ func newCompletionNormal[T any](args completionNormalArgs[T]) completionDefaultI
 	}
 	return c
 }
+
 func newCompletionError[T any](err Value) completionDefaultImpl[T] {
 	return completionDefaultImpl[T]{
 		Type: CompletionTypeThrow,
@@ -82,6 +88,7 @@ func NewCompletionPropertyDescriptorUndefined() CompletionPropertyDescriptor {
 	})
 	return CompletionPropertyDescriptor(c)
 }
+
 func NewCompletionPropertyDescriptor(desc *PropertyDescriptor) CompletionPropertyDescriptor {
 	c := newCompletionNormal(completionNormalArgs[*PropertyDescriptor]{
 		data: desc,
@@ -101,10 +108,12 @@ func NewCompletionObject(obj ObjectType) CompletionObject {
 	})
 	return CompletionObject{c}
 }
+
 func NewCompletionObjectError(err Value) CompletionObject {
 	c := newCompletionError[ObjectType](err)
 	return CompletionObject{c}
 }
+
 func NewCompletionObjectNull() CompletionObject {
 	c := newCompletionNormal(completionNormalArgs[ObjectType]{
 		isNull: true,
@@ -124,6 +133,7 @@ func NewCompletionModule(module *ModuleRecord) CompletionModule {
 	})
 	return CompletionModule{c}
 }
+
 func NewCompletionModuleError(err Value) CompletionModule {
 	c := newCompletionError[*ModuleRecord](err)
 	return CompletionModule{c}
@@ -141,6 +151,7 @@ func NewCompletionValue(value Value) CompletionValue {
 	})
 	return CompletionValue{c}
 }
+
 func NewCompletionReturnValue(value Value) CompletionValue {
 	c := completionDefaultImpl[Value]{
 		Type: CompletionTypeReturn,
@@ -153,6 +164,7 @@ func NewCompletionValueError(err Value) CompletionValue {
 	c := newCompletionError[Value](err)
 	return CompletionValue{c}
 }
+
 func NewCompletionValueUndefined() CompletionValue {
 	c := newCompletionNormal(completionNormalArgs[Value]{
 		isUndefined: true,
@@ -163,21 +175,25 @@ func NewCompletionValueUndefined() CompletionValue {
 func NewNormalCompletion[T any](value T) Completion[T] {
 	return NewCompletion[T](CompletionTypeNormal, value)
 }
+
 func NewReturnCompletion[T any](value T) Completion[T] {
 	return NewCompletion[T](CompletionTypeReturn, value)
 }
+
 func NewThrowCompletion[T any](err Value) Completion[T] {
 	return completionDefaultImpl[T]{
 		Type: CompletionTypeThrow,
 		err:  err,
 	}
 }
+
 func NewCompletion[T any](t CompletionType, value T) Completion[T] {
 	return completionDefaultImpl[T]{
 		Type: t,
 		data: value,
 	}
 }
+
 func NewCompletionUndefined[T any]() Completion[T] {
 	return completionDefaultImpl[T]{
 		Type:        CompletionTypeNormal,

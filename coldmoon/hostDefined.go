@@ -1,4 +1,3 @@
 package coldmoon
 
-type HostDefined struct {
-}
+type HostDefined struct{}

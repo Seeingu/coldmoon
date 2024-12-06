@@ -7,11 +7,13 @@ const (
 	setThrowTypeIgnore
 )
 
-type SetFn = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool
-type GetOwnPropertyFn = func(o ObjectType, p PropertyKey) *PropertyDescriptor
-type DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool
-type GetPrototypeOfFn = func(o ObjectType) ObjectType
-type SetPrototypeOfFn = func(o ObjectType, v ObjectType) bool
+type (
+	SetFn               = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool
+	GetOwnPropertyFn    = func(o ObjectType, p PropertyKey) *PropertyDescriptor
+	DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool
+	GetPrototypeOfFn    = func(o ObjectType) ObjectType
+	SetPrototypeOfFn    = func(o ObjectType, v ObjectType) bool
+)
 
 // TODO: Update method signature
 type InternalMethods struct {

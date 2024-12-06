@@ -55,9 +55,11 @@ var _ Value = (*undefinedValue)(nil)
 func (u *undefinedValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(u)
 }
+
 func (u *undefinedValue) String() string {
 	return "undefined"
 }
+
 func (u *undefinedValue) ToBoolean() bool {
 	return false
 }
@@ -88,6 +90,7 @@ var _ Value = (*StringValue)(nil)
 func (s *StringValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(s)
 }
+
 func (s *StringValue) String() string {
 	return s.Data
 }
@@ -107,8 +110,10 @@ var NullValue = &nullValue{}
 
 var NaNValue = &NumberValue{Data: JSNumberNaN}
 
-var InfinityValue = &NumberValue{Data: JSNumberInf}
-var NegativeInfinityValue = &NumberValue{Data: JSNumberNegInf}
+var (
+	InfinityValue         = &NumberValue{Data: JSNumberInf}
+	NegativeInfinityValue = &NumberValue{Data: JSNumberNegInf}
+)
 
 func NewValueFromObject(object ObjectType) Value {
 	return &ObjectValue{Object: object}
@@ -229,7 +234,6 @@ func ToNumber(agent *Agent, value Value) *NumberValue {
 		return ToNumber(agent, primValue)
 	}
 	panic("TypeError")
-
 }
 
 // 7.1.3
@@ -255,13 +259,15 @@ func ToIntegerOrInfinity(agent *Agent, value Value) JSInt {
 	return JSInt(number.Truncate())
 }
 
-var POW_2_53 = math.Pow(2, 53)
-var POW_2_32 = math.Pow(2, 32)
-var POW_2_31 = math.Pow(2, 31)
-var POW_2_16 = math.Pow(2, 16)
-var POW_2_15 = math.Pow(2, 15)
-var POW_2_8 = math.Pow(2, 8)
-var POW_2_7 = math.Pow(2, 7)
+var (
+	POW_2_53 = math.Pow(2, 53)
+	POW_2_32 = math.Pow(2, 32)
+	POW_2_31 = math.Pow(2, 31)
+	POW_2_16 = math.Pow(2, 16)
+	POW_2_15 = math.Pow(2, 15)
+	POW_2_8  = math.Pow(2, 8)
+	POW_2_7  = math.Pow(2, 7)
+)
 
 func ToInt32(agent *Agent, value Value) JSInt {
 	number := ToNumber(agent, value)
@@ -277,8 +283,8 @@ func ToInt32(agent *Agent, value Value) JSInt {
 	} else {
 		return JSInt(int32(int32bit))
 	}
-
 }
+
 func ToUint32(agent *Agent, value Value) JSInt {
 	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
@@ -290,6 +296,7 @@ func ToUint32(agent *Agent, value Value) JSInt {
 	int32bit := math.Mod(float64(intData), POW_2_32)
 	return JSInt(uint32(int32bit))
 }
+
 func ToInt16(value Value, agent *Agent) int16 {
 	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
@@ -306,6 +313,7 @@ func ToInt16(value Value, agent *Agent) int16 {
 		return int16(int16bit)
 	}
 }
+
 func ToUint16(value Value, agent *Agent) uint16 {
 	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
@@ -315,6 +323,7 @@ func ToUint16(value Value, agent *Agent) uint16 {
 	int16bit := math.Mod(float64(intData), POW_2_16)
 	return uint16(int16bit)
 }
+
 func ToInt8(value Value, agent *Agent) int8 {
 	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
@@ -328,6 +337,7 @@ func ToInt8(value Value, agent *Agent) int8 {
 		return int8(int8bit)
 	}
 }
+
 func ToUint8(value Value, agent *Agent) uint8 {
 	number := ToNumber(agent, value)
 	if !number.IsFinite() || number.Data == 0 {
@@ -337,6 +347,7 @@ func ToUint8(value Value, agent *Agent) uint8 {
 	int8bit := math.Mod(float64(intData), POW_2_8)
 	return uint8(int8bit)
 }
+
 func ToUint8Clamp(value Value, agent *Agent) uint8 {
 	number := ToNumber(agent, value)
 	if number.IsNaN() {
@@ -365,6 +376,7 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 
 	return fInt
 }
+
 func ToBigInt(agent *Agent, value Value) *BigIntValue {
 	prim := ToPrimitive(agent, value, PreferredTypeNumber)
 	switch p := prim.(type) {
@@ -642,7 +654,6 @@ func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) bool {
 		}
 		return nx.Data < ny.Data
 	}
-
 }
 
 // 7.2.14
@@ -718,7 +729,6 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
 	}
 
 	return false
-
 }
 
 // 7.2.15
@@ -831,7 +841,6 @@ func OrdinaryHasInstance(agent *Agent, c Value, value Value) Completion[bool] {
 			return NewNormalCompletion(true)
 		}
 	}
-
 }
 
 // 7.2.8
@@ -928,7 +937,7 @@ func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) 
 		flagsBitSet.Set(flagsBit)
 	}
 
-	var patternText = p.String()
+	patternText := p.String()
 	parseResult, err := ParsePattern(patternText, flagsBitSet.Test(flagsU), flagsBitSet.Test(flagsV))
 	if err != nil {
 		return NewCompletionObjectError(agent.ThrowException(SyntaxError, "Invalid pattern"))
@@ -1029,6 +1038,7 @@ func ValueIs[Type Value](value Value) bool {
 	_, ok := value.(Type)
 	return ok
 }
+
 func ValueGet[Type Value](value Value) (Type, bool) {
 	v, ok := value.(Type)
 	return v, ok

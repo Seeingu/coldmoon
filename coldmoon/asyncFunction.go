@@ -62,7 +62,7 @@ func AsyncFunctionStart(agent *Agent, promiseCapability *PromiseCapability, asyn
 func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction, asyncContext *ExecutionContext) {
 	runningContext := agent.runningExecutionContext()
 
-	var closure = func() {
+	closure := func() {
 		result := asyncFunction.EvaluateBody()
 		agent.ExecutionContextStack.Pop()
 

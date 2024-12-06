@@ -7,9 +7,11 @@ type JSInt int64
 func (i JSInt) IsNegInf() bool {
 	return i == JSInt(math.Inf(-1))
 }
+
 func (i JSInt) IsPositiveInf() bool {
 	return i == JSInt(math.Inf(1))
 }
+
 func (i JSInt) IsInf() bool {
 	return i == JSInt(math.Inf(0))
 }
