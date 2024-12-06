@@ -415,7 +415,7 @@ type AdditionalFields struct {
 
 func IfAbruptRejectPromise[T any](agent *Agent, value Completion[T], capability *PromiseCapability) bool {
 	if value.IsAbrupt() {
-		capability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{value.Error()})
+		NewValueFromObject(capability.Reject).CallAssumeCallable(UndefinedValue, []Value{value.Error()})
 		return false
 	}
 	return true

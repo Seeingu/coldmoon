@@ -82,7 +82,7 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 		dataView.ViewedArrayBuffer = buffer
 		dataView.ByteLength = viewByteLength
 		dataView.ByteOffset = offset
-		return dataView.ToValue()
+		return NewValueFromObject(dataView)
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "DataView", builtinFunctionArgs{
 		realm:     realm,
@@ -90,12 +90,12 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        realm.Intrinsics.DataViewPrototype.ToValue(),
+		Value:        NewValueFromObject(realm.Intrinsics.DataViewPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyV(realm.Intrinsics.DataViewPrototype, "constructor", object.ToValue())
+	DefineBuiltinPropertyV(realm.Intrinsics.DataViewPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }
@@ -106,7 +106,7 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 
 	buffer := func(this Value, args []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*DataView](this)
-		return o.ViewedArrayBuffer.ToValue()
+		return NewValueFromObject(o.ViewedArrayBuffer)
 	}
 	DefineBuiltinAccessor(realm, object, "buffer", buffer, nil)
 	byteLength := func(this Value, args []Value, newTarget ObjectType) Value {

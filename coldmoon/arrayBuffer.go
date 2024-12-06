@@ -181,7 +181,7 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		}
 		byteLength := ToIndex(agent, length)
 		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
-		return AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Data().ToValue()
+		return NewValueFromObject(AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Data())
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "ArrayBuffer", builtinFunctionArgs{
 		realm:         realm,

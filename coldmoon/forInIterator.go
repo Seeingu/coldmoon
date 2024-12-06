@@ -36,7 +36,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := MustGetObject(thisValue).(*ForInIterator)
 		if iterator.Done {
-			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
+			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
 		}
 		obj := iterator.Obj
 		for {
@@ -59,7 +59,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 					if desc != nil {
 						iterator.VisitedKeys[r] = true
 						if desc.Enumerable {
-							return CreateIterResultObject(agent, r.ToValue(), false).ToValue()
+							return NewValueFromObject(CreateIterResultObject(agent, r.ToValue(), false))
 						}
 					}
 				}
@@ -68,7 +68,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 			obj = obj.InternalMethods().GetPrototypeOf(obj)
 			if obj == nil {
 				iterator.Done = true
-				return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
+				return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
 			}
 			iterator.Obj = obj
 			iterator.ObjectWasVisited = false

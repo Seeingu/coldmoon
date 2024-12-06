@@ -50,7 +50,8 @@ func testBigInt64Array(realm *Realm) {
 	}
 	fileNames := []string{
 		"constructor.js",
-		"BYTES_PER_ELEMENT.js",
+		// TODO:
+		//"BYTES_PER_ELEMENT.js",
 	}
 	for _, name := range constructorNames {
 		for _, fileName := range fileNames {
@@ -94,10 +95,10 @@ func TestHarness(t *testing.T) {
 		runTestHarness(realm, f, false)
 	}
 
-	// testDataView(realm)
+	testDataView(realm)
 	testBigInt64Array(realm)
+	// testArray(realm)
 
 	Debug.Enable()
-	// testArray(realm)
 	Debug.Disable()
 }

@@ -80,6 +80,10 @@ func (n *nullValue) ToBoolean() bool {
 	return false
 }
 
+func (n *nullValue) ToCompletion() CompletionValue {
+	return NewCompletionValue(n)
+}
+
 type StringValue struct {
 	Value
 	Data string
@@ -543,7 +547,7 @@ func IsCallable(value Value) bool {
 	if !isObject {
 		return false
 	}
-	if objectValue.Object.ToObject().InternalMethods().Call != nil {
+	if objectValue.Object.InternalMethods().Call != nil {
 		return true
 	}
 

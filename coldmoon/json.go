@@ -41,7 +41,7 @@ func decodeJSON(agent *Agent, d *json.Decoder) Value {
 				arr.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), decodeJSON(agent, d))
 				i++
 			}
-			return arr.ToValue()
+			return NewValueFromObject(arr)
 		case '{':
 			realm := agent.CurrentRealm()
 			obj := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectConstructor, nil)
@@ -50,7 +50,7 @@ func decodeJSON(agent *Agent, d *json.Decoder) Value {
 				value := decodeJSON(agent, d)
 				obj.CreateDataPropertyOrThrow(NewStringPropertyKey(key.String()), value)
 			}
-			return obj.ToValue()
+			return NewValueFromObject(obj)
 		default:
 			return UndefinedValue
 		}

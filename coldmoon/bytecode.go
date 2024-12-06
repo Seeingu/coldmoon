@@ -36,6 +36,9 @@ func GenerateAndRunBytecode(agent *Agent, node ASTNode) CompletionValue {
 	}
 	node.Bytecode(exe, c)
 
+	if Debug.PrintAST {
+		fmt.Println("AST: ", node.String())
+	}
 	if Debug.PrintBytecode {
 		fmt.Println("Executable: ", exe.String())
 	}

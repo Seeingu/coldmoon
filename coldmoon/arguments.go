@@ -5,6 +5,28 @@ type ArgumentsObject struct {
 	ParameterMap ObjectType
 }
 
+func (a *ArgumentsObject) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
+	return a.InternalMethods().DefineOwnProperty(a, key, desc)
+}
+
+func (a *ArgumentsObject) CreateDataProperty(key PropertyKey, value Value) bool {
+	newDesc := a.InternalMethods().DefineOwnProperty(a, key, &PropertyDescriptor{
+		Value:        value,
+		Writable:     true,
+		Enumerable:   true,
+		Configurable: true,
+	})
+	return newDesc
+}
+
+func (a *ArgumentsObject) CreateDataPropertyOrThrow(key PropertyKey, value Value) bool {
+	success := a.CreateDataProperty(key, value)
+	if !success {
+		a.Agent().ThrowException(TypeError, "CreateDataPropertyOrThrow failed")
+	}
+	return success
+}
+
 // 10.4.4.1
 func GetOwnProperty(object ObjectType, key PropertyKey) CompletionPropertyDescriptor {
 	desc := OrdinaryGetOwnProperty(object, key)
@@ -62,7 +84,7 @@ func Get(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
 
 // 10.4.4.4
 func Set(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
-	if SameValue(object.ToValue(), receiver) {
+	if SameValue(NewValueFromObject(object), receiver) {
 		_map := object.(*ArgumentsObject).ParameterMap
 		isMapped := ObjectHasOwnProperty(_map, key)
 		if isMapped {
@@ -130,7 +152,8 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 	}
 	internalMethods := obj.InternalMethods()
 	internalMethods.GetOwnProperty = func(o ObjectType, p PropertyKey) *PropertyDescriptor {
-		return GetOwnProperty(obj, p).Data()
+		pp := GetOwnProperty(obj, p)
+		return pp.Data()
 	}
 	internalMethods.DefineOwnProperty = DefineOwnProperty
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
@@ -143,7 +166,7 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 	obj.ParameterMap = _map
 	parameterNames := formals.BoundNames()
 	numberOfParameters := JSInt(len(parameterNames))
-	for i := JSInt(0); i < numberOfParameters; i++ {
+	for i := JSInt(0); i < length; i++ {
 		value := argumentsList[i]
 		obj.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), value)
 	}
@@ -176,6 +199,7 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 				)
 			}
 		}
+		index--
 	}
 	obj.DefinePropertyOrThrow(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]), &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.ArrayPrototypeValues),

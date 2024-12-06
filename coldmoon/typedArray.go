@@ -50,7 +50,7 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        realm.Intrinsics.TypedArrayPrototype.ToValue(),
+		Value:        NewValueFromObject(realm.Intrinsics.TypedArrayPrototype),
 		Writable:     false,
 		Configurable: false,
 		Enumerable:   false,
@@ -71,8 +71,8 @@ func NewTypedArrayNameConstructor(realm *Realm, name string) ObjectType {
 		isConstructor: true,
 	})
 
-	intrinsicsName := "%" + name + ".prototype%"
-	intrinsics := realm.Intrinsics.Get(intrinsicsName)
+	intrinsicName := "%" + name + ".prototype%"
+	intrinsic := realm.Intrinsics.Get(intrinsicName)
 	DefineBuiltinPropertyP(object, "BYTES_PER_ELEMENT", &PropertyDescriptor{
 		Value:        NewNumberValue(getTypedArraySizeFromName(name).ToNumber()),
 		Writable:     false,
@@ -81,9 +81,9 @@ func NewTypedArrayNameConstructor(realm *Realm, name string) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value: intrinsics.ToValue(),
+		Value: NewValueFromObject(intrinsic),
 	})
-	DefineBuiltinPropertyV(intrinsics, "constructor", object.ToValue())
+	DefineBuiltinPropertyV(intrinsic, "constructor", NewValueFromObject(object))
 
 	return object
 }
@@ -97,7 +97,7 @@ func typedArrayBehavior(agent *Agent, name string, thisArgument Value, arguments
 	proto := "%TypedArray.prototype%"
 	numberOfArgs := len(argumentsList)
 	if numberOfArgs == 0 {
-		return AllocateTypedArray(agent, constructorName, newTarget, proto, 0).ToValue()
+		return NewValueFromObject(AllocateTypedArray(agent, constructorName, newTarget, proto, 0))
 	} else {
 		firstArgument := argumentsList[0]
 		if ValueIsObject(firstArgument) {

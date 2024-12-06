@@ -275,10 +275,12 @@ func (p *PrimaryExpressionParenthesizedExpression) String() string {
 
 // MARK: - ArrayLiteral
 
-type ArrayElement interface{}
-type ArrayElementElision struct {
-	ArrayElement
-}
+type (
+	ArrayElement        interface{}
+	ArrayElementElision struct {
+		ArrayElement
+	}
+)
 type ArrayElementExpression struct {
 	ArrayElement
 	Expression Expression
@@ -435,7 +437,6 @@ func (p *PropertyDefinitionNameAndExpression) Bytecode(e *Executable, c *Bytecod
 	}
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IObjectSetProperty{})
-	e.AddInstruction(InsLoad)
 }
 
 func (p *PropertyDefinitionNameAndExpression) String() string {
@@ -2536,6 +2537,14 @@ func (f *FunctionBody) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return f.StatementList.VarScopedDeclarations()
 }
 
+func (f *FunctionBody) VarDeclaredNames() (l []IdentifierName) {
+	return f.StatementList.VarDeclaredNames()
+}
+
+func (f *FunctionBody) LexicallyDeclaredNames() (l []IdentifierName) {
+	return f.StatementList.TopLevelLexicallyDeclaredNames()
+}
+
 func (f *FunctionBody) Bytecode(e *Executable, c *BytecodeContext) {
 	strictBefore := c.containedInStrictCode
 	c.containedInStrictCode = c.containedInStrictCode || f.FunctionBodyContainsUseStrict()
@@ -3487,7 +3496,7 @@ func (f *ForDeclaration) String() string {
 // MARK: - BreakStatement
 
 type StatementBreak struct {
-	Statement
+	*StatementDefaultImpl
 	Label IdentifierName
 }
 
@@ -3569,6 +3578,22 @@ func (s *StatementReturn) String() string {
 type Declaration interface {
 	ASTNode
 	_declaration()
+	BoundNames() []IdentifierName
+}
+type declarationDefaultImpl struct {
+	Declaration
+}
+
+func DeclarationBoundNames(d Declaration) (l []IdentifierName) {
+	switch decl := d.(type) {
+	case *DeclarationHoistableFunction, *DeclarationHoistableAsyncFunction:
+		return
+	case *DeclarationClass:
+		return decl.BoundNames()
+	case *DeclarationLexical:
+		return decl.BoundNames()
+	}
+	panic("unreachable")
 }
 
 func DeclarationAnalyze(d Declaration, a AnalyzeQuery) bool {
@@ -3585,6 +3610,7 @@ type DeclarationHoistable interface {
 
 type DeclarationHoistableFunction struct {
 	DeclarationHoistable
+	*declarationDefaultImpl
 	FunctionDeclaration *FunctionDeclaration
 }
 
@@ -3601,6 +3627,7 @@ func (d *DeclarationHoistableFunction) String() string {
 
 type DeclarationHoistableAsyncFunction struct {
 	DeclarationHoistable
+	*declarationDefaultImpl
 	AsyncFunctionDeclaration *AsyncFunctionDeclaration
 }
 
@@ -3778,6 +3805,19 @@ type DeclarationClass struct {
 	IdentifierName IdentifierName
 	ClassTail      *ClassTail
 	SourceText     string
+}
+
+func (d *DeclarationClass) LexicallyDeclaredNames() (l []IdentifierName) {
+	return d.BoundNames()
+}
+
+func (d *DeclarationClass) BoundNames() (l []IdentifierName) {
+	if d.IdentifierName != "" {
+		l = append(l, d.IdentifierName)
+	} else {
+		l = append(l, "default")
+	}
+	return
 }
 
 func (d *DeclarationClass) Bytecode(e *Executable, c *BytecodeContext) {
@@ -4125,6 +4165,30 @@ func (b *Block) String() string {
 
 type StatementList []StatementListItem
 
+func (s StatementList) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
+	for _, item := range s {
+		l = append(l, StatementListItemTopLevelLexicallyDeclaredNames(item)...)
+	}
+	return
+}
+
+func StatementListItemTopLevelLexicallyDeclaredNames(item StatementListItem) (l []IdentifierName) {
+	switch t := item.(type) {
+	case *StatementListItemDeclaration:
+		return DeclarationBoundNames(t.Declaration)
+	case *StatementListItemStatement:
+		return
+	}
+	return
+}
+
+func (s StatementList) LexicallyDeclaredNames() (l []IdentifierName) {
+	for _, item := range s {
+		l = append(l, item.LexicallyDeclaredNames()...)
+	}
+	return
+}
+
 func (s StatementList) VarScopedDeclarations() (l []*VariableDeclaration) {
 	for _, item := range s {
 		l = append(l, item.VarScopedDeclarations()...)
@@ -4179,6 +4243,7 @@ type StatementListItem interface {
 	ASTNode
 	VarScopedDeclarations() []*VariableDeclaration
 	VarDeclaredNames() []IdentifierName
+	LexicallyDeclaredNames() []IdentifierName
 }
 
 func StatementListItemAnalyze(s StatementListItem, a AnalyzeQuery) bool {
@@ -4197,6 +4262,10 @@ type StatementListItemStatement struct {
 }
 
 var _ ASTNode = (*StatementListItemStatement)(nil)
+
+func (s *StatementListItemStatement) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
+	return
+}
 
 func (s *StatementListItemStatement) VarDeclaredNames() (l []IdentifierName) {
 	return s.Statement.VarDeclaredNames()
@@ -4224,6 +4293,10 @@ type StatementListItemDeclaration struct {
 }
 
 var _ ASTNode = (*StatementListItemDeclaration)(nil)
+
+func (s *StatementListItemDeclaration) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
+	return s.Declaration.BoundNames()
+}
 
 func (s *StatementListItemDeclaration) VarDeclaredNames() (l []IdentifierName) {
 	return

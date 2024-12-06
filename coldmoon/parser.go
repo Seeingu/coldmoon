@@ -11,6 +11,7 @@ type Parser struct {
 	SourceText              string
 	tokenizer               *Tokenizer
 	inFunctionBody          bool
+	inFormalParameters      bool
 	inClassBody             bool
 	inMethodDefinition      bool
 	inClassConstructor      bool
@@ -137,11 +138,11 @@ func (p *Parser) exportFromClause() (e *ExportFromClause) {
 }
 
 func (p *Parser) moduleExportName() (m *ModuleExportName, ok bool) {
-	if id, _ok := parserRecoverOk(p, p.bindingIdentifier); ok {
+	if id, _ok := parserRecoverOk(p, p.bindingIdentifier); _ok {
 		m.IdentifierName = id
 		ok = _ok
 		return
-	} else if s, _ok := parserRecoverOk(p, p.stringLiteral); ok {
+	} else if s, _ok := parserRecoverOk(p, p.stringLiteral); _ok {
 		m.StringLiteral = s
 		ok = _ok
 		return
@@ -446,6 +447,7 @@ func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 	list := p.statementList()
 	return &FunctionBody{
 		StatementList: list,
+		Type:          functionType,
 	}
 }
 
@@ -1426,29 +1428,32 @@ func (p *Parser) updateExpression(primaryExpression Expression) (*ExpressionUpda
 }
 
 func (p *Parser) expression(accept *acceptContext) Expression {
-	var e Expression
+	var expr Expression
 	if unary, ok := p.tryUnaryExpression(); ok {
-		e = unary
+		expr = unary
 	} else if meta, ok := p.metaProperty(); ok {
-		e = meta
+		expr = meta
 	} else if update, ok := p.updateExpression(nil); ok {
-		e = update
+		expr = update
 	} else if super, ok := p.superProperty(); ok {
-		e = super
+		expr = super
 	} else if super, ok := p.superCall(); ok {
-		e = super
+		expr = super
 	} else if i, ok := p.importCall(); ok {
-		e = i
+		expr = i
 	} else if newExpression, ok := p.newExpression(); ok {
-		e = newExpression
+		expr = newExpression
 	} else {
-		e = p.primaryExpression()
+		expr = p.primaryExpression()
 	}
-	var expr Expression = e
+
 	for {
 		nextToken := p.tokenizer.CurrentToken
 		newAcceptContext := p.acceptContext(nextToken.Type)
-		if newAcceptContext.precedence <= accept.precedence {
+		if newAcceptContext.precedence < accept.precedence {
+			return expr
+		}
+		if newAcceptContext.precedence == accept.precedence && newAcceptContext.associativity == associativeNone {
 			return expr
 		}
 		if newAcceptContext.precedence == accept.precedence && newAcceptContext.associativity == associativeLeft {
@@ -1601,6 +1606,7 @@ func (p *Parser) conditionalExpression(left Expression, accept *acceptContext) *
 	consequent := p.expression(accept)
 	p.tokenizer.MustMatch(TColon)
 	alternate := p.expression(accept)
+	p.automaticSemicolonInsertion()
 	return &ExpressionConditionalExpression{
 		Test:       left,
 		Consequent: consequent,
@@ -1763,8 +1769,10 @@ func (p *Parser) arrowFunction() *PrimaryExpressionArrowFunction {
 		expression := p.expression(p.acceptContext(TComma))
 		body = &FunctionBody{
 			StatementList: StatementList{
-				&StatementReturn{
-					Expression: expression,
+				&StatementListItemStatement{
+					Statement: &StatementReturn{
+						Expression: expression,
+					},
 				},
 			},
 		}
@@ -2208,8 +2216,11 @@ func (p *Parser) variableStatement() *StatementVariable {
 func (p *Parser) variableDeclarationList() *VariableDeclarationList {
 	var list []*VariableDeclaration
 	for {
-		declaration := p.variableDeclaration()
-		list = append(list, declaration)
+		if declaration, ok := parserRecoverOk(p, p.variableDeclaration); ok {
+			list = append(list, declaration)
+		} else {
+			break
+		}
 		if p.tokenizer.CurrentToken.Type == TComma {
 			p.tokenizer.Next()
 			continue

@@ -29,7 +29,7 @@ func NewIteratorPrototype(realm *Realm) ObjectType {
 
 // 7.4.2
 func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *IteratorRecord {
-	iterator := method.ToValue().CallAssumeCallable(object, nil)
+	iterator := NewValueFromObject(method).CallAssumeCallable(object, nil)
 	if !ValueIsObject(iterator) {
 		panic("TypeError")
 	}

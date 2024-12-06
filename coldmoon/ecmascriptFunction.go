@@ -226,9 +226,9 @@ loop:
 	simpleParameterList := formals.IsSimpleParameterList()
 	hasParameterExpressions := formals.ContainsExpression()
 
-	// var varNames []IdentifierName
+	// varNames := code.VarDeclaredNames()
 	varDeclarations := code.VarScopedDeclarations()
-	var lexicalNames []IdentifierName
+	lexicalNames := code.LexicallyDeclaredNames()
 	var functionNames []IdentifierName
 
 	argumentsObjectNeeded := true
@@ -452,8 +452,17 @@ func OrdinaryFunctionCreate(
 	env EnvironmentRecord,
 	privateEnv *PrivateEnvironment,
 ) *ECMAScriptFunction {
-	var thisMode ThisMode = ThisModeLexical
+	var thisMode ThisMode
 	strict := body.Strict
+	if functionCreateThisMode == functionCreateThisModeNonLexical {
+		if strict {
+			thisMode = ThisModeStrict
+		} else {
+			thisMode = ThisModeGlobal
+		}
+	} else {
+		thisMode = ThisModeLexical
+	}
 
 	function := &ECMAScriptFunction{
 		Object:             NewObject(agent, functionPrototype),
@@ -553,11 +562,13 @@ func MakeMethod(F *ECMAScriptFunction, homeObject ObjectType) {
 	F.HomeObject = homeObject
 }
 
-type PropertyKeyOrPrivateName interface{}
-type PropertyKeyOrPrivateNameName struct {
-	PropertyKeyOrPrivateName
-	PrivateName PrivateName
-}
+type (
+	PropertyKeyOrPrivateName     interface{}
+	PropertyKeyOrPrivateNameName struct {
+		PropertyKeyOrPrivateName
+		PrivateName PrivateName
+	}
+)
 
 // 10.2.8
 func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, closure ObjectType, enumerable bool) *PrivateElement {

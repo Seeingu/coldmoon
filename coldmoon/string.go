@@ -299,7 +299,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		if regexp != UndefinedValue && regexp != NullValue {
 			searcher := GetMethod(agent, regexp, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]))
 			if searcher != nil {
-				return searcher.ToValue().CallAssumeCallable(regexp, []Value{o})
+				return NewValueFromObject(searcher).CallAssumeCallable(regexp, []Value{o})
 			}
 		}
 

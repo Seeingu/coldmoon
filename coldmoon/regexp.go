@@ -126,7 +126,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		} else if result.IsError() {
 			panic("RegExp.prototype.exec: error")
 		} else {
-			return result.Data().ToValue()
+			return NewValueFromObject(result.Data())
 		}
 	}
 	test := func(this Value, arguments []Value, _ ObjectType) Value {
@@ -215,7 +215,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 			newTarget = agent.ActiveFunctionObject()
 			if patternIsRegexp && flags == UndefinedValue {
 				patternConstructor := MustGetObject(pattern).Get(NewStringPropertyKey("constructor"))
-				if SameValue(newTarget.ToValue(), patternConstructor) {
+				if SameValue(NewValueFromObject(newTarget), patternConstructor) {
 					return pattern
 				}
 			}
@@ -262,12 +262,12 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewRegExpPrototype(realm).ToValue(),
+		Value:        NewValueFromObject(NewRegExpPrototype(realm)),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyV(realm.Intrinsics.RegExpPrototype, "constructor", object.ToValue())
+	DefineBuiltinPropertyV(realm.Intrinsics.RegExpPrototype, "constructor", NewValueFromObject(object))
 
 	return object
 }
@@ -329,7 +329,7 @@ type MatchRecord struct {
 func RegExpExec(agent *Agent, regExp *RegExpObject, s string) CompletionObject {
 	exec := regExp.Get(NewStringPropertyKey("exec"))
 	if IsCallable(exec) {
-		result := exec.CallAssumeCallable(regExp.ToValue(), []Value{NewStringValue(s)})
+		result := exec.CallAssumeCallable(NewValueFromObject(regExp), []Value{NewStringValue(s)})
 		if !ValueIsObject(result) && result != nil {
 			return NewCompletionObjectError(agent.ThrowException(TypeError, "RegExpExec: exec is not an object"))
 		}
@@ -414,7 +414,7 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 	var groups Value
 	var hasGroups bool
 	if regExp.RegExpRecord.CapturingGroupsCount > 0 {
-		groups = OrdinaryObjectCreate(agent, nil, nil).ToValue()
+		groups = NewValueFromObject(OrdinaryObjectCreate(agent, nil, nil))
 		hasGroups = true
 	} else {
 		groups = UndefinedValue
@@ -453,7 +453,7 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 
 	if hasIndices {
 		indicesArray := MakeMatchIndicesIndexPairArray(agent, s, indices, groupNames, hasGroups)
-		A.CreateDataPropertyOrThrow(NewStringPropertyKey("indices"), indicesArray.ToValue())
+		A.CreateDataPropertyOrThrow(NewStringPropertyKey("indices"), NewValueFromObject(indicesArray))
 	}
 	return NewCompletionObject(A)
 }
@@ -495,7 +495,7 @@ func MakeMatchIndicesIndexPairArray(agent *Agent, s string, indices []*MatchReco
 	A := ArrayCreate(agent, 0, nil)
 	var groups Value
 	if hasGroups {
-		groups = OrdinaryObjectCreate(agent, nil, nil).ToValue()
+		groups = NewValueFromObject(OrdinaryObjectCreate(agent, nil, nil))
 	} else {
 		groups = UndefinedValue
 	}
@@ -507,7 +507,7 @@ func MakeMatchIndicesIndexPairArray(agent *Agent, s string, indices []*MatchReco
 		var matchIndices *MatchRecord
 		if i < len(indices) {
 			matchIndices = indices[i]
-			matchIndexPair = GetMatchIndexPair(agent, s, matchIndices).ToValue()
+			matchIndexPair = NewValueFromObject(GetMatchIndexPair(agent, s, matchIndices))
 		}
 		A.CreateDataPropertyOrThrow(NewStringPropertyKey(groupNames[i]), matchIndexPair)
 		if i > 0 && groupNames[i-1] != "" {

@@ -1,10 +1,12 @@
 package coldmoon
 
-type ReferenceRecordBase interface{}
-type ReferenceRecordBaseValue struct {
-	ReferenceRecordBase
-	Value Value
-}
+type (
+	ReferenceRecordBase      interface{}
+	ReferenceRecordBaseValue struct {
+		ReferenceRecordBase
+		Value Value
+	}
+)
 
 type ReferenceRecordBaseEnvironment struct {
 	ReferenceRecordBase

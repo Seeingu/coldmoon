@@ -22,6 +22,18 @@ func TestBaseline(t *testing.T) {
 	var sourceText string
 
 	sourceText = `
+const a = {
+  b: 8,
+  writable: false,
+  enumerable: false,
+  configurable: false
+};
+let b = 2;
+a.b;
+`
+	testSource(t, sourceText)
+
+	sourceText = `
 let a = 1;
 for (var i = 0; i < 3; i++) {
 	a += i;
@@ -56,7 +68,7 @@ let c = a + b + b;
 'hello' + a + "world";
 c += a + b;
 a ? b : c;
-1 && 2 ? 3 :4;
+var d = 1 ?	2 : 3;
 `
 	testSource(t, sourceText)
 
@@ -74,14 +86,6 @@ const b = a?.b;
 	testSource(t, sourceText)
 
 	sourceText = "``"
-	testSource(t, sourceText)
-
-	sourceText = `
-const a = {
-	b: 1,
-};
-let b = 2;
-`
 	testSource(t, sourceText)
 
 	sourceText = `

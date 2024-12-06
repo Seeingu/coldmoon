@@ -38,7 +38,7 @@ func (vm *VM) stackPush(v Value, m string) {
 		}
 	}
 	vm.stack.Push(v)
-	vm.debugPrintStack(m)
+	vm.debugPrintStack("push: " + m)
 }
 
 // stackPop pops a value from the stack.
@@ -217,7 +217,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IObjectSetProperty:
 		value := vm.stackPop()
 		propertyKey := ToPropertyKey(vm.agent, vm.stackPop())
-		object := vm.stackPop().(*ObjectValue).Object
+		object := MustGetObject(vm.stackPop())
 		object.CreateDataPropertyOrThrow(propertyKey, value)
 		vm.result = NewValueFromObject(object)
 	case *IBitwiseNot:
@@ -510,7 +510,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IRegExpCreate:
 		flags := vm.stack.Pop()
 		pattern := vm.stack.Pop()
-		vm.result = RegExpCreate(vm.agent, pattern, flags).Data().ToValue()
+		vm.result = NewValueFromObject(RegExpCreate(vm.agent, pattern, flags).Data())
 	case *IBindingClassDeclarationEvaluation:
 		classDeclaration := ins.ClassDeclaration
 		vm.result = vm.BindingClassDeclarationEvaluation(classDeclaration).ToValue()
@@ -590,7 +590,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			nil,
 			promiseCapability.ToImportedModulePayload(),
 		)
-		vm.result = promiseCapability.Promise.ToValue()
+		vm.result = NewValueFromObject(promiseCapability.Promise)
 	case *IForInIterator:
 		value := vm.result
 		obj := MustGetObject(value)
@@ -712,7 +712,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 			var result ObjectType
 			if classConstructorFields.ConstructorKind == ConstructorKindDerived {
 				fun := function.InternalMethods().GetPrototypeOf(function)
-				if !IsConstructor(fun.ToValue()) {
+				if !IsConstructor(NewValueFromObject(fun)) {
 					panic("TypeError: prototype is not a constructor")
 				}
 				result = fun.Construct(args, newTarget)
@@ -822,7 +822,7 @@ func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *DeclarationCla
 		}
 
 		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		vm.InitializeBoundName(className, value.ToValue(), env)
+		vm.InitializeBoundName(className, NewValueFromObject(value), env)
 		return value
 	} else {
 		value := vm.ClassDefinitionEvaluation(classDeclaration.ClassTail, "", "default")

@@ -80,20 +80,22 @@ func newCompletionError[T any](err Value) completionDefaultImpl[T] {
 
 // MARK: - PropertyDescriptor
 
-type CompletionPropertyDescriptor completionDefaultImpl[*PropertyDescriptor]
+type CompletionPropertyDescriptor struct {
+	*completionDefaultImpl[*PropertyDescriptor]
+}
 
 func NewCompletionPropertyDescriptorUndefined() CompletionPropertyDescriptor {
 	c := newCompletionNormal(completionNormalArgs[*PropertyDescriptor]{
 		isUndefined: true,
 	})
-	return CompletionPropertyDescriptor(c)
+	return CompletionPropertyDescriptor{&c}
 }
 
 func NewCompletionPropertyDescriptor(desc *PropertyDescriptor) CompletionPropertyDescriptor {
 	c := newCompletionNormal(completionNormalArgs[*PropertyDescriptor]{
 		data: desc,
 	})
-	return CompletionPropertyDescriptor(c)
+	return CompletionPropertyDescriptor{&c}
 }
 
 // MARK: - Object
