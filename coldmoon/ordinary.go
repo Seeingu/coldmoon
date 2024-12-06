@@ -83,7 +83,7 @@ func OrdinaryGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescrip
 		d.Writable = x.Writable
 	} else {
 		if !x.IsAccessorDescriptor() {
-			panic("")
+			return nil
 		}
 
 		d.Get = x.Get

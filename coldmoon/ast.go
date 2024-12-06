@@ -3322,10 +3322,13 @@ func (f *ForInOfStatement) forInOfBodyEvaluation(
 			} else {
 				panic("unreachable")
 			}
+			e.AddInstruction(InsPushReference)
 			e.AddInstruction(InsPutValue)
+			e.AddInstruction(InsPopReference)
 		}
 	} else {
 		// TODO
+		panic("unimplemented")
 	}
 
 	e.AddInstruction(InsStore)
