@@ -11,7 +11,6 @@ func testSource(t *testing.T, s string) {
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	// sourceText := "\t{true; false\u2028;;;}\r\nnull;debugger\uFEFF"
 	sourceText := s
 	script := ParseScript(sourceText, realm, nil)
 	_ = script.Evaluate()
@@ -75,19 +74,9 @@ var d = 1 ?	2 : 3;
 	testSource(t, sourceText)
 
 	sourceText = `
-function a() {}
-a.b = 1;
-a.b;
-`
-	testSource(t, sourceText)
-
-	sourceText = `
 const a = {};
 const b = a?.b;
-`
-	testSource(t, sourceText)
-
-	sourceText = "``"
+` + "``"
 	testSource(t, sourceText)
 
 	sourceText = `

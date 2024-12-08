@@ -4,3 +4,6 @@ build: main.go coldmoon/
 
 test: coldmoon tests
 	go test ./...
+
+fmt: coldmoon tests
+	gofumpt -w -l .
