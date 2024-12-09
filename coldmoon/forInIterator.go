@@ -23,7 +23,7 @@ func (f *ForInIterator) ToValue() Value {
 func CreateForInIterator(agent *Agent, obj ObjectType) *ForInIterator {
 	realm := agent.CurrentRealm()
 	iterator := &ForInIterator{
-		Object:      NewObject(agent, realm.Intrinsics.ForInIteratorPrototype),
+		Object:      NewObject(agent, realm.Intrinsics.ForInIteratorPrototype, "ForInIterator"),
 		Obj:         obj,
 		VisitedKeys: make(map[PropertyKey]bool),
 	}
@@ -32,7 +32,7 @@ func CreateForInIterator(agent *Agent, obj ObjectType) *ForInIterator {
 
 func NewForInIteratorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.IteratorPrototype)
+	object := NewObject(agent, realm.Intrinsics.IteratorPrototype, "ForInIteratorPrototype")
 	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := MustGetObject(thisValue).(*ForInIterator)
 		if iterator.Done {

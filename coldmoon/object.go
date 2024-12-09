@@ -1,6 +1,10 @@
 package coldmoon
 
-import "github.com/samber/lo"
+import (
+	"fmt"
+
+	"github.com/samber/lo"
+)
 
 type IntegrityLevel int
 
@@ -19,7 +23,8 @@ type Data struct {
 
 type Object struct {
 	ObjectType
-	data *Data
+	typeName string
+	data     *Data
 }
 
 func (o *Object) ToObject() *Object {
@@ -30,8 +35,9 @@ func (o *Object) ToValue() Value {
 	return NewValueFromObject(o)
 }
 
-func NewObject(agent *Agent, prototype ObjectType) *Object {
+func NewObject(agent *Agent, prototype ObjectType, typeName string) *Object {
 	o := &Object{
+		typeName: typeName,
 		data: &Data{
 			agent:           agent,
 			prototype:       prototype,
@@ -781,7 +787,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 // NewObjectPrototypeSkeleton init %Object.prototype% at first
 func NewObjectPrototypeSkeleton(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, nil)
+	object := NewObject(realm.Agent, nil, "Object")
 	return object
 }
 
@@ -907,4 +913,10 @@ func objectDefineProperties(agent *Agent, object ObjectType, properties Value) O
 	}
 
 	return object
+}
+
+// MARK: - Internal
+
+func (o *Object) String() string {
+	return fmt.Sprintf("Object[%s]", o.typeName)
 }

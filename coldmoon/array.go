@@ -74,7 +74,7 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) ObjectType {
 	}
 
 	arr := &ArrayObject{
-		Object: NewObject(agent, proto),
+		Object: NewObject(agent, proto, "Array"),
 	}
 	arr.Object.InternalMethods().DefineOwnProperty = defineOwnProperty
 	OrdinaryDefineOwnProperty(arr, NewStringPropertyKey("length"), &PropertyDescriptor{
@@ -288,7 +288,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 func NewArrayPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := &ArrayObject{
-		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
+		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "ArrayPrototype"),
 	}
 
 	DefineBuiltinPropertyP(object.Object, "length", &PropertyDescriptor{
@@ -1612,4 +1612,18 @@ func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen JSInt, 
 		}
 	}
 	return targetIndex
+}
+
+// MARK: - Internal
+
+func (a *ArrayObject) String() string {
+	s := "ArrayObject ["
+	for i := JSInt(0); i < a.LengthOfArrayLike(); i++ {
+		if i > 0 {
+			s += ", "
+		}
+		s += a.Get(NewIntegerIndexPropertyKey(i)).String()
+	}
+	s += "]"
+	return s
 }

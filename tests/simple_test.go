@@ -21,6 +21,16 @@ func TestBaseline(t *testing.T) {
 	var sourceText string
 
 	sourceText = `
+const desc = Object.getOwnPropertyDescriptor(BigInt64Array, 'BYTES_PER_ELEMENT');
+let a = 0;
+if (Object.prototype.hasOwnProperty.call(desc, 'enumerable')) {
+	a = 1;
+}
+a;
+`
+	testSource(t, sourceText)
+
+	sourceText = `
 const a = {
   b: 8,
   writable: false,
@@ -48,6 +58,7 @@ a;
 
 	sourceText = `
 var a = [];
+var a = [1,2,3];
 a[4294967295] = "not an array element";
 a[4294967295];
 `

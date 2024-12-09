@@ -18,7 +18,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		panic("TypeError")
 	}
 	p := &ProxyObject{
-		Object:  NewObject(agent, nil),
+		Object:  NewObject(agent, nil, "Proxy"),
 		Target:  MustGetObject(target),
 		Handler: MustGetObject(handler),
 	}

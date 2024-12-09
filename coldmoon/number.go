@@ -491,7 +491,7 @@ type NumberObject struct {
 
 func NewNumberObject(agent *Agent, value JSNumber, prototype ObjectType) *NumberObject {
 	object := &NumberObject{
-		Object: NewObject(agent, prototype),
+		Object: NewObject(agent, prototype, "Number"),
 		Data:   value,
 	}
 	return object
@@ -499,7 +499,7 @@ func NewNumberObject(agent *Agent, value JSNumber, prototype ObjectType) *Number
 
 func NewNumberPrototype(realm *Realm) *NumberObject {
 	object := &NumberObject{
-		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
+		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "NumberPrototype"),
 	}
 
 	agent := realm.Agent

@@ -92,6 +92,9 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			}
 		}
 
+		if Debug.PrintBytecode {
+			fmt.Printf("EvaluateCall from ip: %d\n", vm.ip)
+		}
 		vm.result = evaluateCall(
 			vm.agent,
 			function,
@@ -291,7 +294,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IArraySetValue:
 		index := JSInt(ins.Index)
 		initValue := vm.stackPop()
-		array := vm.stackPop().(*ObjectValue).Object
+		array := MustGetObject(vm.stackPop())
 		array.CreateDataPropertyOrThrow(
 			NewIntegerIndexPropertyKey(index),
 			initValue,

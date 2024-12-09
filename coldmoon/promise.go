@@ -105,7 +105,7 @@ type PromiseObject struct {
 
 func NewPromisePrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "PromisePrototype")
 
 	var then BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		onFulfilled := arguments[0]

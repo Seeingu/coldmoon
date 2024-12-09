@@ -19,7 +19,7 @@ func (i *IteratorRecord) ToCompletion() Completion[*IteratorRecord] {
 
 func NewIteratorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "IteratorPrototype")
 	var iterator BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		return thisValue
 	}

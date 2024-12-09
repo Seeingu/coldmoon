@@ -9,7 +9,7 @@ type SetIteratorObject struct {
 
 func CreateSetIterator(agent *Agent, value Value, kind objectOwnPropertiesKind) *SetIteratorObject {
 	return &SetIteratorObject{
-		Object:    NewObject(agent, agent.CurrentRealm().Intrinsics.SetIteratorPrototype),
+		Object:    NewObject(agent, agent.CurrentRealm().Intrinsics.SetIteratorPrototype, "SetIterator"),
 		SetObject: RequireInternalSlot[*SetObject](value),
 		Kind:      kind,
 		Index:     0,
@@ -17,7 +17,7 @@ func CreateSetIterator(agent *Agent, value Value, kind objectOwnPropertiesKind) 
 }
 
 func NewSetIteratorPrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype, "SetIteratorPrototype")
 	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		setIterator := MustGetObject(thisValue).(*SetIteratorObject)
 		s := setIterator.SetObject

@@ -26,7 +26,7 @@ type RegExpRecord struct {
 
 func NewRegExpPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "RegExp")
 
 	dotAll := func(this Value, arguments []Value, _ ObjectType) Value {
 		return RegExpHasFlag(agent, this, "s").Data()

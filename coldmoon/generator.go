@@ -6,7 +6,7 @@ type GeneratorObject struct {
 
 func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.IteratorPrototype)
+	object := NewObject(agent, realm.Intrinsics.IteratorPrototype, "GeneratorPrototype")
 	g := &GeneratorObject{
 		Object: object,
 	}

@@ -203,7 +203,7 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 
 func NewArrayBufferPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "ArrayBufferPrototype")
 
 	var isView BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		arg := arguments[0]

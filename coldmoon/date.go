@@ -11,7 +11,7 @@ type DateObject struct {
 }
 
 func NewDatePrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "DatePrototype")
 	agent := realm.Agent
 
 	var valueOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {

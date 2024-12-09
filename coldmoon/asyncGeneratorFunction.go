@@ -38,7 +38,7 @@ func NewAsyncGeneratorFunctionConstructor(realm *Realm) ObjectType {
 
 // 27.4.3
 func NewAsyncGeneratorFunctionPrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype, "AsyncGeneratorFunctionPrototype")
 
 	DefineBuiltinPropertyP(object, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.AsyncGeneratorFunction),

@@ -18,7 +18,7 @@ func ModuleNamespaceCreate(agent *Agent, module *ModuleRecord, exports []string)
 
 	sortedExports := exports
 
-	object := NewObject(agent, nil)
+	object := NewObject(agent, nil, "ModuleNamespace")
 	M := &ModuleNamespace{
 		Object:  object,
 		Module:  module,

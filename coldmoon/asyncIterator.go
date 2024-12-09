@@ -5,7 +5,7 @@ type AsyncIteratorPrototypeObject struct {
 }
 
 func NewAsyncIteratorPrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "AsyncIteratorPrototype")
 
 	asyncIterator := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		return this

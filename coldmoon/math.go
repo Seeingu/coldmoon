@@ -10,7 +10,7 @@ type MathObject struct {
 }
 
 func NewMathObject(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "Math")
 
 	DefineBuiltinPropertyP(object, "E", &PropertyDescriptor{
 		Value:        NewNumberValue(math.E),

@@ -91,7 +91,7 @@ func InstallErrorCause(agent *Agent, errorObject *ErrorObject, options Value) {
 func NewErrorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "ErrorPrototype")
 
 	DefineBuiltinPropertyV(object, "name", NewStringValue("Error"))
 
@@ -138,7 +138,7 @@ func NewErrorPrototype(realm *Realm) ObjectType {
 // 20.5.6.4
 func NativeError() ObjectType {
 	errorObject := &ErrorObject{
-		Object: NewObject(nil, nil),
+		Object: NewObject(nil, nil, "Error"),
 	}
 	return errorObject
 }
@@ -194,7 +194,7 @@ func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 
 func NewNativeErrorPrototype(realm *Realm, name string) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ErrorPrototype)
+	object := NewObject(agent, realm.Intrinsics.ErrorPrototype, name+"Prototype")
 
 	DefineBuiltinPropertyV(object, "name", NewStringValue(name))
 	DefineBuiltinPropertyV(object, "message", NewStringValue(""))
@@ -251,7 +251,7 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 
 func NewAggregateErrorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ErrorPrototype)
+	object := NewObject(agent, realm.Intrinsics.ErrorPrototype, "AggregateErrorPrototype")
 	DefineBuiltinPropertyV(object, "name", NewStringValue("AggregateError"))
 	DefineBuiltinPropertyV(object, "message", NewStringValue(""))
 	return object

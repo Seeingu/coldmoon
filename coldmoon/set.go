@@ -63,7 +63,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 func NewSetPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "SetPrototype")
 
 	var setClear BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		set := RequireInternalSlot[*SetObject](thisValue)

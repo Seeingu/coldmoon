@@ -33,7 +33,7 @@ type SymbolObject struct {
 
 func NewSymbolObject(agent *Agent, s *SymbolValue, prototype ObjectType) *SymbolObject {
 	symbolObject := &SymbolObject{
-		Object: NewObject(agent, prototype),
+		Object: NewObject(agent, prototype, "Symbol"),
 		Data:   s,
 	}
 
@@ -181,7 +181,7 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 }
 
 func NewSymbolPrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "SymbolPrototype")
 
 	toString := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		symbol := thisSymbolValue(this)

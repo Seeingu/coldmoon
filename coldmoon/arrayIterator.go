@@ -8,7 +8,7 @@ type ArrayIteratorObject struct {
 }
 
 func NewArrayIteratorPrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype, "ArrayIteratorPrototype")
 	agent := realm.Agent
 	// 23.1.5.2.1
 	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
@@ -59,7 +59,7 @@ func NewArrayIteratorPrototype(realm *Realm) ObjectType {
 // 23.1.5.1
 func CreateArrayIterator(agent *Agent, array ObjectType, kind objectOwnPropertiesKind) *ArrayIteratorObject {
 	return &ArrayIteratorObject{
-		Object: NewObject(agent, agent.CurrentRealm().Intrinsics.ArrayIteratorPrototype),
+		Object: NewObject(agent, agent.CurrentRealm().Intrinsics.ArrayIteratorPrototype, "ArrayIterator"),
 		Array:  array,
 		Kind:   kind,
 		Index:  0,

@@ -465,7 +465,7 @@ func OrdinaryFunctionCreate(
 	}
 
 	function := &ECMAScriptFunction{
-		Object:             NewObject(agent, functionPrototype),
+		Object:             NewObject(agent, functionPrototype, "ECMAScriptFunction"),
 		Realm:              agent.CurrentRealm(),
 		SourceText:         sourceText,
 		FormalParameters:   parameterList,
@@ -644,4 +644,10 @@ func SetFunctionLength(function ObjectType, length JSInt) {
 		Enumerable:   false,
 		Configurable: true,
 	})
+}
+
+// MARK: - Internal
+
+func (e *ECMAScriptFunction) String() string {
+	return fmt.Sprintf("ECMAScriptFunction: %s", e.SourceText)
 }

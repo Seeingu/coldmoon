@@ -14,7 +14,7 @@ func (b *BoundFunctionObject) GetFunctionRealm() *Realm {
 func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Value) ObjectType {
 	proto := target.InternalMethods().GetPrototypeOf(target)
 	boundFunction := &BoundFunctionObject{
-		Object:              NewObject(agent, proto),
+		Object:              NewObject(agent, proto, "BoundFunction"),
 		BoundTargetFunction: target,
 		BoundThis:           this,
 		BoundArguments:      args,

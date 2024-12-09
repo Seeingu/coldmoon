@@ -27,7 +27,7 @@ type TypedArrayObject struct {
 
 func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.TypedArrayPrototype)
+	object := NewObject(agent, realm.Intrinsics.TypedArrayPrototype, "TypedArrayPrototype")
 	typedArray := &TypedArrayObject{
 		Object: object,
 	}
@@ -36,7 +36,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 
 func NewTypedArrayNamePrototype(realm *Realm, name string) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.TypedArrayPrototype)
+	object := NewObject(agent, realm.Intrinsics.TypedArrayPrototype, "TypedArrayNamePrototype "+name)
 	return object
 }
 
@@ -150,7 +150,7 @@ func AllocateTypedArray(agent *Agent, constructorName string, newTarget ObjectTy
 
 func TypedArrayCreate(agent *Agent, name string, proto ObjectType) *TypedArrayObject {
 	object := &TypedArrayObject{
-		Object:            NewObject(agent, proto),
+		Object:            NewObject(agent, proto, "TypedArray "+name),
 		ViewedArrayBuffer: nil,
 		TypedArrayName:    name,
 	}

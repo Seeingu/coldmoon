@@ -102,7 +102,7 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 
 func NewDataViewPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "DataViewPrototype")
 
 	buffer := func(this Value, args []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*DataView](this)

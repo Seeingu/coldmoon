@@ -1,9 +1,6 @@
 package coldmoon
 
 import (
-	"fmt"
-
-	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
 )
 
@@ -2266,7 +2263,7 @@ func parserRecoverOk[T any](p *Parser, f func() T) (r T, ok bool) {
 	p.tokenizer.store()
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("parser recovered from: ", pkg.GetFunctionName(f), r)
+			// fmt.Println("parser recovered from: ", pkg.GetFunctionName(f), r)
 			p.tokenizer.restore()
 			ok = false
 		} else {

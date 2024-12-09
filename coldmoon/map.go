@@ -73,7 +73,7 @@ func NewMapConstructor(realm *Realm) ObjectType {
 
 func NewMapPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "MapPrototype")
 
 	var mapClear BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)

@@ -5,7 +5,7 @@ type ReflectObject struct {
 }
 
 func NewReflectObject(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "Reflect")
 	agent := realm.Agent
 
 	var apply BehaviorFn = func(_ Value, arguments []Value, newTarget ObjectType) Value {

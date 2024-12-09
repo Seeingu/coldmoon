@@ -3,7 +3,7 @@ package coldmoon
 type RegExpStringIteratorObject struct {
 	*Object
 	RegExp      *RegExpObject
-	String      string
+	string      string
 	Global      bool
 	FullUnicode bool
 	Completed   bool
@@ -14,9 +14,9 @@ func CreateRegExpStringIterator(agent *Agent, R *RegExpObject, S string, global 
 	realm := agent.CurrentRealm()
 
 	return &RegExpStringIteratorObject{
-		Object:      NewObject(agent, realm.Intrinsics.RegExpStringIteratorPrototype),
+		Object:      NewObject(agent, realm.Intrinsics.RegExpStringIteratorPrototype, "RegExpStringIterator"),
 		RegExp:      R,
-		String:      S,
+		string:      S,
 		Global:      global,
 		FullUnicode: fullUnicode,
 	}
@@ -24,14 +24,14 @@ func CreateRegExpStringIterator(agent *Agent, R *RegExpObject, S string, global 
 
 func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.IteratorPrototype)
+	object := NewObject(agent, realm.Intrinsics.IteratorPrototype, "RegExpStringIteratorPrototype")
 	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := MustGetObject(thisValue).(*RegExpStringIteratorObject)
 		if iterator.Completed {
 			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
 		}
 
-		match := RegExpExec(agent, iterator.RegExp, iterator.String)
+		match := RegExpExec(agent, iterator.RegExp, iterator.string)
 		if match.IsNull() {
 			iterator.Completed = true
 			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
@@ -44,7 +44,7 @@ func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 		matchStr := ToString(agent, match.Data().Get(NewStringPropertyKey("0")))
 		if matchStr.Data == "" {
 			thisIndex := ToLength(agent, iterator.RegExp.Get(NewStringPropertyKey("lastIndex")))
-			nextIndex := AdvanceStringIndex(iterator.String, thisIndex, iterator.FullUnicode)
+			nextIndex := AdvanceStringIndex(iterator.string, thisIndex, iterator.FullUnicode)
 			iterator.RegExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(nextIndex.ToNumber()), setThrowTypeThrow)
 		}
 		return NewValueFromObject(CreateIterResultObject(agent, NewValueFromObject(match.Data()), false))

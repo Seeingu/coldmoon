@@ -150,7 +150,7 @@ type BigIntObject struct {
 
 func NewBigIntObject(agent *Agent, v *BigIntValue, prototype ObjectType) *BigIntObject {
 	object := &BigIntObject{
-		Object: NewObject(agent, prototype),
+		Object: NewObject(agent, prototype, "BigInt"),
 		Data:   v,
 	}
 	return object
@@ -196,7 +196,7 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 
 func NewBigIntPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
-	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "BigIntPrototype")
 
 	toString := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		radix := arguments[0]

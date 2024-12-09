@@ -69,7 +69,7 @@ func decodeJSON(agent *Agent, d *json.Decoder) Value {
 
 func NewJSON(realm *Realm) *JSON {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.ObjectPrototype)
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "JSON")
 
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
 		Value:        NewStringValue("JSON"),

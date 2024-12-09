@@ -102,7 +102,7 @@ func CreateUnmappedArgumentsObject(agent *Agent, argumentsList []Value) ObjectTy
 	length := JSInt(len(argumentsList))
 
 	obj := &ArgumentsObject{
-		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype),
+		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype, "Arguments"),
 	}
 
 	obj.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
@@ -138,7 +138,7 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 	realm := agent.CurrentRealm()
 	length := JSInt(len(argumentsList))
 	obj := &ArgumentsObject{
-		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype),
+		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype, "MappedArguments"),
 	}
 	internalMethods := obj.InternalMethods()
 	internalMethods.GetOwnProperty = func(o ObjectType, p PropertyKey) *PropertyDescriptor {

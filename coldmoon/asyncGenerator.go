@@ -1,7 +1,7 @@
 package coldmoon
 
 func NewAsyncGeneratorPrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.AsyncIteratorPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.AsyncIteratorPrototype, "AsyncGeneratorPrototype")
 
 	DefineBuiltinPropertyP(object, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.AsyncGeneratorFunctionPrototype),

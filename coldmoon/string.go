@@ -88,7 +88,7 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 	}
 
 	stringObject := &StringObject{
-		Object: NewObject(agent, prototype),
+		Object: NewObject(agent, prototype, "String"),
 		Data:   s,
 	}
 	stringObject.InternalMethods().GetOwnProperty = getOwnProperty
@@ -167,7 +167,7 @@ func NewStringConstructor(realm *Realm) ObjectType {
 
 func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype := &StringObject{
-		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype),
+		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "StringPrototype"),
 		Data:   "",
 	}
 
@@ -227,7 +227,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		return NewValueFromObject(&StringIteratorObject{
-			Object: NewObject(agent, realm.Intrinsics.StringIteratorPrototype),
+			Object: NewObject(agent, realm.Intrinsics.StringIteratorPrototype, "String Iterator"),
 			Data:   s,
 		})
 	}

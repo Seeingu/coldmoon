@@ -7,7 +7,7 @@ type StringIteratorObject struct {
 }
 
 func NewStringIteratorPrototype(realm *Realm) ObjectType {
-	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype)
+	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype, "StringIteratorPrototype")
 	agent := realm.Agent
 	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		stringIterator := MustGetObject(thisValue).(*StringIteratorObject)

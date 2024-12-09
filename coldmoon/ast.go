@@ -690,6 +690,7 @@ func (m *MemberExpression) AssignmentTargetType() AssignmentTargetType {
 }
 
 func (m *MemberExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	e.AddDebug("MemberExpression: " + m.String())
 	m.Member.Bytecode(e, c)
 	if ExpressionAnalyze(m.Member, AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
@@ -764,7 +765,7 @@ func (l *LiteralUndefined) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 func (l *LiteralUndefined) String() string {
-	return "undefined"
+	return "LiteralUndefined"
 }
 
 type LiteralBoolean struct {
@@ -857,7 +858,7 @@ func (l *LiteralString) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 func (l *LiteralString) String() string {
-	return l.Value
+	return "StringLiteral: " + l.Value
 }
 
 // MARK: - Expression
@@ -975,10 +976,10 @@ func (o *OptionalExpression) Bytecode(e *Executable, c *BytecodeContext) {
 			e.AddInstruction(InsLoad)
 		}
 
-		e.AddInstruction(&ICall{
+		e.AddInstructionDebug(&ICall{
 			ArgumentCount: len(o.Property.Arguments),
 			Strict:        strict,
-		})
+		}, "OptionalExpression "+o.String())
 	} else if o.Property.Expression != nil {
 		expr := o.Property.Expression
 		expr.Bytecode(e, c)
@@ -1874,6 +1875,7 @@ type ExpressionEqualityExpression struct {
 }
 
 func (e *ExpressionEqualityExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+	ex.AddDebug("Equality: " + e.String())
 	e.Left.Bytecode(ex, c)
 	if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
 		ex.AddInstruction(InsGetValue)
@@ -2127,13 +2129,20 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 
 	strict := bc.containedInStrictCode
 
-	e.AddInstruction(&ICall{ArgumentCount: len(c.Arguments), Strict: strict})
+	e.AddInstructionDebug(
+		&ICall{
+			ArgumentCount: len(c.Arguments),
+			Strict:        strict,
+		},
+		"CallExpression: "+c.String(),
+	)
 
 	e.AddInstruction(&IPopReference{})
 }
 
 func (c *CallExpression) String() string {
-	sb := c.Callee.String() + "("
+	sb := "CallExpression "
+	sb += c.Callee.String() + "("
 	for i, arg := range c.Arguments {
 		if i != 0 {
 			sb += ", "
@@ -2475,7 +2484,8 @@ func (s *StatementExpression) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 func (s *StatementExpression) String() string {
-	return "ExpressionStatement " + s.Expression.String()
+	e := s.Expression.String()
+	return "ExpressionStatement " + e
 }
 
 // MARK: - BreakableStatement
