@@ -23,10 +23,8 @@ func (o *ObjectValue) CallAssumeCallable(value Value, argumentsList ArgumentsLis
 	return object.InternalMethods().Call(object, value, argumentsList)
 }
 
+// String is for internal use only.
+// TODO: JS standard toString() should use ToString() instead.
 func (o *ObjectValue) String() string {
-	primValue := ToPrimitive(o.Object.Agent(), o, PreferredTypeString)
-	if _, isObject := primValue.(*ObjectValue); isObject {
-		panic("")
-	}
-	return primValue.String()
+	return "ObjectValue: " + o.Object.String()
 }

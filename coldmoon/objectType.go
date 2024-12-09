@@ -29,6 +29,7 @@ type ObjectType interface {
 	SpeciesConstructor(defaultConstructor ObjectType) CompletionObject
 	ToCompletion() CompletionValue
 	ToValue() Value
+	String() string
 }
 
 func ObjectIs[O ObjectType](o ObjectType) bool {

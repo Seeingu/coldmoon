@@ -19,8 +19,9 @@ func NewSymbolPropertyKey(value *SymbolValue) SymbolPropertyKey {
 	return SymbolPropertyKey{Value: value}
 }
 
-func NewIntegerIndexPropertyKey(value JSInt) IntegerIndexPropertyKey {
-	return IntegerIndexPropertyKey{Value: value}
+// TODO: use as index key
+func NewIntegerIndexPropertyKey(value JSInt) StringPropertyKey {
+	return NewStringPropertyKey(fmt.Sprintf("%f", value.ToNumber()))
 }
 
 type StringPropertyKey struct {

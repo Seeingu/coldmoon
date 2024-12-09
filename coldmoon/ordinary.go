@@ -393,7 +393,7 @@ func OrdinarySetWithOwnDescriptor(
 }
 
 func InternalDelete(object ObjectType, key PropertyKey) bool {
-	return OrdinaryDelete(object.(*Object), key)
+	return OrdinaryDelete(object, key)
 }
 
 func OrdinaryDelete(object ObjectType, key PropertyKey) bool {
@@ -429,7 +429,7 @@ func ObjectSameValue(x, y ObjectType) bool {
 
 // 10.1.12
 func OrdinaryObjectCreate(agent *Agent, proto ObjectType, internalSlotsList []string) *Object {
-	obj := NewObject(agent, proto)
+	obj := NewObject(agent, proto, "OrdinaryObject")
 
 	return obj
 }

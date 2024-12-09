@@ -47,10 +47,8 @@ func (p *PropertyDescriptor) FromPropertyDescriptor(agent *Agent, desc *Property
 		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("value"), p.Value)
 	}
 
-	// TODO: Writable nil check
-	if p.Writable {
-		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("writable"), NewBooleanValue(p.Writable))
-	}
+	// TODO: writable can be nil
+	obj.CreateDataPropertyOrThrow(NewStringPropertyKey("writable"), NewBooleanValue(p.Writable))
 
 	if p.Get != nil {
 		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("get"), NewValueFromObject(p.Get))
@@ -60,13 +58,9 @@ func (p *PropertyDescriptor) FromPropertyDescriptor(agent *Agent, desc *Property
 		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("set"), NewValueFromObject(p.Set))
 	}
 
-	if p.Enumerable {
-		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("enumerable"), NewBooleanValue(p.Enumerable))
-	}
+	obj.CreateDataPropertyOrThrow(NewStringPropertyKey("enumerable"), NewBooleanValue(p.Enumerable))
 
-	if p.Configurable {
-		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("configurable"), NewBooleanValue(p.Configurable))
-	}
+	obj.CreateDataPropertyOrThrow(NewStringPropertyKey("configurable"), NewBooleanValue(p.Configurable))
 
 	return obj
 }
