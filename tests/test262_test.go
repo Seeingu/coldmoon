@@ -51,6 +51,13 @@ func testBigInt64Array(realm *Realm) {
 	fileNames := []string{
 		"constructor.js",
 		"BYTES_PER_ELEMENT.js",
+		"is-a-constructor.js",
+		"length.js",
+		"name.js",
+		"prototype.js",
+		// TODO:
+		//"prop-desc.js",
+		//"proto.js",
 	}
 	for _, name := range constructorNames {
 		for _, fileName := range fileNames {
