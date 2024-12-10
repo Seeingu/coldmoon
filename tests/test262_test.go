@@ -51,6 +51,7 @@ func testBigInt64Array(realm *Realm) {
 	fileNames := []string{
 		"constructor.js",
 		"BYTES_PER_ELEMENT.js",
+		"prototype/BYTES_PER_ELEMENT.js",
 		"is-a-constructor.js",
 		"length.js",
 		"name.js",
@@ -103,8 +104,8 @@ func TestHarness(t *testing.T) {
 
 	testDataView(realm)
 	// testArray(realm)
+	testBigInt64Array(realm)
 
 	Debug.Enable()
-	testBigInt64Array(realm)
 	Debug.Disable()
 }

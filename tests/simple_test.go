@@ -7,7 +7,7 @@ import (
 )
 
 func testSource(t *testing.T, s string) {
-	Debug.Enable()
+	// Debug.Enable()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()

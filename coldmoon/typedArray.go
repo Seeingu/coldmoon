@@ -37,6 +37,13 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 func NewTypedArrayNamePrototype(realm *Realm, name string) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.TypedArrayPrototype, "TypedArrayNamePrototype "+name)
+
+	DefineBuiltinPropertyP(object, "BYTES_PER_ELEMENT", &PropertyDescriptor{
+		Value:        NewNumberValue(getTypedArraySizeFromName(name).ToNumber()),
+		Writable:     false,
+		Configurable: false,
+		Enumerable:   false,
+	})
 	return object
 }
 
