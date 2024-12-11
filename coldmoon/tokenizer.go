@@ -136,6 +136,8 @@ const (
 type Token struct {
 	Type  TokenType
 	Value string
+	Line  int
+	Index int
 }
 
 type cachedState struct {
@@ -192,6 +194,15 @@ func (t *Tokenizer) restore() {
 	t.NextToken = cachedState.nextToken
 }
 
+func (t *Tokenizer) newToken(tokenType TokenType, value string) Token {
+	return Token{
+		Type:  tokenType,
+		Line:  t.line,
+		Index: t.Index,
+		Value: value,
+	}
+}
+
 func (t *Tokenizer) peek() Token {
 	t.skipWhiteSpace()
 	if t.Index >= t.Length {
@@ -204,228 +215,228 @@ func (t *Tokenizer) peek() Token {
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TCaretEquals, Value: "^="}
+			return t.newToken(TCaretEquals, "^=")
 		}
-		return Token{Type: TCaret, Value: "^"}
+		return t.newToken(TCaret, "^")
 	case ':':
 		t.Index++
-		return Token{Type: TColon, Value: ":"}
+		return t.newToken(TColon, ":")
 	case '{':
 		t.Index++
-		return Token{Type: TLeftBrace, Value: "{"}
+		return t.newToken(TLeftBrace, "{")
 	case '}':
 		if t.isTemplate {
 			return t.templateMiddleOrTail()
 		}
 		t.Index++
-		return Token{Type: TRightBrace, Value: "}"}
+		return t.newToken(TRightBrace, "}")
 	case '[':
 		t.Index++
-		return Token{Type: TLeftBracket, Value: "["}
+		return t.newToken(TLeftBracket, "[")
 	case ']':
 		t.Index++
-		return Token{Type: TRightBracket, Value: "]"}
+		return t.newToken(TRightBracket, "]")
 	case '(':
 		t.Index++
-		return Token{Type: TLeftParen, Value: "("}
+		return t.newToken(TLeftParen, "(")
 	case ')':
 		t.Index++
-		return Token{Type: TRightParen, Value: ")"}
+		return t.newToken(TRightParen, ")")
 	case '&':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '&' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
-				return Token{Type: TAmpersandAmpersandEquals, Value: "&&="}
+				return t.newToken(TAmpersandAmpersandEquals, "&&=")
 			}
-			return Token{Type: TAmpersandAmpersand, Value: "&&"}
+			return t.newToken(TAmpersandAmpersand, "&&")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TAmpersandEquals, Value: "&="}
+			return t.newToken(TAmpersandEquals, "&=")
 		}
-		return Token{Type: TAmpersand, Value: "&"}
+		return t.newToken(TAmpersand, "&")
 	case '%':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TPercentEquals, Value: "%="}
+			return t.newToken(TPercentEquals, "%=")
 		}
-		return Token{Type: TPercent, Value: "%"}
+		return t.newToken(TPercent, "%")
 	case '/':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TDivideEquals, Value: "/="}
+			return t.newToken(TDivideEquals, "/=")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '/' {
 			t.Index++
 			comment := t.comment("//")
-			return Token{Type: TComment, Value: comment}
+			return t.newToken(TComment, comment)
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '*' {
 			t.Index++
 			comment := t.comment("/*")
-			return Token{Type: TComment, Value: comment}
+			return t.newToken(TComment, comment)
 		}
 		if token, ok := t.tryToMatchRegularExpression(); ok {
 			return token
 		}
-		return Token{Type: TSlash, Value: "/"}
+		return t.newToken(TSlash, "/")
 	case '`':
 		return t.templateHead()
 	case '*':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TStarEquals, Value: "*="}
+			return t.newToken(TStarEquals, "*=")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '*' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
-				return Token{Type: TStarStarEquals, Value: "**="}
+				return t.newToken(TStarStarEquals, "**=")
 			}
-			return Token{Type: TStarStar, Value: "**"}
+			return t.newToken(TStarStar, "**")
 		}
-		return Token{Type: TStar, Value: "*"}
+		return t.newToken(TStar, "*")
 	case '.':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '.' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '.' {
 				t.Index++
-				return Token{Type: TDotDotDot, Value: "..."}
+				return t.newToken(TDotDotDot, "...")
 			}
 		}
-		return Token{Type: TDot, Value: "."}
+		return t.newToken(TDot, ".")
 	case ';':
 		t.Index++
-		return Token{Type: TSemicolon, Value: ";"}
+		return t.newToken(TSemicolon, ";")
 	case ',':
 		t.Index++
-		return Token{Type: TComma, Value: ","}
+		return t.newToken(TComma, ",")
 	case '<':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TLessThanEquals, Value: "<="}
+			return t.newToken(TLessThanEquals, "<=")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '<' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
-				return Token{Type: TLeftShiftEquals, Value: "<<="}
+				return t.newToken(TLeftShiftEquals, "<<=")
 			}
-			return Token{Type: TLeftShift, Value: "<<"}
+			return t.newToken(TLeftShift, "<<")
 		}
-		return Token{Type: TLessThan, Value: "<"}
+		return t.newToken(TLessThan, "<")
 	case '+':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '+' {
 			t.Index++
-			return Token{Type: TPlusPlus, Value: "++"}
+			return t.newToken(TPlusPlus, "++")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TPlusEquals, Value: "+="}
+			return t.newToken(TPlusEquals, "+=")
 		}
-		return Token{Type: TPlus, Value: "+"}
+		return t.newToken(TPlus, "+")
 	case '-':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '-' {
 			t.Index++
-			return Token{Type: TMinusMinus, Value: "--"}
+			return t.newToken(TMinusMinus, "--")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TMinusEquals, Value: "-="}
+			return t.newToken(TMinusEquals, "-=")
 		}
-		return Token{Type: TMinus, Value: "-"}
+		return t.newToken(TMinus, "-")
 	case '>':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TGreaterThanEquals, Value: ">="}
+			return t.newToken(TGreaterThanEquals, ">=")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '>' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
-				return Token{Type: TRightShiftEquals, Value: ">>="}
+				return t.newToken(TRightShiftEquals, ">>=")
 			}
 			if t.Index < t.Length && t.SourceText[t.Index] == '>' {
 				t.Index++
 				if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 					t.Index++
-					return Token{Type: TUnsignedRightShiftEquals, Value: ">>>="}
+					return t.newToken(TUnsignedRightShiftEquals, ">>>=")
 				}
-				return Token{Type: TUnsignedRightShift, Value: ">>>"}
+				return t.newToken(TUnsignedRightShift, ">>>")
 			}
-			return Token{Type: TRightShift, Value: ">>"}
+			return t.newToken(TRightShift, ">>")
 		}
-		return Token{Type: TGreaterThan, Value: ">"}
+		return t.newToken(TGreaterThan, ">")
 	case '=':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
-				return Token{Type: TStrictEquals, Value: "==="}
+				return t.newToken(TStrictEquals, "===")
 			}
-			return Token{Type: TEqualsEquals, Value: "=="}
+			return t.newToken(TEqualsEquals, "==")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '>' {
 			t.Index++
-			return Token{Type: TArrow, Value: "=>"}
+			return t.newToken(TArrow, "=>")
 		}
-		return Token{Type: TEquals, Value: "="}
+		return t.newToken(TEquals, "=")
 	case '|':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
-			return Token{Type: TPipeEquals, Value: "|="}
+			return t.newToken(TPipeEquals, "|=")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '|' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
-				return Token{Type: TPipePipeEquals, Value: "||="}
+				return t.newToken(TPipePipeEquals, "||=")
 			}
-			return Token{Type: TPipePipe, Value: "||"}
+			return t.newToken(TPipePipe, "||")
 		}
-		return Token{Type: TPipe, Value: "|"}
+		return t.newToken(TPipe, "|")
 	case '!':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
-				return Token{Type: TStrictNotEquals, Value: "!=="}
+				return t.newToken(TStrictNotEquals, "!==")
 			} else {
-				return Token{Type: TNotEquals, Value: "!="}
+				return t.newToken(TNotEquals, "!=")
 			}
 		}
-		return Token{Type: TNot, Value: "!"}
+		return t.newToken(TNot, "!")
 	case '?':
 		t.Index++
 		if t.Index < t.Length && t.SourceText[t.Index] == '.' {
 			t.Index++
-			return Token{Type: TQuestionDot, Value: "?."}
+			return t.newToken(TQuestionDot, "?.")
 		}
 		if t.Index < t.Length && t.SourceText[t.Index] == '?' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
 				t.Index++
-				return Token{Type: TQuestionQuestionEquals, Value: "??="}
+				return t.newToken(TQuestionQuestionEquals, "??=")
 			}
-			return Token{Type: TQuestionQuestion, Value: "??"}
+			return t.newToken(TQuestionQuestion, "??")
 		}
-		return Token{Type: TQuestion, Value: "?"}
+		return t.newToken(TQuestion, "?")
 	case '~':
 		t.Index++
-		return Token{Type: TTilde, Value: "~"}
+		return t.newToken(TTilde, "~")
 	case '\'', '"':
 		return t.string()
 	default:
@@ -447,14 +458,14 @@ func (t *Tokenizer) templateMiddleOrTail() Token {
 		if ch == '`' {
 			t.Index++
 			t.isTemplate = false
-			return Token{Type: TTemplateTail, Value: string(t.SourceText[start : t.Index-1])}
+			return t.newToken(TTemplateTail, string(t.SourceText[start:t.Index-1]))
 		}
 		if ch == '$' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '{' {
 				t.Index++
 				t.isTemplate = true
-				return Token{Type: TTemplateMiddle, Value: string(t.SourceText[start : t.Index-2])}
+				return t.newToken(TTemplateMiddle, string(t.SourceText[start:t.Index-2]))
 			}
 		}
 		t.Index++
@@ -468,14 +479,14 @@ func (t *Tokenizer) templateHead() Token {
 		ch := t.SourceText[t.Index]
 		if ch == '`' {
 			t.Index++
-			return Token{Type: TNoSubstitutionTemplate, Value: string(t.SourceText[start:t.Index])}
+			return t.newToken(TNoSubstitutionTemplate, string(t.SourceText[start:t.Index]))
 		}
 		if ch == '$' {
 			t.Index++
 			if t.Index < t.Length && t.SourceText[t.Index] == '{' {
 				t.Index++
 				t.isTemplate = true
-				return Token{Type: TTemplateHead, Value: string(t.SourceText[start : t.Index-2])}
+				return t.newToken(TTemplateHead, string(t.SourceText[start:t.Index-2]))
 			}
 		}
 		t.Index++
@@ -530,7 +541,7 @@ func (t *Tokenizer) string() Token {
 		t.Index++
 	}
 	value := string(t.SourceText[start : t.Index-1])
-	return Token{Type: TString, Value: value}
+	return t.newToken(TString, value)
 }
 
 // MARK: - Number
@@ -556,7 +567,7 @@ func (t *Tokenizer) number() Token {
 		}
 	}
 	value := string(t.SourceText[start:t.Index])
-	return Token{Type: TNumber, Value: value}
+	return t.newToken(TNumber, value)
 }
 
 // MARK: - Identifier, Keyword
@@ -577,9 +588,9 @@ func (t *Tokenizer) identifierOrKeyword() Token {
 	}
 	value := string(t.SourceText[start:t.Index])
 	if lo.Contains(lo.Keys(keywordsMap), value) {
-		return Token{Type: keywordsMap[value], Value: value}
+		return t.newToken(keywordsMap[value], value)
 	}
-	return Token{Type: TIdentifier, Value: value}
+	return t.newToken(TIdentifier, value)
 }
 
 var keywordsMap = map[string]TokenType{
@@ -633,7 +644,7 @@ func (t *Tokenizer) keyword() (token Token, ok bool) {
 	for keyword, tokenType := range keywordsMap {
 		if t.matchString(keyword) {
 			ok = true
-			token = Token{Type: tokenType, Value: keyword}
+			token = t.newToken(tokenType, keyword)
 			return
 		}
 	}
@@ -691,7 +702,7 @@ func (t *Tokenizer) regularExpression() Token {
 		t.Index++
 	}
 	value := string(t.SourceText[start : t.Index-1])
-	return Token{Type: TRegularExpression, Value: value}
+	return t.newToken(TRegularExpression, value)
 }
 
 func (t *Tokenizer) Peek() Token {
