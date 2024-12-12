@@ -134,10 +134,11 @@ const (
 )
 
 type Token struct {
-	Type  TokenType
-	Value string
-	Line  int
-	Index int
+	Type       TokenType
+	Value      string
+	Line       int
+	StartIndex int
+	EndIndex   int
 }
 
 type cachedState struct {
@@ -170,6 +171,14 @@ func NewTokenizer(sourceText string) *Tokenizer {
 	return tokenizer
 }
 
+func (t *Tokenizer) CurrentStartIndex() int {
+	return t.CurrentToken.StartIndex
+}
+
+func (t *Tokenizer) CurrentEndIndex() int {
+	return t.CurrentToken.EndIndex
+}
+
 func (t *Tokenizer) store() {
 	t.cachedStates.Push(&cachedState{
 		index:        t.Index,
@@ -196,10 +205,11 @@ func (t *Tokenizer) restore() {
 
 func (t *Tokenizer) newToken(tokenType TokenType, value string) Token {
 	return Token{
-		Type:  tokenType,
-		Line:  t.line,
-		Index: t.Index,
-		Value: value,
+		Type:       tokenType,
+		Line:       t.line,
+		StartIndex: t.Index - len(value),
+		EndIndex:   t.Index,
+		Value:      value,
 	}
 }
 

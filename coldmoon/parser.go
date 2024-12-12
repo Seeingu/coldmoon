@@ -638,7 +638,7 @@ func (p *Parser) formalParameters() *FormalParameters {
 }
 
 func (p *Parser) functionDeclaration() *FunctionDeclaration {
-	startOffset := p.tokenizer.Index
+	startOffset := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TFunction)
 	identifier := p.bindingIdentifier()
 	p.tokenizer.MustMatch(TLeftParen)
@@ -646,8 +646,9 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
 	functionBody := p.functionBody(FunctionTypeNormal)
+	endIndex := p.tokenizer.CurrentEndIndex()
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:endIndex]
 	return &FunctionDeclaration{
 		Identifier:       identifier,
 		FormalParameters: params,
