@@ -58,10 +58,12 @@ func NewArrayIteratorPrototype(realm *Realm) ObjectType {
 
 // 23.1.5.1
 func CreateArrayIterator(agent *Agent, array ObjectType, kind objectOwnPropertiesKind) *ArrayIteratorObject {
-	return &ArrayIteratorObject{
+	a := &ArrayIteratorObject{
 		Object: NewObject(agent, agent.CurrentRealm().Intrinsics.ArrayIteratorPrototype, "ArrayIterator"),
 		Array:  array,
 		Kind:   kind,
 		Index:  0,
 	}
+	a.ref = a
+	return a
 }

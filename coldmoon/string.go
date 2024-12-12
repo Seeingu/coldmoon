@@ -91,6 +91,7 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 		Object: NewObject(agent, prototype, "String"),
 		Data:   s,
 	}
+	stringObject.ref = stringObject
 	stringObject.InternalMethods().GetOwnProperty = getOwnProperty
 	stringObject.InternalMethods().DefineOwnProperty = defineOwnProperty
 	stringObject.InternalMethods().OwnPropertyKeys = ownPropertyKeys
@@ -170,6 +171,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "StringPrototype"),
 		Data:   "",
 	}
+	stringPrototype.ref = stringPrototype
 
 	agent := realm.Agent
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
@@ -226,10 +228,12 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	var iterator BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
-		return NewValueFromObject(&StringIteratorObject{
+		stringIteratorObject := &StringIteratorObject{
 			Object: NewObject(agent, realm.Intrinsics.StringIteratorPrototype, "String Iterator"),
 			Data:   s,
-		})
+		}
+		stringIteratorObject.ref = stringIteratorObject
+		return NewValueFromObject(stringIteratorObject)
 	}
 	var at BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		index := argumentsList[0]

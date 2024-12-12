@@ -25,6 +25,8 @@ type Object struct {
 	ObjectType
 	typeName string
 	data     *Data
+	// ref is used to store the reference of the object
+	ref ObjectType
 }
 
 func (o *Object) ToObject() *Object {
@@ -32,7 +34,16 @@ func (o *Object) ToObject() *Object {
 }
 
 func (o *Object) ToValue() Value {
-	return NewValueFromObject(o)
+	return NewValueFromObject(o.Ref())
+}
+
+// Ref returns the reference of the object
+// If the object does not have a reference, it returns itself
+func (o *Object) Ref() ObjectType {
+	if o.ref == nil {
+		return o
+	}
+	return o.ref
 }
 
 func NewObject(agent *Agent, prototype ObjectType, typeName string) *Object {
@@ -116,15 +127,15 @@ func (o *Object) Get(key PropertyKey) Value {
 
 // 7.3.4
 func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) {
-	success := o.InternalMethods().Set(o, key, value, NewValueFromObject(o))
+	success := o.InternalMethods().Set(o.Ref(), key, value, NewValueFromObject(o))
 	if !success && throw == setThrowTypeThrow {
 		o.Agent().ThrowException(TypeError, "SetObject failed")
 	}
 }
 
 // 7.3.5
-func CreateDataProperty(o ObjectType, key PropertyKey, value Value) bool {
-	newDesc := o.InternalMethods().DefineOwnProperty(o, key, &PropertyDescriptor{
+func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
+	newDesc := o.InternalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
 		Value:        value,
 		Writable:     true,
 		Enumerable:   true,
@@ -133,22 +144,14 @@ func CreateDataProperty(o ObjectType, key PropertyKey, value Value) bool {
 	return newDesc
 }
 
-func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
-	return CreateDataProperty(o, key, value)
-}
-
 // 7.3.6
 
-func CreateDataPropertyOrThrow(o ObjectType, key PropertyKey, value Value) bool {
-	success := o.CreateDataProperty(key, value)
+func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) bool {
+	success := o.Ref().CreateDataProperty(key, value)
 	if !success {
 		o.Agent().ThrowException(TypeError, "CreateDataPropertyOrThrow failed")
 	}
 	return success
-}
-
-func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) bool {
-	return CreateDataPropertyOrThrow(o, key, value)
 }
 
 // 7.3.7
@@ -167,21 +170,17 @@ func (o *Object) CreateNonEnumerableDataProperty(key PropertyKey, value Value) b
 }
 
 // 7.3.8
-func DefinePropertyOrThrow(o ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
-	success := o.InternalMethods().DefineOwnProperty(o, key, desc)
+func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
+	success := o.InternalMethods().DefineOwnProperty(o.Ref(), key, desc)
 	if !success {
 		o.Agent().ThrowException(TypeError, "DefinePropertyOrThrow failed")
 	}
 	return success
 }
 
-func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
-	return DefinePropertyOrThrow(o, key, desc)
-}
-
 // 7.3.9
 func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
-	success := o.InternalMethods().Delete(o, key)
+	success := o.InternalMethods().Delete(o.Ref(), key)
 	if !success {
 		o.Agent().ThrowException(TypeError, "DeletePropertyOrThrow failed")
 	}

@@ -5,20 +5,8 @@ type ArgumentsObject struct {
 	ParameterMap ObjectType
 }
 
-func (a *ArgumentsObject) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
-	return DefinePropertyOrThrow(a, key, desc)
-}
-
-func (a *ArgumentsObject) CreateDataProperty(key PropertyKey, value Value) bool {
-	return CreateDataProperty(a, key, value)
-}
-
-func (a *ArgumentsObject) CreateDataPropertyOrThrow(key PropertyKey, value Value) bool {
-	return CreateDataPropertyOrThrow(a, key, value)
-}
-
 // 10.4.4.1
-func GetOwnProperty(object ObjectType, key PropertyKey) CompletionPropertyDescriptor {
+func argumentsGetOwnProperty(object ObjectType, key PropertyKey) CompletionPropertyDescriptor {
 	desc := OrdinaryGetOwnProperty(object, key)
 	if desc == nil {
 		return NewCompletionPropertyDescriptorUndefined()
@@ -32,7 +20,7 @@ func GetOwnProperty(object ObjectType, key PropertyKey) CompletionPropertyDescri
 }
 
 // 10.4.4.2
-func DefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
+func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	newArgDesc := desc
@@ -61,7 +49,7 @@ func DefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescrip
 }
 
 // 10.4.4.3
-func Get(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
+func argumentsGet(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	if !isMapped {
@@ -73,7 +61,7 @@ func Get(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
 }
 
 // 10.4.4.4
-func Set(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
+func argumentsSet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
 	if SameValue(NewValueFromObject(object), receiver) {
 		_map := object.(*ArgumentsObject).ParameterMap
 		isMapped := ObjectHasOwnProperty(_map, key)
@@ -85,7 +73,7 @@ func Set(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
 }
 
 // 10.4.4.5
-func Delete(object ObjectType, key PropertyKey) bool {
+func argumentsDelete(object ObjectType, key PropertyKey) bool {
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	result := OrdinaryDelete(object, key)
@@ -104,6 +92,7 @@ func CreateUnmappedArgumentsObject(agent *Agent, argumentsList []Value) ObjectTy
 	obj := &ArgumentsObject{
 		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype, "Arguments"),
 	}
+	obj.ref = obj
 
 	obj.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
 		Value:        NewNumberValue(length.ToNumber()),
@@ -140,17 +129,18 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 	obj := &ArgumentsObject{
 		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype, "MappedArguments"),
 	}
+	obj.ref = obj
 	internalMethods := obj.InternalMethods()
 	internalMethods.GetOwnProperty = func(o ObjectType, p PropertyKey) *PropertyDescriptor {
-		pp := GetOwnProperty(obj, p)
+		pp := argumentsGetOwnProperty(obj, p)
 		return pp.Data()
 	}
-	internalMethods.DefineOwnProperty = DefineOwnProperty
+	internalMethods.DefineOwnProperty = argumentsDefineOwnProperty
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
-		return Get(obj, p, receiver).Data()
+		return argumentsGet(obj, p, receiver).Data()
 	}
-	internalMethods.Set = Set
-	internalMethods.Delete = Delete
+	internalMethods.Set = argumentsSet
+	internalMethods.Delete = argumentsDelete
 
 	_map := OrdinaryObjectCreate(agent, nil, nil)
 	obj.ParameterMap = _map

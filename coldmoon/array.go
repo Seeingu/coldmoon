@@ -76,6 +76,7 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) ObjectType {
 	arr := &ArrayObject{
 		Object: NewObject(agent, proto, "Array"),
 	}
+	arr.ref = arr
 	arr.Object.InternalMethods().DefineOwnProperty = defineOwnProperty
 	OrdinaryDefineOwnProperty(arr, NewStringPropertyKey("length"), &PropertyDescriptor{
 		Value:        NewNumberValue(length.ToNumber()),
@@ -290,6 +291,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	object := &ArrayObject{
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "ArrayPrototype"),
 	}
+	object.ref = object
 
 	DefineBuiltinPropertyP(object.Object, "length", &PropertyDescriptor{
 		Value:        NewNumberValue(0),

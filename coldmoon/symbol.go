@@ -36,6 +36,7 @@ func NewSymbolObject(agent *Agent, s *SymbolValue, prototype ObjectType) *Symbol
 		Object: NewObject(agent, prototype, "Symbol"),
 		Data:   s,
 	}
+	symbolObject.ref = symbolObject
 
 	return symbolObject
 }

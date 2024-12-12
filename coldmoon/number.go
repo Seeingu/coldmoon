@@ -494,6 +494,7 @@ func NewNumberObject(agent *Agent, value JSNumber, prototype ObjectType) *Number
 		Object: NewObject(agent, prototype, "Number"),
 		Data:   value,
 	}
+	object.ref = object
 	return object
 }
 
@@ -501,6 +502,7 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 	object := &NumberObject{
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "NumberPrototype"),
 	}
+	object.ref = object
 
 	agent := realm.Agent
 	var toString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {

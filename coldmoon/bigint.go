@@ -153,6 +153,7 @@ func NewBigIntObject(agent *Agent, v *BigIntValue, prototype ObjectType) *BigInt
 		Object: NewObject(agent, prototype, "BigInt"),
 		Data:   v,
 	}
+	object.ref = object
 	return object
 }
 

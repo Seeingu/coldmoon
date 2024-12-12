@@ -140,6 +140,7 @@ func NativeError() ObjectType {
 	errorObject := &ErrorObject{
 		Object: NewObject(nil, nil, "Error"),
 	}
+	errorObject.ref = errorObject
 	return errorObject
 }
 

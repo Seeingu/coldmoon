@@ -52,10 +52,12 @@ func (b *BooleanObject) getData() bool {
 }
 
 func NewBooleanObject(agent *Agent, b bool, prototype ObjectType) *BooleanObject {
-	return &BooleanObject{
+	o := &BooleanObject{
 		Object: NewObject(agent, prototype, "Boolean"),
 		Data:   b,
 	}
+	o.ref = o
+	return o
 }
 
 func NewBooleanConstructor(realm *Realm) ObjectType {
@@ -113,6 +115,7 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "BooleanPrototype"),
 		Data:   false,
 	}
+	object.ref = object
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		b := thisBooleanValue(realm.Agent, thisArgument)
 		if b {
