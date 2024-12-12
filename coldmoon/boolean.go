@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/Seeingu/coldmoon/pkg"
+
 // MARK: - BooleanValue
 
 type BooleanValue struct {
@@ -59,8 +61,13 @@ func NewBooleanObject(agent *Agent, b bool, prototype ObjectType) *BooleanObject
 func NewBooleanConstructor(realm *Realm) ObjectType {
 	// 20.3.1.1
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		value := argumentsList[0]
-		b := value.ToBoolean()
+		value := pkg.SliceSafeGet(argumentsList, 0)
+		var b bool
+		if value == nil {
+			b = false
+		} else {
+			b = value.ToBoolean()
+		}
 		if newTarget == nil {
 			return NewBooleanValue(b)
 		}

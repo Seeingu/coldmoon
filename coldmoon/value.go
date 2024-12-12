@@ -619,7 +619,7 @@ func SameValueNonNumber(x Value, y Value) bool {
 	case *StringValue:
 		return x.(*StringValue).Data == y.(*StringValue).Data
 	case *BooleanValue:
-		return x.(*BooleanValue).Data == y.(*BooleanValue).Data
+		return x == y
 	case *SymbolValue:
 		return x.(*SymbolValue).Id == y.(*SymbolValue).Id
 	case *ObjectValue:
