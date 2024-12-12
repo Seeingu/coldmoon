@@ -8,13 +8,15 @@ type BooleanValue struct {
 }
 
 var (
-	FalseValue = NewBooleanValue(false)
-	TrueValue  = NewBooleanValue(true)
+	FalseValue = &BooleanValue{Data: false}
+	TrueValue  = &BooleanValue{Data: true}
 )
 
 func NewBooleanValue(data bool) *BooleanValue {
-	return &BooleanValue{
-		Data: data,
+	if data {
+		return TrueValue
+	} else {
+		return FalseValue
 	}
 }
 
