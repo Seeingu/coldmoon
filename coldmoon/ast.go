@@ -2366,6 +2366,7 @@ func (t *StatementTry) VarScopedDeclarations() (l []*VariableDeclaration) {
 
 func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
 	if t.FinallyBlock == nil {
+		e.AddDebug("Try Catch Start: " + t.String())
 		exceptionJumpToCatch := &IPushExceptionJumpTarget{}
 		e.AddInstruction(exceptionJumpToCatch)
 
@@ -2373,7 +2374,6 @@ func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
 			Value: UndefinedValue,
 		})
 		t.TryBlock.Bytecode(e, c)
-		e.AddInstruction(&IPopExceptionJumpTarget{})
 		exceptionJumpToEnd := &IJump{}
 		e.AddInstruction(exceptionJumpToEnd)
 
@@ -2387,9 +2387,11 @@ func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
 		e.AddInstruction(&IStoreConstant{
 			Value: UndefinedValue,
 		})
+		e.AddDebug("Catch block start")
 		t.CatchBlock.Bytecode(e, c)
 
 		exceptionJumpToEnd.Target = len(e.Instructions) - 1
+		e.AddDebug("Try Catch end")
 	} else if t.CatchBlock == nil {
 		exceptionJumpToFinally := &IPushExceptionJumpTarget{}
 		e.AddInstruction(exceptionJumpToFinally)
@@ -2406,7 +2408,6 @@ func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
 		})
 		t.FinallyBlock.Bytecode(e, c)
 		e.AddInstruction(&IRethrowExceptionIfAny{})
-
 	} else {
 		exceptionJumpToCatch := &IPushExceptionJumpTarget{}
 		e.AddInstruction(exceptionJumpToCatch)
@@ -2444,7 +2445,14 @@ func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 func (t *StatementTry) String() string {
-	return "try"
+	sb := "try " + t.TryBlock.String()
+	if t.CatchBlock != nil {
+		sb += " catch (" + string(t.CatchParameter) + ") " + t.CatchBlock.String()
+	}
+	if t.FinallyBlock != nil {
+		sb += " finally " + t.FinallyBlock.String()
+	}
+	return sb
 }
 
 // MARK: - DebuggerStatement
