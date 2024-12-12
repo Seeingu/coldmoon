@@ -15,7 +15,6 @@ type VM struct {
 	stack                    pkg.Stack[Value]
 	result                   Value
 	ip                       int
-	reference                *ReferenceRecord
 	referenceStack           pkg.Stack[*ReferenceRecord]
 	exceptionJumpTargetStack pkg.Stack[int]
 	exception                Value
@@ -31,6 +30,8 @@ func NewVM(agent *Agent) *VM {
 
 func (vm *VM) stackPush(v Value, m string) {
 	if v == nil {
+		vm.stack.Push(UndefinedValue)
+		vm.debugPrintStack("push nil value: " + m)
 		return
 	}
 	if o, ok := vm.result.(*ObjectValue); ok {
@@ -67,7 +68,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IStoreConstant:
 		vm.result = ins.Value
 	case *IResolveBinding:
-		vm.reference = vm.agent.ResolveBinding(string(ins.Name), nil, ins.Strict)
+		vm.referenceStack.Push(vm.agent.ResolveBinding(string(ins.Name), nil, ins.Strict))
 	case *ICall:
 		argumentCount := ins.ArgumentCount
 		arguments := make([]Value, argumentCount)
@@ -117,7 +118,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		env := agent.GetThisEnvironment()
 		Assert(env.HasSuperBinding())
 		baseValue := env.(*FunctionEnvironment).GetSuperBase()
-		vm.reference = &ReferenceRecord{
+		reference := &ReferenceRecord{
 			Base: &ReferenceRecordBaseValue{
 				Value: baseValue,
 			},
@@ -125,6 +126,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			Strict:         strict,
 			ThisValue:      actualThis,
 		}
+		vm.referenceStack.Push(reference)
 
 	case *IResolveThisBinding:
 		vm.result = vm.agent.ResolveThisBinding()
@@ -159,15 +161,19 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		)
 		vm.result = NewValueFromObject(closure)
 	case *ITypeof:
-		if vm.reference != nil {
-			if vm.reference.IsUnresolvableReference() {
+		var r *ReferenceRecord
+		if !vm.referenceStack.IsEmpty() {
+			r = vm.referenceStack.Peek()
+		}
+		if r != nil {
+			if r.IsUnresolvableReference() {
 				vm.result = NewStringValue("undefined")
 				return
 			}
 		}
 		value := vm.result
-		if vm.reference != nil {
-			value = vm.reference.GetValue(agent)
+		if r != nil {
+			value = r.GetValue(agent)
 		}
 
 		switch v := value.(type) {
@@ -256,7 +262,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 				String: strconv.Itoa(int(p.Value)),
 			}
 		}
-		vm.reference = &ReferenceRecord{
+		reference := &ReferenceRecord{
 			Base: &ReferenceRecordBaseValue{
 				Value: baseValue,
 			},
@@ -264,6 +270,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			Strict:         strict,
 			ThisValue:      nil,
 		}
+		vm.referenceStack.Push(reference)
 	case *IEvaluatePropertyAccessWithIdentifierKey:
 		// 13.3.4
 		propertyNameString := ins.Name
@@ -272,7 +279,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		referencedName := &ReferencedNameString{
 			String: string(propertyNameString),
 		}
-		vm.reference = &ReferenceRecord{
+		reference := &ReferenceRecord{
 			Base: &ReferenceRecordBaseValue{
 				Value: baseValue,
 			},
@@ -280,11 +287,10 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			Strict:         strict,
 			ThisValue:      nil,
 		}
+		vm.referenceStack.Push(reference)
 	case *IGetValue:
-		if vm.reference != nil {
-			vm.result = vm.reference.GetValue(agent)
-		}
-		vm.reference = nil
+		r := vm.referenceStack.Pop()
+		vm.result = r.GetValue(agent)
 	case *IArrayCreate:
 		vm.result = NewValueFromObject(ArrayCreate(vm.agent, 0, nil))
 	case *IArraySetLength:
@@ -398,15 +404,13 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 			panic("CompletionTypeThrow")
 		}
 	case *IPushReference:
-		Assert(vm.reference != nil)
-		vm.referenceStack.Push(vm.reference)
+		vm.referenceStack.Push(vm.referenceStack.Peek())
 	case *IPopReference:
 		vm.referenceStack.Pop()
 	case *IPutValue:
 		lref := vm.referenceStack.Peek()
 		rval := vm.result
 		lref.PutValue(vm.agent, rval)
-		vm.reference = nil
 	case *ICreateCatchBinding:
 		name := ins.IdentifierName
 		thrownValue := vm.exception
@@ -417,7 +421,7 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		catchEnv.InitializeBinding(string(name), thrownValue)
 		vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = catchEnv
 	case *IDelete:
-		ref := vm.reference
+		ref := vm.referenceStack.Peek()
 		if ref.IsUnresolvableReference() {
 			Assert(!ref.Strict)
 			vm.result = NewBooleanValue(true)
