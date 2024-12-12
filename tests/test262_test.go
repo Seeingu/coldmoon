@@ -35,10 +35,20 @@ func runTestHarness(realm *Realm, f string, debug bool) {
 	}
 }
 
+func evaluate(fileName string, realm *Realm) {
+	result := ParseScript(mustReadFile(fileName), realm, nil).Evaluate()
+	if o, ok := ValueGetObject(result); ok {
+		if e, ok := o.(*ErrorObject); ok {
+			println("Return Error: ", e.Message)
+			panic(e)
+		}
+	}
+}
+
 func testDataView(realm *Realm) {
 	dataViewDir := "./test262/test/built-ins/DataView/"
 	f := makeTest262Path(dataViewDir + "constructor.js")
-	ParseScript(mustReadFile(f), realm, nil).Evaluate()
+	evaluate(f, realm)
 }
 
 func testBigInt64Array(realm *Realm) {
@@ -66,8 +76,26 @@ func testBigInt64Array(realm *Realm) {
 		for _, fileName := range fileNames {
 			d := typedArrayConstructorDir + "/" + name
 			f := makeTest262Path(d + "/" + fileName)
-			ParseScript(mustReadFile(f), realm, nil).Evaluate()
+			println("BigInt64Array: Testing file: ", fileName)
+			evaluate(f, realm)
 		}
+	}
+}
+
+func testBoolean(realm *Realm) {
+	boolDir := "./test262/test/built-ins/Boolean/"
+	entries, err := os.ReadDir(makeTest262Path(boolDir))
+	if err != nil {
+		panic(err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		f := makeTest262Path(boolDir + entry.Name())
+		println("BOOLEAN: Testing file: ", entry.Name())
+		evaluate(f, realm)
 	}
 }
 
@@ -83,7 +111,7 @@ func testArray(realm *Realm) {
 		}
 		f := makeTest262Path(arrayDir + entry.Name())
 		println("Testing file: ", entry.Name())
-		ParseScript(mustReadFile(f), realm, nil).Evaluate()
+		evaluate(f, realm)
 	}
 }
 
@@ -104,10 +132,11 @@ func TestHarness(t *testing.T) {
 		runTestHarness(realm, f, false)
 	}
 
-	testDataView(realm)
 	// testArray(realm)
+	testDataView(realm)
 	testBigInt64Array(realm)
 
 	Debug.Enable()
+	// testBoolean(realm)
 	Debug.Disable()
 }

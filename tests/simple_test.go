@@ -7,7 +7,7 @@ import (
 )
 
 func testSource(t *testing.T, s string) {
-	// Debug.Enable()
+	Debug.Enable()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
@@ -18,20 +18,17 @@ func testSource(t *testing.T, s string) {
 }
 
 func TestBaseline(t *testing.T) {
-	var sourceText string
-
-	sourceText = `
-const desc = Object.getOwnPropertyDescriptor(BigInt64Array, 'BYTES_PER_ELEMENT');
+	sourceTexts := []string{
+		"Boolean(function() {}())",
+		"typeof Boolean(void 0)",
+		"void 0",
+		`const desc = Object.getOwnPropertyDescriptor(BigInt64Array, 'BYTES_PER_ELEMENT');
 let a = 0;
 if (Object.prototype.hasOwnProperty.call(desc, 'enumerable')) {
 	a = 1;
 }
-a;
-`
-	testSource(t, sourceText)
-
-	sourceText = `
-const a = {
+a;`,
+		`const a = {
   b: 8,
   writable: false,
   enumerable: false,
@@ -40,66 +37,36 @@ const a = {
 delete a.b;
 let b = 2;
 a.b = b;
-a.b;
-`
-	testSource(t, sourceText)
-
-	sourceText = `
-let a = 1;
+a.b;`,
+		`let a = 1;
 for (var i = 0; i < 3; i++) {
 	a += i;
 }
-for (var i in [1, 2, 3]) {
-	a += i;
-}
-a;
-`
-	testSource(t, sourceText)
-
-	sourceText = `
-var a = [];
+a;`,
+		`var a = [];
 var a = [1,2,3];
 a[4294967295] = "not an array element";
-a[4294967295];
-`
-	testSource(t, sourceText)
-
-	sourceText = `
-function toString(a) {
+a[4294967295];`,
+		`function toString(a) {
 	return a;
 }
 let a = toString(10);
-a + 'hello';
-`
-	testSource(t, sourceText)
-
-	sourceText = `
-let a = 1;
+a + 'hello';`,
+		`let a = 1;
 let b = a + 1;
 let c = a + b + b;
 'hello' + a + "world";
 c += a + b;
 a ? b : c;
-var d = 1 ?	2 : 3;
-`
-	testSource(t, sourceText)
-
-	sourceText = `
-const a = {};
-const b = a?.b;
-` + "``"
-	testSource(t, sourceText)
-
-	sourceText = `
-class A {
+var d = 1 ?	2 : 3;`,
+		`const a = {};
+const b = a?.b;`,
+		"``",
+		`class A {
 	static sa = 'a';
 }
-const B = class {}
-`
-	testSource(t, sourceText)
-
-	sourceText = `
-function a() {
+const B = class {}`,
+		`function a() {
 }
 function* b() {
 }
@@ -108,19 +75,17 @@ async function* c() {
 async function d() {
 }
 const a = async () => {
-}
-`
-	testSource(t, sourceText)
-
-	sourceText = `
-2 == 1;
+}`,
+		`2 == 1;
 2 > 1;
 false || 1;
 true && 1;
 true ? 2 : 1;
 2 ** 3;
 () => 123;
-Date.UTC(2012);
-`
-	testSource(t, sourceText)
+Date.UTC(2012);`,
+	}
+	for _, sourceText := range sourceTexts {
+		testSource(t, sourceText)
+	}
 }
