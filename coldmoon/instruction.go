@@ -104,7 +104,7 @@ type IPushExceptionJumpTarget struct {
 }
 
 func (i *IPushExceptionJumpTarget) String() string {
-	return "IPushExceptionJumpTarget"
+	return "IPushExceptionJumpTarget " + fmt.Sprintf("%d", i.Target)
 }
 
 type IRethrowExceptionIfAny struct {
@@ -658,6 +658,14 @@ type IPushLexicalEnvironment struct {
 
 func (i *IPushLexicalEnvironment) String() string {
 	return "IPushLexicalEnvironment"
+}
+
+type IPopLexicalEnvironment struct {
+	Instruction
+}
+
+func (i *IPopLexicalEnvironment) String() string {
+	return "IPopLexicalEnvironment"
 }
 
 // MARK: - Instruction Constant
