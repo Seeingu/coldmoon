@@ -51,7 +51,7 @@ func testDataView(realm *Realm) {
 	evaluate(f, realm)
 }
 
-func testBigInt64Array(realm *Realm) {
+func testTypedArray(realm *Realm) {
 	typedArrayConstructorDir := "./test262/test/built-ins/TypedArrayConstructors"
 	constructorNames := []string{
 		"BigInt64Array",
@@ -134,7 +134,7 @@ func TestHarness(t *testing.T) {
 
 	// testArray(realm)
 	testDataView(realm)
-	testBigInt64Array(realm)
+	testTypedArray(realm)
 
 	Debug.Enable()
 	// testBoolean(realm)

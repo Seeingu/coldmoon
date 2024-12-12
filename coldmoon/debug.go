@@ -7,7 +7,7 @@ type debugConfig struct {
 
 func (d *debugConfig) Enable() {
 	d.PrintBytecode = true
-	d.PrintAST = false
+	d.PrintAST = true
 }
 
 func (d *debugConfig) Disable() {

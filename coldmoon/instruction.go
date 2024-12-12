@@ -265,7 +265,7 @@ type IInstantiateOrdinaryFunctionExpression struct {
 }
 
 func (i *IInstantiateOrdinaryFunctionExpression) String() string {
-	return "IInstantiateOrdinaryFunctionExpression"
+	return "IInstantiateOrdinaryFunctionExpression " + i.FunctionExpression.String()
 }
 
 type IInstantiateArrowFunctionExpression struct {
