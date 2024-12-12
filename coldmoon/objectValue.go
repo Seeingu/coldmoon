@@ -28,3 +28,17 @@ func (o *ObjectValue) CallAssumeCallable(value Value, argumentsList ArgumentsLis
 func (o *ObjectValue) String() string {
 	return "ObjectValue: " + o.Object.String()
 }
+
+func (o *ObjectValue) ToBoolean() bool {
+	switch oo := o.Object.(type) {
+	case *BooleanObject:
+		return oo.getData()
+	case *StringObject:
+		return oo.Data != ""
+	case *Object:
+		return true
+	default:
+		panic("unimplemented")
+
+	}
+}
