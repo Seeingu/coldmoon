@@ -20,6 +20,7 @@ type VM struct {
 	exceptionJumpTargetStack pkg.Stack[int]
 	exception                Value
 	iterator                 *IteratorRecord
+	envStack                 pkg.Stack[EnvironmentRecord]
 }
 
 func NewVM(agent *Agent) *VM {
@@ -141,7 +142,6 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *IThrow:
 		value := vm.result
 		vm.agent.exception = value
-		panic("CompletionTypeThrow")
 	case *IInstantiateOrdinaryFunctionExpression:
 		functionExpression := ins.FunctionExpression
 		closure := InstantiateOrdinaryFunctionExpression(
@@ -411,9 +411,11 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 		name := ins.IdentifierName
 		thrownValue := vm.exception
 		vm.exception = nil
-		catchEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		oldEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		catchEnv := NewDeclarativeEnvironment(oldEnv)
 		catchEnv.CreateMutableBinding(string(name), false)
 		catchEnv.InitializeBinding(string(name), thrownValue)
+		vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = catchEnv
 	case *IDelete:
 		ref := vm.reference
 		if ref.IsUnresolvableReference() {
@@ -608,6 +610,10 @@ func (vm *VM) execute(executable *Executable, i Instruction) {
 	case *ILoadIterator:
 		vm.stackPush(vm.iterator.NextMethod, "ILoadIterator")
 		vm.stackPush(NewValueFromObject(vm.iterator.Iterator), "ILoadIterator")
+	case *IPushLexicalEnvironment:
+		vm.envStack.Push(vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment)
+	case *IPopLexicalEnvironment:
+		vm.envStack.Pop()
 	}
 }
 
@@ -1280,10 +1286,18 @@ func (vm *VM) Run(executable *Executable) CompletionValue {
 	for vm.ip < len(executable.Instructions) {
 		i := executable.Instructions[vm.ip]
 		vm.execute(executable, i)
+		if vm.agent.exception != nil && !vm.exceptionJumpTargetStack.IsEmpty() {
+			vm.exception = vm.agent.exception
+			vm.agent.exception = nil
+			vm.ip = vm.exceptionJumpTargetStack.Peek()
+		}
 		if _, ok := i.(*IReturn); ok {
 			return NewCompletionReturnValue(vm.result)
 		}
 		vm.ip += 1
+	}
+	if vm.exception != nil {
+		return NewCompletionValueError(vm.exception)
 	}
 	if vm.result == nil {
 		return UndefinedValue.ToCompletion()
