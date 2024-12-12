@@ -44,6 +44,14 @@ func NewTypedArrayNamePrototype(realm *Realm, name string) ObjectType {
 		Configurable: false,
 		Enumerable:   false,
 	})
+	object.InternalMethods().Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
+		if s, ok := p.(StringPropertyKey); ok {
+			if s.Value == "buffer" {
+				return agent.ThrowException(TypeError, "Method get %TypedArray%.prototype.buffer called on incompatible receiver")
+			}
+		}
+		return InternalGet(o, p, receiver)
+	}
 	return object
 }
 
