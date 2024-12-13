@@ -21,6 +21,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 			Object:   o,
 			SetValue: &SetValue{},
 		}
+		s.ref = s
 		if iterable == UndefinedValue || iterable == NullValue {
 			return NewValueFromObject(s)
 		}

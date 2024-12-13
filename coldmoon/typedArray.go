@@ -33,6 +33,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	typedArray := &TypedArrayObject{
 		Object: object,
 	}
+	typedArray.ref = typedArray
 	taAt := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		O := this
 		taRecord := ValidateTypedArray(agent, O, SeqCst)

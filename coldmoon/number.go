@@ -374,8 +374,9 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 			"%Number.prototype", nil)
 		numberObject := &NumberObject{
 			Object: object,
-			Data:   JSNumber(n.Data),
+			Data:   n.Data,
 		}
+		numberObject.ref = numberObject
 		return NewValueFromObject(numberObject)
 	}
 	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "Number", builtinFunctionArgs{

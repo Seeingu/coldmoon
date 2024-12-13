@@ -182,9 +182,11 @@ func NewJSON(realm *Realm) *JSON {
 	DefineBuiltinFunction(object, "parse", parse, 2, realm)
 	DefineBuiltinFunction(object, "stringify", stringify, 3, realm)
 
-	return &JSON{
+	j := &JSON{
 		Object: object,
 	}
+	j.ref = j
+	return j
 }
 
 // InternalizeJSONProperty

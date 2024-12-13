@@ -10,6 +10,7 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 	g := &GeneratorObject{
 		Object: object,
 	}
+	g.ref = g
 
 	DefineBuiltinPropertyP(object, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),

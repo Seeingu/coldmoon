@@ -42,6 +42,7 @@ func NewMapConstructor(realm *Realm) ObjectType {
 			Object:   o,
 			MapValue: &MapValue{},
 		}
+		m.ref = m
 		if iterable == UndefinedValue || iterable == NullValue {
 			return NewValueFromObject(m)
 		}

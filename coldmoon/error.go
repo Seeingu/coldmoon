@@ -37,6 +37,7 @@ func NewErrorConstructor(realm *Realm) ObjectType {
 		errorObject := &ErrorObject{
 			Object: object,
 		}
+		errorObject.ref = errorObject
 		errorObject.InternalMethods().Set = errorInternalSet
 
 		if message != UndefinedValue {
