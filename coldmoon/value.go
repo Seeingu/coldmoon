@@ -119,6 +119,7 @@ var (
 	NegativeInfinityValue = &NumberValue{Data: JSNumberNegInf}
 )
 
+// Deprecated: use `.toValue()` instead
 func NewValueFromObject(object ObjectType) Value {
 	return &ObjectValue{Object: object}
 }
@@ -756,6 +757,7 @@ func GetV(agent *Agent, value Value, key PropertyKey) Value {
 }
 
 // 7.3.11
+// TODO: Should Return UndefinedValue
 func GetMethod(agent *Agent, value Value, key PropertyKey) ObjectType {
 	fun := GetV(agent, value, key)
 	if fun == UndefinedValue || fun == NullValue {

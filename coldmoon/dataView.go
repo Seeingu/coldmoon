@@ -24,7 +24,7 @@ func (b *ByteLength) toAuto() {
 type DataView struct {
 	*Object
 	// [[ViewedArrayBuffer]]
-	ViewedArrayBuffer *ArrayBufferObject
+	ViewedArrayBuffer *ArrayBufferLike
 	// [[ByteLength]]
 	ByteLength *ByteLength
 	// [[ByteOffset]]
@@ -41,7 +41,7 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 
-		buffer := RequireInternalSlot[*ArrayBufferObject](bufferValue)
+		buffer := RequireInternalSlot[*ArrayBufferLike](bufferValue)
 		offset := ToIndex(agent, byteOffset)
 		if IsDetachedBuffer(buffer) {
 			panic("TypeError")

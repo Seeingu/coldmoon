@@ -80,3 +80,7 @@ func DefineBuiltinAccessor(realm *Realm, object ObjectType, name string, getter,
 		Configurable: true,
 	})
 }
+
+func IsUndefinedOrNil(v Value) bool {
+	return v == nil || v == UndefinedValue
+}

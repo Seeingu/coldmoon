@@ -56,7 +56,7 @@ func (vm *VM) stackPop() Value {
 	return vm.stack.Pop()
 }
 
-func (vm *VM) execute(executable *Executable, i Instruction) {
+func (vm *VM) execute(i Instruction) {
 	agent := vm.agent
 	switch ins := i.(type) {
 	case *ILoad:
@@ -1289,7 +1289,7 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 func (vm *VM) Run(executable *Executable) CompletionValue {
 	for vm.ip < len(executable.Instructions) {
 		i := executable.Instructions[vm.ip]
-		vm.execute(executable, i)
+		vm.execute(i)
 		if vm.agent.exception != nil && !vm.exceptionJumpTargetStack.IsEmpty() {
 			vm.exception = vm.agent.exception
 			vm.agent.exception = nil

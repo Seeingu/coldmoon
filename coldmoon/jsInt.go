@@ -27,3 +27,7 @@ func (i JSInt) Min(b JSInt) JSInt {
 func (i JSInt) ToNumber() JSNumber {
 	return JSNumber(i)
 }
+
+func (i JSInt) ToValue() Value {
+	return NewNumberValue(i.ToNumber())
+}

@@ -103,7 +103,7 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 	for _, name := range methodNames {
 		method := o.Get(NewStringPropertyKey(name))
 		if IsCallable(method) {
-			result := CallAssumeCallableNoArgs(method, NewValueFromObject(o))
+			result := CallAssumeCallableNoArgs(method, o.ToValue())
 			if _, isObject := result.(*ObjectValue); !isObject {
 				return result
 			}
@@ -111,8 +111,7 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 	}
 
 	message := "Could not convert object to primitive"
-	o.Agent().ThrowException(TypeError, message)
-	panic("")
+	return o.Agent().ThrowException(TypeError, message)
 }
 
 // 7.2.5
@@ -122,7 +121,7 @@ func (o *Object) IsExtensible() bool {
 
 // 7.3.2
 func (o *Object) Get(key PropertyKey) Value {
-	return o.InternalMethods().Get(o, key, NewValueFromObject(o))
+	return o.InternalMethods().Get(o.Ref(), key, NewValueFromObject(o))
 }
 
 // 7.3.4
@@ -912,6 +911,67 @@ func objectDefineProperties(agent *Agent, object ObjectType, properties Value) O
 	}
 
 	return object
+}
+
+// MARK: - FindViaPredicate
+
+type direction int
+
+const (
+	DirectionAscending direction = iota
+	DirectionDescending
+)
+
+type FoundResult struct {
+	Index JSInt
+	Value Value
+}
+
+// 23.1.3.12.1
+func (o *Object) FindViaPredicate(
+	len JSInt,
+	direction direction,
+	predicate Value,
+	thisArg Value,
+) FoundResult {
+	if !IsCallable(predicate) {
+		panic("TypeError")
+	}
+
+	var k JSInt
+	if direction == DirectionAscending {
+		k = 0
+	} else {
+		k = len - 1
+	}
+
+	for {
+		if direction == DirectionAscending && k >= len {
+			break
+		}
+		if direction == DirectionDescending && k < 0 {
+			break
+		}
+		pk := NewIntegerIndexPropertyKey(k)
+		kValue := o.Ref().Get(pk)
+		testResult := predicate.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()})
+
+		if testResult.ToBoolean() {
+			return FoundResult{
+				Index: k,
+				Value: kValue,
+			}
+		}
+	}
+
+	return FoundResult{
+		Index: -1,
+		Value: UndefinedValue,
+	}
+}
+
+func SameObject(o1, o2 ObjectType) bool {
+	return o1 == o2
 }
 
 // MARK: - Internal

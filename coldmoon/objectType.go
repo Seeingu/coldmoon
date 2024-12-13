@@ -13,6 +13,12 @@ type ObjectType interface {
 	EnumerableOwnProperties(kind objectOwnPropertiesKind) []Value
 	OrdinaryToPrimitive(hint PreferredType) Value
 	CopyDataProperties(source Value, excludedItems []PropertyKey)
+	FindViaPredicate(
+		len JSInt,
+		direction direction,
+		predicate Value,
+		thisArg Value,
+	) FoundResult
 	ToObject() *Object
 	Get(key PropertyKey) Value
 	Set(key PropertyKey, value Value, throw setThrowType)

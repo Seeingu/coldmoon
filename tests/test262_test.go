@@ -76,7 +76,7 @@ func testTypedArray(realm *Realm) {
 		for _, fileName := range fileNames {
 			d := typedArrayConstructorDir + "/" + name
 			f := makeTest262Path(d + "/" + fileName)
-			println("BigInt64Array: Testing file: ", fileName)
+			println("BigInt64Array: Testing file: ", f)
 			evaluate(f, realm)
 		}
 	}
@@ -110,7 +110,7 @@ func testArray(realm *Realm) {
 			continue
 		}
 		f := makeTest262Path(arrayDir + entry.Name())
-		println("Testing file: ", entry.Name())
+		println("Testing file: ", f)
 		evaluate(f, realm)
 	}
 }

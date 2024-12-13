@@ -495,32 +495,32 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		thisArg := args[1]
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		findRec := o.(*ArrayObject).findViaPredicate(length, DirectionAscending, predicate, thisArg)
-		return findRec.value
+		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
+		return findRec.Value
 	}
 	var findIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		findRec := o.(*ArrayObject).findViaPredicate(length, DirectionAscending, predicate, thisArg)
-		return NewNumberValue(findRec.index.ToNumber())
+		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
+		return NewNumberValue(findRec.Index.ToNumber())
 	}
 	var findLast BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		findRec := o.(*ArrayObject).findViaPredicate(length, DirectionDescending, predicate, thisArg)
-		return findRec.value
+		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
+		return findRec.Value
 	}
 	var findLastIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ValueToObject(agent, this)
 		length := o.LengthOfArrayLike()
-		findRec := o.(*ArrayObject).findViaPredicate(length, DirectionDescending, predicate, thisArg)
-		return NewNumberValue(findRec.index.ToNumber())
+		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
+		return NewNumberValue(findRec.Index.ToNumber())
 	}
 	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		searchElement := args[0]
@@ -1128,9 +1128,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		sortCompare := SortCompare{
 			compareFn: MustGetObject(compareFn),
-			impl: func(agent *Agent, x Value, y Value, objectType ObjectType) int {
-				return CompareArrayElements(agent, x, y, objectType)
-			},
+			impl:      CompareArrayElements,
 		}
 
 		sortedList := SortIndexedProperties(agent, obj, length, sortCompare, sortHolesTypeSkipHoles)
@@ -1155,9 +1153,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		sortCompare := SortCompare{
 			compareFn: MustGetObject(compareFn),
-			impl: func(agent *Agent, x Value, y Value, objectType ObjectType) int {
-				return CompareArrayElements(agent, x, y, objectType)
-			},
+			impl:      CompareArrayElements,
 		}
 
 		sortedList := SortIndexedProperties(agent, obj, length, sortCompare, sortHolesTypeReadThroughHoles)
@@ -1414,60 +1410,6 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	return object
 }
 
-type direction int
-
-const (
-	DirectionAscending direction = iota
-	DirectionDescending
-)
-
-type FoundResult struct {
-	index JSInt
-	value Value
-}
-
-func (a *ArrayObject) findViaPredicate(
-	len JSInt,
-	direction direction,
-	predicate Value,
-	thisArg Value,
-) FoundResult {
-	if !IsCallable(predicate) {
-		panic("TypeError")
-	}
-
-	var k JSInt
-	if direction == DirectionAscending {
-		k = 0
-	} else {
-		k = len - 1
-	}
-
-	for {
-		if direction == DirectionAscending && k >= len {
-			break
-		}
-		if direction == DirectionDescending && k < 0 {
-			break
-		}
-		pk := NewIntegerIndexPropertyKey(k)
-		kValue := a.Get(pk)
-		testResult := predicate.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), NewValueFromObject(a)})
-
-		if testResult.ToBoolean() {
-			return FoundResult{
-				index: k,
-				value: kValue,
-			}
-		}
-	}
-
-	return FoundResult{
-		index: -1,
-		value: UndefinedValue,
-	}
-}
-
 // 23.1.3.2.1
 func IsConcatSpreadable(agent *Agent, value Value) bool {
 	if !ValueIsObject(value) {
@@ -1482,7 +1424,7 @@ func IsConcatSpreadable(agent *Agent, value Value) bool {
 
 type SortCompare struct {
 	compareFn ObjectType
-	impl      func(*Agent, Value, Value, ObjectType) int
+	impl      func(*Agent, Value, Value, ObjectType) JSNumber
 }
 
 type sortHolesType int
@@ -1534,7 +1476,7 @@ func SortIndexedProperties(agent *Agent, obj ObjectType, length JSInt, sortCompa
 }
 
 // 23.1.3.30.2
-func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) int {
+func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumber {
 	if x == UndefinedValue && y == UndefinedValue {
 		return 0
 	}
@@ -1553,7 +1495,7 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) int {
 		if v.IsNaN() {
 			return 0
 		}
-		return int(v.Data)
+		return v.Data
 	}
 
 	xString := x.String()
