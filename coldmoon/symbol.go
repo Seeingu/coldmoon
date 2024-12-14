@@ -19,6 +19,10 @@ func (s *SymbolValue) ToBoolean() bool {
 	return true
 }
 
+func (s *SymbolValue) ToCompletion() CompletionValue {
+	return NewCompletionValue(s)
+}
+
 // 20.4.3.3.1
 func (s *SymbolValue) SymbolDescriptiveString() string {
 	return fmt.Sprintf("Symbol(%s)", s.Description)
