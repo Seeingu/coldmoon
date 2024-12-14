@@ -9,22 +9,21 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 		if bodyArg == nil {
 			bodyArg = NewStringValue("")
 		}
-		return NewValueFromObject(
-			CreateDynamicFunction(
-				agent,
-				C,
-				newTarget,
-				dynamicFunctionKindGenerator,
-				parameterArgs,
-				bodyArg,
-			))
+		return (CreateDynamicFunction(
+			agent,
+			C,
+			newTarget,
+			dynamicFunctionKindGenerator,
+			parameterArgs,
+			bodyArg,
+		)).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "GeneratorFunction", builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionConstructor,
 	})
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),
+		Value:        (realm.Intrinsics.GeneratorFunctionPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,

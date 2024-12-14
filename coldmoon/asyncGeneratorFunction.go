@@ -11,15 +11,14 @@ func NewAsyncGeneratorFunctionConstructor(realm *Realm) ObjectType {
 		if bodyArg == nil {
 			bodyArg = NewStringValue("")
 		}
-		return NewValueFromObject(
-			CreateDynamicFunction(
-				agent,
-				C,
-				newTarget,
-				dynamicFunctionKindAsyncGenerator,
-				parameterArgs,
-				bodyArg,
-			))
+		return (CreateDynamicFunction(
+			agent,
+			C,
+			newTarget,
+			dynamicFunctionKindAsyncGenerator,
+			parameterArgs,
+			bodyArg,
+		)).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "AsyncGeneratorFunction", builtinFunctionArgs{
 		realm:     realm,
@@ -41,7 +40,7 @@ func NewAsyncGeneratorFunctionPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype, "AsyncGeneratorFunctionPrototype")
 
 	DefineBuiltinPropertyP(object, "constructor", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.AsyncGeneratorFunction),
+		Value:        (realm.Intrinsics.AsyncGeneratorFunction).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,

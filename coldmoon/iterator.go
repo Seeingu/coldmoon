@@ -29,7 +29,7 @@ func NewIteratorPrototype(realm *Realm) ObjectType {
 
 // 7.4.2
 func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *IteratorRecord {
-	iterator := NewValueFromObject(method).CallAssumeCallable(object, nil)
+	iterator := method.ToValue().CallAssumeCallable(object, nil)
 	if !ValueIsObject(iterator) {
 		panic("TypeError")
 	}
@@ -69,9 +69,9 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) Completion[*Iterato
 func (i *IteratorRecord) IteratorNext(value Value) ObjectType {
 	var result Value
 	if value == nil {
-		result = CallAssumeCallableNoArgs(i.NextMethod, NewValueFromObject(i.Iterator))
+		result = CallAssumeCallableNoArgs(i.NextMethod, (i.Iterator).ToValue())
 	} else {
-		result = i.NextMethod.CallAssumeCallable(NewValueFromObject(i.Iterator), []Value{value})
+		result = i.NextMethod.CallAssumeCallable((i.Iterator).ToValue(), []Value{value})
 	}
 
 	resultObject, ok := result.(*ObjectValue)
@@ -105,10 +105,10 @@ func (i *IteratorRecord) IteratorStep() ObjectType {
 func (i *IteratorRecord) IteratorClose() {
 	iterator := i.Iterator
 	agent := iterator.Agent()
-	innerResult := GetMethod(agent, NewValueFromObject(iterator), NewStringPropertyKey("return"))
+	innerResult := GetMethod(agent, (iterator).ToValue(), NewStringPropertyKey("return"))
 
 	if innerResult != nil {
-		CallAssumeCallableNoArgs(NewValueFromObject(innerResult), NewValueFromObject(iterator))
+		CallAssumeCallableNoArgs((innerResult).ToValue(), (iterator).ToValue())
 	}
 }
 

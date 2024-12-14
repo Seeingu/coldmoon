@@ -3671,7 +3671,7 @@ func (d *AsyncFunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	realm := c.agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := d.instantiateAsyncFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
 }
 
 func (d *AsyncFunctionDeclaration) instantiateAsyncFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
@@ -3723,7 +3723,7 @@ func (d *AsyncGeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) 
 	realm := c.agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := d.instantiateAsyncGeneratorFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
 }
 
 // 15.6.3
@@ -3744,7 +3744,7 @@ func (d *AsyncGeneratorDeclaration) instantiateAsyncGeneratorFunctionObject(agen
 	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
 	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
 	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-		Value:        NewValueFromObject(prototype),
+		Value:        (prototype).ToValue(),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: false,
@@ -3783,7 +3783,7 @@ func (d *GeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	realm := c.agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := d.instantiateOrdinaryFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
 }
 
 // 15.5.3
@@ -3805,7 +3805,7 @@ func (d *GeneratorDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, e
 	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
 	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototype, nil)
 	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-		Value:        NewValueFromObject(prototype),
+		Value:        (prototype).ToValue(),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: false,
@@ -4135,7 +4135,7 @@ func (f *FunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	realm := c.agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := f.instantiateOrdinaryFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), NewValueFromObject(function), setThrowTypeIgnore)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), (function).ToValue(), setThrowTypeIgnore)
 }
 
 func (f *FunctionDeclaration) String() string {

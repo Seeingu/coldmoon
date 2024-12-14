@@ -75,11 +75,11 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	}
 	var toJSON BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := MustGetObject(this)
-		tv := ToPrimitive(agent, NewValueFromObject(o), PreferredTypeNumber)
+		tv := ToPrimitive(agent, (o).ToValue(), PreferredTypeNumber)
 		if n, ok := ValueGet[*NumberValue](tv); ok && !n.IsFinite() {
 			return NullValue
 		}
-		return ValueInvoke(agent, NewValueFromObject(o), NewStringPropertyKey("toISOString"), nil)
+		return ValueInvoke(agent, (o).ToValue(), NewStringPropertyKey("toISOString"), nil)
 	}
 	var toUTCString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
@@ -826,7 +826,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			Object: o,
 			Data:   dv,
 		}
-		return NewValueFromObject(d)
+		return (d).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 7, "Date", builtinFunctionArgs{
 		realm:     realm,
@@ -887,12 +887,12 @@ func NewDateConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "parse", parse, 1, realm)
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.DatePrototype),
+		Value:        realm.Intrinsics.DatePrototype.ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyV(realm.Intrinsics.DatePrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.DatePrototype, "constructor", object.ToValue())
 
 	return object
 }

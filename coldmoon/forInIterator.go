@@ -15,10 +15,6 @@ type ForInIterator struct {
 
 // MARK: - Dispatch
 
-func (f *ForInIterator) ToValue() Value {
-	return NewValueFromObject(f)
-}
-
 // 14.7.5.10.1
 func CreateForInIterator(agent *Agent, obj ObjectType) *ForInIterator {
 	realm := agent.CurrentRealm()
@@ -27,6 +23,7 @@ func CreateForInIterator(agent *Agent, obj ObjectType) *ForInIterator {
 		Obj:         obj,
 		VisitedKeys: make(map[PropertyKey]bool),
 	}
+	iterator.ref = iterator
 	return iterator
 }
 
@@ -36,7 +33,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := MustGetObject(thisValue).(*ForInIterator)
 		if iterator.Done {
-			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
+			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()
 		}
 		obj := iterator.Obj
 		for {
@@ -59,7 +56,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 					if desc != nil {
 						iterator.VisitedKeys[r] = true
 						if desc.Enumerable {
-							return NewValueFromObject(CreateIterResultObject(agent, r.ToValue(), false))
+							return (CreateIterResultObject(agent, r.ToValue(), false)).ToValue()
 						}
 					}
 				}
@@ -68,7 +65,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 			obj = obj.InternalMethods().GetPrototypeOf(obj)
 			if obj == nil {
 				iterator.Done = true
-				return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
+				return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()
 			}
 			iterator.Obj = obj
 			iterator.ObjectWasVisited = false

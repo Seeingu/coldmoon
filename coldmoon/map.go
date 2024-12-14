@@ -25,7 +25,7 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 		}
 		k := MustGetObject(nextItem).Get(NewStringPropertyKey("0"))
 		v := MustGetObject(nextItem).Get(NewStringPropertyKey("1"))
-		NewValueFromObject(adder).CallAssumeCallable(NewValueFromObject(target), []Value{k, v})
+		(adder).ToValue().CallAssumeCallable((target).ToValue(), []Value{k, v})
 	}
 	return target
 }
@@ -44,13 +44,13 @@ func NewMapConstructor(realm *Realm) ObjectType {
 		}
 		m.ref = m
 		if iterable == UndefinedValue || iterable == NullValue {
-			return NewValueFromObject(m)
+			return (m).ToValue()
 		}
 		adder := m.Get(NewStringPropertyKey("set"))
 		if !IsCallable(adder) {
 			panic("TypeError")
 		}
-		return NewValueFromObject(AddEntriesFromIterable(agent, m, iterable, MustGetObject(adder)))
+		return (AddEntriesFromIterable(agent, m, iterable, MustGetObject(adder))).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, "Map", builtinFunctionArgs{
 		prototype: realm.Intrinsics.FunctionPrototype,
@@ -62,12 +62,12 @@ func NewMapConstructor(realm *Realm) ObjectType {
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.MapPrototype),
+		Value:        (realm.Intrinsics.MapPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyV(realm.Intrinsics.MapPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.MapPrototype, "constructor", (object).ToValue())
 
 	return object
 }
@@ -116,13 +116,13 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(JSNumber(len(m.MapValue.Data)))
 	}
 	var mapEntries BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindKeyAndValue))
+		return (CreateMapIterator(agent, this, objectOwnPropertiesKindKeyAndValue)).ToValue()
 	}
 	var mapKeys BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindKey))
+		return (CreateMapIterator(agent, this, objectOwnPropertiesKindKey)).ToValue()
 	}
 	var mapValues BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return NewValueFromObject(CreateMapIterator(agent, this, objectOwnPropertiesKindValue))
+		return (CreateMapIterator(agent, this, objectOwnPropertiesKindValue)).ToValue()
 	}
 	var forEach BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)

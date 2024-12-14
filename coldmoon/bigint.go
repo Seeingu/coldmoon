@@ -182,14 +182,14 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.BigIntPrototype),
+		Value:        (realm.Intrinsics.BigIntPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
 	DefineBuiltinPropertyV(realm.Intrinsics.BigIntPrototype, "constructor",
-		NewValueFromObject(object),
+		(object).ToValue(),
 	)
 
 	return object

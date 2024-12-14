@@ -23,7 +23,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		}
 		s.ref = s
 		if iterable == UndefinedValue || iterable == NullValue {
-			return NewValueFromObject(s)
+			return (s).ToValue()
 		}
 		adder := s.Get(NewStringPropertyKey("add"))
 		if !IsCallable(adder) {
@@ -33,12 +33,12 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		for {
 			next := iteratorRecord.Data().IteratorStep()
 			if next.(*BooleanObject).Data == false {
-				return NewValueFromObject(s)
+				return (s).ToValue()
 			}
 			nextItem := IteratorValue(next)
-			NewValueFromObject(MustGetObject(adder)).CallAssumeCallable(NewValueFromObject(s), []Value{nextItem})
+			(MustGetObject(adder)).ToValue().CallAssumeCallable((s).ToValue(), []Value{nextItem})
 		}
-		return NewValueFromObject(s)
+		return (s).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, "SetObject", builtinFunctionArgs{
 		prototype: realm.Intrinsics.FunctionPrototype,
@@ -46,7 +46,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.SetPrototype),
+		Value:        (realm.Intrinsics.SetPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
@@ -56,7 +56,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 	}
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 
-	DefineBuiltinPropertyV(realm.Intrinsics.SetPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.SetPrototype, "constructor", (object).ToValue())
 
 	return object
 }
@@ -110,11 +110,11 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	}
 	var setEntries BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := CreateSetIterator(agent, thisValue, objectOwnPropertiesKindKeyAndValue)
-		return NewValueFromObject(iterator)
+		return (iterator).ToValue()
 	}
 	var setValues BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := CreateSetIterator(agent, thisValue, objectOwnPropertiesKindValue)
-		return NewValueFromObject(iterator)
+		return (iterator).ToValue()
 	}
 	var forEach BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		callbackFn := argumentsList[0]

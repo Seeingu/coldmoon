@@ -46,10 +46,6 @@ func (b *BuiltinFunction) ToObject() *Object {
 	return b.Object
 }
 
-func (b *BuiltinFunction) ToValue() Value {
-	return NewValueFromObject(b)
-}
-
 // 7.3.24
 func (b *BuiltinFunction) GetFunctionRealm() *Realm {
 	return b.Realm
@@ -128,6 +124,7 @@ func CreateBuiltinFunction(
 		AdditionalFields:   args.additionalFields,
 		AdditionalFieldsV2: args.additionalFieldsV2,
 	}
+	function.ref = function
 	function.InternalMethods().Call = BuiltinCall
 	if args.isConstructor {
 		function.InternalMethods().Construct = BuiltinConstruct

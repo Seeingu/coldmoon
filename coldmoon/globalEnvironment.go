@@ -134,7 +134,7 @@ func (g *GlobalEnvironment) WithBaseObject() ObjectType {
 }
 
 func (g *GlobalEnvironment) GetThisBinding() Value {
-	return NewValueFromObject(g.GlobalThisValue)
+	return g.GlobalThisValue.ToValue()
 }
 
 func (g *GlobalEnvironment) OuterEnv() EnvironmentRecord {

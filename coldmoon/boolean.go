@@ -83,7 +83,7 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 			Object: o,
 			Data:   b,
 		}
-		return NewValueFromObject(booleanObject)
+		return (booleanObject).ToValue()
 	}
 	object := CreateBuiltinFunction(
 		realm.Agent,
@@ -96,13 +96,13 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 		})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.BooleanPrototype),
+		Value:        (realm.Intrinsics.BooleanPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinPropertyV(realm.Intrinsics.BooleanPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.BooleanPrototype, "constructor", (object).ToValue())
 
 	return object
 }
@@ -128,8 +128,6 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 		return NewBooleanValue(thisBooleanValue(realm.Agent, thisArgument))
 	}
 
-	DefineBuiltinPropertyV(object, "constructor",
-		NewValueFromObject(realm.Intrinsics.BooleanConstructor))
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
 

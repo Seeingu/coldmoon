@@ -26,10 +26,10 @@ func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Val
 		_boundThis := b.BoundThis
 		_boundArgs := b.BoundArguments
 		_args := append(_boundArgs, arguments...)
-		return NewValueFromObject(_target).CallAssumeCallable(_boundThis, _args)
+		return (_target).ToValue().CallAssumeCallable(_boundThis, _args)
 	}
 	boundFunction.InternalMethods().Call = call
-	if IsConstructor(NewValueFromObject(target)) {
+	if IsConstructor((target).ToValue()) {
 		construct := func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
 			b := o.(*BoundFunctionObject)
 			_target := b.BoundTargetFunction

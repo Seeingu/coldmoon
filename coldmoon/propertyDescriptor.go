@@ -51,11 +51,11 @@ func (p *PropertyDescriptor) FromPropertyDescriptor(agent *Agent, desc *Property
 	obj.CreateDataPropertyOrThrow(NewStringPropertyKey("writable"), NewBooleanValue(p.Writable))
 
 	if p.Get != nil {
-		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("get"), NewValueFromObject(p.Get))
+		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("get"), (p.Get).ToValue())
 	}
 
 	if p.Set != nil {
-		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("set"), NewValueFromObject(p.Set))
+		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("set"), (p.Set).ToValue())
 	}
 
 	obj.CreateDataPropertyOrThrow(NewStringPropertyKey("enumerable"), NewBooleanValue(p.Enumerable))

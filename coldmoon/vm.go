@@ -151,7 +151,7 @@ func (vm *VM) execute(i Instruction) {
 			functionExpression,
 			"",
 		)
-		vm.result = NewValueFromObject(closure)
+		vm.result = closure.ToValue()
 	case *IInstantiateArrowFunctionExpression:
 		arrowFunction := ins.FunctionExpression
 		closure := InstantiateArrowFunctionExpression(
@@ -159,7 +159,7 @@ func (vm *VM) execute(i Instruction) {
 			arrowFunction,
 			"",
 		)
-		vm.result = NewValueFromObject(closure)
+		vm.result = closure.ToValue()
 	case *ITypeof:
 		var r *ReferenceRecord
 		if !vm.referenceStack.IsEmpty() {
@@ -222,13 +222,13 @@ func (vm *VM) execute(i Instruction) {
 		vm.result = NewBooleanValue(!value.ToBoolean())
 	case *IObjectCreate:
 		object := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
-		vm.result = NewValueFromObject(object)
+		vm.result = object.ToValue()
 	case *IObjectSetProperty:
 		value := vm.stackPop()
 		propertyKey := ToPropertyKey(vm.agent, vm.stackPop())
 		object := MustGetObject(vm.stackPop())
 		object.CreateDataPropertyOrThrow(propertyKey, value)
-		vm.result = NewValueFromObject(object)
+		vm.result = object.ToValue()
 	case *IBitwiseNot:
 		value := vm.result
 		switch v := value.(type) {
@@ -292,7 +292,7 @@ func (vm *VM) execute(i Instruction) {
 		r := vm.referenceStack.Pop()
 		vm.result = r.GetValue(agent)
 	case *IArrayCreate:
-		vm.result = NewValueFromObject(ArrayCreate(vm.agent, 0, nil))
+		vm.result = ArrayCreate(vm.agent, 0, nil).ToValue()
 	case *IArraySetLength:
 		length := JSInt(ins.Length)
 		array := vm.result.(*ObjectValue).Object
@@ -305,7 +305,7 @@ func (vm *VM) execute(i Instruction) {
 			NewIntegerIndexPropertyKey(index),
 			initValue,
 		)
-		vm.result = NewValueFromObject(array)
+		vm.result = array.ToValue()
 	case *IArrayPushValue:
 		initValue := vm.stackPop()
 		arrayValue := vm.stackPop()
@@ -315,7 +315,7 @@ func (vm *VM) execute(i Instruction) {
 			NewIntegerIndexPropertyKey(length),
 			initValue,
 		)
-		vm.result = NewValueFromObject(array)
+		vm.result = array.ToValue()
 	case *IArraySpread:
 		spread := vm.stackPop()
 		arrayValue := vm.stackPop()
@@ -334,7 +334,7 @@ func (vm *VM) execute(i Instruction) {
 			)
 			nextIndex++
 		}
-		vm.result = NewValueFromObject(array)
+		vm.result = array.ToValue()
 	case *IGreaterThan:
 		right := vm.stackPop()
 		left := vm.stackPop()
@@ -492,34 +492,34 @@ func (vm *VM) execute(i Instruction) {
 		object := MustGetObject(toValue)
 		var excludedNames []PropertyKey
 		object.CopyDataProperties(fromValue, excludedNames)
-		vm.result = NewValueFromObject(object)
+		vm.result = (object).ToValue()
 	case *IInstantiateGeneratorFunctionExpression:
 		functionExpression := ins.FunctionExpression
 		closure := vm.InstantiateGeneratorFunctionExpression(functionExpression)
-		vm.result = NewValueFromObject(closure)
+		vm.result = (closure).ToValue()
 	case *IInstantiateAsyncGeneratorFunctionExpression:
 		functionExpression := ins.FunctionExpression
 		closure := vm.InstantiateAsyncGeneratorFunctionExpression(functionExpression)
-		vm.result = NewValueFromObject(closure)
+		vm.result = (closure).ToValue()
 	case *IInstantiateAsyncFunctionExpression:
 		functionExpression := ins.FunctionExpression
 		closure := vm.InstantiateAsyncFunctionExpression(functionExpression)
-		vm.result = NewValueFromObject(closure)
+		vm.result = (closure).ToValue()
 	case *IGetNewTarget:
 		t := vm.agent.GetNewTarget()
 		if t != nil {
-			vm.result = NewValueFromObject(t)
+			vm.result = (t).ToValue()
 		} else {
 			vm.result = UndefinedValue
 		}
 	case *IInstantiateAsyncArrowFunctionExpression:
 		functionExpression := ins.FunctionExpression
 		closure := vm.InstantiateAsyncArrowFunctionExpression(functionExpression, "")
-		vm.result = NewValueFromObject(closure)
+		vm.result = (closure).ToValue()
 	case *IRegExpCreate:
 		flags := vm.stack.Pop()
 		pattern := vm.stack.Pop()
-		vm.result = NewValueFromObject(RegExpCreate(vm.agent, pattern, flags).Data())
+		vm.result = (RegExpCreate(vm.agent, pattern, flags).Data()).ToValue()
 	case *IBindingClassDeclarationEvaluation:
 		classDeclaration := ins.ClassDeclaration
 		vm.result = vm.BindingClassDeclarationEvaluation(classDeclaration).ToValue()
@@ -599,7 +599,7 @@ func (vm *VM) execute(i Instruction) {
 			nil,
 			promiseCapability.ToImportedModulePayload(),
 		)
-		vm.result = NewValueFromObject(promiseCapability.Promise)
+		vm.result = (promiseCapability.Promise).ToValue()
 	case *IForInIterator:
 		value := vm.result
 		obj := MustGetObject(value)
@@ -613,7 +613,7 @@ func (vm *VM) execute(i Instruction) {
 		vm.iterator = GetIterator(agent, vm.result, ins.IteratorKind).Data()
 	case *ILoadIterator:
 		vm.stackPush(vm.iterator.NextMethod, "ILoadIterator")
-		vm.stackPush(NewValueFromObject(vm.iterator.Iterator), "ILoadIterator")
+		vm.stackPush((vm.iterator.Iterator).ToValue(), "ILoadIterator")
 	case *IPushLexicalEnvironment:
 		vm.envStack.Push(vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment)
 	case *IPopLexicalEnvironment:
@@ -725,7 +725,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 			var result ObjectType
 			if classConstructorFields.ConstructorKind == ConstructorKindDerived {
 				fun := function.InternalMethods().GetPrototypeOf(function)
-				if !IsConstructor(NewValueFromObject(fun)) {
+				if !IsConstructor((fun).ToValue()) {
 					panic("TypeError: prototype is not a constructor")
 				}
 				result = fun.Construct(args, newTarget)
@@ -835,7 +835,7 @@ func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *DeclarationCla
 		}
 
 		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		vm.InitializeBoundName(className, NewValueFromObject(value), env)
+		vm.InitializeBoundName(className, (value).ToValue(), env)
 		return value
 	} else {
 		value := vm.ClassDefinitionEvaluation(classDeclaration.ClassTail, "", "default")
@@ -898,7 +898,7 @@ func (vm *VM) InstantiateAsyncFunctionExpression(functionExpression *PrimaryExpr
 			privateEnv,
 		)
 		SetFunctionName(closure, NewStringPropertyKey(name), "")
-		funcEnv.InitializeBinding(name, NewValueFromObject(closure))
+		funcEnv.InitializeBinding(name, (closure).ToValue())
 		return closure
 	} else {
 		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
@@ -942,13 +942,13 @@ func (vm *VM) InstantiateAsyncGeneratorFunctionExpression(functionExpression *Pr
 		prototype := OrdinaryObjectCreate(vm.agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
 
 		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-			Value:        NewValueFromObject(prototype),
+			Value:        (prototype).ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
 		})
 
-		funcEnv.InitializeBinding(name, NewValueFromObject(closure))
+		funcEnv.InitializeBinding(name, (closure).ToValue())
 		return closure
 	} else {
 		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
@@ -968,7 +968,7 @@ func (vm *VM) InstantiateAsyncGeneratorFunctionExpression(functionExpression *Pr
 		prototype := OrdinaryObjectCreate(vm.agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
 
 		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-			Value:        NewValueFromObject(prototype),
+			Value:        (prototype).ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
@@ -1078,13 +1078,13 @@ func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *Primary
 		prototype := OrdinaryObjectCreate(vm.agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
 
 		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-			Value:        NewValueFromObject(prototype),
+			Value:        (prototype).ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
 		})
 
-		funcEnv.InitializeBinding(name, NewValueFromObject(closure))
+		funcEnv.InitializeBinding(name, (closure).ToValue())
 		return closure
 	} else {
 		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
@@ -1104,7 +1104,7 @@ func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *Primary
 		prototype := OrdinaryObjectCreate(vm.agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
 
 		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-			Value:        NewValueFromObject(prototype),
+			Value:        (prototype).ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
@@ -1231,7 +1231,7 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
 
 		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-			Value:        NewValueFromObject(prototype),
+			Value:        prototype.ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
@@ -1276,7 +1276,7 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 		SetFunctionName(closure, propKey, "")
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
 		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-			Value:        NewValueFromObject(prototype),
+			Value:        (prototype).ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
@@ -1329,7 +1329,7 @@ func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
 	}
 	refEnv := reference.Base.(*ReferenceRecordBaseEnvironment).Environment
 	if o := refEnv.WithBaseObject(); o != nil {
-		return NewValueFromObject(o)
+		return (o).ToValue()
 	}
 	return UndefinedValue
 }
@@ -1349,9 +1349,7 @@ func evaluateNew(agent *Agent, constructor Value, arguments []Value) Value {
 		panic("TypeError: constructor is not a constructor")
 	}
 	o := MustGetObject(constructor)
-	return NewValueFromObject(
-		o.Construct(arguments, nil),
-	)
+	return o.Construct(arguments, nil).ToValue()
 }
 
 // 13.10.2
@@ -1514,7 +1512,7 @@ func InstantiateOrdinaryFunctionExpression(
 		SetFunctionName(closure, NewStringPropertyKey(name), "")
 		MakeConstructor(closure, false, nil)
 
-		funcEnv.InitializeBinding(name, NewValueFromObject(closure))
+		funcEnv.InitializeBinding(name, (closure).ToValue())
 		return closure
 	} else {
 		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment

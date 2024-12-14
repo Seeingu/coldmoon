@@ -613,7 +613,7 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 	}, nil)
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.TypedArrayPrototype),
+		Value:        (realm.Intrinsics.TypedArrayPrototype).ToValue(),
 		Writable:     false,
 		Configurable: false,
 		Enumerable:   false,
@@ -644,9 +644,9 @@ func NewTypedArrayNameConstructor(realm *Realm, name string) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value: NewValueFromObject(intrinsic),
+		Value: (intrinsic).ToValue(),
 	})
-	DefineBuiltinPropertyV(intrinsic, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(intrinsic, "constructor", (object).ToValue())
 
 	return object
 }
@@ -660,7 +660,7 @@ func typedArrayBehavior(agent *Agent, name string, thisArgument Value, arguments
 	proto := "%TypedArray.prototype%"
 	numberOfArgs := len(argumentsList)
 	if numberOfArgs == 0 {
-		return NewValueFromObject(AllocateTypedArray(agent, constructorName, newTarget, proto, 0))
+		return (AllocateTypedArray(agent, constructorName, newTarget, proto, 0)).ToValue()
 	} else {
 		firstArgument := argumentsList[0]
 		if ValueIsObject(firstArgument) {

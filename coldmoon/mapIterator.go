@@ -31,7 +31,7 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 		entries := m.MapValue.Data
 		numEntries := JSInt(len(entries))
 		if index >= numEntries {
-			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
+			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()
 		}
 
 		for index < numEntries {
@@ -41,7 +41,7 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 			index++
 		}
 		if index >= numEntries {
-			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
+			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()
 		}
 		mapIterator.Index = index
 		key := NewNumberValue(index.ToNumber())
@@ -54,10 +54,10 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 		case objectOwnPropertiesKindValue:
 			result = value
 		case objectOwnPropertiesKindKeyAndValue:
-			result = NewValueFromObject(CreateArrayFromList(agent, []Value{key, value}))
+			result = (CreateArrayFromList(agent, []Value{key, value})).ToValue()
 
 		}
-		return NewValueFromObject(CreateIterResultObject(agent, result, false))
+		return (CreateIterResultObject(agent, result, false)).ToValue()
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{

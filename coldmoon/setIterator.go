@@ -27,7 +27,7 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 		entries := s.SetValue.Data
 		numEntries := uint64(len(entries))
 		if index >= numEntries {
-			return NewValueFromObject(CreateIterResultObject(realm.Agent, UndefinedValue, true))
+			return (CreateIterResultObject(realm.Agent, UndefinedValue, true)).ToValue()
 		}
 		var value Value
 		for index < numEntries {
@@ -37,7 +37,7 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 			index++
 		}
 		if index >= numEntries {
-			return NewValueFromObject(CreateIterResultObject(realm.Agent, UndefinedValue, true))
+			return (CreateIterResultObject(realm.Agent, UndefinedValue, true)).ToValue()
 		}
 		setIterator.Index = index
 		key := NewNumberValue(JSNumber(index))
@@ -47,11 +47,11 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 		case objectOwnPropertiesKindValue:
 			result = value
 		case objectOwnPropertiesKindKeyAndValue:
-			result = NewValueFromObject(CreateArrayFromList(realm.Agent, []Value{value, value}))
+			result = (CreateArrayFromList(realm.Agent, []Value{value, value})).ToValue()
 		case objectOwnPropertiesKindKey:
 			panic("unreachable")
 		}
-		return NewValueFromObject(CreateIterResultObject(realm.Agent, result, false))
+		return (CreateIterResultObject(realm.Agent, result, false)).ToValue()
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{

@@ -121,12 +121,12 @@ func (o *Object) IsExtensible() bool {
 
 // 7.3.2
 func (o *Object) Get(key PropertyKey) Value {
-	return o.InternalMethods().Get(o.Ref(), key, NewValueFromObject(o))
+	return o.InternalMethods().Get(o.Ref(), key, o.ToValue())
 }
 
 // 7.3.4
 func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) {
-	success := o.InternalMethods().Set(o.Ref(), key, value, NewValueFromObject(o))
+	success := o.InternalMethods().Set(o.Ref(), key, value, (o).ToValue())
 	if !success && throw == setThrowTypeThrow {
 		o.Agent().ThrowException(TypeError, "SetObject failed")
 	}
@@ -313,7 +313,7 @@ func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) CompletionObj
 }
 
 func (o *Object) ToCompletion() CompletionValue {
-	return NewValueFromObject(o).ToCompletion()
+	return (o).ToValue().ToCompletion()
 }
 
 // MARK: - 7.3.23
@@ -345,7 +345,7 @@ func (o *Object) EnumerableOwnProperties(kind objectOwnPropertiesKind) (results 
 						keyValue,
 						o.Get(key),
 					})
-					results = append(results, NewValueFromObject(entry))
+					results = append(results, (entry).ToValue())
 				}
 			}
 		}
@@ -433,15 +433,13 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		value := argumentsList[0]
 		if newTarget != nil && newTarget != agent.ActiveFunctionObject() {
-			return NewValueFromObject(OrdinaryCreateFromConstructor(
+			return (OrdinaryCreateFromConstructor(
 				agent, newTarget, "%Object.prototype%", []string{},
-			))
+			)).ToValue()
 		}
 
 		if value == nil {
-			return NewValueFromObject(
-				OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{}),
-			)
+			return OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{}).ToValue()
 		}
 
 		return value
@@ -469,10 +467,10 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		obj := OrdinaryObjectCreate(agent, MustGetObject(o), []string{})
 
 		if properties != nil {
-			return NewValueFromObject(objectDefineProperties(agent, obj, properties))
+			return (objectDefineProperties(agent, obj, properties)).ToValue()
 		}
 
-		return NewValueFromObject(obj)
+		return (obj).ToValue()
 	}
 
 	var defineProperties BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
@@ -481,7 +479,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		if !ValueIsObject(o) {
 			panic("TypeError")
 		}
-		return NewValueFromObject(objectDefineProperties(agent, MustGetObject(o), properties))
+		return (objectDefineProperties(agent, MustGetObject(o), properties)).ToValue()
 	}
 
 	defineProperty := func(this Value, arguments []Value, newTarget ObjectType) Value {
@@ -525,7 +523,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		if desc == nil {
 			return UndefinedValue
 		}
-		return NewValueFromObject(desc.FromPropertyDescriptor(agent, desc))
+		return (desc.FromPropertyDescriptor(agent, desc)).ToValue()
 	}
 	// 20.1.2.9
 	var getOwnPropertyDescriptors BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -538,11 +536,11 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		for _, key := range ownKeys {
 			desc := obj.InternalMethods().GetOwnProperty(obj, key)
 			if desc != nil {
-				descValue := NewValueFromObject(desc.FromPropertyDescriptor(agent, desc))
+				descValue := (desc.FromPropertyDescriptor(agent, desc)).ToValue()
 				descriptors.CreateDataPropertyOrThrow(key, descValue)
 			}
 		}
-		return NewValueFromObject(descriptors)
+		return (descriptors).ToValue()
 	}
 
 	// 20.1.2.12
@@ -551,7 +549,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 		obj := ValueToObject(agent, o)
 		proto := obj.InternalMethods().GetPrototypeOf(obj)
-		return NewValueFromObject(proto)
+		return (proto).ToValue()
 	}
 
 	// 20.1.2.15
@@ -608,7 +606,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 	// 20.1.2.21
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.ObjectPrototype),
+		Value:        (realm.Intrinsics.ObjectPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
@@ -669,26 +667,26 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		objectValue := args[0]
 		obj := ValueToObject(agent, objectValue)
 		entryList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKeyAndValue)
-		return NewValueFromObject(CreateArrayFromList(agent, entryList))
+		return (CreateArrayFromList(agent, entryList)).ToValue()
 	}
 	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
 		obj := ValueToObject(agent, objectValue)
 		keyList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKey)
-		return NewValueFromObject(CreateArrayFromList(agent, keyList))
+		return (CreateArrayFromList(agent, keyList)).ToValue()
 	}
 	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
 		obj := ValueToObject(agent, objectValue)
 		valueList := obj.EnumerableOwnProperties(objectOwnPropertiesKindValue)
-		return NewValueFromObject(CreateArrayFromList(agent, valueList))
+		return (CreateArrayFromList(agent, valueList)).ToValue()
 	}
 	var assign BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		target := args[0]
 		to := ValueToObject(agent, target)
 		sources := args[1:]
 		if len(sources) == 0 {
-			return NewValueFromObject(to)
+			return (to).ToValue()
 		}
 		for _, nextSource := range sources {
 			if nextSource != UndefinedValue && nextSource != NullValue {
@@ -703,7 +701,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 				}
 			}
 		}
-		return NewValueFromObject(to)
+		return (to).ToValue()
 	}
 	var getOwnPropertyNames BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
@@ -716,7 +714,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		keyValues := lo.Map(keyNames, func(key PropertyKey, _ int) Value {
 			return key.ToValue()
 		})
-		return NewValueFromObject(CreateArrayFromList(agent, keyValues))
+		return (CreateArrayFromList(agent, keyValues)).ToValue()
 	}
 	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
@@ -729,7 +727,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		symbolValues := lo.Map(symbols, func(key PropertyKey, _ int) Value {
 			return key.ToValue()
 		})
-		return NewValueFromObject(CreateArrayFromList(agent, symbolValues))
+		return (CreateArrayFromList(agent, symbolValues)).ToValue()
 	}
 	fromEntries := func(this Value, args []Value, newTarget ObjectType) Value {
 		iterable := args[0]
@@ -778,7 +776,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "fromEntries", fromEntries, 1, realm)
 
 	// 20.1.3.1
-	DefineBuiltinPropertyV(realm.Intrinsics.ObjectPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.ObjectPrototype, "constructor", (object).ToValue())
 
 	return object
 }
@@ -795,7 +793,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	realm.Intrinsics.ObjectPrototype = object
 
 	valueOf := func(this Value, args []Value, newTarget ObjectType) Value {
-		return NewValueFromObject(ValueToObject(agent, this))
+		return (ValueToObject(agent, this)).ToValue()
 	}
 
 	// 20.1.3.6 toString
@@ -873,7 +871,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	}
 	toLocaleString := func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
-		return ValueInvoke(agent, NewValueFromObject(o), NewStringPropertyKey("toString"), []Value{})
+		return ValueInvoke(agent, o.ToValue(), NewStringPropertyKey("toString"), []Value{})
 	}
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)

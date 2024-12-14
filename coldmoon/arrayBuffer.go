@@ -226,7 +226,7 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		}
 		byteLength := ToIndex(agent, length)
 		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
-		return NewValueFromObject(AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Data())
+		return (AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Data()).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "ArrayBuffer", builtinFunctionArgs{
 		realm:         realm,
@@ -235,9 +235,9 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value: NewValueFromObject(realm.Intrinsics.ArrayBufferPrototype),
+		Value: (realm.Intrinsics.ArrayBufferPrototype).ToValue(),
 	})
-	DefineBuiltinPropertyV(realm.Intrinsics.ArrayBufferPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.ArrayBufferPrototype, "constructor", (object).ToValue())
 
 	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return this
@@ -301,7 +301,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		newLen := JSInt(math.Max(float64(final-first), 0))
 		ctor := o.SpeciesConstructor(realm.Intrinsics.ArrayBufferConstructor)
 		newObject := ctor.Data().Construct([]Value{NewNumberValue(JSNumber(newLen))}, nil)
-		_new := RequireInternalSlot[*ArrayBufferLike](NewValueFromObject(newObject))
+		_new := RequireInternalSlot[*ArrayBufferLike]((newObject).ToValue())
 		if IsDetachedBuffer(_new) {
 			panic("TypeError")
 		}
@@ -321,7 +321,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 			count := JSInt(math.Min(float64(newLen), float64(currentLen-first)))
 			CopyDataBlockBytes(toBuf, 0, fromBuf, first, count)
 		}
-		return NewValueFromObject(_new)
+		return (_new).ToValue()
 	}
 	maxByteLength := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*ArrayBufferLike](this)

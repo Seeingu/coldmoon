@@ -68,5 +68,5 @@ func (f *FunctionEnvironment) GetSuperBase() Value {
 	if home == nil {
 		return UndefinedValue
 	}
-	return NewValueFromObject(home.InternalMethods().GetPrototypeOf(home))
+	return (home.InternalMethods().GetPrototypeOf(home)).ToValue()
 }

@@ -377,7 +377,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 			Data:   n.Data,
 		}
 		numberObject.ref = numberObject
-		return NewValueFromObject(numberObject)
+		return (numberObject).ToValue()
 	}
 	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "Number", builtinFunctionArgs{
 		realm:     realm,
@@ -424,7 +424,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "isNaN", isNaN, 1, realm)
 	DefineBuiltinFunction(object, "isSafeInteger", isSafeInteger, 1, realm)
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.NumberPrototype),
+		Value:        (realm.Intrinsics.NumberPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
@@ -477,10 +477,10 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyV(object, "parseFloat", NewValueFromObject(realm.Intrinsics.ParseFloat))
-	DefineBuiltinPropertyV(object, "parseInt", NewValueFromObject(realm.Intrinsics.ParseInt))
+	DefineBuiltinPropertyV(object, "parseFloat", (realm.Intrinsics.ParseFloat).ToValue())
+	DefineBuiltinPropertyV(object, "parseInt", (realm.Intrinsics.ParseInt).ToValue())
 
-	DefineBuiltinPropertyV(realm.Intrinsics.NumberPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.NumberPrototype, "constructor", (object).ToValue())
 
 	return object
 }

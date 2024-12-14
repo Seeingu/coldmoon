@@ -38,7 +38,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		args := CreateListFromArrayLike(agent, argumentsList)
 
-		return NewValueFromObject(ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object))
+		return (ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object)).ToValue()
 	}
 	var defineProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
@@ -104,7 +104,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		desc := targetObject.InternalMethods().GetOwnProperty(targetObject, key)
 
 		if desc != nil {
-			return NewValueFromObject(desc.FromPropertyDescriptor(agent, desc))
+			return (desc.FromPropertyDescriptor(agent, desc)).ToValue()
 		}
 
 		panic("return undefined")
@@ -118,7 +118,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		targetObject := MustGetObject(target)
 
-		return NewValueFromObject(targetObject.InternalMethods().GetPrototypeOf(targetObject))
+		return (targetObject.InternalMethods().GetPrototypeOf(targetObject)).ToValue()
 	}
 	var has BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
@@ -159,7 +159,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 			keys = append(keys, key.ToValue())
 		}
 
-		return NewValueFromObject(CreateArrayFromList(agent, keys))
+		return (CreateArrayFromList(agent, keys)).ToValue()
 	}
 	var preventExtensions BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]

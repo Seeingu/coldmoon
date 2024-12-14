@@ -28,7 +28,7 @@ func NewArrayIteratorPrototype(realm *Realm) ObjectType {
 			length = array.LengthOfArrayLike()
 		}
 		if index >= length {
-			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
+			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
 		}
 		indexNumber := NewNumberValue(index.ToNumber())
 		var result Value
@@ -40,11 +40,11 @@ func NewArrayIteratorPrototype(realm *Realm) ObjectType {
 			if kind == objectOwnPropertiesKindValue {
 				result = elementValue
 			} else {
-				result = NewValueFromObject(CreateArrayFromList(agent, []Value{indexNumber, elementValue}))
+				result = CreateArrayFromList(agent, []Value{indexNumber, elementValue}).ToValue()
 			}
 		}
 		arrayIterator.Index += 1
-		return NewValueFromObject(CreateIterResultObject(agent, result, false))
+		return CreateIterResultObject(agent, result, false).ToValue()
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{

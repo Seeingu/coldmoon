@@ -52,7 +52,7 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 	executor := CreateBuiltinFunction(agent, executorClosure, 2, "", builtinFunctionArgs{
 		additionalFields: additionalFields,
 	})
-	promise := MustGetObject(constructor).Construct([]Value{NewValueFromObject(executor)}, nil)
+	promise := MustGetObject(constructor).Construct([]Value{(executor).ToValue()}, nil)
 	if !IsCallable(additionalFields.ResolvingFunctions.Resolve) {
 		panic("TypeError")
 	}
@@ -138,8 +138,8 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 			thenFinally = onFinally
 			catchFinally = onFinally
 		} else {
-			thenFinally = NewValueFromObject(realm.Intrinsics.FunctionPrototype)
-			catchFinally = NewValueFromObject(realm.Intrinsics.FunctionPrototype)
+			thenFinally = (realm.Intrinsics.FunctionPrototype).ToValue()
+			catchFinally = (realm.Intrinsics.FunctionPrototype).ToValue()
 			captures := &PromiseThenFinallyCaptures{
 				OnFinally:   onFinally,
 				Constructor: C.Data(),
@@ -161,15 +161,14 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 						Value: arguments[0],
 					},
 				})
-				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{NewValueFromObject(valueThunk)})
+				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(valueThunk).ToValue()})
 			}
 
-			thenFinally = NewValueFromObject(
-				CreateBuiltinFunction(agent, thenFinallyClosure, 1, "", builtinFunctionArgs{
-					additionalFields: &AdditionalFields{
-						PromiseThenFinallyCaptures: captures,
-					},
-				}))
+			thenFinally = (CreateBuiltinFunction(agent, thenFinallyClosure, 1, "", builtinFunctionArgs{
+				additionalFields: &AdditionalFields{
+					PromiseThenFinallyCaptures: captures,
+				},
+			})).ToValue()
 
 			catchFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
 				function := agent.ActiveFunctionObject()
@@ -191,14 +190,13 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 						Value: reason,
 					},
 				})
-				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{NewValueFromObject(thrower)})
+				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(thrower).ToValue()})
 			}
-			catchFinally = NewValueFromObject(
-				CreateBuiltinFunction(agent, catchFinallyClosure, 1, "", builtinFunctionArgs{
-					additionalFields: &AdditionalFields{
-						PromiseThenFinallyCaptures: captures,
-					},
-				}))
+			catchFinally = (CreateBuiltinFunction(agent, catchFinallyClosure, 1, "", builtinFunctionArgs{
+				additionalFields: &AdditionalFields{
+					PromiseThenFinallyCaptures: captures,
+				},
+			})).ToValue()
 		}
 		return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{thenFinally, catchFinally})
 	}
@@ -235,7 +233,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 
 		resolvingFunctions := CreateResolvingFunctions(agent, promise)
 		executor.CallAssumeCallable(UndefinedValue, []Value{resolvingFunctions.Resolve})
-		return NewValueFromObject(promise)
+		return (promise).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "Promise", builtinFunctionArgs{
 		realm:     realm,
@@ -246,8 +244,8 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		reason := arguments[0]
 		C := this
 		capability := NewPromiseCapability(agent, C)
-		NewValueFromObject(capability.Reject).Call(UndefinedValue, []Value{reason})
-		return NewValueFromObject(capability.Promise)
+		(capability.Reject).ToValue().Call(UndefinedValue, []Value{reason})
+		return (capability.Promise).ToValue()
 	}
 	var resolve BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		resolution := arguments[0]
@@ -255,7 +253,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		if !ValueIsObject(C) {
 			panic("TypeError")
 		}
-		return NewValueFromObject(PromiseResolve(agent, MustGetObject(C), resolution))
+		return (PromiseResolve(agent, MustGetObject(C), resolution)).ToValue()
 	}
 	race := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		iterable := arguments[0]
@@ -378,12 +376,12 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.PromisePrototype),
+		Value:        (realm.Intrinsics.PromisePrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyV(realm.Intrinsics.PromisePrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.PromisePrototype, "constructor", (object).ToValue())
 
 	return object
 }
@@ -415,7 +413,7 @@ type AdditionalFields struct {
 
 func IfAbruptRejectPromise[T any](agent *Agent, value Completion[T], capability *PromiseCapability) bool {
 	if value.IsAbrupt() {
-		NewValueFromObject(capability.Reject).CallAssumeCallable(UndefinedValue, []Value{value.Error()})
+		(capability.Reject).ToValue().CallAssumeCallable(UndefinedValue, []Value{value.Error()})
 		return false
 	}
 	return true
@@ -437,7 +435,7 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 			return UndefinedValue
 		}
 		_alreadyResolved.Value = true
-		if SameValue(resolution, NewValueFromObject(_promise)) {
+		if SameValue(resolution, (_promise).ToValue()) {
 			agent.ThrowException(TypeError, "self resolution")
 			RejectPromise(agent, _promise, agent.exception)
 			return UndefinedValue
@@ -486,8 +484,8 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		additionalFields: rejectAdditionalFields,
 	})
 	return &ResolvingFunctions{
-		Resolve: NewValueFromObject(resolve),
-		Reject:  NewValueFromObject(reject),
+		Resolve: (resolve).ToValue(),
+		Reject:  (reject).ToValue(),
 	}
 }
 
@@ -611,13 +609,13 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 func PromiseResolve(agent *Agent, constructor ObjectType, x Value) ObjectType {
 	if ValueIsPromise(x) {
 		xConstructor := MustGetObject(x).Get(NewStringPropertyKey("constructor"))
-		if SameValue(xConstructor, NewValueFromObject(constructor)) {
+		if SameValue(xConstructor, (constructor).ToValue()) {
 			return MustGetObject(x)
 		}
 	}
 
-	promiseCapability := NewPromiseCapability(agent, NewValueFromObject(constructor))
-	NewValueFromObject(promiseCapability.Resolve).CallAssumeCallable(UndefinedValue, []Value{x})
+	promiseCapability := NewPromiseCapability(agent, (constructor).ToValue())
+	(promiseCapability.Resolve).ToValue().CallAssumeCallable(UndefinedValue, []Value{x})
 	return promiseCapability.Promise
 }
 
@@ -665,7 +663,7 @@ func PerformPromiseThen(agent *Agent, promise ObjectType, onFulfilled Value, onR
 	if resultCapability == nil {
 		return UndefinedValue
 	} else {
-		return NewValueFromObject(resultCapability.Promise)
+		return (resultCapability.Promise).ToValue()
 	}
 }
 

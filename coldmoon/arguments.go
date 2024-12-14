@@ -62,7 +62,7 @@ func argumentsGet(object ObjectType, key PropertyKey, receiver Value) Completion
 
 // 10.4.4.4
 func argumentsSet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
-	if SameValue(NewValueFromObject(object), receiver) {
+	if SameValue(object.ToValue(), receiver) {
 		_map := object.(*ArgumentsObject).ParameterMap
 		isMapped := ObjectHasOwnProperty(_map, key)
 		if isMapped {
@@ -107,7 +107,7 @@ func CreateUnmappedArgumentsObject(agent *Agent, argumentsList []Value) ObjectTy
 	}
 
 	obj.DefinePropertyOrThrow(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]), &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.ArrayPrototypeValues),
+		Value:        (realm.Intrinsics.ArrayPrototypeValues).ToValue(),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,
@@ -182,13 +182,13 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 		index--
 	}
 	obj.DefinePropertyOrThrow(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]), &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.ArrayPrototypeValues),
+		Value:        (realm.Intrinsics.ArrayPrototypeValues).ToValue(),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,
 	})
 	obj.DefinePropertyOrThrow(NewStringPropertyKey("callee"), &PropertyDescriptor{
-		Value:        NewValueFromObject(function),
+		Value:        (function).ToValue(),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,

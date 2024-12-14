@@ -187,6 +187,6 @@ func (a *Agent) ThrowException(exceptionType ExceptionType, message string) Valu
 	realm := a.CurrentRealm()
 	constructor := realm.Intrinsics.Get("%" + exceptionType.String() + "%")
 	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
-	a.exception = NewValueFromObject(errorObject)
+	a.exception = errorObject.ToValue()
 	return a.exception
 }

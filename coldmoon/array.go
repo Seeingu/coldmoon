@@ -89,7 +89,7 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) ObjectType {
 
 // 10.4.2.3
 func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) ObjectType {
-	isArray := IsArray(NewValueFromObject(originalArray))
+	isArray := IsArray(originalArray.ToValue())
 	if !isArray {
 		return ArrayCreate(agent, length, nil)
 	}
@@ -201,7 +201,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 
 		numberOfArgs := JSInt(len(args))
 		if numberOfArgs == 0 {
-			return NewValueFromObject(ArrayCreate(agent, 0, proto))
+			return (ArrayCreate(agent, 0, proto)).ToValue()
 		} else if numberOfArgs == 1 {
 			length := args[0]
 			array := ArrayCreate(agent, 0, proto)
@@ -220,7 +220,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 				setThrowTypeThrow,
 			)
 
-			return NewValueFromObject(array)
+			return array.ToValue()
 		} else {
 			Assert(numberOfArgs >= 2)
 			array := ArrayCreate(agent, numberOfArgs, proto)
@@ -231,7 +231,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 			}
 
 			Assert(getArrayLength(array) == numberOfArgs)
-			return NewValueFromObject(array)
+			return array.ToValue()
 		}
 	}
 
@@ -257,7 +257,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		}
 
 		array.Set(NewStringPropertyKey("length"), lenNumber, setThrowTypeThrow)
-		return NewValueFromObject(array)
+		return array.ToValue()
 	}
 
 	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "Array", builtinFunctionArgs{
@@ -270,7 +270,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "of", of, 0, realm)
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.ArrayPrototype),
+		Value:        realm.Intrinsics.ArrayPrototype.ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
@@ -281,7 +281,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		return this
 	}
 	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
-	DefineBuiltinPropertyV(realm.Intrinsics.ArrayPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.ArrayPrototype, "constructor", object.ToValue())
 
 	return object
 }
@@ -321,7 +321,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 			A.CreateDataPropertyOrThrow(pk, mappedValue)
 		}
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 
 	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -632,7 +632,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				array.CreateDataPropertyOrThrow(pk, o.Get(pk))
 			}
 		}
-		return NewValueFromObject(array)
+		return array.ToValue()
 	}
 	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		items := args[0]
@@ -665,7 +665,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				next := iteratorRecord.IteratorStep()
 				if next == nil {
 					a.Set(NewStringPropertyKey("length"), NewNumberValue(k.ToNumber()), setThrowTypeThrow)
-					return NewValueFromObject(a)
+					return a.ToValue()
 				}
 
 				nextValue := IteratorValue(next)
@@ -700,19 +700,19 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			a.CreateDataPropertyOrThrow(pk, mappedValue)
 		}
 		a.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
-		return NewValueFromObject(a)
+		return a.ToValue()
 	}
 	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
-		return NewValueFromObject(CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindKeyAndValue))
+		return CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindKeyAndValue).ToValue()
 	}
 	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
-		return NewValueFromObject(CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindKey))
+		return CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindKey).ToValue()
 	}
 	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
-		return NewValueFromObject(CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindValue))
+		return CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindValue).ToValue()
 	}
 	var shift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
@@ -793,7 +793,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 			k++
 		}
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 	var reduce BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		callbackFn := args[0]
@@ -887,7 +887,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		for index := range len(args) + 1 {
 			var element Value
 			if index == 0 {
-				element = NewValueFromObject(o)
+				element = o.ToValue()
 			} else {
 				element = args[index-1]
 			}
@@ -917,7 +917,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 
 		A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow)
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
@@ -966,7 +966,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			n++
 		}
 		A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow)
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 	var fill BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		value := args[0]
@@ -1000,7 +1000,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			o.Set(pk, value, setThrowTypeThrow)
 			k++
 		}
-		return NewValueFromObject(o)
+		return o.ToValue()
 	}
 	var copyWithin BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		target := args[0]
@@ -1070,7 +1070,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			to += JSInt(direction)
 			count--
 		}
-		return NewValueFromObject(o)
+		return o.ToValue()
 	}
 	var reverse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
@@ -1104,7 +1104,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 			lower++
 		}
-		return NewValueFromObject(o)
+		return o.ToValue()
 	}
 	var toReversed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
@@ -1116,7 +1116,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			pk := NewIntegerIndexPropertyKey(k)
 			A.CreateDataPropertyOrThrow(pk, fromValue)
 		}
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 	var sort BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		compareFn := args[0]
@@ -1141,7 +1141,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		for ; j < length; j++ {
 			obj.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(j))
 		}
-		return NewValueFromObject(obj)
+		return obj.ToValue()
 	}
 	var toSorted BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		compareFn := args[0]
@@ -1161,7 +1161,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		for k, v := range sortedList {
 			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(JSInt(k)), v)
 		}
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 	var flat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		depth := args[0]
@@ -1176,7 +1176,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		A := ArraySpeciesCreate(agent, o, 0)
 		FlattenIntoArray(agent, A, o, sourceLen, 0, depthNum, nil, nil)
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 	var flatMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		mapperFunction := args[0]
@@ -1188,7 +1188,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		A := ArraySpeciesCreate(agent, o, 0)
 		FlattenIntoArray(agent, A, o, sourceLen, 0, 1, MustGetObject(mapperFunction), thisArg)
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 	var splice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		start := args[0]
@@ -1276,7 +1276,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			k++
 		}
 		o.Set(NewStringPropertyKey("length"), NewNumberValue((length - actualDeleteCount + itemCount).ToNumber()), setThrowTypeThrow)
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 	var toSpliced BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		start := args[0]
@@ -1332,7 +1332,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			r++
 		}
 
-		return NewValueFromObject(A)
+		return A.ToValue()
 	}
 
 	DefineBuiltinFunction(object, "join", join, 1, realm)
@@ -1488,7 +1488,7 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumb
 	}
 	if compareFn != nil {
 		v := ToNumber(agent,
-			NewValueFromObject(compareFn).CallAssumeCallable(
+			compareFn.ToValue().CallAssumeCallable(
 				UndefinedValue,
 				[]Value{x, y}),
 		)
@@ -1514,7 +1514,7 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumb
 
 func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen JSInt, start, depth JSInt, mapperFunction ObjectType, thisArg Value) JSInt {
 	if mapperFunction != nil {
-		Assert(IsCallable(NewValueFromObject(mapperFunction)))
+		Assert(IsCallable((mapperFunction).ToValue()))
 		Assert(thisArg != nil)
 		Assert(depth == 1)
 	}
@@ -1527,9 +1527,9 @@ func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen JSInt, 
 		if exists {
 			element := source.Get(p)
 			if mapperFunction != nil {
-				element = NewValueFromObject(mapperFunction).CallAssumeCallable(
+				element = (mapperFunction).ToValue().CallAssumeCallable(
 					thisArg,
-					[]Value{element, NewNumberValue(sourceIndex.ToNumber()), NewValueFromObject(source)},
+					[]Value{element, NewNumberValue(sourceIndex.ToNumber()), (source).ToValue()},
 				)
 			}
 

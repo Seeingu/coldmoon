@@ -119,7 +119,6 @@ var (
 	NegativeInfinityValue = &NumberValue{Data: JSNumberNegInf}
 )
 
-// Deprecated: use `.toValue()` instead
 func NewValueFromObject(object ObjectType) Value {
 	return &ObjectValue{Object: object}
 }
@@ -195,7 +194,7 @@ func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
 		if exoticToPrim != nil {
 			hintString := hint.String()
 
-			result := NewValueFromObject(exoticToPrim).CallAssumeCallable(value, []Value{
+			result := exoticToPrim.ToValue().CallAssumeCallable(value, []Value{
 				NewStringValue(hintString),
 			})
 			if _, isObject = result.(*ObjectValue); !isObject {
@@ -536,7 +535,7 @@ func IsArray(value Value) bool {
 	if proxy, ok := o.Object.(*ProxyObject); ok {
 		proxy.validateNonRevokedProxy()
 		proxyTarget := proxy.Target
-		return IsArray(NewValueFromObject(proxyTarget))
+		return IsArray(proxyTarget.ToValue())
 	}
 	return false
 }

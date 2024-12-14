@@ -19,7 +19,7 @@ func DefineBuiltinFunction(object ObjectType,
 		functionName,
 		builtinFunctionArgs{realm: realm},
 	)
-	DefineBuiltinPropertyV(object, name, NewValueFromObject(f))
+	DefineBuiltinPropertyV(object, name, f.ToValue())
 }
 
 func DefineBuiltinFunctionWithAttributes(object ObjectType,
@@ -41,7 +41,7 @@ func DefineBuiltinFunctionWithAttributes(object ObjectType,
 		builtinFunctionArgs{realm: realm},
 	)
 	DefineBuiltinPropertyP(object, name, &PropertyDescriptor{
-		Value:        NewValueFromObject(f),
+		Value:        f.ToValue(),
 		Writable:     attr.Writable,
 		Configurable: attr.Configurable,
 		Enumerable:   attr.Enumerable,

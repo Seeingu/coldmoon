@@ -9,15 +9,14 @@ func NewAsyncFunctionConstructor(realm *Realm) ObjectType {
 		if bodyArg == nil {
 			bodyArg = NewStringValue("")
 		}
-		return NewValueFromObject(
-			CreateDynamicFunction(
-				agent,
-				C,
-				newTarget,
-				dynamicFunctionKindAsync,
-				parameterArgs,
-				bodyArg,
-			))
+		return (CreateDynamicFunction(
+			agent,
+			C,
+			newTarget,
+			dynamicFunctionKindAsync,
+			parameterArgs,
+			bodyArg,
+		)).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "AsyncFunction", builtinFunctionArgs{
 		realm:     realm,
@@ -25,13 +24,13 @@ func NewAsyncFunctionConstructor(realm *Realm) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.AsyncFunctionPrototype),
+		Value:        (realm.Intrinsics.AsyncFunctionPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 	DefineBuiltinPropertyP(realm.Intrinsics.AsyncFunctionPrototype, "constructor", &PropertyDescriptor{
-		Value:        NewValueFromObject(object),
+		Value:        (object).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
@@ -67,7 +66,7 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 		agent.ExecutionContextStack.Pop()
 
 		if result.Type == CompletionTypeNormal {
-			NewValueFromObject(promiseCapability.Resolve).CallAssumeCallable(
+			(promiseCapability.Resolve).ToValue().CallAssumeCallable(
 				UndefinedValue, []Value{result.Data()})
 		} else {
 			panic("AsyncBlockStart: completion type not normal")

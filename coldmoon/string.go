@@ -127,9 +127,7 @@ func NewStringConstructor(realm *Realm) ObjectType {
 		if newTarget == nil {
 			return NewStringValue(s)
 		}
-		return NewValueFromObject(StringCreate(
-			realm.Agent, s, GetPrototypeFromConstructor(newTarget, "%String.prototype%")),
-		)
+		return StringCreate(realm.Agent, s, GetPrototypeFromConstructor(newTarget, "%String.prototype%")).ToValue()
 	}
 
 	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "String", builtinFunctionArgs{
@@ -139,12 +137,12 @@ func NewStringConstructor(realm *Realm) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.StringPrototype),
+		Value:        realm.Intrinsics.StringPrototype.ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyV(realm.Intrinsics.StringPrototype, "constructor", NewValueFromObject(object))
+	DefineBuiltinPropertyV(realm.Intrinsics.StringPrototype, "constructor", object.ToValue())
 
 	var fromCharCode BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		var s string
@@ -233,7 +231,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 			Data:   s,
 		}
 		stringIteratorObject.ref = stringIteratorObject
-		return NewValueFromObject(stringIteratorObject)
+		return (stringIteratorObject).ToValue()
 	}
 	var at BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		index := argumentsList[0]
@@ -303,7 +301,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		if regexp != UndefinedValue && regexp != NullValue {
 			searcher := GetMethod(agent, regexp, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]))
 			if searcher != nil {
-				return NewValueFromObject(searcher).CallAssumeCallable(regexp, []Value{o})
+				return (searcher).ToValue().CallAssumeCallable(regexp, []Value{o})
 			}
 		}
 

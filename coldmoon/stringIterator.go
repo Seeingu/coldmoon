@@ -14,11 +14,11 @@ func NewStringIteratorPrototype(realm *Realm) ObjectType {
 		data := stringIterator.Data
 		length := len(data)
 		if stringIterator.Index >= uint64(length) {
-			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
+			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()
 		}
 		result := NewStringValue(string(data[stringIterator.Index]))
 		stringIterator.Index += 1
-		return NewValueFromObject(CreateIterResultObject(agent, result, false))
+		return (CreateIterResultObject(agent, result, false)).ToValue()
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{

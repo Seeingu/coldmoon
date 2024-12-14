@@ -97,7 +97,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 			targetNameString = s.Data
 		}
 		SetFunctionName(F, NewStringPropertyKey(targetNameString), "bound")
-		return NewValueFromObject(F)
+		return (F).ToValue()
 	}
 	DefineBuiltinFunction(f, "call", call, 1, realm)
 	DefineBuiltinFunction(f, "bind", bind, 1, realm)
@@ -263,7 +263,7 @@ func CreateDynamicFunction(
 	case dynamicFunctionKindGenerator:
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
 		DefineBuiltinPropertyP(function, "prototype", &PropertyDescriptor{
-			Value:        NewValueFromObject(prototype),
+			Value:        (prototype).ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
@@ -271,7 +271,7 @@ func CreateDynamicFunction(
 	case dynamicFunctionKindAsyncGenerator:
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
 		DefineBuiltinPropertyP(function, "prototype", &PropertyDescriptor{
-			Value:        NewValueFromObject(prototype),
+			Value:        (prototype).ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
@@ -295,14 +295,14 @@ func NewFunctionConstructor(realm *Realm) ObjectType {
 			bodyArg = NewStringValue("")
 		}
 
-		return NewValueFromObject(CreateDynamicFunction(
+		return (CreateDynamicFunction(
 			agent,
 			constructor,
 			newTarget,
 			dynamicFunctionKindNormal,
 			parameters,
 			bodyArg,
-		))
+		)).ToValue()
 	}
 	f := CreateBuiltinFunction(realm.Agent, behavior, 1, "Function", builtinFunctionArgs{
 		realm:         realm,

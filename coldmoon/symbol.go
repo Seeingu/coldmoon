@@ -102,7 +102,7 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.SymbolPrototype),
+		Value:        (realm.Intrinsics.SymbolPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
@@ -151,7 +151,7 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 	})
 
 	DefineBuiltinPropertyV(realm.Intrinsics.SymbolPrototype, "constructor",
-		NewValueFromObject(object),
+		(object).ToValue(),
 	)
 
 	var symbolFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {

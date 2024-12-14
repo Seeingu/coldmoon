@@ -29,14 +29,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("getPrototypeOf"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("getPrototypeOf"))
 		if trap == nil {
 			return t.InternalMethods().GetPrototypeOf(t)
 		}
 
-		handlerPrototype := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t)},
+		handlerPrototype := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue()},
 		)
 		handlerProtoObject, handlerProtoIsObject := handlerPrototype.(*ObjectValue)
 
@@ -54,7 +54,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 
 		targetProto := t.InternalMethods().GetPrototypeOf(t)
-		if !SameValue(handlerPrototype, NewValueFromObject(targetProto)) {
+		if !SameValue(handlerPrototype, (targetProto).ToValue()) {
 			panic("TypeError")
 		}
 
@@ -65,14 +65,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("setPrototypeOf"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("setPrototypeOf"))
 		if trap == nil {
 			return t.InternalMethods().SetPrototypeOf(t, prototype)
 		}
 
-		booleanTrapResult := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), NewValueFromObject(prototype)},
+		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), (prototype).ToValue()},
 		).ToBoolean()
 		if !booleanTrapResult {
 			return false
@@ -82,7 +82,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return true
 		}
 		targetProto := t.InternalMethods().GetPrototypeOf(t)
-		if !SameValue(NewValueFromObject(prototype), NewValueFromObject(targetProto)) {
+		if !SameValue((prototype).ToValue(), (targetProto).ToValue()) {
 			panic("TypeError")
 		}
 		return true
@@ -92,14 +92,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("isExtensible"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("isExtensible"))
 		if trap == nil {
 			return t.InternalMethods().IsExtensible(t)
 		}
 
-		booleanTrapResult := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t)},
+		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue()},
 		).ToBoolean()
 		targetExtensible := t.IsExtensible()
 		if booleanTrapResult != targetExtensible {
@@ -112,14 +112,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("preventExtensions"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("preventExtensions"))
 		if trap == nil {
 			return t.InternalMethods().PreventExtensions(t)
 		}
 
-		booleanTrapResult := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t)},
+		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue()},
 		).ToBoolean()
 		if booleanTrapResult {
 			targetExtensible := t.IsExtensible()
@@ -134,14 +134,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("getOwnPropertyDescriptor"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("getOwnPropertyDescriptor"))
 		if trap == nil {
 			return t.InternalMethods().GetOwnProperty(t, pk)
 		}
 
-		trapResultObjValue := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), pk.ToValue()},
+		trapResultObjValue := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), pk.ToValue()},
 		)
 		_, trapResultIsObject := trapResultObjValue.(*ObjectValue)
 		if !trapResultIsObject {
@@ -168,15 +168,15 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("defineProperty"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("defineProperty"))
 		if trap == nil {
 			return t.InternalMethods().DefineOwnProperty(t, pk, desc)
 		}
 
 		descObj := desc.FromPropertyDescriptor(agent, desc)
-		booleanTrapResult := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), pk.ToValue(), NewValueFromObject(descObj)},
+		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), pk.ToValue(), (descObj).ToValue()},
 		).ToBoolean()
 
 		if !booleanTrapResult {
@@ -213,14 +213,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("has"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("has"))
 		if trap == nil {
 			return t.InternalMethods().HasProperty(t, pk)
 		}
 
-		booleanTrapResult := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), pk.ToValue()},
+		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), pk.ToValue()},
 		).ToBoolean()
 		if !booleanTrapResult {
 			targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
@@ -240,14 +240,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("get"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("get"))
 		if trap == nil {
 			return t.InternalMethods().Get(t, pk, receiver)
 		}
 
-		trapResult := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), pk.ToValue(), receiver},
+		trapResult := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), pk.ToValue(), receiver},
 		)
 		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
 		if targetDesc != nil && !targetDesc.Configurable {
@@ -269,14 +269,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("set"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("set"))
 		if trap == nil {
 			return t.InternalMethods().Set(t, pk, v, receiver)
 		}
 
-		booleanTrapResult := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), pk.ToValue(), v, receiver},
+		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), pk.ToValue(), v, receiver},
 		).ToBoolean()
 		if !booleanTrapResult {
 			return false
@@ -301,14 +301,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("deleteProperty"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("deleteProperty"))
 		if trap == nil {
 			return t.InternalMethods().Delete(t, pk)
 		}
 
-		booleanTrapResult := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), pk.ToValue()},
+		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), pk.ToValue()},
 		).ToBoolean()
 		if !booleanTrapResult {
 			return false
@@ -331,14 +331,14 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("ownKeys"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("ownKeys"))
 		if trap == nil {
 			return t.InternalMethods().OwnPropertyKeys(t)
 		}
 
-		trapResultArray := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t)},
+		trapResultArray := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue()},
 		)
 
 		elements := CreateListFromArrayLike(agent, trapResultArray)
@@ -410,32 +410,32 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("apply"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("apply"))
 		if trap == nil {
 			return t.InternalMethods().Call(t, this, arguments)
 		}
 
 		argArray := CreateArrayFromList(agent, arguments)
-		return NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), this, NewValueFromObject(argArray)},
+		return (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), this, (argArray).ToValue()},
 		)
 	}
 	construct := func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
-		Assert(IsConstructor(NewValueFromObject(t)))
+		Assert(IsConstructor((t).ToValue()))
 		h := proxy.Handler
-		trap := GetMethod(agent, NewValueFromObject(h), NewStringPropertyKey("construct"))
+		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("construct"))
 		if trap == nil {
 			return t.InternalMethods().Construct(t, arguments, newTarget)
 		}
 
 		argArray := CreateArrayFromList(agent, arguments)
-		newObj := NewValueFromObject(trap).CallAssumeCallable(
-			NewValueFromObject(h),
-			[]Value{NewValueFromObject(t), NewValueFromObject(argArray), NewValueFromObject(newTarget)},
+		newObj := (trap).ToValue().CallAssumeCallable(
+			(h).ToValue(),
+			[]Value{(t).ToValue(), (argArray).ToValue(), (newTarget).ToValue()},
 		)
 		if !ValueIsObject(newObj) {
 			panic("TypeError")
@@ -483,7 +483,7 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 		if newTarget == nil {
 			panic("TypeError")
 		}
-		return NewValueFromObject(ProxyCreate(agent, target, handler))
+		return (ProxyCreate(agent, target, handler)).ToValue()
 	}
 
 	obj := CreateBuiltinFunction(agent, behavior, 2, "Proxy", builtinFunctionArgs{
@@ -513,9 +513,9 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 		})
 
 		result := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, nil)
-		result.CreateDataPropertyOrThrow(NewStringPropertyKey("proxy"), NewValueFromObject(proxy))
-		result.CreateDataPropertyOrThrow(NewStringPropertyKey("revoke"), NewValueFromObject(revoker))
-		return NewValueFromObject(result)
+		result.CreateDataPropertyOrThrow(NewStringPropertyKey("proxy"), (proxy).ToValue())
+		result.CreateDataPropertyOrThrow(NewStringPropertyKey("revoke"), (revoker).ToValue())
+		return (result).ToValue()
 	}
 	DefineBuiltinFunction(obj, "revocable", revocable, 2, realm)
 

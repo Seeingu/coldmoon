@@ -140,9 +140,9 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 	} else {
 		if thisArgument == nil || thisArgument == UndefinedValue || thisArgument == NullValue {
 			globalEnv := calleeRealm.GlobalEnv
-			thisValue = NewValueFromObject(globalEnv.GlobalThisValue)
+			thisValue = (globalEnv.GlobalThisValue).ToValue()
 		} else {
-			thisValue = NewValueFromObject(ValueToObject(agent, thisArgument))
+			thisValue = (ValueToObject(agent, thisArgument)).ToValue()
 		}
 	}
 
@@ -172,11 +172,11 @@ func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argume
 
 func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	realm := agent.CurrentRealm()
-	promiseCapability := NewPromiseCapability(agent, NewValueFromObject(realm.Intrinsics.Promise))
+	promiseCapability := NewPromiseCapability(agent, (realm.Intrinsics.Promise).ToValue())
 	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
 	if completion.IsError() {
 		ex := agent.exception
-		NewValueFromObject(promiseCapability.Reject).CallAssumeCallable(
+		(promiseCapability.Reject).ToValue().CallAssumeCallable(
 			UndefinedValue,
 			[]Value{ex},
 		)
@@ -184,7 +184,7 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 	} else {
 		// TODO
 	}
-	return NewCompletionReturnValue(NewValueFromObject(promiseCapability.Promise))
+	return NewCompletionReturnValue((promiseCapability.Promise).ToValue())
 }
 
 func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
@@ -196,13 +196,13 @@ func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsL
 func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	G := OrdinaryCreateFromConstructor(agent, function, "%AsyncGeneratorFunction.prototype.prototype%", nil)
-	return NewCompletionReturnValue(NewValueFromObject(G))
+	return NewCompletionReturnValue((G).ToValue())
 }
 
 func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	G := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
-	return NewCompletionReturnValue(NewValueFromObject(G))
+	return NewCompletionReturnValue((G).ToValue())
 }
 
 // 10.2.11
@@ -272,7 +272,7 @@ loop:
 		} else {
 			env.CreateMutableBinding("arguments", false)
 		}
-		env.InitializeBinding("arguments", NewValueFromObject(argumentsObject))
+		env.InitializeBinding("arguments", (argumentsObject).ToValue())
 
 		for _, parameterName := range parameterNames {
 			parameterBindings = append(parameterBindings, string(parameterName))
@@ -388,13 +388,12 @@ func (e *ECMAScriptFunction) Construct(
 
 	var thisArgument Value
 	if kind == ConstructorKindBase {
-		thisArgument = NewValueFromObject(
-			OrdinaryCreateFromConstructor(
-				agent,
-				newTarget,
-				"%Object.prototype%",
-				nil,
-			))
+		thisArgument = (OrdinaryCreateFromConstructor(
+			agent,
+			newTarget,
+			"%Object.prototype%",
+			nil,
+		)).ToValue()
 	}
 
 	calleeContext := PrepareForOrdinaryCall(agent, function, newTarget)
@@ -479,6 +478,7 @@ func OrdinaryFunctionCreate(
 		HomeObject:         nil,
 		ConstructorKind:    ConstructorKindBase,
 	}
+	function.ref = function
 	call := func(o ObjectType, this Value, arguments []Value) Value {
 		return o.(*ECMAScriptFunction).Call(this, arguments)
 	}
@@ -521,7 +521,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 	fun, isECMAScriptFunction := F.(*ECMAScriptFunction)
 
 	if isECMAScriptFunction {
-		Assert(!IsConstructor(NewValueFromObject(fun)))
+		Assert(!IsConstructor((fun).ToValue()))
 
 		Assert(fun.IsExtensible() &&
 			!F.PropertyStorage().Has(NewStringPropertyKey("prototype")),
@@ -542,7 +542,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 		proto = OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, nil)
 
 		proto.DefinePropertyOrThrow(NewStringPropertyKey("constructor"), &PropertyDescriptor{
-			Value:        NewValueFromObject(F),
+			Value:        (F).ToValue(),
 			Writable:     writable,
 			Enumerable:   false,
 			Configurable: true,
@@ -550,7 +550,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 	}
 
 	F.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-		Value:        NewValueFromObject(proto),
+		Value:        (proto).ToValue(),
 		Writable:     writable,
 		Enumerable:   false,
 		Configurable: false,
@@ -578,11 +578,11 @@ func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, c
 		return &PrivateElement{
 			Key:   k.PrivateName,
 			Kind:  PrivateElementKindMethod,
-			Value: NewValueFromObject(closure),
+			Value: (closure).ToValue(),
 		}
 	case PropertyKey:
 		desc := &PropertyDescriptor{
-			Value:        NewValueFromObject(closure),
+			Value:        (closure).ToValue(),
 			Writable:     true,
 			Enumerable:   enumerable,
 			Configurable: true,

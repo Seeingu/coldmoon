@@ -28,17 +28,17 @@ func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := MustGetObject(thisValue).(*RegExpStringIteratorObject)
 		if iterator.Completed {
-			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
+			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()
 		}
 
 		match := RegExpExec(agent, iterator.RegExp, iterator.string)
 		if match.IsNull() {
 			iterator.Completed = true
-			return NewValueFromObject(CreateIterResultObject(agent, UndefinedValue, true))
+			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()
 		}
 		if !iterator.Global {
 			iterator.Completed = true
-			return NewValueFromObject(CreateIterResultObject(agent, NewValueFromObject(match.Data()), false))
+			return (CreateIterResultObject(agent, (match.Data()).ToValue(), false)).ToValue()
 		}
 
 		matchStr := ToString(agent, match.Data().Get(NewStringPropertyKey("0")))
@@ -47,7 +47,7 @@ func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 			nextIndex := AdvanceStringIndex(iterator.string, thisIndex, iterator.FullUnicode)
 			iterator.RegExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(nextIndex.ToNumber()), setThrowTypeThrow)
 		}
-		return NewValueFromObject(CreateIterResultObject(agent, NewValueFromObject(match.Data()), false))
+		return (CreateIterResultObject(agent, (match.Data()).ToValue(), false)).ToValue()
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
 	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
