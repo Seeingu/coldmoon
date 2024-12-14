@@ -29,8 +29,6 @@ type HostHooks struct {
 	HostLoadImportedModule         func(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined *HostDefined, payload ImportedModulePayload)
 }
 
-var WellKnownSymbols = map[WellKnownSymbolsKey]*SymbolValue{}
-
 //go:generate stringer -type=ExceptionType
 type ExceptionType int
 
@@ -135,42 +133,6 @@ func (a *Agent) GetNewTarget() ObjectType {
 // 9.4.6
 func (a *Agent) GetGlobalObject() *Object {
 	return a.CurrentRealm().GlobalObject
-}
-
-// MARK: - Well-known Symbols
-
-type WellKnownSymbolsKey string
-
-const (
-	WellKnownSymbolsAsyncIterator      WellKnownSymbolsKey = "@@asyncIterator"
-	WellKnownSymbolsHasInstance        WellKnownSymbolsKey = "@@hasInstance"
-	WellKnownSymbolsIsConcatSpreadable WellKnownSymbolsKey = "@@isConcatSpreadable"
-	WellKnownSymbolsIterator           WellKnownSymbolsKey = "@@iterator"
-	WellKnownSymbolsMatch              WellKnownSymbolsKey = "@@match"
-	WellKnownSymbolsMatchAll           WellKnownSymbolsKey = "@@matchAll"
-	WellKnownSymbolsReplace            WellKnownSymbolsKey = "@@replace"
-	WellKnownSymbolsSearch             WellKnownSymbolsKey = "@@search"
-	WellKnownSymbolsSpecies            WellKnownSymbolsKey = "@@species"
-	WellKnownSymbolsSplit              WellKnownSymbolsKey = "@@split"
-	WellKnownSymbolsToPrimitive        WellKnownSymbolsKey = "@@toPrimitive"
-	WellKnownSymbolsToStringTag        WellKnownSymbolsKey = "@@toStringTag"
-	WellKnownSymbolsUnscopables        WellKnownSymbolsKey = "@@unscopables"
-)
-
-func initWellKnownSymbols(agent *Agent) {
-	WellKnownSymbols[WellKnownSymbolsAsyncIterator] = agent.CreateSymbol("SymbolValue.asyncIterator")
-	WellKnownSymbols[WellKnownSymbolsHasInstance] = agent.CreateSymbol("SymbolValue.hasInstance")
-	WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable] = agent.CreateSymbol("SymbolValue.isConcatSpreadable")
-	WellKnownSymbols[WellKnownSymbolsIterator] = agent.CreateSymbol("SymbolValue.iterator")
-	WellKnownSymbols[WellKnownSymbolsMatch] = agent.CreateSymbol("SymbolValue.match")
-	WellKnownSymbols[WellKnownSymbolsMatchAll] = agent.CreateSymbol("SymbolValue.matchAll")
-	WellKnownSymbols[WellKnownSymbolsReplace] = agent.CreateSymbol("SymbolValue.replace")
-	WellKnownSymbols[WellKnownSymbolsSearch] = agent.CreateSymbol("SymbolValue.search")
-	WellKnownSymbols[WellKnownSymbolsSpecies] = agent.CreateSymbol("SymbolValue.species")
-	WellKnownSymbols[WellKnownSymbolsSplit] = agent.CreateSymbol("SymbolValue.split")
-	WellKnownSymbols[WellKnownSymbolsToPrimitive] = agent.CreateSymbol("SymbolValue.toPrimitive")
-	WellKnownSymbols[WellKnownSymbolsToStringTag] = agent.CreateSymbol("SymbolValue.toStringTag")
-	WellKnownSymbols[WellKnownSymbolsUnscopables] = agent.CreateSymbol("SymbolValue.unscopables")
 }
 
 func (a *Agent) CreateSymbol(desc string) *SymbolValue {
