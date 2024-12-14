@@ -45,6 +45,21 @@ func evaluate(fileName string, realm *Realm) {
 	}
 }
 
+func readDir(dir string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		panic(err)
+	}
+	var files []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		files = append(files, path.Join(dir, entry.Name()))
+	}
+	return files
+}
+
 func testDataView(realm *Realm) {
 	dataViewDir := "./test262/test/built-ins/DataView/"
 	f := makeTest262Path(dataViewDir + "constructor.js")
@@ -52,6 +67,21 @@ func testDataView(realm *Realm) {
 }
 
 func testTypedArray(realm *Realm) {
+	typedArrayDir := "./test262/test/built-ins/TypedArray/"
+	subdirs := []string{
+		"Symbol.species",
+	}
+
+	for _, subdir := range subdirs {
+		d := typedArrayDir + subdir
+		for _, f := range readDir(makeTest262Path(d)) {
+			println("Testing file: ", f)
+			evaluate(f, realm)
+		}
+	}
+}
+
+func testTypedArrayName(realm *Realm) {
 	typedArrayConstructorDir := "./test262/test/built-ins/TypedArrayConstructors"
 	constructorNames := []string{
 		"BigInt64Array",
@@ -76,7 +106,7 @@ func testTypedArray(realm *Realm) {
 		for _, fileName := range fileNames {
 			d := typedArrayConstructorDir + "/" + name
 			f := makeTest262Path(d + "/" + fileName)
-			println("BigInt64Array: Testing file: ", f)
+			println("Testing file: ", f)
 			evaluate(f, realm)
 		}
 	}
@@ -101,17 +131,15 @@ func testBoolean(realm *Realm) {
 
 func testArray(realm *Realm) {
 	arrayDir := "./test262/test/built-ins/Array/"
-	entries, err := os.ReadDir(makeTest262Path(arrayDir))
-	if err != nil {
-		panic(err)
+	subdirs := []string{
+		"Symbol.species",
 	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	for _, subdir := range subdirs {
+		d := arrayDir + subdir
+		for _, f := range readDir(makeTest262Path(d)) {
+			println("Testing file: ", f)
+			evaluate(f, realm)
 		}
-		f := makeTest262Path(arrayDir + entry.Name())
-		println("Testing file: ", f)
-		evaluate(f, realm)
 	}
 }
 
@@ -123,6 +151,7 @@ func TestHarness(t *testing.T) {
 		"nans.js",
 		"assertRelativeDateMs.js",
 		"propertyHelper.js",
+		"testTypedArray.js",
 	}
 
 	agent := NewAgent()
@@ -132,8 +161,9 @@ func TestHarness(t *testing.T) {
 		runTestHarness(realm, f, false)
 	}
 
-	// testArray(realm)
+	testArray(realm)
 	testDataView(realm)
+	testTypedArrayName(realm)
 	testTypedArray(realm)
 
 	Debug.Enable()

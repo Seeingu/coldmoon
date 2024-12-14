@@ -280,7 +280,10 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	var getter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		return this
 	}
-	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+		Getter:              getter,
+	})
 	DefineBuiltinPropertyV(realm.Intrinsics.ArrayPrototype, "constructor", object.ToValue())
 
 	return object

@@ -608,9 +608,13 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 
 	DefineBuiltinFunction(object, "from", from, 1, realm)
 	DefineBuiltinFunction(object, "of", of, 0, realm)
-	DefineBuiltinAccessor(realm, object, "%Symbol.species%", func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	species := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return thisArgument
-	}, nil)
+	}
+	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+		Getter:              species,
+		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        (realm.Intrinsics.TypedArrayPrototype).ToValue(),
@@ -717,6 +721,7 @@ func TypedArrayCreate(agent *Agent, name string, proto ObjectType) *TypedArrayOb
 		ViewedArrayBuffer: nil,
 		TypedArrayName:    name,
 	}
+	object.ref = object
 	internalMethods := object.InternalMethods()
 	internalMethods.PreventExtensions = func(o ObjectType) bool {
 		oo := o.(*TypedArrayObject)
