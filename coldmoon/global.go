@@ -48,6 +48,7 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 		{"Set", r.Intrinsics.Set.ToValue()},
 		{"Promise", r.Intrinsics.Promise.ToValue()},
 		{"ArrayBuffer", r.Intrinsics.ArrayBufferConstructor.ToValue()},
+		{"SharedArrayBuffer", r.Intrinsics.SharedArrayBufferConstructor.ToValue()},
 		{"parseInt", r.Intrinsics.ParseInt.ToValue()},
 		{"parseFloat", r.Intrinsics.ParseFloat.ToValue()},
 		{"RegExp", r.Intrinsics.RegExpConstructor.ToValue()},

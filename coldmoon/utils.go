@@ -52,6 +52,35 @@ func DefineBuiltinPropertyP(object ObjectType, name string, p *PropertyDescripto
 	object.DefinePropertyOrThrow(NewStringPropertyKey(name), p)
 }
 
+// BuiltInPropertyParams
+// - should provide either Name or WellKnownSymbolsKey
+// - should provide either Desc or Value
+type BuiltinPropertyParams struct {
+	Name                string
+	WellKnownSymbolsKey WellKnownSymbolsKey
+	Desc                *PropertyDescriptor
+	Value               Value
+}
+
+func DefineBuiltinProperty(object ObjectType, params BuiltinPropertyParams) {
+	var pk PropertyKey
+	if params.WellKnownSymbolsKey.Nil() {
+		pk = NewStringPropertyKey(params.Name)
+	} else {
+		pk = NewSymbolPropertyKey(WellKnownSymbols[params.WellKnownSymbolsKey])
+	}
+	if params.Desc != nil {
+		object.DefinePropertyOrThrow(pk, params.Desc)
+	} else {
+		object.DefinePropertyOrThrow(pk, &PropertyDescriptor{
+			Value:        params.Value,
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: true,
+		})
+	}
+}
+
 func DefineBuiltinPropertyV(object ObjectType, name string, value Value) {
 	descriptor := &PropertyDescriptor{
 		Value:        value,
@@ -118,4 +147,17 @@ func DefineBuiltinAccessor(realm *Realm, object ObjectType, name string, getter,
 
 func IsUndefinedOrNil(v Value) bool {
 	return v == nil || v == UndefinedValue
+}
+
+// BindPrototypeAndConstructor set proto as the prototype of constructor
+// and constructor as the constructor of proto
+func BindPrototypeAndConstructor(proto ObjectType, constructor ObjectType) {
+	DefineBuiltinPropertyP(constructor, "prototype", &PropertyDescriptor{
+		Value:        proto.ToValue(),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+
+	DefineBuiltinPropertyV(proto, "constructor", constructor.ToValue())
 }

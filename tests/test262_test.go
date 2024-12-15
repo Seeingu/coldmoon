@@ -81,6 +81,21 @@ func testTypedArray(realm *Realm) {
 	}
 }
 
+func testSharedArrayBuffer(realm *Realm) {
+	sharedArrayBufferDir := "./test262/test/built-ins/SharedArrayBuffer"
+	files := []string{
+		"is-a-constructor.js",
+		"length.js",
+		"prototype/constructor.js",
+		"prototype/Symbol.toStringTag.js",
+	}
+	for _, f := range files {
+		f = makeTest262Path(path.Join(sharedArrayBufferDir, f))
+		println("Testing file: ", f)
+		evaluate(f, realm)
+	}
+}
+
 func testTypedArrayName(realm *Realm) {
 	typedArrayConstructorDir := "./test262/test/built-ins/TypedArrayConstructors"
 	constructorNames := []string{
@@ -167,6 +182,7 @@ func TestHarness(t *testing.T) {
 	testTypedArray(realm)
 
 	Debug.Enable()
+	testSharedArrayBuffer(realm)
 	// testBoolean(realm)
 	Debug.Disable()
 }

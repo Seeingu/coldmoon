@@ -3,19 +3,19 @@ package coldmoon
 type IntrinsicName string
 
 const (
-	IntrinsicNameObjectPrototype                          IntrinsicName = "%Object.Prototype%"
+	IntrinsicNameObjectPrototype                          IntrinsicName = "%Object.prototype%"
 	IntrinsicNameObject                                   IntrinsicName = "%Object%"
-	IntrinsicNameFunctionPrototype                        IntrinsicName = "%Function.Prototype%"
+	IntrinsicNameFunctionPrototype                        IntrinsicName = "%Function.prototype%"
 	IntrinsicNameFunction                                 IntrinsicName = "%Function%"
 	IntrinsicNameArray                                    IntrinsicName = "%Array%"
-	IntrinsicNameArrayPrototype                           IntrinsicName = "%Array.Prototype%"
+	IntrinsicNameArrayPrototype                           IntrinsicName = "%Array.prototype%"
 	IntrinsicNameArrayIteratorPrototype                   IntrinsicName = "%ArrayIteratorPrototype%"
 	IntrinsicNameArrayPrototypeValues                     IntrinsicName = "%Array.prototype.values%"
 	IntrinsicNameArrayBufferPrototype                     IntrinsicName = "%ArrayBuffer.prototype%"
 	IntrinsicNameArrayBuffer                              IntrinsicName = "%ArrayBuffer%"
-	IntrinsicNameBooleanPrototype                         IntrinsicName = "%Boolean.Prototype%"
+	IntrinsicNameBooleanPrototype                         IntrinsicName = "%Boolean.prototype%"
 	IntrinsicNameBoolean                                  IntrinsicName = "%Boolean%"
-	IntrinsicNameStringPrototype                          IntrinsicName = "%String.Prototype%"
+	IntrinsicNameStringPrototype                          IntrinsicName = "%String.prototype%"
 	IntrinsicNameString                                   IntrinsicName = "%String%"
 	IntrinsicNameGeneratorFunction                        IntrinsicName = "%GeneratorFunction%"
 	IntrinsicNameGeneratorFunctionPrototype               IntrinsicName = "%GeneratorFunction.prototype%"
@@ -30,14 +30,14 @@ const (
 	IntrinsicNameAsyncFunctionPrototype                   IntrinsicName = "%AsyncFunction.prototype%"
 	IntrinsicNamePromise                                  IntrinsicName = "%Promise%"
 	IntrinsicNamePromisePrototype                         IntrinsicName = "%Promise.prototype%"
-	IntrinsicNameDatePrototype                            IntrinsicName = "%Date.Prototype%"
+	IntrinsicNameDatePrototype                            IntrinsicName = "%Date.prototype%"
 	IntrinsicNameDate                                     IntrinsicName = "%Date%"
 	IntrinsicNameStringIteratorPrototype                  IntrinsicName = "%StringIteratorPrototype%"
-	IntrinsicNameNumberPrototype                          IntrinsicName = "%Number.Prototype%"
+	IntrinsicNameNumberPrototype                          IntrinsicName = "%Number.prototype%"
 	IntrinsicNameNumber                                   IntrinsicName = "%Number%"
-	IntrinsicNameSymbolPrototype                          IntrinsicName = "&Symbol.Prototype%"
+	IntrinsicNameSymbolPrototype                          IntrinsicName = "&Symbol.prototype%"
 	IntrinsicNameSymbol                                   IntrinsicName = "%Symbol%"
-	IntrinsicNameBigIntPrototype                          IntrinsicName = "%BigInt.Prototype%"
+	IntrinsicNameBigIntPrototype                          IntrinsicName = "%BigInt.prototype%"
 	IntrinsicNameBigInt                                   IntrinsicName = "%BigInt%"
 	IntrinsicNameJSON                                     IntrinsicName = "%JSON%"
 	IntrinsicNameReflect                                  IntrinsicName = "%Reflect%"
@@ -54,6 +54,8 @@ const (
 	IntrinsicNameIntl                                     IntrinsicName = "%Intl%"
 	IntrinsicNameTypedArray                               IntrinsicName = "%TypedArray%"
 	IntrinsicNameTypedArrayPrototype                      IntrinsicName = "%TypedArray.prototype%"
+	IntrinsicNameSharedArrayBuffer                        IntrinsicName = "%SharedArrayBuffer%"
+	IntrinsicNameSharedArrayBufferPrototype               IntrinsicName = "%SharedArrayBuffer.prototype%"
 	IntrinsicNameBigInt64Array                            IntrinsicName = "%BigInt64Array%"
 	IntrinsicNameBigInt64ArrayPrototype                   IntrinsicName = "%BigInt64Array.prototype%"
 	IntrinsicNameBigUint64Array                           IntrinsicName = "%BigUint64Array%"
@@ -210,6 +212,10 @@ type Intrinsics struct {
 	TypedArrayConstructor ObjectType
 	// %TypedArray.prototype%
 	TypedArrayPrototype ObjectType
+	// %SharedArrayBuffer%
+	SharedArrayBufferConstructor ObjectType
+	// %SharedArrayBuffer.prototype%
+	SharedArrayBufferPrototype ObjectType
 	// %BigInt64Array%
 	BigInt64ArrayConstructor ObjectType
 	// %BigInt64Array.prototype%
@@ -520,6 +526,10 @@ func (i *Intrinsics) Get(key IntrinsicName) ObjectType {
 		return i.AggregateErrorConstructor
 	case IntrinsicNameAggregateErrorPrototype:
 		return i.AggregateErrorPrototype
+	case IntrinsicNameSharedArrayBufferPrototype:
+		return i.SharedArrayBufferPrototype
+	case IntrinsicNameSharedArrayBuffer:
+		return i.SharedArrayBufferConstructor
 	}
 	panic("unreachable")
 }

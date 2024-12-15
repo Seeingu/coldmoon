@@ -287,19 +287,20 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 	return true
 }
 
-// 7.3.19
+// 7.3.18
 func (o *Object) LengthOfArrayLike() JSInt {
 	return ToLength(o.Agent(), o.Get(NewStringPropertyKey("length")))
 }
 
 // 7.3.22
 func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) CompletionObject {
-	c := o.Get(NewStringPropertyKey("constructor"))
+	objectRef := o.Ref()
+	c := objectRef.Get(NewStringPropertyKey("constructor"))
 	if c == UndefinedValue {
 		return NewCompletionObject(defaultConstructor)
 	}
 	if !ValueIsObject(c) {
-		return NewCompletionObjectError(o.Agent().ThrowException(TypeError, c.String()+" is not an object"))
+		return NewCompletionObjectError(objectRef.Agent().ThrowException(TypeError, c.String()+" is not an object"))
 	}
 	cObject := MustGetObject(c)
 	s := cObject.Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]))

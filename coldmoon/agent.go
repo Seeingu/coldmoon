@@ -140,6 +140,14 @@ func (a *Agent) ThrowException(exceptionType ExceptionType, message string) Valu
 	return a.exception
 }
 
+func (a *Agent) ThrowTypeError(message string) Value {
+	return a.ThrowException(TypeError, message)
+}
+
+func (a *Agent) ThrowRangeError(message string) Value {
+	return a.ThrowException(RangeError, message)
+}
+
 func (a *Agent) ThrowRangeExceptionObject(message string) ObjectType {
 	realm := a.CurrentRealm()
 	constructor := realm.Intrinsics.Get(RangeError.ToIntrinsicName())

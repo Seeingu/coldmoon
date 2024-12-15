@@ -95,6 +95,8 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.BigIntConstructor = NewBigIntConstructor(r)
 	r.Intrinsics.TypedArrayPrototype = NewTypedArrayPrototype(r)
 	r.Intrinsics.TypedArrayConstructor = NewTypedArrayConstructor(r)
+	r.Intrinsics.SharedArrayBufferPrototype = NewSharedArrayBufferPrototype(r)
+	r.Intrinsics.SharedArrayBufferConstructor = NewSharedArrayBufferConstructor(r)
 	r.Intrinsics.BigInt64ArrayPrototype = NewTypedArrayNamePrototype(r, TypedArrayNameBigInt64)
 	r.Intrinsics.BigInt64ArrayConstructor = NewTypedArrayNameConstructor(r, TypedArrayNameBigInt64)
 	r.Intrinsics.BigUint64ArrayPrototype = NewTypedArrayNamePrototype(r, TypedArrayNameBigUint64)
