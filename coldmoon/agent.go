@@ -29,19 +29,6 @@ type HostHooks struct {
 	HostLoadImportedModule         func(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined *HostDefined, payload ImportedModulePayload)
 }
 
-//go:generate stringer -type=ExceptionType
-type ExceptionType int
-
-const (
-	EvalError ExceptionType = iota
-	RangeError
-	ReferenceError
-	SyntaxError
-	TypeError
-	URIError
-	AggregateError
-)
-
 func NewAgent() *Agent {
 	a := &Agent{}
 	initWellKnownSymbols(a)
@@ -147,8 +134,24 @@ func (a *Agent) CreateSymbol(desc string) *SymbolValue {
 // 5.2.3.2
 func (a *Agent) ThrowException(exceptionType ExceptionType, message string) Value {
 	realm := a.CurrentRealm()
-	constructor := realm.Intrinsics.Get("%" + exceptionType.String() + "%")
+	constructor := realm.Intrinsics.Get(exceptionType.ToIntrinsicName())
 	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
 	a.exception = errorObject.ToValue()
 	return a.exception
+}
+
+func (a *Agent) ThrowRangeExceptionObject(message string) ObjectType {
+	realm := a.CurrentRealm()
+	constructor := realm.Intrinsics.Get(RangeError.ToIntrinsicName())
+	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
+	a.exception = errorObject.ToValue()
+	return errorObject
+}
+
+func (a *Agent) ThrowTypeExceptionObject(message string) ObjectType {
+	realm := a.CurrentRealm()
+	constructor := realm.Intrinsics.Get(TypeError.ToIntrinsicName())
+	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
+	a.exception = errorObject.ToValue()
+	return errorObject
 }
