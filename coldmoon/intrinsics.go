@@ -1,5 +1,112 @@
 package coldmoon
 
+type IntrinsicName string
+
+const (
+	IntrinsicNameObjectPrototype                          IntrinsicName = "%Object.Prototype%"
+	IntrinsicNameObject                                   IntrinsicName = "%Object%"
+	IntrinsicNameFunctionPrototype                        IntrinsicName = "%Function.Prototype%"
+	IntrinsicNameFunction                                 IntrinsicName = "%Function%"
+	IntrinsicNameArray                                    IntrinsicName = "%Array%"
+	IntrinsicNameArrayPrototype                           IntrinsicName = "%Array.Prototype%"
+	IntrinsicNameArrayIteratorPrototype                   IntrinsicName = "%ArrayIteratorPrototype%"
+	IntrinsicNameArrayPrototypeValues                     IntrinsicName = "%Array.prototype.values%"
+	IntrinsicNameArrayBufferPrototype                     IntrinsicName = "%ArrayBuffer.prototype%"
+	IntrinsicNameArrayBuffer                              IntrinsicName = "%ArrayBuffer%"
+	IntrinsicNameBooleanPrototype                         IntrinsicName = "%Boolean.Prototype%"
+	IntrinsicNameBoolean                                  IntrinsicName = "%Boolean%"
+	IntrinsicNameStringPrototype                          IntrinsicName = "%String.Prototype%"
+	IntrinsicNameString                                   IntrinsicName = "%String%"
+	IntrinsicNameGeneratorFunction                        IntrinsicName = "%GeneratorFunction%"
+	IntrinsicNameGeneratorFunctionPrototype               IntrinsicName = "%GeneratorFunction.prototype%"
+	IntrinsicNameGeneratorFunctionPrototypePrototype      IntrinsicName = "%GeneratorFunction.prototype.prototype%"
+	IntrinsicNameDataViewPrototype                        IntrinsicName = "%DataView.prototype%"
+	IntrinsicNameDataView                                 IntrinsicName = "%DataView%"
+	IntrinsicNameAsyncGeneratorFunction                   IntrinsicName = "%AsyncGeneratorFunction%"
+	IntrinsicNameAsyncGeneratorFunctionPrototype          IntrinsicName = "%AsyncGeneratorFunction.prototype%"
+	IntrinsicNameAsyncGeneratorFunctionPrototypePrototype IntrinsicName = "%AsyncGeneratorFunction.prototype.prototype%"
+	IntrinsicNameAsyncIteratorPrototype                   IntrinsicName = "%AsyncIteratorPrototype%"
+	IntrinsicNameAsyncFunction                            IntrinsicName = "%AsyncFunction%"
+	IntrinsicNameAsyncFunctionPrototype                   IntrinsicName = "%AsyncFunction.prototype%"
+	IntrinsicNamePromise                                  IntrinsicName = "%Promise%"
+	IntrinsicNamePromisePrototype                         IntrinsicName = "%Promise.prototype%"
+	IntrinsicNameDatePrototype                            IntrinsicName = "%Date.Prototype%"
+	IntrinsicNameDate                                     IntrinsicName = "%Date%"
+	IntrinsicNameStringIteratorPrototype                  IntrinsicName = "%StringIteratorPrototype%"
+	IntrinsicNameNumberPrototype                          IntrinsicName = "%Number.Prototype%"
+	IntrinsicNameNumber                                   IntrinsicName = "%Number%"
+	IntrinsicNameSymbolPrototype                          IntrinsicName = "&Symbol.Prototype%"
+	IntrinsicNameSymbol                                   IntrinsicName = "%Symbol%"
+	IntrinsicNameBigIntPrototype                          IntrinsicName = "%BigInt.Prototype%"
+	IntrinsicNameBigInt                                   IntrinsicName = "%BigInt%"
+	IntrinsicNameJSON                                     IntrinsicName = "%JSON%"
+	IntrinsicNameReflect                                  IntrinsicName = "%Reflect%"
+	IntrinsicNameProxy                                    IntrinsicName = "%Proxy%"
+	IntrinsicNameIteratorPrototype                        IntrinsicName = "%IteratorPrototype%"
+	IntrinsicNameForInIteratorPrototype                   IntrinsicName = "%ForInIteratorPrototype%"
+	IntrinsicNameMath                                     IntrinsicName = "%Math%"
+	IntrinsicNameMap                                      IntrinsicName = "%Map%"
+	IntrinsicNameMapPrototype                             IntrinsicName = "%Map.prototype%"
+	IntrinsicNameMapIteratorPrototype                     IntrinsicName = "%MapIteratorPrototype%"
+	IntrinsicNameSet                                      IntrinsicName = "%SetObject%"
+	IntrinsicNameSetPrototype                             IntrinsicName = "%SetObject.prototype%"
+	IntrinsicNameSetIteratorPrototype                     IntrinsicName = "%SetIteratorPrototype%"
+	IntrinsicNameIntl                                     IntrinsicName = "%Intl%"
+	IntrinsicNameTypedArray                               IntrinsicName = "%TypedArray%"
+	IntrinsicNameTypedArrayPrototype                      IntrinsicName = "%TypedArray.prototype%"
+	IntrinsicNameBigInt64Array                            IntrinsicName = "%BigInt64Array%"
+	IntrinsicNameBigInt64ArrayPrototype                   IntrinsicName = "%BigInt64Array.prototype%"
+	IntrinsicNameBigUint64Array                           IntrinsicName = "%BigUint64Array%"
+	IntrinsicNameBigUint64ArrayPrototype                  IntrinsicName = "%BigUint64Array.prototype%"
+	IntrinsicNameFloat32Array                             IntrinsicName = "%Float32Array%"
+	IntrinsicNameFloat32ArrayPrototype                    IntrinsicName = "%Float32Array.prototype%"
+	IntrinsicNameFloat64Array                             IntrinsicName = "%Float64Array%"
+	IntrinsicNameFloat64ArrayPrototype                    IntrinsicName = "%Float64Array.prototype%"
+	IntrinsicNameInt8Array                                IntrinsicName = "%Int8Array%"
+	IntrinsicNameInt8ArrayPrototype                       IntrinsicName = "%Int8Array.prototype%"
+	IntrinsicNameInt16Array                               IntrinsicName = "%Int16Array%"
+	IntrinsicNameInt16ArrayPrototype                      IntrinsicName = "%Int16Array.prototype%"
+	IntrinsicNameInt32Array                               IntrinsicName = "%Int32Array%"
+	IntrinsicNameInt32ArrayPrototype                      IntrinsicName = "%Int32Array.prototype%"
+	IntrinsicNameUint8Array                               IntrinsicName = "%Uint8Array%"
+	IntrinsicNameUint8ArrayPrototype                      IntrinsicName = "%Uint8Array.prototype%"
+	IntrinsicNameUint8ClampedArray                        IntrinsicName = "%Uint8ClampedArray%"
+	IntrinsicNameUint8ClampedArrayPrototype               IntrinsicName = "%Uint8ClampedArray.prototype%"
+	IntrinsicNameUint16Array                              IntrinsicName = "%Uint16Array%"
+	IntrinsicNameUint16ArrayPrototype                     IntrinsicName = "%Uint16Array.prototype%"
+	IntrinsicNameUint32Array                              IntrinsicName = "%Uint32Array%"
+	IntrinsicNameUint32ArrayPrototype                     IntrinsicName = "%Uint32Array.prototype%"
+	IntrinsicNameIsFinite                                 IntrinsicName = "%IsFinite%"
+	IntrinsicNameIsNaN                                    IntrinsicName = "%isNaN%"
+	IntrinsicNameEval                                     IntrinsicName = "%eval%"
+	IntrinsicNameParseInt                                 IntrinsicName = "%parseInt%"
+	IntrinsicNameParseFloat                               IntrinsicName = "%parseFloat%"
+	IntrinsicNameDecodeURI                                IntrinsicName = "%decodeURI%"
+	IntrinsicNameDecodeURIComponent                       IntrinsicName = "%decodeURIComponent%"
+	IntrinsicNameEncodeURI                                IntrinsicName = "%encodeURI%"
+	IntrinsicNameEncodeURIComponent                       IntrinsicName = "%encodeURIComponent%"
+	IntrinsicNameRegExp                                   IntrinsicName = "%RegExp%"
+	IntrinsicNameRegExpPrototype                          IntrinsicName = "%RegExp.prototype%"
+	IntrinsicNameRegExpStringIteratorPrototype            IntrinsicName = "%RegExpStringIteratorPrototype%"
+	IntrinsicNameEvalError                                IntrinsicName = "%EvalError%"
+	IntrinsicNameEvalErrorPrototype                       IntrinsicName = "%EvalError.prototype%"
+	IntrinsicNameRangeError                               IntrinsicName = "%RangeError%"
+	IntrinsicNameRangeErrorPrototype                      IntrinsicName = "%RangeError.prototype%"
+	IntrinsicNameReferenceError                           IntrinsicName = "%ReferenceError%"
+	IntrinsicNameReferenceErrorPrototype                  IntrinsicName = "%ReferenceError.prototype%"
+	IntrinsicNameSyntaxError                              IntrinsicName = "%SyntaxError%"
+	IntrinsicNameSyntaxErrorPrototype                     IntrinsicName = "%SyntaxError.prototype%"
+	IntrinsicNameTypeError                                IntrinsicName = "%TypeError%"
+	IntrinsicNameTypeErrorPrototype                       IntrinsicName = "%TypeError.prototype%"
+	IntrinsicNameURIError                                 IntrinsicName = "%URIError%"
+	IntrinsicNameURIErrorPrototype                        IntrinsicName = "%URIError.prototype%"
+	IntrinsicNameError                                    IntrinsicName = "%Error%"
+	IntrinsicNameErrorPrototype                           IntrinsicName = "%Error.prototype%"
+	IntrinsicNameThrowTypeError                           IntrinsicName = "%ThrowTypeError%"
+	IntrinsicNameAggregateError                           IntrinsicName = "%AggregateError%"
+	IntrinsicNameAggregateErrorPrototype                  IntrinsicName = "%AggregateError.prototype%"
+)
+
 type Intrinsics struct {
 	// %Object.Prototype%
 	ObjectPrototype ObjectType
@@ -207,127 +314,212 @@ type Intrinsics struct {
 	AggregateErrorPrototype ObjectType
 }
 
-func (i *Intrinsics) Get(key string) ObjectType {
+func (i *Intrinsics) Get(key IntrinsicName) ObjectType {
 	switch key {
-	case "%Object.Prototype%":
+	case IntrinsicNameObjectPrototype:
 		return i.ObjectPrototype
-	case "%Object%":
+	case IntrinsicNameObject:
 		return i.ObjectConstructor
-	case "%Function.Prototype%":
+	case IntrinsicNameFunctionPrototype:
 		return i.FunctionPrototype
-	case "%Function%":
+	case IntrinsicNameFunction:
 		return i.FunctionConstructor
-	case "%Boolean.Prototype%":
-		return i.BooleanPrototype
-	case "%Boolean%":
-		return i.BooleanConstructor
-	case "%IsFinite%":
-		return i.IsFinite
-	case "%isNaN%":
-		return i.IsNaN
-	case "%eval%":
-		return i.Eval
-	case "%ThrowTypeError%":
-		return i.ThrowTypeError
-	case "%Array%":
+	case IntrinsicNameArray:
 		return i.ArrayConstructor
-	case "%Array.Prototype%":
+	case IntrinsicNameArrayPrototype:
 		return i.ArrayPrototype
-	case "%String.Prototype%":
+	case IntrinsicNameArrayIteratorPrototype:
+		return i.ArrayIteratorPrototype
+	case IntrinsicNameArrayPrototypeValues:
+		return i.ArrayPrototypeValues
+	case IntrinsicNameArrayBufferPrototype:
+		return i.ArrayBufferPrototype
+	case IntrinsicNameArrayBuffer:
+		return i.ArrayBufferConstructor
+	case IntrinsicNameBooleanPrototype:
+		return i.BooleanPrototype
+	case IntrinsicNameBoolean:
+		return i.BooleanConstructor
+	case IntrinsicNameStringPrototype:
 		return i.StringPrototype
-	case "%String%":
+	case IntrinsicNameString:
 		return i.StringConstructor
-	case "%Number.Prototype%":
+	case IntrinsicNameGeneratorFunction:
+		return i.GeneratorFunctionConstructor
+	case IntrinsicNameGeneratorFunctionPrototype:
+		return i.GeneratorFunctionPrototype
+	case IntrinsicNameGeneratorFunctionPrototypePrototype:
+		return i.GeneratorFunctionPrototypePrototype
+	case IntrinsicNameDataViewPrototype:
+		return i.DataViewPrototype
+	case IntrinsicNameDataView:
+		return i.DataViewConstructor
+	case IntrinsicNameAsyncGeneratorFunction:
+		return i.AsyncGeneratorFunction
+	case IntrinsicNameAsyncGeneratorFunctionPrototype:
+		return i.AsyncGeneratorFunctionPrototype
+	case IntrinsicNameAsyncGeneratorFunctionPrototypePrototype:
+		return i.AsyncGeneratorFunctionPrototypePrototype
+	case IntrinsicNameAsyncIteratorPrototype:
+		return i.AsyncIteratorPrototype
+	case IntrinsicNameAsyncFunction:
+		return i.AsyncFunctionConstructor
+	case IntrinsicNameAsyncFunctionPrototype:
+		return i.AsyncFunctionPrototype
+	case IntrinsicNamePromise:
+		return i.Promise
+	case IntrinsicNamePromisePrototype:
+		return i.PromisePrototype
+	case IntrinsicNameDatePrototype:
+		return i.DatePrototype
+	case IntrinsicNameDate:
+		return i.DateConstructor
+	case IntrinsicNameStringIteratorPrototype:
+		return i.StringIteratorPrototype
+	case IntrinsicNameNumberPrototype:
 		return i.NumberPrototype
-	case "%Number%":
+	case IntrinsicNameNumber:
 		return i.NumberConstructor
-	case "%Symbol.Prototype%":
+	case IntrinsicNameSymbolPrototype:
 		return i.SymbolPrototype
-	case "%Symbol%":
+	case IntrinsicNameSymbol:
 		return i.SymbolConstructor
-	case "%BigInt.Prototype%":
+	case IntrinsicNameBigIntPrototype:
 		return i.BigIntPrototype
-	case "%BigInt%":
+	case IntrinsicNameBigInt:
 		return i.BigIntConstructor
-	case "%JSON%":
+	case IntrinsicNameJSON:
 		return i.JSON
-	case "%BigInt64Array%":
+	case IntrinsicNameReflect:
+		return i.Reflect
+	case IntrinsicNameProxy:
+		return i.Proxy
+	case IntrinsicNameIteratorPrototype:
+		return i.IteratorPrototype
+	case IntrinsicNameForInIteratorPrototype:
+		return i.ForInIteratorPrototype
+	case IntrinsicNameMath:
+		return i.Math
+	case IntrinsicNameMap:
+		return i.Map
+	case IntrinsicNameMapPrototype:
+		return i.MapPrototype
+	case IntrinsicNameMapIteratorPrototype:
+		return i.MapIteratorPrototype
+	case IntrinsicNameSet:
+		return i.Set
+	case IntrinsicNameSetPrototype:
+		return i.SetPrototype
+	case IntrinsicNameSetIteratorPrototype:
+		return i.SetIteratorPrototype
+	case IntrinsicNameIntl:
+		return i.Intl
+	case IntrinsicNameTypedArray:
+		return i.TypedArrayConstructor
+	case IntrinsicNameTypedArrayPrototype:
+		return i.TypedArrayPrototype
+	case IntrinsicNameBigInt64Array:
 		return i.BigInt64ArrayConstructor
-	case "%BigInt64Array.prototype%":
+	case IntrinsicNameBigInt64ArrayPrototype:
 		return i.BigInt64ArrayPrototype
-	case "%BigUint64Array%":
+	case IntrinsicNameBigUint64Array:
 		return i.BigUint64ArrayConstructor
-	case "%BigUint64Array.prototype%":
+	case IntrinsicNameBigUint64ArrayPrototype:
 		return i.BigUint64ArrayPrototype
-	case "%Float32Array%":
+	case IntrinsicNameFloat32Array:
 		return i.Float32ArrayConstructor
-	case "%Float32Array.prototype%":
+	case IntrinsicNameFloat32ArrayPrototype:
 		return i.Float32ArrayPrototype
-	case "%Float64Array%":
+	case IntrinsicNameFloat64Array:
 		return i.Float64ArrayConstructor
-	case "%Float64Array.prototype%":
+	case IntrinsicNameFloat64ArrayPrototype:
 		return i.Float64ArrayPrototype
-	case "%Int8Array%":
+	case IntrinsicNameInt8Array:
 		return i.Int8ArrayConstructor
-	case "%Int8Array.prototype%":
+	case IntrinsicNameInt8ArrayPrototype:
 		return i.Int8ArrayPrototype
-	case "%Int16Array%":
+	case IntrinsicNameInt16Array:
 		return i.Int16ArrayConstructor
-	case "%Int16Array.prototype%":
+	case IntrinsicNameInt16ArrayPrototype:
 		return i.Int16ArrayPrototype
-	case "%Int32Array%":
+	case IntrinsicNameInt32Array:
 		return i.Int32ArrayConstructor
-	case "%Int32Array.prototype%":
+	case IntrinsicNameInt32ArrayPrototype:
 		return i.Int32ArrayPrototype
-	case "%Uint8Array%":
+	case IntrinsicNameUint8Array:
 		return i.Uint8ArrayConstructor
-	case "%Uint8Array.prototype%":
+	case IntrinsicNameUint8ArrayPrototype:
 		return i.Uint8ArrayPrototype
-	case "%Uint8ClampedArray%":
+	case IntrinsicNameUint8ClampedArray:
 		return i.Uint8ClampedArrayConstructor
-	case "%Uint8ClampedArray.prototype%":
+	case IntrinsicNameUint8ClampedArrayPrototype:
 		return i.Uint8ClampedArrayPrototype
-	case "%Uint16Array%":
+	case IntrinsicNameUint16Array:
 		return i.Uint16ArrayConstructor
-	case "%Uint16Array.prototype%":
+	case IntrinsicNameUint16ArrayPrototype:
 		return i.Uint16ArrayPrototype
-	case "%Uint32Array%":
+	case IntrinsicNameUint32Array:
 		return i.Uint32ArrayConstructor
-	case "%Uint32Array.prototype%":
+	case IntrinsicNameUint32ArrayPrototype:
 		return i.Uint32ArrayPrototype
-	case "%EvalError%":
+	case IntrinsicNameIsFinite:
+		return i.IsFinite
+	case IntrinsicNameIsNaN:
+		return i.IsNaN
+	case IntrinsicNameEval:
+		return i.Eval
+	case IntrinsicNameParseInt:
+		return i.ParseInt
+	case IntrinsicNameParseFloat:
+		return i.ParseFloat
+	case IntrinsicNameDecodeURI:
+		return i.DecodeURI
+	case IntrinsicNameDecodeURIComponent:
+		return i.DecodeURIComponent
+	case IntrinsicNameEncodeURI:
+		return i.EncodeURI
+	case IntrinsicNameEncodeURIComponent:
+		return i.EncodeURIComponent
+	case IntrinsicNameRegExp:
+		return i.RegExpConstructor
+	case IntrinsicNameRegExpPrototype:
+		return i.RegExpPrototype
+	case IntrinsicNameRegExpStringIteratorPrototype:
+		return i.RegExpStringIteratorPrototype
+	case IntrinsicNameEvalError:
 		return i.EvalErrorConstructor
-	case "%EvalError.prototype%":
+	case IntrinsicNameEvalErrorPrototype:
 		return i.EvalErrorPrototype
-	case "%RangeError%":
+	case IntrinsicNameRangeError:
 		return i.RangeErrorConstructor
-	case "%RangeError.prototype%":
+	case IntrinsicNameRangeErrorPrototype:
 		return i.RangeErrorPrototype
-	case "%ReferenceError%":
+	case IntrinsicNameReferenceError:
 		return i.ReferenceErrorConstructor
-	case "%ReferenceError.prototype%":
+	case IntrinsicNameReferenceErrorPrototype:
 		return i.ReferenceErrorPrototype
-	case "%SyntaxError%":
+	case IntrinsicNameSyntaxError:
 		return i.SyntaxErrorConstructor
-	case "%SyntaxError.prototype%":
+	case IntrinsicNameSyntaxErrorPrototype:
 		return i.SyntaxErrorPrototype
-	case "%TypeError%":
+	case IntrinsicNameTypeError:
 		return i.TypeErrorConstructor
-	case "%TypeError.prototype%":
+	case IntrinsicNameTypeErrorPrototype:
 		return i.TypeErrorPrototype
-	case "%URIError%":
+	case IntrinsicNameURIError:
 		return i.URIErrorConstructor
-	case "%URIError.prototype%":
+	case IntrinsicNameURIErrorPrototype:
 		return i.URIErrorPrototype
-	case "%Error%":
+	case IntrinsicNameError:
 		return i.ErrorConstructor
-	case "%Error.prototype%":
+	case IntrinsicNameErrorPrototype:
 		return i.ErrorPrototype
-	case "%AggregateError%":
+	case IntrinsicNameThrowTypeError:
+		return i.ThrowTypeError
+	case IntrinsicNameAggregateError:
 		return i.AggregateErrorConstructor
-	case "%AggregateError.prototype%":
+	case IntrinsicNameAggregateErrorPrototype:
 		return i.AggregateErrorPrototype
-
 	}
-	panic("unknown intrinsic")
+	panic("unreachable")
 }

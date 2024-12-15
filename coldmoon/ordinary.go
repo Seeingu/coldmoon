@@ -435,16 +435,14 @@ func OrdinaryObjectCreate(agent *Agent, proto ObjectType, internalSlotsList []st
 }
 
 // 10.1.13
-func OrdinaryCreateFromConstructor(agent *Agent, constructor ObjectType, intrinsicDefaultProto string, internalSlotsList []string) *Object {
-	// TODO: Assert
+func OrdinaryCreateFromConstructor(agent *Agent, constructor ObjectType, intrinsicDefaultProto IntrinsicName, internalSlotsList []string) *Object {
 	proto := GetPrototypeFromConstructor(constructor, intrinsicDefaultProto)
 
 	return OrdinaryObjectCreate(agent, proto, internalSlotsList)
 }
 
 // 10.1.14
-func GetPrototypeFromConstructor(constructor ObjectType, intrinsicDefaultProto string) ObjectType {
-	// TODO: Assert
+func GetPrototypeFromConstructor(constructor ObjectType, intrinsicDefaultProto IntrinsicName) ObjectType {
 	proto := constructor.Get(NewStringPropertyKey("prototype"))
 
 	switch p := proto.(type) {

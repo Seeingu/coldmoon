@@ -156,7 +156,7 @@ func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 			newTarget = agent.ActiveFunctionObject()
 		}
 
-		protoName := "%" + name + ".prototype%"
+		protoName := IntrinsicName("%" + name + ".prototype%")
 		object := OrdinaryCreateFromConstructor(agent, newTarget, protoName, []string{})
 		errorObject := &ErrorObject{
 			Object: object,
@@ -182,7 +182,7 @@ func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 		isConstructor: true,
 	})
 
-	protoName := "%" + name + ".prototype%"
+	protoName := IntrinsicName("%" + name + ".prototype%")
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        (realm.Intrinsics.Get(protoName)).ToValue(),
 		Writable:     false,

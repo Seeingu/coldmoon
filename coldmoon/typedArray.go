@@ -11,10 +11,82 @@ const (
 	TypedArrayContentTypeNumber
 )
 
+type TypedArrayName int
+
+func (t TypedArrayName) String() string {
+	switch t {
+	case TypedArrayNameInt8:
+		return "Int8Array"
+	case TypedArrayNameUint8:
+		return "Uint8Array"
+	case TypedArrayNameUint8Clamped:
+		return "Uint8ClampedArray"
+	case TypedArrayNameInt16:
+		return "Int16Array"
+	case TypedArrayNameUint16:
+		return "Uint16Array"
+	case TypedArrayNameInt32:
+		return "Int32Array"
+	case TypedArrayNameUint32:
+		return "Uint32Array"
+	case TypedArrayNameBigInt64:
+		return "BigInt64Array"
+	case TypedArrayNameBigUint64:
+		return "BigUint64Array"
+	case TypedArrayNameFloat32:
+		return "Float32Array"
+	case TypedArrayNameFloat64:
+		return "Float64Array"
+	}
+	panic("invalid TypedArrayName")
+}
+
+func (t TypedArrayName) ToIntrinsicName() IntrinsicName {
+	switch t {
+	case TypedArrayNameInt8:
+		return IntrinsicNameInt8Array
+	case TypedArrayNameUint8:
+		return IntrinsicNameUint8Array
+	case TypedArrayNameUint8Clamped:
+		return IntrinsicNameUint8ClampedArray
+	case TypedArrayNameInt16:
+		return IntrinsicNameInt16Array
+	case TypedArrayNameUint16:
+		return IntrinsicNameUint16Array
+	case TypedArrayNameInt32:
+		return IntrinsicNameInt32Array
+	case TypedArrayNameUint32:
+		return IntrinsicNameUint32Array
+	case TypedArrayNameBigInt64:
+		return IntrinsicNameBigInt64Array
+	case TypedArrayNameBigUint64:
+		return IntrinsicNameBigUint64Array
+	case TypedArrayNameFloat32:
+		return IntrinsicNameFloat32Array
+	case TypedArrayNameFloat64:
+		return IntrinsicNameFloat64Array
+	}
+	panic("invalid TypedArrayName")
+}
+
+const (
+	TypedArrayNameInt8 TypedArrayName = iota
+	TypedArrayNameUint8
+	TypedArrayNameUint8Clamped
+	TypedArrayNameInt16
+	TypedArrayNameUint16
+	TypedArrayNameInt32
+	TypedArrayNameUint32
+	TypedArrayNameBigInt64
+	TypedArrayNameBigUint64
+	TypedArrayNameFloat32
+	TypedArrayNameFloat64
+)
+
 type TypedArrayObject struct {
 	*Object
 	// [[TypedArrayName]]
-	TypedArrayName string
+	TypedArrayName TypedArrayName
 	// [[ContentType]]
 	ContentType TypedArrayContentType
 	// [[ViewedArrayBuffer]]
@@ -308,15 +380,15 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 			return UndefinedValue
 		}
 		name := o.(*TypedArrayObject).TypedArrayName
-		return NewStringValue(name)
+		return NewStringValue(name.String())
 	}
 	DefineBuiltinAccessor(realm, object, "%Symbol.toStringTag%", nil, toStringTag)
 	return typedArray
 }
 
-func NewTypedArrayNamePrototype(realm *Realm, name string) ObjectType {
+func NewTypedArrayNamePrototype(realm *Realm, name TypedArrayName) ObjectType {
 	agent := realm.Agent
-	object := NewObject(agent, realm.Intrinsics.TypedArrayPrototype, "TypedArrayNamePrototype "+name)
+	object := NewObject(agent, realm.Intrinsics.TypedArrayPrototype, "TypedArrayNamePrototype "+name.String())
 
 	DefineBuiltinPropertyP(object, "BYTES_PER_ELEMENT", &PropertyDescriptor{
 		Value:        NewNumberValue(getTypedArraySizeFromName(name).ToNumber()),
@@ -486,7 +558,7 @@ func TypedArraySpeciesCreate(
 	argumentList []Value,
 ) *TypedArrayObject {
 	realm := agent.CurrentRealm()
-	defaultConstructor := realm.Intrinsics.Get(exemplar.TypedArrayName)
+	defaultConstructor := realm.Intrinsics.Get(exemplar.TypedArrayName.ToIntrinsicName())
 	constructor := exemplar.SpeciesConstructor(defaultConstructor)
 	result := TypedArrayCreateFromConstructor(agent, constructor.Data(), argumentList)
 	if result.(*TypedArrayObject).ContentType != exemplar.ContentType {
@@ -523,7 +595,7 @@ func TypedArrayCreateFromConstructor(
 // 23.2.4.3
 func TypedArrayCreateSameType(agent *Agent, exemplar *TypedArrayObject, argumentList []Value) *TypedArrayObject {
 	realm := agent.CurrentRealm()
-	constructor := realm.Intrinsics.Get(exemplar.TypedArrayName)
+	constructor := realm.Intrinsics.Get(exemplar.TypedArrayName.ToIntrinsicName())
 	result := TypedArrayCreateFromConstructor(agent, constructor, argumentList)
 	Assert(result.(*TypedArrayObject).ContentType == exemplar.ContentType)
 	return result.(*TypedArrayObject)
@@ -627,18 +699,18 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 	return object
 }
 
-func NewTypedArrayNameConstructor(realm *Realm, name string) ObjectType {
+func NewTypedArrayNameConstructor(realm *Realm, name TypedArrayName) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return typedArrayBehavior(agent, name, thisArgument, argumentsList, newTarget)
 	}
-	object := CreateBuiltinFunction(agent, behavior, 3, name, builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 3, name.String(), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.TypedArrayConstructor,
 		isConstructor: true,
 	})
 
-	intrinsicName := "%" + name + ".prototype%"
+	intrinsicName := IntrinsicName("%" + name.String() + ".prototype%")
 	intrinsic := realm.Intrinsics.Get(intrinsicName)
 	DefineBuiltinPropertyP(object, "BYTES_PER_ELEMENT", &PropertyDescriptor{
 		Value:        NewNumberValue(getTypedArraySizeFromName(name).ToNumber()),
@@ -656,12 +728,12 @@ func NewTypedArrayNameConstructor(realm *Realm, name string) ObjectType {
 }
 
 // 23.2.5.1
-func typedArrayBehavior(agent *Agent, name string, thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+func typedArrayBehavior(agent *Agent, name TypedArrayName, thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 	if newTarget == nil {
 		panic("TypeError")
 	}
 	constructorName := name
-	proto := "%TypedArray.prototype%"
+	proto := IntrinsicNameTypedArrayPrototype
 	numberOfArgs := len(argumentsList)
 	if numberOfArgs == 0 {
 		return (AllocateTypedArray(agent, constructorName, newTarget, proto, 0)).ToValue()
@@ -706,7 +778,7 @@ func InitializeTypedArrayFromList(agent *Agent, O *TypedArrayObject, values []Va
 }
 
 // 23.2.5.1.1
-func AllocateTypedArray(agent *Agent, constructorName string, newTarget ObjectType, defaultProto string, length JSInt) *TypedArrayObject {
+func AllocateTypedArray(agent *Agent, constructorName TypedArrayName, newTarget ObjectType, defaultProto IntrinsicName, length JSInt) *TypedArrayObject {
 	proto := GetPrototypeFromConstructor(newTarget, defaultProto)
 	obj := TypedArrayCreate(agent, constructorName, proto)
 	if length != 0 {
@@ -715,9 +787,9 @@ func AllocateTypedArray(agent *Agent, constructorName string, newTarget ObjectTy
 	return obj
 }
 
-func TypedArrayCreate(agent *Agent, name string, proto ObjectType) *TypedArrayObject {
+func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *TypedArrayObject {
 	object := &TypedArrayObject{
-		Object:            NewObject(agent, proto, "TypedArray "+name),
+		Object:            NewObject(agent, proto, "TypedArray "+name.String()),
 		ViewedArrayBuffer: nil,
 		TypedArrayName:    name,
 	}
@@ -870,37 +942,36 @@ func AllocateTypedArrayBuffer(agent *Agent, O *TypedArrayObject, length JSInt) {
 	O.ArrayLength = NewByteLength(length)
 }
 
-func TypedArrayElementType(O *TypedArrayObject) string {
+func TypedArrayElementType(O *TypedArrayObject) TypedArrayName {
 	return O.TypedArrayName
 }
 
-func getTypedArraySizeFromName(name string) JSInt {
+func getTypedArraySizeFromName(name TypedArrayName) JSInt {
 	switch name {
-	case "Int8Array":
+	case TypedArrayNameInt8:
 		return 1
-	case "Uint8Array":
+	case TypedArrayNameUint8:
 		return 1
-	case "Uint8ClampedArray":
+	case TypedArrayNameUint8Clamped:
 		return 1
-	case "Int16Array":
+	case TypedArrayNameInt16:
 		return 2
-	case "Uint16Array":
+	case TypedArrayNameUint16:
 		return 2
-	case "Int32Array":
+	case TypedArrayNameInt32:
 		return 4
-	case "Uint32Array":
+	case TypedArrayNameUint32:
 		return 4
-	case "BigInt64Array":
-		return 8
-	case "BigUint64Array":
-		return 8
-	case "Float32Array":
+	case TypedArrayNameFloat32:
 		return 4
-	case "Float64Array":
+	case TypedArrayNameFloat64:
 		return 8
-	default:
-		panic("unreachable")
+	case TypedArrayNameBigInt64:
+		return 8
+	case TypedArrayNameBigUint64:
+		return 8
 	}
+	panic("unreachable")
 }
 
 func TypedArrayElementSize(O *TypedArrayObject) JSInt {

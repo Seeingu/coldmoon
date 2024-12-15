@@ -152,7 +152,7 @@ func CreateDynamicFunction(
 	}
 
 	var prefix string
-	var fallbackPrototype string
+	var fallbackPrototype IntrinsicName
 	exprSym := &GrammarSymbol[Expression]{}
 	bodySym := &GrammarSymbol[*FunctionBody]{}
 	parameterSym := &GrammarSymbol[*FormalParameters]{}
@@ -168,7 +168,7 @@ func CreateDynamicFunction(
 		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
 			return p.formalParameters()
 		}
-		fallbackPrototype = "%Function.prototype%"
+		fallbackPrototype = IntrinsicNameFunctionPrototype
 	case dynamicFunctionKindGenerator:
 		prefix = "function*"
 
@@ -181,7 +181,7 @@ func CreateDynamicFunction(
 		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
 			return p.formalParameters()
 		}
-		fallbackPrototype = "%GeneratorFunction.prototype%"
+		fallbackPrototype = IntrinsicNameGeneratorFunctionPrototype
 	case dynamicFunctionKindAsyncGenerator:
 		prefix = "async function*"
 
@@ -194,7 +194,7 @@ func CreateDynamicFunction(
 		parameterSym.acceptFn = func(p *Parser) *FormalParameters {
 			return p.formalParameters()
 		}
-		fallbackPrototype = "%AsyncGeneratorFunction.prototype%"
+		fallbackPrototype = IntrinsicNameAsyncGeneratorFunctionPrototype
 	case dynamicFunctionKindAsync:
 		prefix = "async function"
 
