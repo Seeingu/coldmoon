@@ -1314,7 +1314,11 @@ func (p *Parser) newExpression() (*NewExpression, bool) {
 	accept := p.acceptContext(TNew)
 	expr := p.expression(accept)
 	p.callExpressionForbidden = previous
-	args := p.arguments()
+	// can be called without parens, like: `new Date`
+	var args Arguments
+	if p.tokenizer.CurrentToken.Type == TLeftParen {
+		args = p.arguments()
+	}
 	p.automaticSemicolonInsertion()
 	return &NewExpression{
 		Callee:    expr,
