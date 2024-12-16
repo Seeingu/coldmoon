@@ -123,10 +123,10 @@ func GetModifySetValueInBuffer(
 	// TODO:
 	if IsSharedArrayBuffer(arrayBuffer) {
 	} else {
-		rawBytesRead = block[byteIndex : byteIndex+size]
+		rawBytesRead = block.Slice(byteIndex, byteIndex+size)
 	}
 
-	return RawBytesToNumeric(rawBytesRead, isLittleEndian).ToValue()
+	return RawBytesToNumeric(getTypedArraySizeFromName(elementType), rawBytesRead, isLittleEndian).ToValue()
 }
 
 // 25.4.3.4

@@ -36,6 +36,7 @@ type ObjectType interface {
 	ToCompletion() CompletionValue
 	ToValue() Value
 	String() string
+	Ref() ObjectType
 }
 
 func ObjectIs[O ObjectType](o ObjectType) bool {

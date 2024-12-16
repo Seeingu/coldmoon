@@ -7,8 +7,8 @@ import (
 type TypedArrayContentType int
 
 const (
-	TypedArrayContentTypeBigInt TypedArrayContentType = iota
-	TypedArrayContentTypeNumber
+	TypedArrayContentTypeNumber TypedArrayContentType = iota
+	TypedArrayContentTypeBigInt
 )
 
 type TypedArrayName int
@@ -742,13 +742,15 @@ func typedArrayBehavior(agent *Agent, name TypedArrayName, thisArgument Value, a
 		if ValueIsObject(firstArgument) {
 			O := AllocateTypedArray(agent, constructorName, newTarget, proto, 0)
 			firstArgumentObj := MustGetObject(firstArgument)
-			if t, ok := firstArgumentObj.(*TypedArrayObject); ok {
-				InitializeTypedArrayFromTypedArray(agent, O, t)
-			} else if ab, ok := firstArgumentObj.(*ArrayBufferLike); ok {
+			switch fao := firstArgumentObj.(type) {
+			case *TypedArrayObject:
+				InitializeTypedArrayFromTypedArray(agent, O, fao)
+			case *ArrayBufferLike, *SharedArrayBufferObject:
 				byteOffset := pkg.SliceSafeGet(argumentsList, 1)
 				length := pkg.SliceSafeGet(argumentsList, 2)
-				InitializeTypedArrayFromArrayBuffer(agent, O, ab, byteOffset, length)
-			} else {
+				bl := NewArrayBufferLike(fao)
+				InitializeTypedArrayFromArrayBuffer(agent, O, bl, byteOffset, length)
+			default:
 				usingIterator := GetMethod(agent, firstArgument, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
 				if usingIterator != nil {
 					values := GetIteratorFromMethod(agent, firstArgument, usingIterator).IteratorToList()
@@ -803,10 +805,10 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		return OrdinaryPreventExtensions(oo.Object)
 	}
 	internalMethods.GetOwnProperty = func(o ObjectType, p PropertyKey) *PropertyDescriptor {
-		oo := o.(*TypedArrayObject)
-		if i, ok := p.(IntegerIndexPropertyKey); ok {
-			value := TypedArrayGetElement(agent, oo, i.Value)
-			if value == UndefinedValue {
+		oo := o.Ref().(*TypedArrayObject)
+		if i, err := p.GetIndex(); err == nil {
+			value := TypedArrayGetElement(agent, oo, i)
+			if IsUndefinedOrNil(value) {
 				return nil
 			}
 			return &PropertyDescriptor{
@@ -825,24 +827,25 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		return OrdinaryHasProperty(o.(*TypedArrayObject).Object, p)
 	}
 	internalMethods.DefineOwnProperty = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
-		if i, ok := p.(IntegerIndexPropertyKey); ok {
-			if !o.(*TypedArrayObject).IsValidIntegerIndex(agent, i.Value) {
+		if i, err := p.GetIndex(); err == nil {
+			if !o.(*TypedArrayObject).IsValidIntegerIndex(agent, i) {
 				return false
 			}
-			if !desc.Enumerable {
-				return false
-			}
-			if !desc.Configurable {
-				return false
-			}
-			if !desc.Writable {
-				return false
-			}
-			if desc.IsAccessorDescriptor() {
-				return false
-			}
+			// TODO: Only check for undefined
+			//if !desc.Enumerable {
+			//	return false
+			//}
+			//if !desc.Configurable {
+			//	return false
+			//}
+			//if !desc.Writable {
+			//	return false
+			//}
+			//if desc.IsAccessorDescriptor() {
+			//	return false
+			//}
 			if desc.Value != nil {
-				TypedArraySetElement(agent, o.(*TypedArrayObject), i.Value, desc.Value)
+				TypedArraySetElement(agent, o.(*TypedArrayObject), i, desc.Value)
 			}
 		}
 		return true
@@ -914,7 +917,12 @@ func (t *TypedArrayObject) IsValidIntegerIndex(agent *Agent, index JSInt) bool {
 	if index < 0 {
 		return false
 	}
-	if index >= t.ArrayLength.Value {
+	taRecord := MakeTypedArrayWithBufferWitnessRecord(t, Relaxed)
+	if IsTypedArrayOutOfBounds(taRecord) {
+		return false
+	}
+	length := TypedArrayLength(taRecord)
+	if index >= length {
 		return false
 	}
 	return true
@@ -1028,7 +1036,11 @@ func InitializeTypedArrayFromTypedArray(agent *Agent, O, srcArray *TypedArrayObj
 	return NewCompletionObjectNull()
 }
 
-func InitializeTypedArrayFromArrayBuffer(agent *Agent, O *TypedArrayObject, buffer *ArrayBufferLike, byteOffset, length Value) CompletionObject {
+func InitializeTypedArrayFromArrayBuffer(
+	agent *Agent,
+	O *TypedArrayObject,
+	buffer *ArrayBufferLike, byteOffset, length Value,
+) CompletionObject {
 	elementSize := TypedArrayElementSize(O)
 	offset := ToIndex(agent, byteOffset)
 	if offset%elementSize != 0 {
@@ -1043,7 +1055,7 @@ func InitializeTypedArrayFromArrayBuffer(agent *Agent, O *TypedArrayObject, buff
 		return NewCompletionObjectError(agent.ThrowException(TypeError, "detached buffer"))
 	}
 	bufferByteLength := ArrayBufferByteLength(buffer, SeqCst)
-	if length == UndefinedValue && !bufferIsFixedLength {
+	if IsUndefinedOrNil(length) && !bufferIsFixedLength {
 		if offset > bufferByteLength {
 			return NewCompletionObjectError(agent.ThrowException(RangeError, "offset > bufferByteLength"))
 		}
@@ -1051,7 +1063,7 @@ func InitializeTypedArrayFromArrayBuffer(agent *Agent, O *TypedArrayObject, buff
 		O.ArrayLength.toAuto()
 	} else {
 		var byteLength JSInt
-		if length == UndefinedValue {
+		if IsUndefinedOrNil(length) {
 			if bufferByteLength%elementSize != 0 {
 				return NewCompletionObjectError(agent.ThrowException(RangeError, "bufferByteLength is not a multiple of element size"))
 			}
@@ -1163,8 +1175,17 @@ func InitializeTypedArrayFromArrayLike(agent *Agent, O *TypedArrayObject, arrayL
 }
 
 func TypedArrayLength(taRecord *TypedArrayWithBufferWitnessRecord) JSInt {
-	// TODO
-	return 0
+	Assert(!IsTypedArrayOutOfBounds(taRecord))
+	O := taRecord.TypedArray
+	if !O.ArrayLength.Auto {
+		return O.ArrayLength.Value
+	}
+	Assert(!IsFixedLengthArrayBuffer(O.ViewedArrayBuffer))
+	byteOffset := O.ByteOffset
+	elementSize := TypedArrayElementSize(O)
+	byteLength := taRecord.CachedBufferByteLength
+	Assert(!byteLength.Detached)
+	return (byteLength.Value - byteOffset) / elementSize
 }
 
 // MARK: - Internal

@@ -504,7 +504,7 @@ func ToLength(agent *Agent, value Value) JSInt {
 
 // 7.1.22
 func ToIndex(agent *Agent, value Value) JSInt {
-	if value == UndefinedValue {
+	if IsUndefinedOrNil(value) {
 		return 0
 	}
 

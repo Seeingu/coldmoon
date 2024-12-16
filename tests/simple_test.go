@@ -19,6 +19,12 @@ func testSource(t *testing.T, s string) {
 
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
+		`
+const sab = new SharedArrayBuffer(1024);
+const ta = new Uint8Array(sab);
+ta[123] = 12;
+ta[123]
+`,
 		"Boolean(function() {}())",
 		"typeof Boolean(void 0)",
 		"void 0",

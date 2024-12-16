@@ -6,7 +6,7 @@ import (
 
 type SharedArrayBufferObject struct {
 	*Object
-	ArrayBufferData          DataBlock
+	ArrayBufferData          *DataBlock
 	ArrayBufferByteLength    JSInt
 	ArrayBufferMaxByteLength JSInt
 }

@@ -1,42 +1,46 @@
 package coldmoon
 
-type DataBlock []byte
-
-func (db DataBlock) Size() JSInt {
-	return JSInt(len(db))
+type DataBlock struct {
+	data []byte
 }
 
-func (db DataBlock) Equal(other DataBlock) bool {
-	if len(db) != len(other) {
-		return false
-	}
-	for i, v := range db {
-		if v != other[i] {
-			return false
-		}
-	}
-	return true
+func (db *DataBlock) Size() JSInt {
+	return JSInt(len(db.data))
+}
+
+func (db *DataBlock) Equal(other *DataBlock) bool {
+	return db == other
+}
+
+func (db *DataBlock) Slice(start JSInt, end JSInt) []byte {
+	return db.data[start:end]
+}
+
+func (db *DataBlock) Set(index JSInt, value []byte) {
+	copy(db.data[index:], value)
 }
 
 // 6.2.9.1
-func CreateByteDataBlock(agent *Agent, size int) DataBlock {
-	db := make(DataBlock, size)
-	return db
+func CreateByteDataBlock(agent *Agent, size JSInt) *DataBlock {
+	return &DataBlock{
+		data: make([]byte, size),
+	}
 }
 
 // 6.2.9.2
-func CreateSharedByteDataBlock(agent *Agent, size JSInt) DataBlock {
-	db := make(DataBlock, size)
-	return db
+func CreateSharedByteDataBlock(agent *Agent, size JSInt) *DataBlock {
+	return &DataBlock{
+		data: make([]byte, size),
+	}
 }
 
 // 6.2.9.3
 func CopyDataBlockBytes(
-	toBlock DataBlock,
+	toBlock *DataBlock,
 	toIndex JSInt,
-	fromBlock DataBlock,
+	fromBlock *DataBlock,
 	fromIndex JSInt,
 	count JSInt,
 ) {
-	copy(toBlock[toIndex:], fromBlock[fromIndex:fromIndex+count])
+	copy(toBlock.data[toIndex:], fromBlock.data[fromIndex:fromIndex+count])
 }

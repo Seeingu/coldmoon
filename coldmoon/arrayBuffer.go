@@ -1,7 +1,6 @@
 package coldmoon
 
 import (
-	"bytes"
 	"encoding/binary"
 	"math"
 )
@@ -13,7 +12,7 @@ type ArrayBufferLike struct {
 	SharedArrayBuffer *SharedArrayBufferObject
 }
 
-func (a *ArrayBufferLike) Data() DataBlock {
+func (a *ArrayBufferLike) Data() *DataBlock {
 	if a.ArrayBuffer != nil {
 		return a.ArrayBuffer.ArrayBufferData
 	}
@@ -21,7 +20,7 @@ func (a *ArrayBufferLike) Data() DataBlock {
 }
 
 func (a *ArrayBufferLike) ByteLength() JSInt {
-	return JSInt(len(a.Data()))
+	return a.Data().Size()
 }
 
 func (a *ArrayBufferLike) MaxByteLength() JSInt {
@@ -48,7 +47,7 @@ func NewArrayBufferLike(object ObjectType) *ArrayBufferLike {
 
 type ArrayBufferObject struct {
 	*Object
-	ArrayBufferData          DataBlock
+	ArrayBufferData          *DataBlock
 	ArrayBufferByteLength    JSInt
 	ArrayBufferDetachKey     Value
 	ArrayBufferMaxByteLength JSInt
@@ -68,7 +67,7 @@ func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength JSInt,
 	object := OrdinaryCreateFromConstructor(agent, constructor, "%ArrayBuffer.prototype%", nil)
 	arrayBuffer := &ArrayBufferObject{
 		Object:                object,
-		ArrayBufferData:       make([]byte, byteLength),
+		ArrayBufferData:       CreateByteDataBlock(agent, byteLength),
 		ArrayBufferByteLength: byteLength,
 	}
 	return NewCompletionObject(arrayBuffer)
@@ -129,12 +128,10 @@ const (
 	Relaxed
 )
 
+// 25.1.3.2
 func ArrayBufferByteLength(buffer *ArrayBufferLike, memoryOrder MemoryOrder) JSInt {
 	Assert(!IsDetachedBuffer(buffer))
-	if buffer.ArrayBuffer != nil {
-		return buffer.ArrayBuffer.ArrayBufferByteLength
-	}
-	return buffer.SharedArrayBuffer.ArrayBufferByteLength
+	return buffer.Data().Size()
 }
 
 // 25.1.3.8
@@ -145,6 +142,17 @@ func IsFixedLengthArrayBuffer(buffer *ArrayBufferLike) bool {
 	return buffer.SharedArrayBuffer.ArrayBufferMaxByteLength == 0
 }
 
+func GetRawBytesFromSharedBlock(
+	block *DataBlock,
+	byteIndex JSInt,
+	size JSInt,
+	isTypedArray bool,
+	order MemoryOrder,
+) []byte {
+	return block.Slice(byteIndex, byteIndex+size)
+}
+
+// 25.1.3.16
 func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferLike, byteIndex JSInt, size JSInt, isTypedArray bool, order MemoryOrder, isLittleEndian bool) JSNumber {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	block := arrayBuffer.Data()
@@ -152,12 +160,12 @@ func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferLike, byteIndex JS
 
 	var rawValue []byte
 	if IsSharedArrayBuffer(arrayBuffer) {
-		// TODO
+		rawValue = GetRawBytesFromSharedBlock(block, byteIndex, elementSize, isTypedArray, order)
 	} else {
-		rawValue = block[byteIndex : byteIndex+elementSize]
+		rawValue = block.data[byteIndex : byteIndex+elementSize]
 	}
 
-	return RawBytesToNumeric(rawValue, isLittleEndian)
+	return RawBytesToNumeric(elementSize, rawValue, isLittleEndian)
 }
 
 func IsSharedArrayBuffer(buffer *ArrayBufferLike) bool {
@@ -166,19 +174,31 @@ func IsSharedArrayBuffer(buffer *ArrayBufferLike) bool {
 
 // 25.1.3.17
 func NumericToRawBytes(value Value, size JSInt, isLittleEndian bool) []byte {
-	// TODO: convert Value to bytes
-	buf := &bytes.Buffer{}
-	var endian binary.ByteOrder
-	if isLittleEndian {
-		endian = binary.LittleEndian
-	} else {
-		endian = binary.BigEndian
+	rawBytes := make([]byte, size)
+	n := value.(*NumberValue).Data
+	switch size {
+	case 1:
+		rawBytes[0] = byte(n)
+	case 2:
+		if isLittleEndian {
+			binary.LittleEndian.PutUint16(rawBytes, uint16(n))
+		} else {
+			binary.BigEndian.PutUint16(rawBytes, uint16(n))
+		}
+	case 4:
+		if isLittleEndian {
+			binary.LittleEndian.PutUint32(rawBytes, uint32(n))
+		} else {
+			binary.BigEndian.PutUint32(rawBytes, uint32(n))
+		}
+	case 8:
+		if isLittleEndian {
+			binary.LittleEndian.PutUint64(rawBytes, uint64(n))
+		} else {
+			binary.BigEndian.PutUint64(rawBytes, uint64(n))
+		}
 	}
-	err := binary.Write(buf, endian, value)
-	if err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
+	return rawBytes
 }
 
 func SetValueInBuffer(
@@ -196,28 +216,34 @@ func SetValueInBuffer(
 	block := arrayBuffer.Data()
 	elementSize := size
 	rawBytes := NumericToRawBytes(value, elementSize, isLittleEndian)
-	CopyDataBlockBytes(block, byteIndex, rawBytes, 0, size)
+	block.Set(byteIndex, rawBytes)
 }
 
 // 25.1.3.14
-func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) JSNumber {
-	buf := &bytes.Buffer{}
-	var endian binary.ByteOrder
-	if isLittleEndian {
-		endian = binary.LittleEndian
-	} else {
-		endian = binary.BigEndian
+func RawBytesToNumeric(size JSInt, rawBytes []byte, isLittleEndian bool) JSNumber {
+	switch size {
+	case 1:
+		return JSNumber(rawBytes[0])
+	case 2:
+		if isLittleEndian {
+			return JSNumber(binary.LittleEndian.Uint16(rawBytes))
+		} else {
+			return JSNumber(binary.BigEndian.Uint16(rawBytes))
+		}
+	case 4:
+		if isLittleEndian {
+			return JSNumber(binary.LittleEndian.Uint32(rawBytes))
+		} else {
+			return JSNumber(binary.BigEndian.Uint32(rawBytes))
+		}
+	case 8:
+		if isLittleEndian {
+			return JSNumber(binary.LittleEndian.Uint64(rawBytes))
+		} else {
+			return JSNumber(binary.BigEndian.Uint64(rawBytes))
+		}
 	}
-	err := binary.Write(buf, endian, rawBytes)
-	if err != nil {
-		panic(err)
-	}
-	t := JSNumber(0)
-	err = binary.Read(buf, endian, &t)
-	if err != nil {
-		panic(err)
-	}
-	return t
+	panic("unreachable")
 }
 
 func NewArrayBufferConstructor(realm *Realm) ObjectType {
