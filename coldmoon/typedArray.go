@@ -821,8 +821,8 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		return OrdinaryGetOwnProperty(oo.Object, p)
 	}
 	internalMethods.HasProperty = func(o ObjectType, p PropertyKey) bool {
-		if i, ok := p.(IntegerIndexPropertyKey); ok {
-			return o.(*TypedArrayObject).IsValidIntegerIndex(agent, i.Value)
+		if i, err := p.GetIndex(); err == nil {
+			return o.(*TypedArrayObject).IsValidIntegerIndex(agent, i)
 		}
 		return OrdinaryHasProperty(o.(*TypedArrayObject).Object, p)
 	}
@@ -851,21 +851,21 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		return true
 	}
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
-		if i, ok := p.(IntegerIndexPropertyKey); ok {
-			return TypedArrayGetElement(agent, o.(*TypedArrayObject), i.Value)
+		if i, err := p.GetIndex(); err == nil {
+			return TypedArrayGetElement(agent, o.(*TypedArrayObject), i)
 		}
 		return OrdinaryGet(o.(*TypedArrayObject).Object, p, receiver)
 	}
 	internalMethods.Set = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool {
-		if i, ok := p.(IntegerIndexPropertyKey); ok {
-			TypedArraySetElement(agent, o.(*TypedArrayObject), i.Value, v)
+		if i, err := p.GetIndex(); err == nil {
+			TypedArraySetElement(agent, o.(*TypedArrayObject), i, v)
 			return true
 		}
 		return OrdinarySet(o.(*TypedArrayObject).Object, p, v, receiver)
 	}
 	internalMethods.Delete = func(o ObjectType, p PropertyKey) bool {
-		if i, ok := p.(IntegerIndexPropertyKey); ok {
-			return !o.(*TypedArrayObject).IsValidIntegerIndex(agent, i.Value)
+		if i, err := p.GetIndex(); err == nil {
+			return !o.(*TypedArrayObject).IsValidIntegerIndex(agent, i)
 		}
 		return OrdinaryDelete(o.(*TypedArrayObject).Object, p)
 	}

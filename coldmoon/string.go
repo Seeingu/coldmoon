@@ -13,11 +13,10 @@ type StringObject struct {
 }
 
 func StringGetOwnProperty(s *StringObject, p PropertyKey) *PropertyDescriptor {
-	intIndex, ok := p.(IntegerIndexPropertyKey)
-	if !ok {
+	index, err := p.GetIndex()
+	if err != nil {
 		return nil
 	}
-	index := intIndex.Value
 
 	str := s.Data
 	l := JSInt(len(str))
@@ -64,13 +63,21 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 		}
 
 		keysGreaterThanLength := lo.Filter(lo.Keys(propertiesMap), func(pk PropertyKey, index int) bool {
-			if index, ok := pk.(IntegerIndexPropertyKey); ok {
-				return index.Value >= length
+			if index, err := pk.GetIndex(); err == nil {
+				return index >= length
 			}
 			return false
 		})
 		sort.Slice(keysGreaterThanLength, func(i, j int) bool {
-			return keysGreaterThanLength[i].(IntegerIndexPropertyKey).Value < keysGreaterThanLength[j].(IntegerIndexPropertyKey).Value
+			ii, err := keysGreaterThanLength[i].GetIndex()
+			if err != nil {
+				panic(err)
+			}
+			jj, err := keysGreaterThanLength[j].GetIndex()
+			if err != nil {
+				panic(err)
+			}
+			return ii < jj
 		})
 		copy(keys[length:], keysGreaterThanLength)
 

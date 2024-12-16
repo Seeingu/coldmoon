@@ -330,9 +330,7 @@ func (o *Object) EnumerableOwnProperties(kind objectOwnPropertiesKind) (results 
 	ownKeys := o.InternalMethods().OwnPropertyKeys(o)
 
 	for _, key := range ownKeys {
-		_, isString := key.(StringPropertyKey)
-		_, isIndex := key.(IntegerIndexPropertyKey)
-		if isString || isIndex {
+		if _, err := key.GetIndex(); err == nil {
 			desc := o.InternalMethods().GetOwnProperty(o, key)
 			if desc != nil && desc.Enumerable {
 				switch kind {

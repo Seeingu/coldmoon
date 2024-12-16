@@ -2,7 +2,6 @@ package coldmoon
 
 import (
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/Seeingu/coldmoon/pkg"
@@ -28,15 +27,9 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) ObjectType {
 		if ok && propertyKeyString.Value == "length" {
 			return ArraySetLength(agent, array, desc)
 		}
-		var index JSInt
-		if propertyKeyIndex, err := strconv.ParseFloat(propertyKeyString.Value, 64); err != nil {
-			intValue, ok := p.(IntegerIndexPropertyKey)
-			if !ok {
-				panic("unexpected")
-			}
-			index = intValue.Value
-		} else {
-			index = JSInt(propertyKeyIndex)
+		index, err := p.GetIndex()
+		if err != nil {
+			panic(err)
 		}
 		lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
 		Assert(lengthDesc.IsDataDescriptor())
