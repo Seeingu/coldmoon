@@ -56,10 +56,13 @@ func NewMapConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 		realm:     realm,
 	})
-	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return this
-	}
-	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+
+	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+			return this
+		},
+		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        (realm.Intrinsics.MapPrototype).ToValue(),

@@ -275,10 +275,12 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	})
 	DefineBuiltinPropertyV(realm.Intrinsics.ArrayBufferPrototype, "constructor", (object).ToValue())
 
-	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return this
-	}
-	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+			return this
+		},
+		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+	})
 	return object
 }
 

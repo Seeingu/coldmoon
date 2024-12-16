@@ -370,10 +370,12 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "allSettled", allSettled, 1, realm)
 	DefineBuiltinFunction(object, "any", promiseAny, 1, realm)
 
-	var getter BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return this
-	}
-	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+			return this
+		},
+		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+	})
 
 	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
 		Value:        (realm.Intrinsics.PromisePrototype).ToValue(),

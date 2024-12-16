@@ -51,10 +51,13 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: false,
 	})
-	var getter BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
-		return thisValue
-	}
-	DefineBuiltinAccessor(realm, object, "@@species", getter, nil)
+
+	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+			return this
+		},
+		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+	})
 
 	DefineBuiltinPropertyV(realm.Intrinsics.SetPrototype, "constructor", (object).ToValue())
 
