@@ -153,7 +153,14 @@ func GetRawBytesFromSharedBlock(
 }
 
 // 25.1.3.16
-func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferLike, byteIndex JSInt, size JSInt, isTypedArray bool, order MemoryOrder, isLittleEndian bool) JSNumber {
+func GetValueFromBuffer(
+	agent *Agent,
+	arrayBuffer *ArrayBufferLike,
+	byteIndex JSInt,
+	size JSInt,
+	isTypedArray bool,
+	order MemoryOrder,
+) uint64 {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	block := arrayBuffer.Data()
 	elementSize := size
@@ -165,7 +172,7 @@ func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferLike, byteIndex JS
 		rawValue = block.data[byteIndex : byteIndex+elementSize]
 	}
 
-	return RawBytesToNumeric(elementSize, rawValue, isLittleEndian)
+	return RawBytesToNumeric(elementSize, rawValue, agent.IsLittleEndian)
 }
 
 func IsSharedArrayBuffer(buffer *ArrayBufferLike) bool {
@@ -209,38 +216,37 @@ func SetValueInBuffer(
 	size JSInt,
 	isTypedArray bool,
 	order MemoryOrder,
-	isLittleEndian bool,
 ) {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	Assert(byteIndex+size <= arrayBuffer.ByteLength())
 	block := arrayBuffer.Data()
 	elementSize := size
-	rawBytes := NumericToRawBytes(value, elementSize, isLittleEndian)
+	rawBytes := NumericToRawBytes(value, elementSize, agent.IsLittleEndian)
 	block.Set(byteIndex, rawBytes)
 }
 
 // 25.1.3.14
-func RawBytesToNumeric(size JSInt, rawBytes []byte, isLittleEndian bool) JSNumber {
+func RawBytesToNumeric(size JSInt, rawBytes []byte, isLittleEndian bool) uint64 {
 	switch size {
 	case 1:
-		return JSNumber(rawBytes[0])
+		return uint64(rawBytes[0])
 	case 2:
 		if isLittleEndian {
-			return JSNumber(binary.LittleEndian.Uint16(rawBytes))
+			return uint64(binary.LittleEndian.Uint16(rawBytes))
 		} else {
-			return JSNumber(binary.BigEndian.Uint16(rawBytes))
+			return uint64(binary.BigEndian.Uint16(rawBytes))
 		}
 	case 4:
 		if isLittleEndian {
-			return JSNumber(binary.LittleEndian.Uint32(rawBytes))
+			return uint64(binary.LittleEndian.Uint32(rawBytes))
 		} else {
-			return JSNumber(binary.BigEndian.Uint32(rawBytes))
+			return uint64(binary.BigEndian.Uint32(rawBytes))
 		}
 	case 8:
 		if isLittleEndian {
-			return JSNumber(binary.LittleEndian.Uint64(rawBytes))
+			return binary.LittleEndian.Uint64(rawBytes)
 		} else {
-			return JSNumber(binary.BigEndian.Uint64(rawBytes))
+			return binary.BigEndian.Uint64(rawBytes)
 		}
 	}
 	panic("unreachable")

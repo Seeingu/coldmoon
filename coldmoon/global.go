@@ -70,6 +70,7 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 		{"Uint32Array", r.Intrinsics.Uint32ArrayConstructor.ToValue()},
 		{"Float32Array", r.Intrinsics.Float32ArrayConstructor.ToValue()},
 		{"Float64Array", r.Intrinsics.Float64ArrayConstructor.ToValue()},
+		{"Atomics", r.Intrinsics.Atomics.ToValue()},
 	}
 
 	var properties []constructorProperties

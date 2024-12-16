@@ -510,15 +510,15 @@ func SetTypedArrayFromTypedArray(agent *Agent, target *TypedArrayObject, targetO
 	limit := targetByteIndex + srcLength*targetElementSize
 	if srcType == targetType {
 		for targetByteIndex < limit {
-			value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, srcElementSize, true, Relaxed, false)
-			SetValueInBuffer(agent, targetBuffer, targetByteIndex, value.ToValue(), targetElementSize, true, Relaxed, false)
+			value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, srcElementSize, true, Relaxed)
+			SetValueInBuffer(agent, targetBuffer, targetByteIndex, JSNumber(value).ToValue(), targetElementSize, true, Relaxed)
 			srcByteIndex += srcElementSize
 			targetByteIndex += targetElementSize
 		}
 	} else {
 		for targetByteIndex < limit {
-			value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, srcElementSize, true, Relaxed, false)
-			SetValueInBuffer(agent, targetBuffer, targetByteIndex, NewNumberValue(value), targetElementSize, true, Relaxed, false)
+			value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, srcElementSize, true, Relaxed)
+			SetValueInBuffer(agent, targetBuffer, targetByteIndex, NewNumberValue(JSNumber(value)), targetElementSize, true, Relaxed)
 			srcByteIndex += srcElementSize
 			targetByteIndex += targetElementSize
 		}
@@ -905,7 +905,6 @@ func TypedArraySetElement(agent *Agent, O *TypedArrayObject, index JSInt, value 
 		elementSize,
 		true,
 		Relaxed,
-		false,
 	)
 }
 
@@ -936,7 +935,8 @@ func TypedArrayGetElement(agent *Agent, O *TypedArrayObject, index JSInt) Value 
 	offset := O.ByteOffset
 	elementSize := TypedArrayElementSize(O)
 	byteIndexInBuffer := offset + index*elementSize
-	return NewNumberValue(GetValueFromBuffer(agent, O.ViewedArrayBuffer, byteIndexInBuffer, elementSize, true, Relaxed, false))
+	u := GetValueFromBuffer(agent, O.ViewedArrayBuffer, byteIndexInBuffer, elementSize, true, Relaxed)
+	return NewNumberValue(JSNumber(u))
 }
 
 func AllocateTypedArrayBuffer(agent *Agent, O *TypedArrayObject, length JSInt) {
@@ -1012,16 +1012,15 @@ func InitializeTypedArrayFromTypedArray(agent *Agent, O, srcArray *TypedArrayObj
 		targetByteIndex := JSInt(0)
 		count := elementLength
 		for count > 0 {
-			value := GetValueFromBuffer(agent, srcData, srcByteIndex, getTypedArraySizeFromName(srcType), true, Relaxed, false)
+			value := GetValueFromBuffer(agent, srcData, srcByteIndex, getTypedArraySizeFromName(srcType), true, Relaxed)
 			SetValueInBuffer(
 				agent,
 				NewArrayBufferLike(data.Data()),
 				targetByteIndex,
-				NewNumberValue(value),
+				NewNumberValue(JSNumber(value)),
 				getTypedArraySizeFromName(srcType),
 				true,
-				Relaxed,
-				false)
+				Relaxed)
 			srcByteIndex += srcElementSize
 			targetByteIndex += elementSize
 			count--
@@ -1258,8 +1257,8 @@ func typedArrayCopyWith(agent *Agent, this Value, target, start, end Value) Valu
 		for countBytes > 0 {
 			if fromByteIndex < bufferByteLimit &&
 				toByteIndex < bufferByteLimit {
-				value := GetValueFromBuffer(agent, buffer, fromByteIndex, elementSize, true, Relaxed, false)
-				SetValueInBuffer(agent, buffer, toByteIndex, value.ToValue(), elementSize, true, Relaxed, false)
+				value := GetValueFromBuffer(agent, buffer, fromByteIndex, elementSize, true, Relaxed)
+				SetValueInBuffer(agent, buffer, toByteIndex, JSNumber(value).ToValue(), elementSize, true, Relaxed)
 				fromByteIndex += dir
 				toByteIndex += dir
 				countBytes--
@@ -1685,8 +1684,8 @@ func typedArraySlice(agent *Agent, this Value, start, end Value) Value {
 			targetByteIndex := A.ByteOffset
 			endByteIndex := targetByteIndex + countBytes*elementSize
 			for targetByteIndex < endByteIndex {
-				value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, elementSize, true, Relaxed, false)
-				SetValueInBuffer(agent, targetBuffer, targetByteIndex, value.ToValue(), elementSize, true, Relaxed, false)
+				value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, elementSize, true, Relaxed)
+				SetValueInBuffer(agent, targetBuffer, targetByteIndex, JSNumber(value).ToValue(), elementSize, true, Relaxed)
 				srcByteIndex += elementSize
 				targetByteIndex += elementSize
 			}

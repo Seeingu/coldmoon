@@ -131,64 +131,64 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 	DefineBuiltinAccessor(realm, object, "byteOffset", byteOffset, nil)
 
 	getBigInt64 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 8).Data()
+		return GetViewValue(agent, this, args[0], 8).Data()
 	}
 	getBigUint64 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 8).Data()
+		return GetViewValue(agent, this, args[0], 8).Data()
 	}
 	getFloat32 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 4).Data()
+		return GetViewValue(agent, this, args[0], 4).Data()
 	}
 	getFloat64 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 8).Data()
+		return GetViewValue(agent, this, args[0], 8).Data()
 	}
 	getInt8 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 1).Data()
+		return GetViewValue(agent, this, args[0], 1).Data()
 	}
 	getInt16 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 2).Data()
+		return GetViewValue(agent, this, args[0], 2).Data()
 	}
 	getInt32 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 4).Data()
+		return GetViewValue(agent, this, args[0], 4).Data()
 	}
 	getUint8 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 1).Data()
+		return GetViewValue(agent, this, args[0], 1).Data()
 	}
 	getUint16 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 2).Data()
+		return GetViewValue(agent, this, args[0], 2).Data()
 	}
 	getUint32 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return GetViewValue(agent, this, args[0], args[1], 4).Data()
+		return GetViewValue(agent, this, args[0], 4).Data()
 	}
 	setBigInt64 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Data()
+		return SetViewValue(agent, this, args[0], args[1], 8).Data()
 	}
 	setBigUint64 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Data()
+		return SetViewValue(agent, this, args[0], args[1], 8).Data()
 	}
 	setFloat32 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Data()
+		return SetViewValue(agent, this, args[0], args[1], 4).Data()
 	}
 	setFloat64 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 8).Data()
+		return SetViewValue(agent, this, args[0], args[1], 8).Data()
 	}
 	setInt8 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 1).Data()
+		return SetViewValue(agent, this, args[0], args[1], 1).Data()
 	}
 	setInt16 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 2).Data()
+		return SetViewValue(agent, this, args[0], args[1], 2).Data()
 	}
 	setInt32 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Data()
+		return SetViewValue(agent, this, args[0], args[1], 4).Data()
 	}
 	setUint8 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 1).Data()
+		return SetViewValue(agent, this, args[0], args[1], 1).Data()
 	}
 	setUint16 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 2).Data()
+		return SetViewValue(agent, this, args[0], args[1], 2).Data()
 	}
 	setUint32 := func(this Value, args []Value, newTarget ObjectType) Value {
-		return SetViewValue(agent, this, args[0], args[1], args[2], 4).Data()
+		return SetViewValue(agent, this, args[0], args[1], 4).Data()
 	}
 
 	DefineBuiltinFunction(object, "getBigInt64", getBigInt64, 2, realm)
@@ -265,10 +265,9 @@ func GetViewByteLength(viewRecord *DataViewWithBufferWitnessRecord) JSInt {
 }
 
 // 25.3.1.5
-func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEndian Value, size JSInt) CompletionValue {
+func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, size JSInt) CompletionValue {
 	view := RequireInternalSlot[*DataView](viewValue)
 	getIndex := ToIndex(agent, requestIndex)
-	isLittleEndianBool := isLittleEndian.ToBoolean()
 	viewOffset := view.ByteOffset
 	viewRecord := MakeDataViewWithBufferWitnessRecord(view, SeqCst)
 	if IsViewOutOfBounds(viewRecord) {
@@ -280,14 +279,19 @@ func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEnd
 		return NewCompletionValueError(agent.ThrowException(RangeError, "DataView is out of bounds"))
 	}
 	bufferIndex := getIndex + viewOffset
-	v := GetValueFromBuffer(agent, view.ViewedArrayBuffer, bufferIndex, size, false, SeqCst, isLittleEndianBool)
-	return NewCompletionValue(NewNumberValue(v))
+	v := GetValueFromBuffer(agent, view.ViewedArrayBuffer, bufferIndex, size, false, SeqCst)
+	return NewCompletionValue(NewNumberValue(JSNumber(v)))
 }
 
-func SetViewValue(agent *Agent, viewValue Value, requestIndex Value, value Value, isLittleEndian Value, size JSInt) CompletionValue {
+func SetViewValue(
+	agent *Agent,
+	viewValue Value,
+	requestIndex Value,
+	value Value,
+	size JSInt,
+) CompletionValue {
 	view := RequireInternalSlot[*DataView](viewValue)
 	setIndex := ToIndex(agent, requestIndex)
-	isLittleEndianBool := isLittleEndian.ToBoolean()
 	viewOffset := view.ByteOffset
 	viewRecord := MakeDataViewWithBufferWitnessRecord(view, SeqCst)
 	var numberValue JSNumber
@@ -305,7 +309,7 @@ func SetViewValue(agent *Agent, viewValue Value, requestIndex Value, value Value
 		return NewCompletionValue(agent.ThrowException(RangeError, "DataView is out of bounds"))
 	}
 	bufferIndex := setIndex + viewOffset
-	SetValueInBuffer(agent, view.ViewedArrayBuffer, bufferIndex, NewNumberValue(numberValue), size, false, SeqCst, isLittleEndianBool)
+	SetValueInBuffer(agent, view.ViewedArrayBuffer, bufferIndex, NewNumberValue(numberValue), size, false, SeqCst)
 	return NewCompletionValue(UndefinedValue)
 }
 

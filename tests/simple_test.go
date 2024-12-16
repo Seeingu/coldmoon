@@ -22,8 +22,9 @@ func TestBaseline(t *testing.T) {
 		`
 const sab = new SharedArrayBuffer(1024);
 const ta = new Uint8Array(sab);
+ta[0] = 5; // 5
 ta[123] = 12;
-ta[123]
+Atomics.add(ta, 0, 12); // 5
 `,
 		"Boolean(function() {}())",
 		"typeof Boolean(void 0)",

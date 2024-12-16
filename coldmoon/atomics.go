@@ -20,9 +20,7 @@ func ValidateIntegerTypedArray(agent *Agent, typedArray Value, waitable bool) Co
 	}
 	return newCompletionNormal(
 		completionNormalArgs[*TypedArrayWithBufferWitnessRecord]{
-			data: &TypedArrayWithBufferWitnessRecord{
-				TypedArray: ta,
-			},
+			data: taRecord,
 		})
 }
 
@@ -120,13 +118,30 @@ func GetModifySetValueInBuffer(
 	isLittleEndian := agent.IsLittleEndian
 	_ = NumericToRawBytes(value, size, isLittleEndian)
 	var rawBytesRead []byte
-	// TODO:
+	// TODO: atom calculation
 	if IsSharedArrayBuffer(arrayBuffer) {
+		rawBytesRead = GetRawBytesFromSharedBlock(block, byteIndex, size, false, Relaxed)
 	} else {
 		rawBytesRead = block.Slice(byteIndex, byteIndex+size)
 	}
+	previous := RawBytesToNumeric(size, rawBytesRead, isLittleEndian)
+	v := uint64(value.(*NumberValue).Data)
 
-	return RawBytesToNumeric(getTypedArraySizeFromName(elementType), rawBytesRead, isLittleEndian).ToValue()
+	// TODO: Lock
+	var target uint64
+	switch op {
+	case AtomicOpAdd:
+		target = previous + v
+	case AtomicOpAnd:
+		target = previous & v
+	case AtomicOpLoad:
+		return JSNumber(previous).ToValue()
+	default:
+		panic("unimplemented")
+	}
+	block.Set(byteIndex, NumericToRawBytes(JSNumber(target).ToValue(), size, isLittleEndian))
+	// return previous
+	return JSNumber(previous).ToValue()
 }
 
 // 25.4.3.4

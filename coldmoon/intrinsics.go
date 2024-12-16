@@ -78,6 +78,7 @@ const (
 	IntrinsicNameUint16ArrayPrototype                     IntrinsicName = "%Uint16Array.prototype%"
 	IntrinsicNameUint32Array                              IntrinsicName = "%Uint32Array%"
 	IntrinsicNameUint32ArrayPrototype                     IntrinsicName = "%Uint32Array.prototype%"
+	IntrinsicNameAtomics                                  IntrinsicName = "Atomics"
 	IntrinsicNameIsFinite                                 IntrinsicName = "%IsFinite%"
 	IntrinsicNameIsNaN                                    IntrinsicName = "%isNaN%"
 	IntrinsicNameEval                                     IntrinsicName = "%eval%"
@@ -260,6 +261,8 @@ type Intrinsics struct {
 	Uint32ArrayConstructor ObjectType
 	// %Uint32Array.prototype%
 	Uint32ArrayPrototype ObjectType
+	// %Atomics%
+	Atomics ObjectType
 	// %IsFinite%
 	IsFinite ObjectType
 	// %isNaN%
@@ -530,6 +533,8 @@ func (i *Intrinsics) Get(key IntrinsicName) ObjectType {
 		return i.SharedArrayBufferPrototype
 	case IntrinsicNameSharedArrayBuffer:
 		return i.SharedArrayBufferConstructor
+	case IntrinsicNameAtomics:
+		return i.Atomics
 	}
 	panic("unreachable")
 }

@@ -119,6 +119,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.Int32ArrayConstructor = NewTypedArrayNameConstructor(r, TypedArrayNameInt32)
 	r.Intrinsics.Uint32ArrayPrototype = NewTypedArrayNamePrototype(r, TypedArrayNameUint32)
 	r.Intrinsics.Uint32ArrayConstructor = NewTypedArrayNameConstructor(r, TypedArrayNameUint32)
+	r.Intrinsics.Atomics = NewAtomics(r)
 	r.Intrinsics.JSON = NewJSON(r)
 	r.Intrinsics.Reflect = NewReflectObject(r)
 	r.Intrinsics.Proxy = NewProxyConstructor(r)
