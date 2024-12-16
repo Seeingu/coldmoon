@@ -2,6 +2,10 @@ package coldmoon
 
 type DataBlock []byte
 
+func (db DataBlock) Size() JSInt {
+	return JSInt(len(db))
+}
+
 func (db DataBlock) Equal(other DataBlock) bool {
 	if len(db) != len(other) {
 		return false

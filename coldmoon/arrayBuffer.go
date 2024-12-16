@@ -103,6 +103,10 @@ func IsBigIntElementType(size JSInt) bool {
 	return size == 8
 }
 
+func IsUnclampedIntegerElementType(size JSInt) bool {
+	return size == 1 || size == 2 || size == 4 || size == 8
+}
+
 // 25.1.2.2
 func IsDetachedBuffer(buffer *ArrayBufferLike) bool {
 	if buffer.ArrayBuffer != nil {
@@ -141,7 +145,7 @@ func IsFixedLengthArrayBuffer(buffer *ArrayBufferLike) bool {
 	return buffer.SharedArrayBuffer.ArrayBufferMaxByteLength == 0
 }
 
-func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferLike, byteIndex JSInt, size JSInt, isTypedArray bool, order MemoryOrder, isLittleEndian bool) JSInt {
+func GetValueFromBuffer(agent *Agent, arrayBuffer *ArrayBufferLike, byteIndex JSInt, size JSInt, isTypedArray bool, order MemoryOrder, isLittleEndian bool) JSNumber {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	block := arrayBuffer.Data()
 	elementSize := size
@@ -196,7 +200,7 @@ func SetValueInBuffer(
 }
 
 // 25.1.3.14
-func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) JSInt {
+func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) JSNumber {
 	buf := &bytes.Buffer{}
 	var endian binary.ByteOrder
 	if isLittleEndian {
@@ -208,7 +212,7 @@ func RawBytesToNumeric(rawBytes []byte, isLittleEndian bool) JSInt {
 	if err != nil {
 		panic(err)
 	}
-	t := JSInt(0)
+	t := JSNumber(0)
 	err = binary.Read(buf, endian, &t)
 	if err != nil {
 		panic(err)

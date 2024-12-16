@@ -167,6 +167,7 @@ func TestHarness(t *testing.T) {
 		"assertRelativeDateMs.js",
 		"propertyHelper.js",
 		"testTypedArray.js",
+		"testAtomics.js",
 	}
 
 	agent := NewAgent()

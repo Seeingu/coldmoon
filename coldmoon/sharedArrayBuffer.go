@@ -132,16 +132,7 @@ func NewSharedArrayBufferPrototype(realm *Realm) ObjectType {
 		Getter: maxByteLength,
 	})
 
-	DefineBuiltinProperty(object, BuiltinPropertyParams{
-		WellKnownSymbolsKey: WellKnownSymbolsToStringTag,
-		Desc: &PropertyDescriptor{
-			Value:        NewStringValue("SharedArrayBuffer"),
-			Writable:     false,
-			Enumerable:   false,
-			Configurable: true,
-		},
-	})
-
+	DefineToStringTagBuiltinProperty(object, "SharedArrayBuffer")
 	return object
 }
 

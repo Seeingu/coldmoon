@@ -518,7 +518,7 @@ func SetTypedArrayFromTypedArray(agent *Agent, target *TypedArrayObject, targetO
 	} else {
 		for targetByteIndex < limit {
 			value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, srcElementSize, true, Relaxed, false)
-			SetValueInBuffer(agent, targetBuffer, targetByteIndex, NewNumberValue(value.ToNumber()), targetElementSize, true, Relaxed, false)
+			SetValueInBuffer(agent, targetBuffer, targetByteIndex, NewNumberValue(value), targetElementSize, true, Relaxed, false)
 			srcByteIndex += srcElementSize
 			targetByteIndex += targetElementSize
 		}
@@ -928,7 +928,7 @@ func TypedArrayGetElement(agent *Agent, O *TypedArrayObject, index JSInt) Value 
 	offset := O.ByteOffset
 	elementSize := TypedArrayElementSize(O)
 	byteIndexInBuffer := offset + index*elementSize
-	return NewNumberValue(GetValueFromBuffer(agent, O.ViewedArrayBuffer, byteIndexInBuffer, elementSize, true, Relaxed, false).ToNumber())
+	return NewNumberValue(GetValueFromBuffer(agent, O.ViewedArrayBuffer, byteIndexInBuffer, elementSize, true, Relaxed, false))
 }
 
 func AllocateTypedArrayBuffer(agent *Agent, O *TypedArrayObject, length JSInt) {
@@ -1009,7 +1009,7 @@ func InitializeTypedArrayFromTypedArray(agent *Agent, O, srcArray *TypedArrayObj
 				agent,
 				NewArrayBufferLike(data.Data()),
 				targetByteIndex,
-				NewNumberValue(value.ToNumber()),
+				NewNumberValue(value),
 				getTypedArraySizeFromName(srcType),
 				true,
 				Relaxed,

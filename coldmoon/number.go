@@ -9,6 +9,10 @@ import (
 // MARK: - JSNumber
 type JSNumber float64
 
+func (n JSNumber) ToValue() Value {
+	return NewNumberValue(n)
+}
+
 func (n JSNumber) ToInt() JSInt {
 	return JSInt(n)
 }

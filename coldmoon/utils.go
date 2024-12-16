@@ -81,6 +81,18 @@ func DefineBuiltinProperty(object ObjectType, params BuiltinPropertyParams) {
 	}
 }
 
+func DefineToStringTagBuiltinProperty(object ObjectType, name string) {
+	DefineBuiltinProperty(object, BuiltinPropertyParams{
+		WellKnownSymbolsKey: WellKnownSymbolsToStringTag,
+		Desc: &PropertyDescriptor{
+			Value:        NewStringValue(name),
+			Writable:     false,
+			Enumerable:   false,
+			Configurable: true,
+		},
+	})
+}
+
 func DefineBuiltinPropertyV(object ObjectType, name string, value Value) {
 	descriptor := &PropertyDescriptor{
 		Value:        value,

@@ -13,6 +13,8 @@ type Agent struct {
 	HostHooks             *HostHooks
 	GlobalSymbolRegistry  map[string]*SymbolValue
 	QueuedPromiseJobs     pkg.Stack[*QueuedPromiseJob]
+	// [[IsLittleEndian]]
+	IsLittleEndian bool
 }
 
 type HostHooks struct {

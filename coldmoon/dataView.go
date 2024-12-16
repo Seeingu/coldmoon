@@ -281,7 +281,7 @@ func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, isLittleEnd
 	}
 	bufferIndex := getIndex + viewOffset
 	v := GetValueFromBuffer(agent, view.ViewedArrayBuffer, bufferIndex, size, false, SeqCst, isLittleEndianBool)
-	return NewCompletionValue(NewNumberValue(v.ToNumber()))
+	return NewCompletionValue(NewNumberValue(v))
 }
 
 func SetViewValue(agent *Agent, viewValue Value, requestIndex Value, value Value, isLittleEndian Value, size JSInt) CompletionValue {
