@@ -997,6 +997,10 @@ func (o *OptionalExpression) Bytecode(e *Executable, c *BytecodeContext) {
 		})
 	}
 
+	if o.Property.Arguments == nil {
+		e.AddInstruction(InsGetValue)
+	}
+
 	endJump.Target = len(e.Instructions) - 1
 }
 

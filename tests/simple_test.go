@@ -20,7 +20,8 @@ func testSource(t *testing.T, s string) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`const a = {};
-const b = a?.b;`,
+const b = a?.b ?? 1;
+b`,
 		`
 class ValidatorClass {
   get [Symbol.toStringTag]() {
