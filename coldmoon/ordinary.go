@@ -438,7 +438,8 @@ func OrdinaryObjectCreate(agent *Agent, proto ObjectType, internalSlotsList []st
 func OrdinaryCreateFromConstructor(agent *Agent, constructor ObjectType, intrinsicDefaultProto IntrinsicName, internalSlotsList []string) *Object {
 	proto := GetPrototypeFromConstructor(constructor, intrinsicDefaultProto)
 
-	return OrdinaryObjectCreate(agent, proto, internalSlotsList)
+	o := OrdinaryObjectCreate(agent, proto, internalSlotsList)
+	return o
 }
 
 // 10.1.14

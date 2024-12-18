@@ -617,11 +617,10 @@ func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
 	}
 
 	builtinFunction, isBuiltinFunction := function.(*BuiltinFunction)
-	if isBuiltinFunction {
-		builtinFunction.InitialName = name
-	}
 	if prefix != "" {
 		name = prefix + " " + name
+	}
+	if isBuiltinFunction {
 		builtinFunction.InitialName = name
 	}
 

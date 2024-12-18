@@ -2044,7 +2044,7 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 		m = methodType
 	}
 	var funExpression *PrimaryExpressionFunctionExpression
-	if m == MethodDefinitionTypeMethod {
+	if m == MethodDefinitionTypeMethod || m == MethodDefinitionTypeGet || m == MethodDefinitionTypeSet {
 		funExpression = &PrimaryExpressionFunctionExpression{
 			Identifier:       "",
 			FormalParameters: formalParameters,

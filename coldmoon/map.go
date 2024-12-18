@@ -158,11 +158,6 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
 
 	DefineBuiltinPropertyP(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("entries")))
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("Map"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Map")
 	return object
 }

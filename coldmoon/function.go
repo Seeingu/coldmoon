@@ -61,7 +61,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		if !IsCallable(fun) {
 			panic("TypeError")
 		}
-		return fun.CallAssumeCallable(thisArg, args)
+		return fun.Call(thisArg, args)
 	}
 	bind := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		thisArg := argumentsList[0]

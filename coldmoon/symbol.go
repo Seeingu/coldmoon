@@ -12,7 +12,7 @@ type SymbolValue struct {
 var _ Value = (*SymbolValue)(nil)
 
 func (s *SymbolValue) String() string {
-	panic("TypeError")
+	return "Symbol: " + s.Description
 }
 
 func (s *SymbolValue) ToBoolean() bool {
