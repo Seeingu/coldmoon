@@ -34,7 +34,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().GetPrototypeOf(t)
 		}
 
-		handlerPrototype := (trap).ToValue().CallAssumeCallable(
+		handlerPrototype := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue()},
 		)
@@ -70,7 +70,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().SetPrototypeOf(t, prototype)
 		}
 
-		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+		booleanTrapResult := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), (prototype).ToValue()},
 		).ToBoolean()
@@ -97,7 +97,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().IsExtensible(t)
 		}
 
-		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+		booleanTrapResult := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue()},
 		).ToBoolean()
@@ -117,7 +117,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().PreventExtensions(t)
 		}
 
-		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+		booleanTrapResult := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue()},
 		).ToBoolean()
@@ -139,7 +139,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().GetOwnProperty(t, pk)
 		}
 
-		trapResultObjValue := (trap).ToValue().CallAssumeCallable(
+		trapResultObjValue := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), pk.ToValue()},
 		)
@@ -174,7 +174,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 
 		descObj := desc.FromPropertyDescriptor(agent, desc)
-		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+		booleanTrapResult := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), pk.ToValue(), (descObj).ToValue()},
 		).ToBoolean()
@@ -218,7 +218,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().HasProperty(t, pk)
 		}
 
-		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+		booleanTrapResult := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), pk.ToValue()},
 		).ToBoolean()
@@ -245,7 +245,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().Get(t, pk, receiver)
 		}
 
-		trapResult := (trap).ToValue().CallAssumeCallable(
+		trapResult := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), pk.ToValue(), receiver},
 		)
@@ -274,7 +274,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().Set(t, pk, v, receiver)
 		}
 
-		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+		booleanTrapResult := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), pk.ToValue(), v, receiver},
 		).ToBoolean()
@@ -306,7 +306,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().Delete(t, pk)
 		}
 
-		booleanTrapResult := (trap).ToValue().CallAssumeCallable(
+		booleanTrapResult := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), pk.ToValue()},
 		).ToBoolean()
@@ -336,7 +336,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().OwnPropertyKeys(t)
 		}
 
-		trapResultArray := (trap).ToValue().CallAssumeCallable(
+		trapResultArray := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue()},
 		)
@@ -416,7 +416,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 
 		argArray := CreateArrayFromList(agent, arguments)
-		return (trap).ToValue().CallAssumeCallable(
+		return (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), this, (argArray).ToValue()},
 		)
@@ -433,7 +433,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 
 		argArray := CreateArrayFromList(agent, arguments)
-		newObj := (trap).ToValue().CallAssumeCallable(
+		newObj := (trap).ToValue().Call(
 			(h).ToValue(),
 			[]Value{(t).ToValue(), (argArray).ToValue(), (newTarget).ToValue()},
 		)

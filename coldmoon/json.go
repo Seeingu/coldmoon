@@ -219,7 +219,7 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 			}
 		}
 	}
-	return reviver.CallAssumeCallable(holder.ToValue(), []Value{name.ToValue(), value})
+	return reviver.Call(holder.ToValue(), []Value{name.ToValue(), value})
 }
 
 func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key PropertyKey, holder ObjectType) string {
@@ -227,12 +227,12 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 	if ValueIsObject(value) || ValueIs[*BigIntValue](value) {
 		toJSON := GetV(agent, value, NewStringPropertyKey("toJSON"))
 		if IsCallable(toJSON) {
-			value = toJSON.CallAssumeCallable(value, []Value{key.ToValue()})
+			value = toJSON.Call(value, []Value{key.ToValue()})
 		}
 	}
 
 	if state.ReplacerFunction != nil {
-		value = state.ReplacerFunction.ToValue().CallAssumeCallable(holder.ToValue(), []Value{key.ToValue(), value})
+		value = state.ReplacerFunction.ToValue().Call(holder.ToValue(), []Value{key.ToValue(), value})
 	}
 
 	if obj, ok := ValueGetObject(value); ok {

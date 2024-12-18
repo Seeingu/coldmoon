@@ -176,13 +176,13 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
 	if completion.IsError() {
 		ex := agent.exception
-		(promiseCapability.Reject).ToValue().CallAssumeCallable(
+		promiseCapability.Reject.ToValue().Call(
 			UndefinedValue,
 			[]Value{ex},
 		)
 		agent.exception = nil
 	} else {
-		// TODO
+		panic("unimplemented")
 	}
 	return NewCompletionReturnValue((promiseCapability.Promise).ToValue())
 }

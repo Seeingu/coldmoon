@@ -310,7 +310,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		A := ArraySpeciesCreate(agent, array, length)
 		for k := range length {
 			pk := NewIntegerIndexPropertyKey(k)
-			mappedValue := callbackFn.CallAssumeCallable(
+			mappedValue := callbackFn.Call(
 				thisArg,
 				[]Value{array.Get(pk), NewNumberValue(k.ToNumber()), this},
 			)
@@ -348,7 +348,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if !IsCallable(fun) {
 			fun = realm.Intrinsics.ObjectPrototype.Get(NewStringPropertyKey("toString"))
 		}
-		return CallAssumeCallableNoArgs(fun, this)
+		return fun.Call(this, nil)
 	}
 
 	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -367,7 +367,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := array.HasProperty(pk)
 			if kPresent {
 				kValue := array.Get(pk)
-				callbackFn.CallAssumeCallable(
+				callbackFn.Call(
 					thisArg,
 					[]Value{kValue, NewNumberValue(k.ToNumber()), this},
 				)
@@ -576,7 +576,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				testResult := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
+				testResult := callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
 				if !testResult.ToBoolean() {
 					return FalseValue
 				}
@@ -599,7 +599,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				testResult := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
+				testResult := callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
 				if testResult.ToBoolean() {
 					return TrueValue
 				}
@@ -667,7 +667,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				nextValue := IteratorValue(next)
 				var mappedValue Value
 				if mapping {
-					mappedValue = mapFn.CallAssumeCallable(thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())})
+					mappedValue = mapFn.Call(thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())})
 				} else {
 					mappedValue = nextValue
 				}
@@ -689,7 +689,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kValue := arrayLike.Get(pk)
 			var mappedValue Value
 			if mapping {
-				mappedValue = mapFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber())})
+				mappedValue = mapFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber())})
 			} else {
 				mappedValue = kValue
 			}
@@ -781,7 +781,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				selected := callbackFn.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
+				selected := callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
 				if selected.ToBoolean() {
 					A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(to), kValue)
 					to++
@@ -827,7 +827,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				accumulator = callbackFn.CallAssumeCallable(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this})
+				accumulator = callbackFn.Call(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this})
 			}
 			k++
 		}
@@ -869,7 +869,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				accumulator = callbackFn.CallAssumeCallable(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this})
+				accumulator = callbackFn.Call(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this})
 			}
 			k--
 		}
@@ -1484,7 +1484,7 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumb
 	}
 	if compareFn != nil {
 		v := ToNumber(agent,
-			compareFn.ToValue().CallAssumeCallable(
+			compareFn.ToValue().Call(
 				UndefinedValue,
 				[]Value{x, y}),
 		)
@@ -1523,7 +1523,7 @@ func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen JSInt, 
 		if exists {
 			element := source.Get(p)
 			if mapperFunction != nil {
-				element = (mapperFunction).ToValue().CallAssumeCallable(
+				element = (mapperFunction).ToValue().Call(
 					thisArg,
 					[]Value{element, NewNumberValue(sourceIndex.ToNumber()), (source).ToValue()},
 				)

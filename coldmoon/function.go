@@ -111,11 +111,11 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		}
 
 		if argArray == UndefinedValue || argArray == NullValue {
-			return fun.CallAssumeCallable(thisArg, []Value{})
+			return fun.Call(thisArg, []Value{})
 		}
 
 		argList := CreateListFromArrayLike(realm.Agent, argArray)
-		return fun.CallAssumeCallable(thisArg, argList)
+		return fun.Call(thisArg, argList)
 	}
 	DefineBuiltinFunction(f, "apply", apply, 2, realm)
 }

@@ -29,7 +29,7 @@ func NewIteratorPrototype(realm *Realm) ObjectType {
 
 // 7.4.2
 func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *IteratorRecord {
-	iterator := method.ToValue().CallAssumeCallable(object, nil)
+	iterator := method.ToValue().Call(object, nil)
 	if !ValueIsObject(iterator) {
 		panic("TypeError")
 	}
@@ -69,9 +69,9 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) Completion[*Iterato
 func (i *IteratorRecord) IteratorNext(value Value) ObjectType {
 	var result Value
 	if value == nil {
-		result = CallAssumeCallableNoArgs(i.NextMethod, (i.Iterator).ToValue())
+		result = i.NextMethod.CallNoArgs(i.Iterator.ToValue())
 	} else {
-		result = i.NextMethod.CallAssumeCallable((i.Iterator).ToValue(), []Value{value})
+		result = i.NextMethod.Call((i.Iterator).ToValue(), []Value{value})
 	}
 
 	resultObject, ok := result.(*ObjectValue)
@@ -108,7 +108,7 @@ func (i *IteratorRecord) IteratorClose() {
 	innerResult := GetMethod(agent, (iterator).ToValue(), NewStringPropertyKey("return"))
 
 	if innerResult != nil {
-		CallAssumeCallableNoArgs((innerResult).ToValue(), (iterator).ToValue())
+		innerResult.ToValue().CallNoArgs(iterator.ToValue())
 	}
 }
 

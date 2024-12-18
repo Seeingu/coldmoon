@@ -433,7 +433,7 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 			kValue := values[k]
 			var mappedValue Value
 			if mapping {
-				mappedValue = mapper.CallAssumeCallable(thisArg, []Value{kValue, k.ToValue(), source})
+				mappedValue = mapper.Call(thisArg, []Value{kValue, k.ToValue(), source})
 			} else {
 				mappedValue = kValue
 			}
@@ -451,7 +451,7 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 		kValue := arrayLike.Get(Pk)
 		var mappedValue Value
 		if mapping {
-			mappedValue = mapper.CallAssumeCallable(thisArg, []Value{kValue, k.ToValue(), source})
+			mappedValue = mapper.Call(thisArg, []Value{kValue, k.ToValue(), source})
 		} else {
 			mappedValue = kValue
 		}

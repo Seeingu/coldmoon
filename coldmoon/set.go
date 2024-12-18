@@ -36,7 +36,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 				return (s).ToValue()
 			}
 			nextItem := IteratorValue(next)
-			(MustGetObject(adder)).ToValue().CallAssumeCallable((s).ToValue(), []Value{nextItem})
+			(MustGetObject(adder)).ToValue().Call((s).ToValue(), []Value{nextItem})
 		}
 		return (s).ToValue()
 	}
@@ -131,7 +131,7 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		index := uint64(0)
 		for index < numEntries {
 			if v, ok := entries[NewNumberValue(JSNumber(index))]; ok {
-				callbackFn.CallAssumeCallable(thisArg, []Value{v, v, thisValue})
+				callbackFn.Call(thisArg, []Value{v, v, thisValue})
 			}
 			numEntries = uint64(len(entries))
 			index++

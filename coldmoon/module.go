@@ -45,7 +45,7 @@ func GetModuleNamespace(agent *Agent, module *ModuleRecord) ObjectType {
 
 func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCompletion CompletionModule) {
 	if moduleCompletion.IsAbrupt() {
-		(capability.Reject).ToValue().CallAssumeCallable(UndefinedValue, []Value{moduleCompletion.Error()})
+		(capability.Reject).ToValue().Call(UndefinedValue, []Value{moduleCompletion.Error()})
 		return
 	}
 
@@ -53,20 +53,20 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 	loadPromise := module.LoadRequestedModules(agent, nil)
 
 	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		(capability.Reject).ToValue().CallAssumeCallable(UndefinedValue, []Value{argumentsList[0]})
+		(capability.Reject).ToValue().Call(UndefinedValue, []Value{argumentsList[0]})
 		return nil
 	}
 	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, "onRejected", builtinFunctionArgs{})
 	var linkAndEvaluateClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		link := module.Link()
 		if link.IsAbrupt() {
-			(capability.Reject).ToValue().CallAssumeCallable(UndefinedValue, []Value{link.Error()})
+			(capability.Reject).ToValue().Call(UndefinedValue, []Value{link.Error()})
 			return nil
 		}
 		evaluatePromise := module.Evaluate()
 		var fulfilledClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 			namespace := GetModuleNamespace(agent, module)
-			(capability.Resolve).ToValue().CallAssumeCallable(UndefinedValue, []Value{(namespace).ToValue()})
+			(capability.Resolve).ToValue().Call(UndefinedValue, []Value{(namespace).ToValue()})
 			return nil
 		}
 		onFulfilled := CreateBuiltinFunction(agent, fulfilledClosure, 0, "", builtinFunctionArgs{})

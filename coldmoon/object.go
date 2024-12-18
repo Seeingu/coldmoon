@@ -104,7 +104,7 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 	for _, name := range methodNames {
 		method := o.Get(NewStringPropertyKey(name))
 		if IsCallable(method) {
-			result := CallAssumeCallableNoArgs(method, o.ToValue())
+			result := method.CallNoArgs(o.ToValue())
 			if _, isObject := result.(*ObjectValue); !isObject {
 				return result
 			}
@@ -985,7 +985,7 @@ func (o *Object) FindViaPredicate(
 		}
 		pk := NewIntegerIndexPropertyKey(k)
 		kValue := o.Ref().Get(pk)
-		testResult := predicate.CallAssumeCallable(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()})
+		testResult := predicate.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()})
 
 		if testResult.ToBoolean() {
 			return FoundResult{

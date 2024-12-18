@@ -148,7 +148,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 				function := agent.ActiveFunctionObject()
 				_captures := function.(*BuiltinFunction).AdditionalFields.PromiseThenFinallyCaptures
 				onFinally := _captures.OnFinally
-				result := CallAssumeCallableNoArgs(onFinally, UndefinedValue)
+				result := onFinally.CallNoArgs(UndefinedValue)
 				p := PromiseResolve(agent, _captures.Constructor, result)
 
 				var returnValue BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
@@ -174,7 +174,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 				function := agent.ActiveFunctionObject()
 				_captures := function.(*BuiltinFunction).AdditionalFields.PromiseThenFinallyCaptures
 				onFinally := _captures.OnFinally
-				result := CallAssumeCallableNoArgs(onFinally, UndefinedValue)
+				result := onFinally.CallNoArgs(UndefinedValue)
 				p := PromiseResolve(agent, _captures.Constructor, result)
 				reason := arguments[0]
 
@@ -232,7 +232,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 
 		resolvingFunctions := CreateResolvingFunctions(agent, promise)
-		executor.CallAssumeCallable(UndefinedValue, []Value{resolvingFunctions.Resolve})
+		executor.Call(UndefinedValue, []Value{resolvingFunctions.Resolve})
 		return (promise).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, "Promise", builtinFunctionArgs{
@@ -415,7 +415,7 @@ type AdditionalFields struct {
 
 func IfAbruptRejectPromise[T any](agent *Agent, value Completion[T], capability *PromiseCapability) bool {
 	if value.IsAbrupt() {
-		(capability.Reject).ToValue().CallAssumeCallable(UndefinedValue, []Value{value.Error()})
+		(capability.Reject).ToValue().Call(UndefinedValue, []Value{value.Error()})
 		return false
 	}
 	return true
@@ -577,12 +577,12 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 		}
 		if handlerResult.IsError() {
 			reason := handlerResult.Error()
-			return promiseCapability.Reject.ToValue().CallAssumeCallable(
+			return promiseCapability.Reject.ToValue().Call(
 				UndefinedValue, []Value{reason},
 			)
 		} else {
 			value := handlerResult.Data()
-			return promiseCapability.Resolve.ToValue().CallAssumeCallable(
+			return promiseCapability.Resolve.ToValue().Call(
 				UndefinedValue, []Value{value},
 			)
 		}
@@ -617,7 +617,7 @@ func PromiseResolve(agent *Agent, constructor ObjectType, x Value) ObjectType {
 	}
 
 	promiseCapability := NewPromiseCapability(agent, (constructor).ToValue())
-	(promiseCapability.Resolve).ToValue().CallAssumeCallable(UndefinedValue, []Value{x})
+	(promiseCapability.Resolve).ToValue().Call(UndefinedValue, []Value{x})
 	return promiseCapability.Promise
 }
 
@@ -696,14 +696,14 @@ func PerformPromiseAll(
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				valuesArray := CreateArrayFromList(agent, values)
-				resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+				resultCapability.Resolve.ToValue().Call(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
 			return NewCompletionValue(resultCapability.Promise.ToValue())
 		}
 
 		nextValue := IteratorValue(next)
 		values = append(values, nextValue)
-		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
+		nextPromise := promiseResolve.ToValue().Call(constructor.ToValue(), []Value{nextValue})
 
 		steps := func(this Value, arguments []Value, newTarget ObjectType) Value {
 			F := agent.ActiveFunctionObject()
@@ -719,7 +719,7 @@ func PerformPromiseAll(
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				valuesArray := CreateArrayFromList(agent, _values)
-				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+				return resultCapability.Resolve.ToValue().Call(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
 			return UndefinedValue
 		}
@@ -757,14 +757,14 @@ func PerformPromiseAllSettled(
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				valuesArray := CreateArrayFromList(agent, values)
-				resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+				resultCapability.Resolve.ToValue().Call(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
 			return NewCompletionValue(resultCapability.Promise.ToValue())
 		}
 
 		nextValue := IteratorValue(next)
 		values = append(values, nextValue)
-		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
+		nextPromise := promiseResolve.ToValue().Call(constructor.ToValue(), []Value{nextValue})
 
 		stepsFulfilled := func(this Value, arguments []Value, newTarget ObjectType) Value {
 			F := agent.ActiveFunctionObject()
@@ -782,7 +782,7 @@ func PerformPromiseAllSettled(
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				valuesArray := CreateArrayFromList(agent, _values)
-				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+				return resultCapability.Resolve.ToValue().Call(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
 			return UndefinedValue
 		}
@@ -813,7 +813,7 @@ func PerformPromiseAllSettled(
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				valuesArray := CreateArrayFromList(agent, _values)
-				return resultCapability.Resolve.ToValue().CallAssumeCallable(UndefinedValue, []Value{valuesArray.ToValue()})
+				return resultCapability.Resolve.ToValue().Call(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
 			return UndefinedValue
 		}
@@ -864,7 +864,7 @@ func PerformPromiseAny(
 
 		nextValue := IteratorValue(next)
 		errors = append(errors, UndefinedValue)
-		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
+		nextPromise := promiseResolve.ToValue().Call(constructor.ToValue(), []Value{nextValue})
 
 		stepsRejected := func(this Value, arguments []Value, newTarget ObjectType) Value {
 			F := agent.ActiveFunctionObject()
@@ -885,7 +885,7 @@ func PerformPromiseAny(
 					Enumerable:   false,
 					Configurable: true,
 				})
-				return resultCapability.Reject.ToValue().CallAssumeCallable(UndefinedValue, []Value{err.ToValue()})
+				return resultCapability.Reject.ToValue().Call(UndefinedValue, []Value{err.ToValue()})
 			}
 			return UndefinedValue
 		}
@@ -958,7 +958,7 @@ func PerformPromiseRace(
 		}
 
 		nextValue := IteratorValue(next)
-		nextPromise := promiseResolve.ToValue().CallAssumeCallable(constructor.ToValue(), []Value{nextValue})
+		nextPromise := promiseResolve.ToValue().Call(constructor.ToValue(), []Value{nextValue})
 		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{resultCapability.Resolve.ToValue(), resultCapability.Reject.ToValue()})
 	}
 }

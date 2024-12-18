@@ -328,7 +328,7 @@ type MatchRecord struct {
 func RegExpExec(agent *Agent, regExp *RegExpObject, s string) CompletionObject {
 	exec := regExp.Get(NewStringPropertyKey("exec"))
 	if IsCallable(exec) {
-		result := exec.CallAssumeCallable((regExp).ToValue(), []Value{NewStringValue(s)})
+		result := exec.Call(regExp.ToValue(), []Value{NewStringValue(s)})
 		if !ValueIsObject(result) && result != nil {
 			return NewCompletionObjectError(agent.ThrowException(TypeError, "RegExpExec: exec is not an object"))
 		}

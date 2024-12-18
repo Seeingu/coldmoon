@@ -39,8 +39,8 @@ type ArgumentsList []Value
 type Value interface {
 	String() string
 	ToBoolean() bool
-	CallAssumeCallable(value Value, argumentsList ArgumentsList) Value
 	Call(this Value, argumentsList ArgumentsList) Value
+	CallNoArgs(this Value) Value
 	ToCompletion() CompletionValue
 }
 
@@ -194,7 +194,7 @@ func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
 		if exoticToPrim != nil {
 			hintString := hint.String()
 
-			result := exoticToPrim.ToValue().CallAssumeCallable(value, []Value{
+			result := exoticToPrim.ToValue().Call(value, []Value{
 				NewStringValue(hintString),
 			})
 			if _, isObject = result.(*ObjectValue); !isObject {
@@ -984,10 +984,6 @@ func ParsePattern(pattern string, unicode bool, unicodeSets bool) (r *regexp2.Re
 		return regexp2.Compile(pattern, regexp2.Unicode)
 	}
 	return
-}
-
-func CallAssumeCallableNoArgs(self, value Value) Value {
-	return self.CallAssumeCallable(value, []Value{})
 }
 
 func ValueType(value Value) string {

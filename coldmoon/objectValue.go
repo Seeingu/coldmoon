@@ -11,16 +11,16 @@ func (o *ObjectValue) Call(this Value, argumentsList ArgumentsList) Value {
 	if !IsCallable(o) {
 		panic("TypeError")
 	}
-	return o.CallAssumeCallable(this, argumentsList)
+	object := o.Object
+	return object.InternalMethods().Call(object, this, argumentsList)
+}
+
+func (o *ObjectValue) CallNoArgs(this Value) Value {
+	return o.Call(this, nil)
 }
 
 func (o *ObjectValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(o)
-}
-
-func (o *ObjectValue) CallAssumeCallable(value Value, argumentsList ArgumentsList) Value {
-	object := o.Object
-	return object.InternalMethods().Call(object, value, argumentsList)
 }
 
 // String is for internal use only.

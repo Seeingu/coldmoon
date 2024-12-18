@@ -25,7 +25,7 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 		}
 		k := MustGetObject(nextItem).Get(NewStringPropertyKey("0"))
 		v := MustGetObject(nextItem).Get(NewStringPropertyKey("1"))
-		(adder).ToValue().CallAssumeCallable((target).ToValue(), []Value{k, v})
+		adder.ToValue().Call(target.ToValue(), []Value{k, v})
 	}
 	return target
 }
@@ -139,7 +139,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		index := 0
 		for ; index < numEntries; index++ {
 			if v, ok := entries[NewNumberValue(JSNumber(index))]; ok {
-				callbackFn.CallAssumeCallable(thisArg, []Value{v, NewNumberValue(JSNumber(index)), this})
+				callbackFn.Call(thisArg, []Value{v, NewNumberValue(JSNumber(index)), this})
 			}
 			numEntries = len(m.MapValue.Data)
 		}

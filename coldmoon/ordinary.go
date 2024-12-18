@@ -314,7 +314,7 @@ func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) Value {
 		return UndefinedValue
 	}
 
-	return CallAssumeCallableNoArgs((getter).ToValue(), receiver)
+	return getter.ToValue().CallNoArgs(receiver)
 }
 
 func InternalSet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
@@ -388,7 +388,7 @@ func OrdinarySetWithOwnDescriptor(
 	if setter == nil {
 		return false
 	}
-	_ = setter.ToValue().CallAssumeCallable(receiver, []Value{value})
+	_ = setter.ToValue().Call(receiver, []Value{value})
 	return true
 }
 
