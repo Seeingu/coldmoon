@@ -18,12 +18,7 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("Generator"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Generator")
 
 	return g
 }

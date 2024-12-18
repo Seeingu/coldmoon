@@ -54,11 +54,6 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 		return (CreateIterResultObject(realm.Agent, result, false)).ToValue()
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("SetObject Iterator"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Set Iterator")
 	return object
 }

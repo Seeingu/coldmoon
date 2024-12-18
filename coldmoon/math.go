@@ -60,12 +60,7 @@ func NewMathObject(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("Math"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Math")
 
 	agent := realm.Agent
 	var random BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {

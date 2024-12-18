@@ -226,12 +226,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "set", set, 3, realm)
 	DefineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm)
 
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("Reflect"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Reflect")
 
 	return object
 }

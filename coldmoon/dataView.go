@@ -206,12 +206,7 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "setUint16", setUint16, 3, realm)
 	DefineBuiltinFunction(object, "setUint32", setUint32, 3, realm)
 
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("DataView"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "DataView")
 
 	return object
 }

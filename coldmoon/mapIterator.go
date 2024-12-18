@@ -60,12 +60,7 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 		return (CreateIterResultObject(agent, result, false)).ToValue()
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("Map Iterator"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Map Iterator")
 
 	return object
 }

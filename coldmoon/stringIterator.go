@@ -21,11 +21,6 @@ func NewStringIteratorPrototype(realm *Realm) ObjectType {
 		return (CreateIterResultObject(agent, result, false)).ToValue()
 	}
 	DefineBuiltinFunction(object, "next", next, 0, realm)
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("String Iterator"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "String Iterator")
 	return object
 }

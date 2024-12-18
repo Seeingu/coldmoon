@@ -128,12 +128,7 @@ func ModuleNamespaceCreate(agent *Agent, module *ModuleRecord, exports []string)
 		return symbolKeys
 	}
 
-	DefineBuiltinPropertyP(M, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("Module"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
+	DefineToStringTagBuiltinProperty(object, "Module")
 	module.SourceTextModule.Namespace = M
 	return M
 }

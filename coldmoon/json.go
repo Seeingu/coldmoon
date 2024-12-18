@@ -71,12 +71,7 @@ func NewJSON(realm *Realm) *JSON {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "JSON")
 
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("JSON"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "JSON")
 
 	var parse BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		text := argumentsList[0]

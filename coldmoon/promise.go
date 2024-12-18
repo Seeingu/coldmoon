@@ -204,12 +204,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "catch", catch, 1, realm)
 	DefineBuiltinFunction(object, "finally", finally, 1, realm)
 
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("Promise"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Promise")
 	return object
 }
 

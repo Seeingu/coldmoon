@@ -199,12 +199,7 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("String"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Symbol")
 
 	return object
 }

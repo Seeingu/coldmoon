@@ -219,12 +219,7 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
 	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
 
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("BigInt"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "BigInt")
 
 	return object
 }

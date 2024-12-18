@@ -45,11 +45,6 @@ func NewGeneratorFunctionPrototype(realm *Realm) ObjectType {
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("GeneratorFunction"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "GeneratorFunction")
 	return object
 }

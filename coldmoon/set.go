@@ -143,11 +143,6 @@ func NewSetPrototype(realm *Realm) ObjectType {
 
 	DefineBuiltinPropertyP(object, "keys", object.PropertyStorage().Get(NewStringPropertyKey("values")))
 	DefineBuiltinPropertyP(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("SetObject"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "Set")
 	return object
 }

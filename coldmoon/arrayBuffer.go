@@ -405,11 +405,6 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 	DefineBuiltinAccessor(realm, object, "maxByteLength", maxByteLength, nil)
 	DefineBuiltinAccessor(realm, object, "resizable", resizable, nil)
 
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("ArrayBuffer"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "ArrayBuffer")
 	return object
 }

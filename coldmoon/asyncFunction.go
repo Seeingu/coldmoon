@@ -32,12 +32,7 @@ func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.FunctionPrototype, "AsyncFunctionPrototype")
 
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("AsyncFunction"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "AsyncFunction")
 	return object
 }
 
