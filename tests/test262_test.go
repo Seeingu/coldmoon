@@ -35,14 +35,18 @@ func runTestHarness(realm *Realm, f string, debug bool) {
 	}
 }
 
-func evaluate(fileName string, realm *Realm) {
-	result := ParseScript(mustReadFile(fileName), realm, nil).Evaluate()
+func evaluate(source string, realm *Realm) {
+	result := ParseScript(source, realm, nil).Evaluate()
 	if o, ok := ValueGetObject(result); ok {
 		if e, ok := o.(*ErrorObject); ok {
 			println("Return Error: ", e.Message)
 			panic(e)
 		}
 	}
+}
+
+func evaluateFile(fileName string, realm *Realm) {
+	evaluate(mustReadFile(fileName), realm)
 }
 
 func readDir(dir string) []string {
@@ -63,7 +67,7 @@ func readDir(dir string) []string {
 func testDataView(realm *Realm) {
 	dataViewDir := "./test262/test/built-ins/DataView/"
 	f := makeTest262Path(dataViewDir + "constructor.js")
-	evaluate(f, realm)
+	evaluateFile(f, realm)
 }
 
 func testTypedArray(realm *Realm) {
@@ -76,7 +80,7 @@ func testTypedArray(realm *Realm) {
 		d := typedArrayDir + subdir
 		for _, f := range readDir(makeTest262Path(d)) {
 			println("Testing file: ", f)
-			evaluate(f, realm)
+			evaluateFile(f, realm)
 		}
 	}
 }
@@ -92,7 +96,7 @@ func testSharedArrayBuffer(realm *Realm) {
 	for _, f := range files {
 		f = makeTest262Path(path.Join(sharedArrayBufferDir, f))
 		println("Testing file: ", f)
-		evaluate(f, realm)
+		evaluateFile(f, realm)
 	}
 }
 
@@ -122,7 +126,7 @@ func testTypedArrayName(realm *Realm) {
 			d := typedArrayConstructorDir + "/" + name
 			f := makeTest262Path(d + "/" + fileName)
 			println("Testing file: ", f)
-			evaluate(f, realm)
+			evaluateFile(f, realm)
 		}
 	}
 }
@@ -140,7 +144,7 @@ func testBoolean(realm *Realm) {
 		}
 		f := makeTest262Path(boolDir + entry.Name())
 		println("BOOLEAN: Testing file: ", entry.Name())
-		evaluate(f, realm)
+		evaluateFile(f, realm)
 	}
 }
 
@@ -153,7 +157,7 @@ func testArray(realm *Realm) {
 		d := arrayDir + subdir
 		for _, f := range readDir(makeTest262Path(d)) {
 			println("Testing file: ", f)
-			evaluate(f, realm)
+			evaluateFile(f, realm)
 		}
 	}
 }

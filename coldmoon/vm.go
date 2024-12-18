@@ -1369,10 +1369,17 @@ func (vm *VM) Run(executable *Executable) CompletionValue {
 	for vm.ip < len(executable.Instructions) {
 		i := executable.Instructions[vm.ip]
 		vm.execute(i)
-		if vm.agent.exception != nil && !vm.exceptionJumpTargetStack.IsEmpty() {
-			vm.exception = vm.agent.exception
-			vm.agent.exception = nil
-			vm.ip = vm.exceptionJumpTargetStack.Peek()
+		if vm.agent.exception != nil {
+			if !vm.exceptionJumpTargetStack.IsEmpty() {
+				vm.exception = vm.agent.exception
+				vm.agent.exception = nil
+				vm.ip = vm.exceptionJumpTargetStack.Peek()
+			} else {
+				// exception unhandled
+				vm.exception = vm.agent.exception
+				vm.agent.exception = nil
+				break
+			}
 		}
 		if _, ok := i.(*IReturn); ok {
 			return NewCompletionReturnValue(vm.result)

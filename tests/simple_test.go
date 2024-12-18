@@ -12,8 +12,19 @@ func testSource(t *testing.T, s string) {
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	sourceText := s
-	script := ParseScript(sourceText, realm, nil)
-	_ = script.Evaluate()
+	evaluate(`
+function assert(a, msg) {
+	if (a) {
+		return;
+	}
+	if (msg) {
+		throw new Error('assertion failed: ' + msg);
+	} else {
+		throw new Error('assertion failed');
+	}
+}
+`, realm)
+	evaluate(sourceText, realm)
 	Debug.Disable()
 }
 
@@ -21,7 +32,7 @@ func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`const a = {};
 const b = a?.b ?? 1;
-b`,
+assert(b === 1, 'b should be 1')`,
 		`
 class ValidatorClass {
   get [Symbol.toStringTag]() {

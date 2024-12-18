@@ -101,7 +101,7 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Val
 	if result.Type == CompletionTypeReturn {
 		return result.Data()
 	}
-	return nil
+	return UndefinedValue
 }
 
 // 10.2.1.1
