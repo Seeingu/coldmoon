@@ -40,7 +40,8 @@ class ValidatorClass {
   }
 }
 const v = new ValidatorClass();
-Object.prototype.toString.call(v);`,
+assert(Object.prototype.toString.call(v) === '[object Validator]', 'should be [object Validator]');
+`,
 		`const sab = new SharedArrayBuffer(1024);
 const ta = new Uint8Array(sab);
 ta[0] = 5; // 5

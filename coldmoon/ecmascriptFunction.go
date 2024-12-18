@@ -550,7 +550,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 	}
 
 	F.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-		Value:        (proto).ToValue(),
+		Value:        proto.ToValue(),
 		Writable:     writable,
 		Enumerable:   false,
 		Configurable: false,

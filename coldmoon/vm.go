@@ -805,7 +805,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 	for _, classElement := range elements {
 		var err error
 		var result classEvaluationResult
-		if ClassElementIsStatic(classElement) {
+		if !ClassElementIsStatic(classElement) {
 			result, err = vm.ClassElementEvaluation(classElement, proto)
 		} else {
 			result, err = vm.ClassElementEvaluation(classElement, function)
@@ -1377,7 +1377,6 @@ func (vm *VM) Run(executable *Executable) CompletionValue {
 			} else {
 				// exception unhandled
 				vm.exception = vm.agent.exception
-				vm.agent.exception = nil
 				break
 			}
 		}
