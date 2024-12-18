@@ -1,6 +1,6 @@
 package coldmoon
 
 type PrivateMethodDefinition struct {
-	PrivateName    *PrivateName
+	PrivateName    PrivateName
 	PrivateElement *PrivateElement
 }

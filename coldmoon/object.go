@@ -19,6 +19,7 @@ type Data struct {
 	agent           *Agent
 	internalMethods InternalMethods
 	propertyStorage PropertyStorage
+	privateElements map[PrivateName]*PrivateElement
 }
 
 type Object struct {
@@ -404,24 +405,57 @@ func (o *Object) DefineField(field *ClassFieldDefinition) {
 	}
 }
 
+func (o *Object) PrivateElementFind(privateName PrivateName) *PrivateElement {
+	return o.data.privateElements[privateName]
+}
+
+// 7.3.26
+func (o *Object) PrivateMethodOrAccessorAdd(
+	privateName PrivateName,
+	method *PrivateElement,
+) {
+	Assert(method.Kind == PrivateElementKindMethod || method.Kind == PrivateElementKindAccessor)
+	o.Agent().HostHooks.HostEnsureCanAddPrivateElement()
+	entry := o.PrivateElementFind(privateName)
+	if entry != nil {
+		panic("TypeError")
+	}
+	o.data.privateElements[privateName] = method
+}
+
+// 7.3.30
+func (o *Object) PrivateGet(privateName PrivateName) Value {
+	entry := o.PrivateElementFind(privateName)
+	if entry == nil {
+		return o.Agent().ThrowTypeError("PrivateGet failed")
+	}
+	switch entry.Kind {
+	case PrivateElementKindField:
+		return entry.Value
+	case PrivateElementKindMethod:
+		return entry.Value
+	case PrivateElementKindAccessor:
+		getter := entry.Get
+		if getter == nil {
+			return o.Agent().ThrowTypeError("PrivateGet failed: getter is nil")
+		}
+		return getter.ToValue().Call(o.ToValue(), []Value{})
+	}
+	panic("unreachable")
+}
+
 // MARK: - InitializeInstanceElements
 
 func (o *Object) InitializeInstanceElements(constructor ObjectType) {
 	methods := constructor.(InternalSlotPrivateMethods).PrivateMethods()
 	for _, method := range methods {
-		o.PrivateMethodOrAccessorAdd(method.PrivateElement)
+		o.PrivateMethodOrAccessorAdd(method.PrivateName, method.PrivateElement)
 	}
 
 	fields := constructor.(InternalSlotFields).Fields()
 	for _, field := range fields {
 		o.DefineField(field)
 	}
-}
-
-func (o *Object) PrivateMethodOrAccessorAdd(method *PrivateElement) {
-	Assert(method.Kind == PrivateElementKindMethod || method.Kind == PrivateElementKindAccessor)
-	o.Agent().HostHooks.HostEnsureCanAddPrivateElement()
-	// TODO
 }
 
 // MARK: - Object Constructor

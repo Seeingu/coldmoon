@@ -3741,7 +3741,7 @@ func (d *AsyncGeneratorDeclaration) instantiateAsyncGeneratorFunctionObject(agen
 		env,
 		privateEnv,
 	)
-	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	SetFunctionName(function, NewStringPropertyKey(string(name)), "")
 	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
 	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
 		Value:        (prototype).ToValue(),
@@ -3872,7 +3872,26 @@ func (c *ClassBody) ConstructorMethod() *MethodDefinition {
 }
 
 func (c *ClassBody) PrivateBoundIdentifiers() (l []PrivateIdentifierName) {
-	// TODO
+	var propertyName PropertyName
+	for _, item := range c.ClassElementList.Items {
+		switch i := item.(type) {
+		case *ClassElementStaticBlock, *ClassElementEmpty:
+			// ignore
+		case *ClassElementMethodDefinition:
+			propertyName = i.MethodDefinition.PropertyName
+		case *ClassElementStaticMethodDefinition:
+			propertyName = i.MethodDefinition.PropertyName
+		case *ClassElementFieldDefinition:
+			propertyName = i.FieldDefinition.PropertyName
+		case *ClassElementStaticFieldDefinition:
+			propertyName = i.FieldDefinition.PropertyName
+		}
+	}
+	switch p := propertyName.(type) {
+	case *PropertyNameLiteralIdentifier:
+		l = append(l, PrivateIdentifierName(p.Identifier))
+	}
+
 	return
 }
 
@@ -4081,11 +4100,22 @@ type LexicalBinding struct {
 }
 
 func (l *LexicalBinding) Bytecode(e *Executable, c *BytecodeContext) {
-	variableDecl := &VariableDeclaration{
-		BindingIdentifier: l.Identifier,
-		Initializer:       l.Initializer,
+	if l.Initializer == nil {
+		panic("unimplemented: bindingidentifier")
+	} else {
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(&IResolveBinding{
+			Name:   l.Identifier,
+			Strict: c.containedInStrictCode,
+		})
+
+		l.Initializer.Bytecode(e, c)
+		if ExpressionAnalyze(l.Initializer, AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		e.AddInstruction(&IInitializeReferencedBinding{})
+		e.AddInstruction(InsStore)
 	}
-	variableDecl.Bytecode(e, c)
 }
 
 func (l *LexicalBinding) String() string {

@@ -22,7 +22,7 @@ func GetIdentifierReference(env EnvironmentRecord, name string, strict bool) *Re
 	if env == nil {
 		return NewReferenceRecord(
 			&ReferenceRecordBaseUnresolvable{},
-			&ReferencedNameString{String: name},
+			&ReferencedName{String: name},
 			strict,
 			nil,
 		)
@@ -32,7 +32,7 @@ func GetIdentifierReference(env EnvironmentRecord, name string, strict bool) *Re
 	if exists {
 		return NewReferenceRecord(
 			&ReferenceRecordBaseEnvironment{Environment: env},
-			&ReferencedNameString{String: name},
+			&ReferencedName{String: name},
 			strict,
 			nil,
 		)

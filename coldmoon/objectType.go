@@ -33,6 +33,8 @@ type ObjectType interface {
 	Prototype() ObjectType
 	Extensible() bool
 	SpeciesConstructor(defaultConstructor ObjectType) CompletionObject
+	PrivateMethodOrAccessorAdd(privateName PrivateName, method *PrivateElement)
+	PrivateGet(privateName PrivateName) Value
 	ToCompletion() CompletionValue
 	ToValue() Value
 	String() string
@@ -40,6 +42,10 @@ type ObjectType interface {
 }
 
 func ObjectIs[O ObjectType](o ObjectType) bool {
-	_, ok := o.(O)
+	_, ok := o.Ref().(O)
 	return ok
+}
+
+func ObjectAs[O ObjectType](o ObjectType) O {
+	return o.Ref().(O)
 }

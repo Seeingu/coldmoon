@@ -19,8 +19,17 @@ func testSource(t *testing.T, s string) {
 
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
+		`const a = {};
+const b = a?.b;`,
 		`
-const sab = new SharedArrayBuffer(1024);
+class ValidatorClass {
+  get [Symbol.toStringTag]() {
+    return 'Validator';
+  }
+}
+const v = new ValidatorClass();
+Object.prototype.toString.call(v);`,
+		`const sab = new SharedArrayBuffer(1024);
 const ta = new Uint8Array(sab);
 ta[0] = 5; // 5
 ta[123] = 12;
@@ -78,8 +87,6 @@ let c = a + b + b;
 c += a + b;
 a ? b : c;
 var d = 1 ?	2 : 3;`,
-		`const a = {};
-const b = a?.b;`,
 		"``",
 		`class A {
 	static sa = 'a';

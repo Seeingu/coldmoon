@@ -88,6 +88,14 @@ func (i *IPopReference) String() string {
 	return "IPopReference"
 }
 
+type IInitializeReferencedBinding struct {
+	Instruction
+}
+
+func (i *IInitializeReferencedBinding) String() string {
+	return "IInitializeReferencedBinding"
+}
+
 // MARK: - Exception
 
 type IPopExceptionJumpTarget struct {

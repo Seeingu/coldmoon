@@ -17,38 +17,21 @@ type ReferenceRecordBaseUnresolvable struct {
 	ReferenceRecordBase
 }
 
-type ReferencedName interface {
-	_isRefName()
+// ReferencedName Enum
+type ReferencedName struct {
+	String      string
+	Symbol      *SymbolValue
+	PrivateName *PrivateName
 }
-
-type ReferencedNameString struct {
-	ReferencedName
-	String string
-}
-
-func (r *ReferencedNameString) _isRefName() {}
-
-type ReferencedNameSymbol struct {
-	ReferencedName
-	Symbol *SymbolValue
-}
-
-func (r *ReferencedNameSymbol) _isRefName() {}
-
-type ReferencedNamePrivateName struct {
-	ReferencedName
-}
-
-func (r *ReferencedNamePrivateName) _isRefName() {}
 
 type ReferenceRecord struct {
 	Base           ReferenceRecordBase
-	ReferencedName ReferencedName
+	ReferencedName *ReferencedName
 	Strict         bool
 	ThisValue      Value
 }
 
-func NewReferenceRecord(base ReferenceRecordBase, referencedName ReferencedName, strict bool, thisValue Value) *ReferenceRecord {
+func NewReferenceRecord(base ReferenceRecordBase, referencedName *ReferencedName, strict bool, thisValue Value) *ReferenceRecord {
 	return &ReferenceRecord{
 		Base:           base,
 		ReferencedName: referencedName,
@@ -81,8 +64,7 @@ func (r *ReferenceRecord) IsSuperReference() bool {
 
 // 6.2.5.4
 func (r *ReferenceRecord) IsPrivateReference() bool {
-	_, ok := r.ReferencedName.(*ReferencedNamePrivateName)
-	return ok
+	return r.ReferencedName.PrivateName != nil
 }
 
 // 6.2.5.5
@@ -93,22 +75,21 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 	if r.IsPropertyReference() {
 		baseObj := MustGetObject(r.Base.(*ReferenceRecordBaseValue).Value)
 		if r.IsPrivateReference() {
-			panic("implement me")
+			return baseObj.PrivateGet(*r.ReferencedName.PrivateName)
 		}
 
 		var propKey PropertyKey
-		switch referencedName := r.ReferencedName.(type) {
-		case *ReferencedNameString:
-			propKey = NewStringPropertyKey(referencedName.String)
-		case *ReferencedNameSymbol:
-			propKey = NewSymbolPropertyKey(referencedName.Symbol)
-		case *ReferencedNamePrivateName:
+		if r.ReferencedName.PrivateName != nil {
 			panic("unreachable")
+		} else if r.ReferencedName.Symbol != nil {
+			propKey = NewSymbolPropertyKey(r.ReferencedName.Symbol)
+		} else {
+			propKey = NewStringPropertyKey(r.ReferencedName.String)
 		}
 		return baseObj.InternalMethods().Get(baseObj, propKey, r.GetThisValue())
 	} else {
 		base := r.Base.(*ReferenceRecordBaseEnvironment)
-		name := r.ReferencedName.(*ReferencedNameString).String
+		name := r.ReferencedName.String
 		c := base.Environment.GetBindingValue(agent, name, r.Strict)
 		return c.Data()
 	}
@@ -121,7 +102,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 			panic("ReferenceError")
 		}
 		globalObj := agent.GetGlobalObject()
-		globalObj.Set(NewStringPropertyKey(r.ReferencedName.(*ReferencedNameString).String), value, setThrowTypeIgnore)
+		globalObj.Set(NewStringPropertyKey(r.ReferencedName.String), value, setThrowTypeIgnore)
 		return
 	}
 
@@ -133,13 +114,12 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 		}
 
 		var referencedName PropertyKey
-		switch rn := r.ReferencedName.(type) {
-		case *ReferencedNameString:
-			referencedName = NewStringPropertyKey(rn.String)
-		case *ReferencedNameSymbol:
-			referencedName = NewSymbolPropertyKey(rn.Symbol)
-		case *ReferencedNamePrivateName:
+		if r.ReferencedName.PrivateName != nil {
 			panic("unreachable")
+		} else if r.ReferencedName.Symbol != nil {
+			referencedName = NewSymbolPropertyKey(r.ReferencedName.Symbol)
+		} else {
+			referencedName = NewStringPropertyKey(r.ReferencedName.String)
 		}
 
 		succeeded := baseObj.InternalMethods().Set(
@@ -154,7 +134,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 	}
 
 	base := r.Base.(*ReferenceRecordBaseEnvironment)
-	referencedName := r.ReferencedName.(*ReferencedNameString).String
+	referencedName := r.ReferencedName.String
 	base.Environment.SetMutableBinding(referencedName, value, r.Strict)
 }
 
@@ -173,5 +153,5 @@ func (r *ReferenceRecord) InitializeReferencedBinding(value Value) {
 	Assert(!r.IsUnresolvableReference())
 
 	base := r.Base.(*ReferenceRecordBaseEnvironment).Environment
-	base.InitializeBinding(r.ReferencedName.(*ReferencedNameString).String, value)
+	base.InitializeBinding(r.ReferencedName.String, value)
 }

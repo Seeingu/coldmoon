@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/samber/lo"
+
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
@@ -84,10 +86,9 @@ func (vm *VM) execute(i Instruction) {
 
 		if !vm.referenceStack.IsEmpty() {
 			ref := vm.referenceStack.Peek()
-			refName, ok := ref.ReferencedName.(*ReferencedNameString)
+			refName := ref.ReferencedName.String
 			if ref.IsPropertyReference() &&
-				ok &&
-				refName.String == "eval" &&
+				refName == "eval" &&
 				pkg.FuncEqual(function.(*ObjectValue).Object, eval) {
 				vm.result = directEval(vm.agent, arguments, strict)
 				return
@@ -247,18 +248,18 @@ func (vm *VM) execute(i Instruction) {
 		Assert(baseValue != nil)
 		propertyKey := ToPropertyKey(vm.agent, propertyNameValue)
 
-		var referencedName ReferencedName
+		var referencedName *ReferencedName
 		switch p := propertyKey.(type) {
 		case StringPropertyKey:
-			referencedName = &ReferencedNameString{
+			referencedName = &ReferencedName{
 				String: p.Value,
 			}
 		case SymbolPropertyKey:
-			referencedName = &ReferencedNameSymbol{
+			referencedName = &ReferencedName{
 				Symbol: p.Value,
 			}
 		case IntegerIndexPropertyKey:
-			referencedName = &ReferencedNameString{
+			referencedName = &ReferencedName{
 				String: strconv.Itoa(int(p.Value)),
 			}
 		}
@@ -276,7 +277,7 @@ func (vm *VM) execute(i Instruction) {
 		propertyNameString := ins.Name
 		strict := ins.Strict
 		baseValue := vm.stackPop()
-		referencedName := &ReferencedNameString{
+		referencedName := &ReferencedName{
 			String: string(propertyNameString),
 		}
 		reference := &ReferenceRecord{
@@ -385,6 +386,7 @@ func (vm *VM) execute(i Instruction) {
 		vm.result = applyStringOrNumericBinaryOperator(
 			vm.agent, left, right, operator,
 		)
+		// EvaluateNew
 	case *INew:
 		argumentCount := ins.ArgumentCount
 		arguments := make([]Value, argumentCount)
@@ -436,13 +438,12 @@ func (vm *VM) execute(i Instruction) {
 
 			baseObj := ValueToObject(agent, ref.Base.(*ReferenceRecordBaseValue).Value)
 			var referencedName PropertyKey
-			switch refName := ref.ReferencedName.(type) {
-			case *ReferencedNameString:
-				referencedName = NewStringPropertyKey(refName.String)
-			case *ReferencedNameSymbol:
-				referencedName = NewSymbolPropertyKey(refName.Symbol)
-			default:
+			if ref.ReferencedName.PrivateName != nil {
 				panic("unreachable")
+			} else if ref.ReferencedName.Symbol != nil {
+				referencedName = NewSymbolPropertyKey(ref.ReferencedName.Symbol)
+			} else {
+				referencedName = NewStringPropertyKey(ref.ReferencedName.String)
 			}
 			deleteStatus := baseObj.InternalMethods().Delete(baseObj, referencedName)
 			if !deleteStatus && ref.Strict {
@@ -451,7 +452,7 @@ func (vm *VM) execute(i Instruction) {
 			vm.result = NewBooleanValue(deleteStatus)
 		} else {
 			base := ref.Base.(*ReferenceRecordBaseEnvironment)
-			referencedName := ref.ReferencedName.(*ReferencedNameString).String
+			referencedName := ref.ReferencedName.String
 			deleteStatus := base.Environment.DeleteBinding(referencedName)
 			vm.result = NewBooleanValue(deleteStatus)
 		}
@@ -618,6 +619,10 @@ func (vm *VM) execute(i Instruction) {
 		vm.envStack.Push(vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment)
 	case *IPopLexicalEnvironment:
 		vm.envStack.Pop()
+	case *IInitializeReferencedBinding:
+		ref := vm.referenceStack.Pop()
+		value := vm.result
+		ref.InitializeReferencedBinding(value)
 	}
 }
 
@@ -630,11 +635,18 @@ func (vm *VM) getSuperConstructor() Value {
 	return superConstructor.ToValue()
 }
 
-// 15.7.3
-func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) (classFieldDefinition *ClassFieldDefinition, staticBlockDefinition *ClassStaticBlockDefinition, err error) {
+// classEvaluationResult enum
+type classEvaluationResult struct {
+	classFieldDefinition    *ClassFieldDefinition
+	staticBlockDefinition   *ClassStaticBlockDefinition
+	privateMethodDefinition *PrivateMethodDefinition
+}
+
+// 15.7.13
+func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) (result classEvaluationResult, err error) {
 	switch ce := classElement.(type) {
 	case *ClassElementStaticBlock:
-		staticBlockDefinition = vm.ClassStaticBlockDefinitionEvaluation(ce, object)
+		result.staticBlockDefinition = vm.ClassStaticBlockDefinitionEvaluation(ce, object)
 		return
 	case *ClassElementFieldDefinition, *ClassElementStaticFieldDefinition:
 		var fieldDefinition *FieldDefinition
@@ -643,7 +655,7 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 		} else {
 			fieldDefinition = ce.(*ClassElementStaticFieldDefinition).FieldDefinition
 		}
-		classFieldDefinition = vm.ClassFieldDefinitionEvaluation(fieldDefinition, object)
+		result.classFieldDefinition = vm.ClassFieldDefinitionEvaluation(fieldDefinition, object)
 		return
 	case *ClassElementStaticMethodDefinition, *ClassElementMethodDefinition:
 		var methodDefinition *MethodDefinition
@@ -653,7 +665,7 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 			methodDefinition = ce.(*ClassElementMethodDefinition).MethodDefinition
 		}
 		propertyName := GenerateAndRunBytecode(vm.agent, methodDefinition.PropertyName)
-		vm.MethodDefinitionEvaluation(methodDefinitionArgs{
+		result.privateMethodDefinition = vm.MethodDefinitionEvaluation(methodDefinitionArgs{
 			PropertyName:       propertyName.Data(),
 			FunctionExpression: methodDefinition.FunctionExpression,
 			MethodType:         methodDefinition.Type,
@@ -679,7 +691,18 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 	classPrivateEnvironment := NewPrivateEnvironment(outerPrivateEnvironment)
 
 	if len(classTail.ClassBody.ClassElementList.Items) > 0 {
-		// TODO
+		privateBoundIdentifiers := classTail.ClassBody.PrivateBoundIdentifiers()
+		for _, privateBoundIdentifier := range privateBoundIdentifiers {
+			names := lo.Map(classPrivateEnvironment.Names, func(item PrivateName, index int) string {
+				return item.Symbol.Description
+			})
+			if lo.Contains(names, string(privateBoundIdentifier)) {
+			} else {
+				classPrivateEnvironment.Names = append(classPrivateEnvironment.Names, PrivateName{
+					Symbol: agent.CreateSymbol(string(privateBoundIdentifier)),
+				})
+			}
+		}
 	}
 
 	var protoParent ObjectType
@@ -717,11 +740,11 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 		var defaultConstructor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 			args := arguments
 			if newTarget == nil {
-				panic("TypeError: newTarget is nil")
+				return agent.ThrowTypeError("class must be invoked with 'new'")
 			}
 
 			F := agent.ActiveFunctionObject()
-			classConstructorFields := F.(*BuiltinFunction).AdditionalFields.ClassConstructorFields
+			classConstructorFields := ObjectAs[*BuiltinFunction](F).AdditionalFields.ClassConstructorFields
 			var result ObjectType
 			if classConstructorFields.ConstructorKind == ConstructorKindDerived {
 				fun := function.InternalMethods().GetPrototypeOf(function)
@@ -771,33 +794,77 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 
 	elements := classTail.ClassBody.NonConstructorElements()
 
+	instancePrivateMethods := &pkg.Stack[*PrivateMethodDefinition]{}
+	staticPrivateMethods := &pkg.Stack[*PrivateMethodDefinition]{}
+
 	instanceFields := make([]*ClassFieldDefinition, 0)
 
 	staticClassFields := make([]*ClassFieldDefinition, 0)
 	staticStaticBlocks := make([]*ClassStaticBlockDefinition, 0)
 
 	for _, classElement := range elements {
-		var classFieldDefinition *ClassFieldDefinition
-		var staticBlockDefinition *ClassStaticBlockDefinition
 		var err error
+		var result classEvaluationResult
 		if ClassElementIsStatic(classElement) {
-			classFieldDefinition, staticBlockDefinition, err = vm.ClassElementEvaluation(classElement, proto)
+			result, err = vm.ClassElementEvaluation(classElement, proto)
 		} else {
-			classFieldDefinition, staticBlockDefinition, err = vm.ClassElementEvaluation(classElement, function)
+			result, err = vm.ClassElementEvaluation(classElement, function)
 		}
 		if err != nil {
 			agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 			agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
-		} else if classFieldDefinition != nil {
+			panic(err)
+		}
+		if result.classFieldDefinition != nil {
 			if !ClassElementIsStatic(classElement) {
-				instanceFields = append(instanceFields, classFieldDefinition)
+				instanceFields = append(instanceFields, result.classFieldDefinition)
 			} else {
-				staticClassFields = append(staticClassFields, classFieldDefinition)
+				staticClassFields = append(staticClassFields, result.classFieldDefinition)
 			}
-		} else if staticBlockDefinition != nil {
-			staticStaticBlocks = append(staticStaticBlocks, staticBlockDefinition)
-		} else {
-			panic("unreachable")
+		} else if result.staticBlockDefinition != nil {
+			staticStaticBlocks = append(staticStaticBlocks, result.staticBlockDefinition)
+		} else if result.privateMethodDefinition != nil {
+			pme := result.privateMethodDefinition
+			Assert(pme.PrivateElement.Kind == PrivateElementKindMethod || pme.PrivateElement.Kind == PrivateElementKindAccessor)
+			var container *pkg.Stack[*PrivateMethodDefinition]
+			if !ClassElementIsStatic(classElement) {
+				container = instancePrivateMethods
+			} else {
+				container = staticPrivateMethods
+			}
+
+			element := pme.PrivateElement
+			var found bool
+			for i, pe := range container.Data() {
+				if pe.PrivateElement.Key.Equal(element.Key) {
+					found = true
+					Assert(
+						pe.PrivateElement.Kind == PrivateElementKindAccessor &&
+							pe.PrivateElement.Kind == element.Kind)
+					var combined *PrivateElement
+					if element.Get == nil {
+						combined = &PrivateElement{
+							Key:  element.Key,
+							Kind: PrivateElementKindAccessor,
+							Set:  element.Set,
+							Get:  pe.PrivateElement.Get,
+						}
+					} else {
+						combined = &PrivateElement{
+							Key:  element.Key,
+							Kind: PrivateElementKindAccessor,
+							Set:  pe.PrivateElement.Set,
+							Get:  element.Get,
+						}
+					}
+					container.Data()[i] = &PrivateMethodDefinition{
+						PrivateElement: combined,
+					}
+				}
+			}
+			if !found {
+				container.Push(pme)
+			}
 		}
 	}
 
@@ -806,13 +873,21 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 		classEnv.InitializeBinding(classBinding, function.ToValue())
 	}
 
-	function.(InternalSlotFields).SetFields(instanceFields)
+	if ObjectIs[*ECMAScriptFunction](function) {
+		e := ObjectAs[*ECMAScriptFunction](function)
+		e.privateMethods = instancePrivateMethods.Data()
+		function.(InternalSlotFields).SetFields(instanceFields)
+	}
 
+	for _, method := range staticPrivateMethods.Data() {
+		function.PrivateMethodOrAccessorAdd(
+			method.PrivateName, method.PrivateElement)
+	}
 	for _, element := range staticClassFields {
 		function.DefineField(element)
 	}
 	for _, block := range staticStaticBlocks {
-		CallAssumeCallableNoArgs(block.BodyFunction.ToValue(), function.ToValue())
+		block.BodyFunction.ToValue().Call(function.ToValue(), nil)
 	}
 
 	agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
@@ -835,7 +910,7 @@ func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *DeclarationCla
 		}
 
 		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		vm.InitializeBoundName(className, (value).ToValue(), env)
+		vm.InitializeBoundName(className, value.ToValue(), env)
 		return value
 	} else {
 		value := vm.ClassDefinitionEvaluation(classDeclaration.ClassTail, "", "default")
@@ -1123,12 +1198,12 @@ type methodDefinitionArgs struct {
 }
 
 // 15.4.5
-func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, object ObjectType, enumerable bool) *PrivateElement {
+func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, object ObjectType, enumerable bool) *PrivateMethodDefinition {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	functionExpression := methodDefinition.FunctionExpression
 	methodType := methodDefinition.MethodType
-	propertyName := vm.stack.Pop()
+	propertyName := methodDefinition.PropertyName
 	switch methodType {
 	case MethodDefinitionTypeMethod:
 		methodDef := DefineMethod(
@@ -1147,8 +1222,8 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 		sourceText := functionExpression.SourceText
 		formalParameterList := &FormalParameters{}
 		closure := OrdinaryFunctionCreate(
-			vm.agent,
-			vm.agent.CurrentRealm().Intrinsics.FunctionPrototype,
+			agent,
+			agent.CurrentRealm().Intrinsics.FunctionPrototype,
 			sourceText,
 			formalParameterList,
 			functionExpression.Body,
@@ -1158,13 +1233,15 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 		)
 		MakeMethod(closure, object)
 
-		propKey := ToPropertyKey(vm.agent, propertyName)
+		propKey := ToPropertyKey(agent, propertyName)
 		SetFunctionName(closure, propKey, "get")
 		if _, ok := GetPrivateName(agent, propKeyOrPrivateName); ok {
-			return &PrivateElement{
-				Get:  closure,
-				Kind: PrivateElementKindAccessor,
-				Set:  nil,
+			return &PrivateMethodDefinition{
+				PrivateElement: &PrivateElement{
+					Get:  closure,
+					Kind: PrivateElementKindAccessor,
+					Set:  nil,
+				},
 			}
 		} else {
 			desc := &PropertyDescriptor{
@@ -1195,10 +1272,12 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 		MakeMethod(closure, object)
 		SetFunctionName(closure, propKey, "set")
 		if _, ok := GetPrivateName(agent, propKeyOrPrivateName); ok {
-			return &PrivateElement{
-				Get:  nil,
-				Kind: PrivateElementKindAccessor,
-				Set:  closure,
+			return &PrivateMethodDefinition{
+				PrivateElement: &PrivateElement{
+					Get:  nil,
+					Kind: PrivateElementKindAccessor,
+					Set:  closure,
+				},
 			}
 		} else {
 			desc := &PropertyDescriptor{
@@ -1317,7 +1396,7 @@ func evaluateCall(agent *Agent, function Value, this Value, arguments []Value) V
 	if !IsCallable(function) {
 		panic("TypeError: function is not callable")
 	}
-	return function.CallAssumeCallable(this, arguments)
+	return function.Call(this, arguments)
 }
 
 func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
