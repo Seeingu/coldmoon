@@ -886,13 +886,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "now", now, 0, realm)
 	DefineBuiltinFunction(object, "parse", parse, 1, realm)
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        realm.Intrinsics.DatePrototype.ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.DatePrototype, "constructor", object.ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.DatePrototype, object)
 
 	return object
 }

@@ -260,14 +260,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (NewRegExpPrototype(realm)).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.RegExpPrototype, "constructor", (object).ToValue())
-
+	BindPrototypeAndConstructor(realm.Intrinsics.RegExpPrototype, object)
 	return object
 }
 

@@ -10,12 +10,7 @@ func NewAsyncGeneratorPrototype(realm *Realm) ObjectType {
 		Configurable: true,
 	})
 
-	DefineBuiltinPropertyP(object, "@@toStringTag", &PropertyDescriptor{
-		Value:        NewStringValue("AsyncGenerator"),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	DefineToStringTagBuiltinProperty(object, "AsyncGenerator")
 
 	return object
 }

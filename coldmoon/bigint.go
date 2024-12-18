@@ -181,16 +181,7 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.BigIntPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-
-	DefineBuiltinPropertyV(realm.Intrinsics.BigIntPrototype, "constructor",
-		(object).ToValue(),
-	)
+	BindPrototypeAndConstructor(realm.Intrinsics.BigIntPrototype, object)
 
 	return object
 }

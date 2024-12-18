@@ -377,14 +377,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.PromisePrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.PromisePrototype, "constructor", (object).ToValue())
-
+	BindPrototypeAndConstructor(realm.Intrinsics.PromisePrototype, object)
 	return object
 }
 

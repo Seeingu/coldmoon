@@ -427,12 +427,6 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "isInteger", isInteger, 1, realm)
 	DefineBuiltinFunction(object, "isNaN", isNaN, 1, realm)
 	DefineBuiltinFunction(object, "isSafeInteger", isSafeInteger, 1, realm)
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.NumberPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
 	DefineBuiltinPropertyP(object, "EPSILON", &PropertyDescriptor{
 		Value:        NewNumberValue(2.220446049250313e-16),
 		Writable:     false,
@@ -484,8 +478,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 	DefineBuiltinPropertyV(object, "parseFloat", (realm.Intrinsics.ParseFloat).ToValue())
 	DefineBuiltinPropertyV(object, "parseInt", (realm.Intrinsics.ParseInt).ToValue())
 
-	DefineBuiltinPropertyV(realm.Intrinsics.NumberPrototype, "constructor", (object).ToValue())
-
+	BindPrototypeAndConstructor(realm.Intrinsics.NumberPrototype, object)
 	return object
 }
 

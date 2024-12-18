@@ -262,13 +262,6 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "isArray", isArray, 1, realm)
 	DefineBuiltinFunction(object, "of", of, 0, realm)
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        realm.Intrinsics.ArrayPrototype.ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-
 	// 23.1.2.5
 	var getter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		return this
@@ -277,7 +270,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 		Getter:              getter,
 	})
-	DefineBuiltinPropertyV(realm.Intrinsics.ArrayPrototype, "constructor", object.ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.ArrayPrototype, object)
 
 	return object
 }

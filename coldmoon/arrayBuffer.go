@@ -270,10 +270,7 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		prototype:     realm.Intrinsics.FunctionPrototype,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value: (realm.Intrinsics.ArrayBufferPrototype).ToValue(),
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.ArrayBufferPrototype, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.ArrayBufferPrototype, object)
 
 	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
 		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {

@@ -64,13 +64,7 @@ func NewMapConstructor(realm *Realm) ObjectType {
 		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.MapPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.MapPrototype, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.MapPrototype, object)
 
 	return object
 }

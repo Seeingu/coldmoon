@@ -637,14 +637,6 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return obj
 	}
 
-	// 20.1.2.21
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.ObjectPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-
 	// 20.1.2.22
 	var seal BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
@@ -808,8 +800,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "assign", assign, 2, realm)
 	DefineBuiltinFunction(object, "fromEntries", fromEntries, 1, realm)
 
-	// 20.1.3.1
-	DefineBuiltinPropertyV(realm.Intrinsics.ObjectPrototype, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.ObjectPrototype, object)
 
 	return object
 }

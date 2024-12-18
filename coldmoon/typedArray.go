@@ -688,13 +688,7 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.TypedArrayPrototype).ToValue(),
-		Writable:     false,
-		Configurable: false,
-		Enumerable:   false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.TypedArrayPrototype, "constructor", object.ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.TypedArrayPrototype, object)
 
 	return object
 }
@@ -719,10 +713,7 @@ func NewTypedArrayNameConstructor(realm *Realm, name TypedArrayName) ObjectType 
 		Configurable: false,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value: (intrinsic).ToValue(),
-	})
-	DefineBuiltinPropertyV(intrinsic, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(intrinsic, object)
 
 	return object
 }

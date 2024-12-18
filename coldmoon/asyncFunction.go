@@ -23,18 +23,7 @@ func NewAsyncFunctionConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionConstructor,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.AsyncFunctionPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(realm.Intrinsics.AsyncFunctionPrototype, "constructor", &PropertyDescriptor{
-		Value:        (object).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	BindPrototypeAndConstructor(realm.Intrinsics.AsyncFunctionPrototype, object)
 
 	return object
 }

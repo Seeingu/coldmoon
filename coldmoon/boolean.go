@@ -95,14 +95,7 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 			isConstructor: true,
 		})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.BooleanPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-
-	DefineBuiltinPropertyV(realm.Intrinsics.BooleanPrototype, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.BooleanPrototype, object)
 
 	return object
 }

@@ -89,13 +89,7 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.DataViewPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.DataViewPrototype, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.DataViewPrototype, object)
 
 	return object
 }

@@ -65,14 +65,7 @@ func NewErrorConstructor(realm *Realm) ObjectType {
 		},
 	)
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.ErrorPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-
-	DefineBuiltinPropertyV(realm.Intrinsics.ErrorPrototype, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.ErrorPrototype, object)
 
 	return object
 }
@@ -183,13 +176,7 @@ func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 	})
 
 	protoName := IntrinsicName("%" + name + ".prototype%")
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.Get(protoName)).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.Get(protoName), "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.Get(protoName), object)
 
 	return object
 }
@@ -241,13 +228,7 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 		realm:     realm,
 		prototype: realm.Intrinsics.ErrorConstructor,
 	})
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.AggregateErrorPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.AggregateErrorPrototype, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.AggregateErrorPrototype, object)
 	return object
 }
 

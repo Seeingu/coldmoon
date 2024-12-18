@@ -143,13 +143,7 @@ func NewStringConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        realm.Intrinsics.StringPrototype.ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(realm.Intrinsics.StringPrototype, "constructor", object.ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.StringPrototype, object)
 
 	var fromCharCode BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		var s string

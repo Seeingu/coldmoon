@@ -45,13 +45,6 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		realm:     realm,
 	})
 
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
-		Value:        (realm.Intrinsics.SetPrototype).ToValue(),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-
 	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
 		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 			return this
@@ -59,7 +52,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 
-	DefineBuiltinPropertyV(realm.Intrinsics.SetPrototype, "constructor", (object).ToValue())
+	BindPrototypeAndConstructor(realm.Intrinsics.SetPrototype, object)
 
 	return object
 }
