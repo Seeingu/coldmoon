@@ -1,13 +1,11 @@
 package coldmoon
 
 type PropertyDescriptor struct {
-	Value Value
-	// TODO: use nullable
-	Writable   bool
-	Get        ObjectType
-	Set        ObjectType
-	Enumerable bool
-	// TODO: use nullable
+	Value        Value
+	Writable     bool
+	Get          ObjectType
+	Set          ObjectType
+	Enumerable   bool
 	Configurable bool
 }
 
@@ -47,7 +45,6 @@ func (p *PropertyDescriptor) FromPropertyDescriptor(agent *Agent, desc *Property
 		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("value"), p.Value)
 	}
 
-	// TODO: writable can be nil
 	obj.CreateDataPropertyOrThrow(NewStringPropertyKey("writable"), NewBooleanValue(p.Writable))
 
 	if p.Get != nil {

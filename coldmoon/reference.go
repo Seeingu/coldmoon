@@ -1,20 +1,34 @@
 package coldmoon
 
-type (
-	ReferenceRecordBase      interface{}
-	ReferenceRecordBaseValue struct {
-		ReferenceRecordBase
-		Value Value
-	}
-)
-
-type ReferenceRecordBaseEnvironment struct {
-	ReferenceRecordBase
-	Environment EnvironmentRecord
+// ReferenceRecordBase Enum
+type ReferenceRecordBase struct {
+	value        Value
+	env          EnvironmentRecord
+	unresolvable bool
 }
 
-type ReferenceRecordBaseUnresolvable struct {
-	ReferenceRecordBase
+func NewReferenceRecordBaseUnresolvable() *ReferenceRecordBase {
+	return &ReferenceRecordBase{unresolvable: true}
+}
+
+func NewReferenceRecordBaseValue(value Value) *ReferenceRecordBase {
+	return &ReferenceRecordBase{value: value}
+}
+
+func NewReferenceRecordBaseEnv(env EnvironmentRecord) *ReferenceRecordBase {
+	return &ReferenceRecordBase{env: env}
+}
+
+func (r *ReferenceRecordBase) Unresolvable() bool {
+	return r.unresolvable
+}
+
+func (r *ReferenceRecordBase) Env() (EnvironmentRecord, bool) {
+	return r.env, r.env != nil
+}
+
+func (r *ReferenceRecordBase) Value() (Value, bool) {
+	return r.value, r.value != nil
 }
 
 // ReferencedName Enum
@@ -25,13 +39,14 @@ type ReferencedName struct {
 }
 
 type ReferenceRecord struct {
-	Base           ReferenceRecordBase
+	// [[Base]]: Value, EnvironmentRecord, or UNRESOLVABLE
+	Base           *ReferenceRecordBase
 	ReferencedName *ReferencedName
 	Strict         bool
 	ThisValue      Value
 }
 
-func NewReferenceRecord(base ReferenceRecordBase, referencedName *ReferencedName, strict bool, thisValue Value) *ReferenceRecord {
+func NewReferenceRecord(base *ReferenceRecordBase, referencedName *ReferencedName, strict bool, thisValue Value) *ReferenceRecord {
 	return &ReferenceRecord{
 		Base:           base,
 		ReferencedName: referencedName,
@@ -42,19 +57,13 @@ func NewReferenceRecord(base ReferenceRecordBase, referencedName *ReferencedName
 
 // 6.2.5.1
 func (r *ReferenceRecord) IsPropertyReference() bool {
-	switch r.Base.(type) {
-	case *ReferenceRecordBaseUnresolvable, *ReferenceRecordBaseEnvironment:
-		return false
-	case *ReferenceRecordBaseValue:
-		return true
-	}
-	panic("unreachable")
+	_, ok := r.Base.Value()
+	return ok
 }
 
 // 6.2.5.2
 func (r *ReferenceRecord) IsUnresolvableReference() bool {
-	_, ok := r.Base.(*ReferenceRecordBaseUnresolvable)
-	return ok
+	return r.Base.Unresolvable()
 }
 
 // 6.2.5.3
@@ -73,7 +82,8 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 		panic("ReferenceError")
 	}
 	if r.IsPropertyReference() {
-		baseObj := MustGetObject(r.Base.(*ReferenceRecordBaseValue).Value)
+		value, _ := r.Base.Value()
+		baseObj := ValueToObject(agent, value)
 		if r.IsPrivateReference() {
 			return baseObj.PrivateGet(*r.ReferencedName.PrivateName)
 		}
@@ -88,9 +98,9 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 		}
 		return baseObj.InternalMethods().Get(baseObj, propKey, r.GetThisValue())
 	} else {
-		base := r.Base.(*ReferenceRecordBaseEnvironment)
+		base, _ := r.Base.Env()
 		name := r.ReferencedName.String
-		c := base.Environment.GetBindingValue(agent, name, r.Strict)
+		c := base.GetBindingValue(agent, name, r.Strict)
 		return c.Data()
 	}
 }
@@ -107,7 +117,8 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 	}
 
 	if r.IsPropertyReference() {
-		baseObj := ValueToObject(agent, r.Base.(*ReferenceRecordBaseValue).Value)
+		v, _ := r.Base.Value()
+		baseObj := ValueToObject(agent, v)
 
 		if r.IsPrivateReference() {
 			panic("implement me")
@@ -133,9 +144,9 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 		return
 	}
 
-	base := r.Base.(*ReferenceRecordBaseEnvironment)
+	env, _ := r.Base.Env()
 	referencedName := r.ReferencedName.String
-	base.Environment.SetMutableBinding(referencedName, value, r.Strict)
+	env.SetMutableBinding(referencedName, value, r.Strict)
 }
 
 // 6.2.5.7
@@ -145,13 +156,14 @@ func (r *ReferenceRecord) GetThisValue() Value {
 	if r.IsSuperReference() {
 		return r.ThisValue
 	}
-	return r.Base.(*ReferenceRecordBaseValue).Value
+	v, _ := r.Base.Value()
+	return v
 }
 
 // 6.2.5.8
 func (r *ReferenceRecord) InitializeReferencedBinding(value Value) {
 	Assert(!r.IsUnresolvableReference())
 
-	base := r.Base.(*ReferenceRecordBaseEnvironment).Environment
-	base.InitializeBinding(r.ReferencedName.String, value)
+	env, _ := r.Base.Env()
+	env.InitializeBinding(r.ReferencedName.String, value)
 }

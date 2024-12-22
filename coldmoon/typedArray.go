@@ -579,13 +579,11 @@ func TypedArrayCreateFromConstructor(
 	if len(argumentList) == 1 {
 		if n, ok := argumentList[0].(*NumberValue); ok {
 			if IsTypedArrayOutOfBounds(taRecord) {
-				// TODO: Return error object
-				// return agent.ThrowException(TypeError, "out of bounds")
-				panic("TypeError")
+				return agent.ThrowTypeExceptionObject("out of bounds")
 			}
 			length := TypedArrayLength(taRecord)
 			if length.ToNumber() < n.Data {
-				panic("TypeError")
+				return agent.ThrowTypeExceptionObject("out of bounds")
 			}
 		}
 	}

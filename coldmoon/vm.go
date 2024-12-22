@@ -120,9 +120,7 @@ func (vm *VM) execute(i Instruction) {
 		Assert(env.HasSuperBinding())
 		baseValue := env.(*FunctionEnvironment).GetSuperBase()
 		reference := &ReferenceRecord{
-			Base: &ReferenceRecordBaseValue{
-				Value: baseValue,
-			},
+			Base:           NewReferenceRecordBaseValue(baseValue),
 			ReferencedName: propertyKey.ToReference(),
 			Strict:         strict,
 			ThisValue:      actualThis,
@@ -264,9 +262,7 @@ func (vm *VM) execute(i Instruction) {
 			}
 		}
 		reference := &ReferenceRecord{
-			Base: &ReferenceRecordBaseValue{
-				Value: baseValue,
-			},
+			Base:           NewReferenceRecordBaseValue(baseValue),
 			ReferencedName: referencedName,
 			Strict:         strict,
 			ThisValue:      nil,
@@ -281,9 +277,7 @@ func (vm *VM) execute(i Instruction) {
 			String: string(propertyNameString),
 		}
 		reference := &ReferenceRecord{
-			Base: &ReferenceRecordBaseValue{
-				Value: baseValue,
-			},
+			Base:           NewReferenceRecordBaseValue(baseValue),
 			ReferencedName: referencedName,
 			Strict:         strict,
 			ThisValue:      nil,
@@ -436,7 +430,8 @@ func (vm *VM) execute(i Instruction) {
 				panic("ReferenceError: cannot delete super")
 			}
 
-			baseObj := ValueToObject(agent, ref.Base.(*ReferenceRecordBaseValue).Value)
+			v, _ := ref.Base.Value()
+			baseObj := ValueToObject(agent, v)
 			var referencedName PropertyKey
 			if ref.ReferencedName.PrivateName != nil {
 				panic("unreachable")
@@ -451,9 +446,9 @@ func (vm *VM) execute(i Instruction) {
 			}
 			vm.result = NewBooleanValue(deleteStatus)
 		} else {
-			base := ref.Base.(*ReferenceRecordBaseEnvironment)
+			base, _ := ref.Base.Env()
 			referencedName := ref.ReferencedName.String
-			deleteStatus := base.Environment.DeleteBinding(referencedName)
+			deleteStatus := base.DeleteBinding(referencedName)
 			vm.result = NewBooleanValue(deleteStatus)
 		}
 	case *IIncrement:
@@ -1412,7 +1407,7 @@ func evaluateCallGetThisValue(reference *ReferenceRecord) Value {
 	if reference.IsPropertyReference() {
 		return reference.GetThisValue()
 	}
-	refEnv := reference.Base.(*ReferenceRecordBaseEnvironment).Environment
+	refEnv, _ := reference.Base.Env()
 	if o := refEnv.WithBaseObject(); o != nil {
 		return (o).ToValue()
 	}

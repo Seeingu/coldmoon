@@ -21,7 +21,7 @@ type EnvironmentRecord interface {
 func GetIdentifierReference(env EnvironmentRecord, name string, strict bool) *ReferenceRecord {
 	if env == nil {
 		return NewReferenceRecord(
-			&ReferenceRecordBaseUnresolvable{},
+			NewReferenceRecordBaseUnresolvable(),
 			&ReferencedName{String: name},
 			strict,
 			nil,
@@ -31,7 +31,7 @@ func GetIdentifierReference(env EnvironmentRecord, name string, strict bool) *Re
 	exists := env.HasBinding(name)
 	if exists {
 		return NewReferenceRecord(
-			&ReferenceRecordBaseEnvironment{Environment: env},
+			NewReferenceRecordBaseEnv(env),
 			&ReferencedName{String: name},
 			strict,
 			nil,
