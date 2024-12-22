@@ -1,3 +1,5 @@
+github.com/Seeingu/icu4xgo v0.0.0-20241222034622-5b6a270b7c04 h1:9/liw6XgIz1RaFtX5rYR6kvbRG0YPqflVRGGZsPvJ1s=
+github.com/Seeingu/icu4xgo v0.0.0-20241222034622-5b6a270b7c04/go.mod h1:HTBUhJgJoQx1VEm6X9BTBM4uDCx9cShzdRMYXnM1Si0=
 github.com/bits-and-blooms/bitset v1.16.0 h1:G3lirLlhFTcW/7ym/SLtYYLHQS0hBOcC8fPNJxbTYm4=
 github.com/bits-and-blooms/bitset v1.16.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/bits-and-blooms/bitset v1.19.1 h1:mv2yVhy96D2CuskLPXnc58oJNMs5PCWjAZuyYU0p12M=

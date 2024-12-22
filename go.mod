@@ -1,6 +1,6 @@
 module github.com/Seeingu/coldmoon
 
-go 1.23.1
+go 1.23.4
 
 require (
 	github.com/bits-and-blooms/bitset v1.19.1
@@ -9,4 +9,7 @@ require (
 	lukechampine.com/uint128 v1.3.0
 )
 
-require golang.org/x/text v0.21.0 // indirect
+require (
+	github.com/Seeingu/icu4xgo v0.0.0-20241222034622-5b6a270b7c04 // indirect
+	golang.org/x/text v0.21.0 // indirect
+)
