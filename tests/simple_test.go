@@ -7,7 +7,7 @@ import (
 )
 
 func testSource(t *testing.T, s string) {
-	Debug.Enable()
+	//Debug.Enable()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
@@ -30,6 +30,25 @@ function assert(a, msg) {
 
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
+		// string
+		`
+const string1 = "A string primitive";
+const string2 = 'Also a string primitive';
+const string4 = new String("A String object");
+assert("cat".charAt(1) === 'a');
+assert("cat"[1] === 'a');
+const strPrim = "foo"; // A literal is a string primitive
+const strPrim2 = String(1); // Coerced into the string primitive "1"
+const strPrim3 = String(true); // Coerced into the string primitive "true"
+const strObj = new String(strPrim); // String with new returns a string wrapper object.
+
+assert(typeof strPrim === "string", "typeof: expected string");
+assert(typeof strPrim2 === "string", "typeof: expected string");
+assert(typeof strPrim3 === "string", "typeof: expected string");
+assert(typeof strObj === "object", "typeof: expected object"); 
+`,
+		// TODO: String locale compare
+		"const string3 = `Yet another string primitive`;",
 		`const a = {};
 const b = a?.b ?? 1;
 assert(b === 1, 'b should be 1')`,

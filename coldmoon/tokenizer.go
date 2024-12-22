@@ -485,6 +485,7 @@ func (t *Tokenizer) templateMiddleOrTail() Token {
 
 func (t *Tokenizer) templateHead() Token {
 	start := t.Index
+	t.Index++
 	for t.Index < t.Length {
 		ch := t.SourceText[t.Index]
 		if ch == '`' {
