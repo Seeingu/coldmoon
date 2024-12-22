@@ -494,7 +494,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		o := arguments[0]
 		properties := arguments[1]
 		if !ValueIsObject(o) {
-			panic("TypeError")
+			return agent.ThrowTypeError("is not an object")
 		}
 
 		obj := OrdinaryObjectCreate(agent, MustGetObject(o), []string{})
@@ -510,7 +510,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		o := arguments[0]
 		properties := arguments[1]
 		if !ValueIsObject(o) {
-			panic("TypeError")
+			return agent.ThrowTypeError("is not an object")
 		}
 		return (objectDefineProperties(agent, MustGetObject(o), properties)).ToValue()
 	}
@@ -520,7 +520,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		property := arguments[1]
 		attributes := arguments[2]
 		if !ValueIsObject(o) {
-			panic("TypeError")
+			return agent.ThrowTypeError("is not an object")
 		}
 
 		key := ToPropertyKey(agent, property)
@@ -661,7 +661,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 		obj, ok := objectValue.(*ObjectValue)
 		if !ok && proto != nil {
-			panic("TypeError")
+			return agent.ThrowTypeError("")
 		}
 		if !ok {
 			return obj
@@ -673,7 +673,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		status := obj.Object.InternalMethods().SetPrototypeOf(obj.Object, protoObj)
 		if !status {
-			panic("TypeError")
+			return agent.ThrowTypeError("setPrototypeOf failed")
 		}
 
 		return obj

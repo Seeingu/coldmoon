@@ -146,7 +146,6 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 	}
 
 	newWritable := false
-	// TODO: nil
 	if newLenDesc.Writable {
 		newWritable = true
 	} else {

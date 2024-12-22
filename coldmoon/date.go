@@ -14,21 +14,17 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "DatePrototype")
 	agent := realm.Agent
 
+	// 21.4.4.44
 	var valueOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		if o, ok := ValueGetObject(this); ok {
-			if date, ok := o.(*DateObject); ok {
-				return NewNumberValue(date.Data)
-			} else {
-				panic("TypeError")
-			}
-		} else {
-			panic("TypeError")
-		}
+		dateObject := RequireInternalSlot[*DateObject](this)
+		return dateObject.Data.ToValue()
 	}
+	// 21.4.4.45
+	// TODO: Refactor: make hint type safe
 	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		hintValue := args[0]
 		if !ValueIsObject(this) {
-			panic("TypeError")
+			return agent.ThrowTypeError("is not an object")
 		}
 		o := MustGetObject(this)
 		if !ValueIs[*StringValue](hintValue) {

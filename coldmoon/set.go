@@ -14,7 +14,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 	behavior := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		iterable := argumentsList[0]
 		if newTarget == nil {
-			panic("TypeError")
+			return agent.ThrowTypeError("new target is nil")
 		}
 		o := OrdinaryCreateFromConstructor(agent, newTarget, "%SetObject.prototype%", nil)
 		s := &SetObject{
@@ -27,7 +27,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		}
 		adder := s.Get(NewStringPropertyKey("add"))
 		if !IsCallable(adder) {
-			panic("TypeError")
+			return agent.ThrowTypeError("adder is not callable")
 		}
 		iteratorRecord := GetIterator(agent, iterable, IteratorKindSync)
 		for {
@@ -38,7 +38,6 @@ func NewSetConstructor(realm *Realm) ObjectType {
 			nextItem := IteratorValue(next)
 			(MustGetObject(adder)).ToValue().Call((s).ToValue(), []Value{nextItem})
 		}
-		return (s).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, "SetObject", builtinFunctionArgs{
 		prototype: realm.Intrinsics.FunctionPrototype,
@@ -62,62 +61,50 @@ func NewSetPrototype(realm *Realm) ObjectType {
 
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "SetPrototype")
 
+	// 24.2.3.2
 	var setClear BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		set := RequireInternalSlot[*SetObject](thisValue)
-		if set.SetValue == nil {
-			panic("TypeError")
-		}
 		set.SetValue.Data = make(map[Value]Value)
 		return UndefinedValue
 	}
+	// 24.2.3.4
 	var setDelete BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		if set.SetValue == nil {
-			panic("TypeError")
-		}
 		delete(set.SetValue.Data, value)
 		return TrueValue
 	}
+	// 24.2.3.7
 	var setHas BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		if set.SetValue == nil {
-			panic("TypeError")
-		}
 		_, ok := set.SetValue.Data[value]
 		return NewBooleanValue(ok)
 	}
 	var setSize BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		set := RequireInternalSlot[*SetObject](thisValue)
-		if set.SetValue == nil {
-			panic("TypeError")
-		}
 		return NewNumberValue(JSNumber(len(set.SetValue.Data)))
 	}
 	var setAdd BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		if set.SetValue == nil {
-			panic("TypeError")
-		}
 		set.SetValue.Data[value] = value
 		return thisValue
 	}
 	var setEntries BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := CreateSetIterator(agent, thisValue, objectOwnPropertiesKindKeyAndValue)
-		return (iterator).ToValue()
+		return iterator.ToValue()
 	}
 	var setValues BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		iterator := CreateSetIterator(agent, thisValue, objectOwnPropertiesKindValue)
-		return (iterator).ToValue()
+		return iterator.ToValue()
 	}
 	var forEach BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		callbackFn := argumentsList[0]
 		thisArg := argumentsList[1]
 		set := RequireInternalSlot[*SetObject](thisValue)
 		if !IsCallable(callbackFn) {
-			panic("TypeError")
+			return agent.ThrowTypeError("callback is not callable")
 		}
 		entries := set.SetValue.Data
 		numEntries := uint64(len(entries))
