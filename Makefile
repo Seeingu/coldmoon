@@ -1,6 +1,8 @@
+ICU4XGO_DIR := $(shell go list -f "{{.Dir}}" github.com/Seeingu/icu4xgo)
+
 static:
-	cd ./thirdparty/icu4xgo && make rustlib
-	cd ./thirdparty/icu4xgo && make install
+	go mod download
+	cd ${ICU4XGO_DIR} && sudo make rustlib
 
 build: main.go coldmoon/
 	go build -o main.exe .
