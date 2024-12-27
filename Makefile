@@ -1,6 +1,6 @@
 static:
 	cd ./thirdparty/icu4xgo && make rustlib
-	cp ./thirdparty/icu4xgo/lib/*.a ./lib/
+	cd ./thirdparty/icu4xgo && make install
 
 build: main.go coldmoon/
 	go build -o main.exe .
