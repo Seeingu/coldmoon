@@ -67,21 +67,17 @@ func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody *ECM
 		a := bytecode.agent
 		acGenContext := a.runningExecutionContext()
 		acGenerator := acGenContext.Generator
-		result := bytecode.Run()
-
-		if acGenerator.result != nil {
-			r := acGenerator.result
-			acGenerator.result = nil
+		if bytecode.IsFinished() {
+			a.ExecutionContextStack.Pop()
 			acGenerator.GeneratorState = GeneratorStateCompleted
-			return MustGetObject(r)
+			return CreateIterResultObject(a, UndefinedValue, true)
 		}
-
-		a.ExecutionContextStack.Pop()
-		acGenerator.GeneratorState = GeneratorStateCompleted
+		result := bytecode.Run()
 		if result.IsError() {
 			return MustGetObject(result.Error())
 		}
-		return CreateIterResultObject(a, result.Data(), true)
+		acGenerator.GeneratorState = GeneratorStateSuspendedYield
+		return CreateIterResultObject(a, result.Data(), false)
 	}
 	generator.closure = closure
 	generator.bytecode = GenerateBytecode(agent, generatorBody.ECMAScriptCode)
@@ -161,9 +157,11 @@ func GeneratorYield(agent *Agent, iteratorResult ObjectType) CompletionValue {
 	genContext := agent.runningExecutionContext()
 	Assert(genContext.Generator != nil)
 	generator := genContext.Generator
+	Assert(GetGeneratorKind(agent) == GeneratorKindSync)
+	generator.GeneratorState = GeneratorStateSuspendedYield
 	agent.ExecutionContextStack.Pop()
 	generator.result = iteratorResult.ToValue()
-	return NewCompletionValueUndefined()
+	return NewCompletionValue(iteratorResult.Get(PString("value").ToPropertyKey()))
 }
 
 // 27.5.3.7

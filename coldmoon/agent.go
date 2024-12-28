@@ -84,6 +84,7 @@ func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
 // 9.4.2
 func (a *Agent) ResolveBinding(name string, env EnvironmentRecord, strict bool) *ReferenceRecord {
 	if env == nil {
+		Assert(a.runningExecutionContext().ECMAScriptCode != nil)
 		env = a.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
 	}
 	return GetIdentifierReference(env, name, strict)

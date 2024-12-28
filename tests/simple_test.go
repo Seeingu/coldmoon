@@ -47,6 +47,11 @@ for (const val of foo()) {
   str = str + val;
 }
 assert(str === 'abc');
+
+const gen = foo();
+assert(gen.next().value === 'a');
+assert(gen.next().value === 'b');
+assert(gen.next().value === 'c');
 `,
 		`
 const string1 = "A string primitive";
