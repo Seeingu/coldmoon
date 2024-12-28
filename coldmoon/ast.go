@@ -2,8 +2,6 @@ package coldmoon
 
 import (
 	"strconv"
-
-	"github.com/Seeingu/coldmoon/pkg"
 )
 
 type boundName interface {
@@ -13,16 +11,6 @@ type boundName interface {
 type ASTNode interface {
 	String() string
 	Bytecode(e *Executable, c *BytecodeContext)
-}
-
-type BytecodeContext struct {
-	agent                     *Agent
-	containedInStrictCode     bool
-	labelContinueJumpIndexMap map[string]pkg.Stack[*IJump]
-	labelBreakJumpIndexMap    map[string]pkg.Stack[*IJump]
-	continueJumpIndices       pkg.Stack[*IJump]
-	breakJumpIndices          pkg.Stack[*IJump]
-	Label                     string
 }
 
 // MARK: - AnalyzeQuery
@@ -4596,4 +4584,25 @@ type YieldExpression struct {
 	Expression
 	// TODO: Check AssignmentExpression type
 	AssignmentExpression Expression
+}
+
+var _ Expression = (*YieldExpression)(nil)
+
+func (y *YieldExpression) String() string {
+	if y.AssignmentExpression != nil {
+		return "YieldExpression " + y.AssignmentExpression.String()
+	}
+	return "YieldExpression"
+}
+
+func (y *YieldExpression) Bytecode(e *Executable, c *BytecodeContext) {
+	if y.AssignmentExpression != nil {
+		y.AssignmentExpression.Bytecode(e, c)
+		if ExpressionAnalyze(y.AssignmentExpression, AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+	} else {
+		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
+	}
+	e.AddInstruction(InsYield)
 }
