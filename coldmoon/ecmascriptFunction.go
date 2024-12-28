@@ -208,7 +208,7 @@ func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, arguments
 	G.ref = G
 
 	GeneratorStart(agent, G, function)
-	return NewCompletionReturnValue((G).ToValue())
+	return NewCompletionReturnValue(G.ToValue())
 }
 
 // 10.2.11

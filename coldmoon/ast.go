@@ -3799,12 +3799,12 @@ type GeneratorDeclaration struct {
 func (d *GeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	realm := c.agent.CurrentRealm()
 	env := realm.GlobalEnv
-	function := d.instantiateOrdinaryFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+	function := d.instantiateGeneratorFunctionObject(c.agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(PString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
 }
 
 // 15.5.3
-func (d *GeneratorDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+func (d *GeneratorDeclaration) instantiateGeneratorFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
 	realm := agent.CurrentRealm()
 	name := d.Identifier
 	sourceText := d.SourceText

@@ -114,7 +114,11 @@ func CreateBuiltinFunctionV2(
 		panic("FunctionPrototype is nil")
 	}
 
-	object := NewObject(agent, prototype.ToObject(), "BuiltinFunction ")
+	typeName := "BuiltinFunction"
+	if nameString, ok := name.(PString); ok {
+		typeName += " " + string(nameString)
+	}
+	object := NewObject(agent, prototype.ToObject(), typeName)
 	object.SetExtensible(true)
 	function := &BuiltinFunction{
 		Object:             object,

@@ -87,7 +87,7 @@ func (d *DeclarativeEnvironment) CreateMutableBinding(name string, deletable boo
 // 9.1.1.1.4
 func (d *DeclarativeEnvironment) InitializeBinding(name string, value Value) {
 	binding := d.Bindings[name]
-	Assert(binding.Value == nil)
+	Assert(IsUndefinedOrNil(binding.Value))
 
 	binding.Value = value
 }
