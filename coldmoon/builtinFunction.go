@@ -92,12 +92,13 @@ type builtinFunctionArgs struct {
 	additionalFieldsV2 any
 }
 
-// 10.3.4
-func CreateBuiltinFunction(
+// TODO(P) 10.3.4
+
+func CreateBuiltinFunctionV2(
 	agent *Agent,
 	behavior BehaviorFn,
 	length JSInt,
-	name string,
+	name PropertyConvertable,
 	args builtinFunctionArgs,
 ) ObjectType {
 	realm := args.realm
@@ -113,7 +114,7 @@ func CreateBuiltinFunction(
 		panic("FunctionPrototype is nil")
 	}
 
-	object := NewObject(agent, prototype.ToObject(), "BuiltinFunction "+name)
+	object := NewObject(agent, prototype.ToObject(), "BuiltinFunction ")
 	object.SetExtensible(true)
 	function := &BuiltinFunction{
 		Object:             object,
@@ -131,9 +132,26 @@ func CreateBuiltinFunction(
 	}
 
 	SetFunctionLength(function.Object, length)
-	SetFunctionName(function, NewStringPropertyKey(name), args.prefix)
+	SetFunctionName(function, name.ToPropertyKey(), args.prefix)
 
 	return function
+}
+
+// Deprecated:
+func CreateBuiltinFunction(
+	agent *Agent,
+	behavior BehaviorFn,
+	length JSInt,
+	name string,
+	args builtinFunctionArgs,
+) ObjectType {
+	return CreateBuiltinFunctionV2(
+		agent,
+		behavior,
+		length,
+		PString(name),
+		args,
+	)
 }
 
 // MARK: - Class

@@ -693,7 +693,7 @@ func (p *Parser) asyncArrowFunction() *PrimaryExpressionAsyncArrowFunction {
 		body = p.functionBody(FunctionTypeAsync)
 		p.tokenizer.MustMatch(TRightBrace)
 	} else {
-		// prec: greater than ,
+		// TODO(P): prec: greater than ,
 		e := p.expression(p.acceptContext(TYield))
 		body = &FunctionBody{
 			StatementList: StatementList{
@@ -944,6 +944,7 @@ func (p *Parser) lexicalBinding() *LexicalBinding {
 	var init Expression
 	if p.tokenizer.CurrentToken.Type == TEquals {
 		p.tokenizer.Next()
+		// TODO(P)
 		init = p.expression(p.acceptContext(TYield))
 	}
 	return &LexicalBinding{

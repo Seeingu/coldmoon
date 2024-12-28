@@ -5,6 +5,13 @@ import (
 	"strconv"
 )
 
+// PString is a string that can be converted to PropertyKey
+type PString string
+
+func (p PString) ToPropertyKey() PropertyKey {
+	return NewStringPropertyKey(string(p))
+}
+
 type PropertyKey interface {
 	PropertyKeyOrPrivateName
 	Hash() string

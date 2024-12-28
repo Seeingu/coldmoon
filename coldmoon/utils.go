@@ -2,6 +2,25 @@ package coldmoon
 
 import "strings"
 
+func DefineBuiltinFunctionV2(
+	realm *Realm,
+	name PropertyConvertable,
+	object ObjectType,
+	fn BehaviorFn,
+	length JSInt,
+) {
+	functionName := name
+	f := CreateBuiltinFunctionV2(
+		realm.Agent,
+		fn,
+		length,
+		functionName,
+		builtinFunctionArgs{realm: realm},
+	)
+	DefineBuiltinPropertyValue(object, name, f.ToValue())
+}
+
+// Deprecated:
 func DefineBuiltinFunction(object ObjectType,
 	name string,
 	fn BehaviorFn,
@@ -9,6 +28,7 @@ func DefineBuiltinFunction(object ObjectType,
 	realm *Realm,
 ) {
 	functionName := name
+	// TODO(P)
 	if strings.HasPrefix(name, "@@") {
 		functionName = name[2:]
 	}
@@ -30,6 +50,7 @@ func DefineBuiltinFunctionWithAttributes(object ObjectType,
 	attr PropertyDescriptorAttributes,
 ) {
 	functionName := name
+	// TODO(P)
 	if strings.HasPrefix(name, "@@") {
 		functionName = name[2:]
 	}
@@ -93,14 +114,23 @@ func DefineToStringTagBuiltinProperty(object ObjectType, name string) {
 	})
 }
 
-func DefineBuiltinPropertyV(object ObjectType, name string, value Value) {
+type PropertyConvertable interface {
+	ToPropertyKey() PropertyKey
+}
+
+func DefineBuiltinPropertyValue(object ObjectType, p PropertyConvertable, value Value) {
 	descriptor := &PropertyDescriptor{
 		Value:        value,
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,
 	}
-	object.DefinePropertyOrThrow(NewStringPropertyKey(name), descriptor)
+	object.DefinePropertyOrThrow(p.ToPropertyKey(), descriptor)
+}
+
+// Deprecated
+func DefineBuiltinPropertyV(object ObjectType, name string, value Value) {
+	DefineBuiltinPropertyValue(object, PString(name), value)
 }
 
 // BuiltinAccessorParams Enum
@@ -148,6 +178,7 @@ func DefineBuiltinAccessorV2(
 	})
 }
 
+// TODO(P)
 // Deprecated: use DefineBuiltinAccessorV2
 func DefineBuiltinAccessor(realm *Realm, object ObjectType, name string, getter, setter BehaviorFn) {
 	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
