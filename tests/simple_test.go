@@ -7,7 +7,7 @@ import (
 )
 
 func testSource(t *testing.T, s string) {
-	//Debug.Enable()
+	Debug.Enable()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
@@ -30,7 +30,24 @@ function assert(a, msg) {
 
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
-		// string
+		`
+const a = [1,2,3]
+for (const i in a) {
+}
+`,
+		`
+const foo = function* () {
+  yield 'a';
+  yield 'b';
+  yield 'c';
+};
+
+let str = '';
+for (const val of foo()) {
+  str = str + val;
+}
+assert(str === 'abc');
+`,
 		`
 const string1 = "A string primitive";
 const string2 = 'Also a string primitive';

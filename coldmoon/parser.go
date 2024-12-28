@@ -1,6 +1,8 @@
 package coldmoon
 
 import (
+	"strings"
+
 	"github.com/samber/lo"
 )
 
@@ -263,6 +265,13 @@ func (p *Parser) acceptContextLowest() *acceptContext {
 	return &acceptContext{
 		precedence: 0,
 	}
+}
+
+// add 1 to the precedence
+func (p *Parser) acceptContextHigherThan(t TokenType) *acceptContext {
+	c := p.acceptContext(t)
+	c.precedence += 1
+	return c
 }
 
 func (p *Parser) acceptContext(t TokenType) *acceptContext {
@@ -749,7 +758,10 @@ func (p *Parser) generatorExpression() *PrimaryExpressionGeneratorExpression {
 	startOffset := p.tokenizer.Index
 	p.tokenizer.MustMatch(TFunction)
 	p.tokenizer.MustMatch(TStar)
-	identifier := p.bindingIdentifier()
+	var identifier IdentifierName
+	if id, ok := parserRecoverOk(p, p.bindingIdentifier); ok {
+		identifier = id
+	}
 	p.tokenizer.MustMatch(TLeftParen)
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
@@ -1085,7 +1097,7 @@ func (p *Parser) forInOfStatement() *ForInOfStatement {
 	init := &ForInOfStatementInitializer{}
 	if p.tokenizer.Match(TVar) {
 		init.ForBinding = p.forBinding()
-	} else if p.tokenizer.Match(TLet) || p.tokenizer.Match(TConst) {
+	} else if p.tokenizer.CurrentToken.Type == TLet || p.tokenizer.CurrentToken.Type == TConst {
 		init.ForDeclaration = p.forDeclaration()
 	} else {
 		init.LeftHandSideExpression = p.expression(p.acceptContextLowest())
@@ -1298,6 +1310,26 @@ func (p *Parser) superCall() (*ExpressionSuperCall, bool) {
 	}, true
 }
 
+func (p *Parser) followedByLineTerminator(previous Token) bool {
+	gap := p.tokenizer.SourceText[previous.EndIndex:p.tokenizer.CurrentToken.StartIndex]
+	// TODO: check in `lineTerminators`
+	return strings.Contains(string(gap), "\n")
+}
+
+func (p *Parser) yieldExpression() (*YieldExpression, bool) {
+	t := p.tokenizer.CurrentToken
+	if !p.tokenizer.Match(TYield) {
+		return nil, false
+	}
+	if p.followedByLineTerminator(t) {
+		return &YieldExpression{AssignmentExpression: nil}, true
+	}
+	e := p.expression(p.acceptContextHigherThan(TYield))
+	return &YieldExpression{
+		AssignmentExpression: e,
+	}, true
+}
+
 func (p *Parser) newExpression() (*NewExpression, bool) {
 	t := p.tokenizer.CurrentToken
 
@@ -1442,6 +1474,8 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 		expr = i
 	} else if newExpression, ok := p.newExpression(); ok {
 		expr = newExpression
+	} else if yieldExpression, ok := p.yieldExpression(); ok {
+		expr = yieldExpression
 	} else {
 		expr = p.primaryExpression()
 	}

@@ -618,7 +618,29 @@ func (vm *VM) execute(i Instruction) {
 		ref := vm.referenceStack.Pop()
 		value := vm.result
 		ref.InitializeReferencedBinding(value)
+	case *IForDeclarationBindingInstantiation:
+		vm.forDeclarationBindingInstantiation(ins.LexicalDeclaration)
+	case *IRestoreLexicalEnvironment:
+		vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = vm.envStack.Peek()
+	default:
+		panic("unreachable")
 	}
+}
+
+func (vm *VM) forDeclarationBindingInstantiation(lexicalDeclaration *DeclarationLexical) {
+	oldEnv := vm.envStack.Peek()
+	iterationEnv := NewDeclarativeEnvironment(oldEnv)
+
+	boundNames := lexicalDeclaration.BoundNames()
+
+	for _, name := range boundNames {
+		if lexicalDeclaration.IsConstantDeclaration() {
+			iterationEnv.CreateImmutableBinding(string(name), true)
+		} else {
+			iterationEnv.CreateMutableBinding(string(name), false)
+		}
+	}
+	vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = iterationEnv
 }
 
 func (vm *VM) getSuperConstructor() Value {

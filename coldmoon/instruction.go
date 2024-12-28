@@ -650,6 +650,15 @@ func (i *ILoadIterator) String() string {
 	return "ILoadIterator"
 }
 
+type IForDeclarationBindingInstantiation struct {
+	Instruction
+	LexicalDeclaration *DeclarationLexical
+}
+
+func (i *IForDeclarationBindingInstantiation) String() string {
+	return "IForDeclarationBindingInstantiation"
+}
+
 // MARK: - Env
 
 type IRestoreLexicalEnvironment struct {

@@ -3407,8 +3407,33 @@ func (f *ForInOfStatement) forInOfBodyEvaluation(
 			e.AddInstruction(InsPopReference)
 		}
 	} else {
-		// TODO
-		panic("unimplemented")
+		lexicalDeclaration := &DeclarationLexical{
+			BindingList: &BindingList{
+				Items: make([]*LexicalBinding, 0),
+			},
+		}
+		lexicalBinding := &LexicalBinding{}
+		if lhs.ForDeclaration.ForBinding.BindingIdentifier != "" {
+			lexicalBinding.Identifier = lhs.ForDeclaration.ForBinding.BindingIdentifier
+		} else {
+			lexicalBinding.BindingPattern = lhs.ForDeclaration.ForBinding.BindingPattern
+		}
+		lexicalDeclaration.BindingList.Items = append(lexicalDeclaration.BindingList.Items, lexicalBinding)
+		e.AddInstruction(&IForDeclarationBindingInstantiation{
+			LexicalDeclaration: lexicalDeclaration,
+		})
+
+		if destructuring {
+			// TODO
+			panic("unimplemented")
+		} else {
+			lhsName := lhs.ForDeclaration.ForBinding.BindingIdentifier
+			e.AddInstruction(&IResolveBinding{
+				Name:   lhsName,
+				Strict: c.containedInStrictCode,
+			})
+			e.AddInstruction(&IInitializeReferencedBinding{})
+		}
 	}
 
 	e.AddInstruction(InsStore)
@@ -4067,6 +4092,10 @@ type DeclarationLexical struct {
 	BindingList *BindingList
 }
 
+func (d *DeclarationLexical) IsConstantDeclaration() bool {
+	return d.Type == LetOrConstConst
+}
+
 func (d *DeclarationLexical) Bytecode(e *Executable, c *BytecodeContext) {
 	d.BindingList.Bytecode(e, c)
 }
@@ -4075,9 +4104,20 @@ func (d *DeclarationLexical) String() string {
 	return "LexicalDeclaration " + d.BindingList.String()
 }
 
+func (d *DeclarationLexical) BoundNames() (l []IdentifierName) {
+	return d.BindingList.BoundNames()
+}
+
 type BindingList struct {
 	ASTNode
 	Items []*LexicalBinding
+}
+
+func (b *BindingList) BoundNames() (l []IdentifierName) {
+	for _, item := range b.Items {
+		l = append(l, item.BoundNames()...)
+	}
+	return
 }
 
 func (b *BindingList) Bytecode(e *Executable, c *BytecodeContext) {
@@ -4097,10 +4137,23 @@ func (b *BindingList) String() string {
 	return sb
 }
 
+// LexicalBinding [In, Yield, Await] :
+// BindingIdentifier[?Yield, ?Await] Initializer[?In, ?Yield, ?Await] opt
+// BindingPattern[?Yield, ?Await] Initializer[?In, ?Yield, ?Await]
 type LexicalBinding struct {
 	ASTNode
-	Identifier  IdentifierName
-	Initializer Expression
+	Identifier     IdentifierName
+	BindingPattern *BindingPattern
+	Initializer    Expression
+}
+
+func (l *LexicalBinding) BoundNames() (list []IdentifierName) {
+	if l.Identifier != "" {
+		list = append(list, l.Identifier)
+	} else {
+		list = append(list, l.BindingPattern.BoundNames()...)
+	}
+	return
 }
 
 func (l *LexicalBinding) Bytecode(e *Executable, c *BytecodeContext) {
@@ -4532,3 +4585,15 @@ type ImportClause struct {
 }
 
 type ImportsList struct{}
+
+// MARK: - YieldExpression
+
+// YieldExpression [In, Await] :
+// yield
+// yield [no LineTerminator here] AssignmentExpression[?In, +Yield, ?Await]
+// yield [no LineTerminator here] * AssignmentExpression[?In, +Yield, ?Await]
+type YieldExpression struct {
+	Expression
+	// TODO: Check AssignmentExpression type
+	AssignmentExpression Expression
+}
