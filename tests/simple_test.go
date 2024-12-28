@@ -52,6 +52,20 @@ const gen = foo();
 assert(gen.next().value === 'a');
 assert(gen.next().value === 'b');
 assert(gen.next().value === 'c');
+
+const infinite = function*() {
+  let index = 0;
+
+  while (true) {
+    yield index++;
+  }
+}
+
+const generator = infinite(); // "Generator { }"
+
+assert(generator.next().value === 0); // 0
+assert(generator.next().value === 1); // 1
+assert(generator.next().value === 2); // 2
 `,
 		`
 const string1 = "A string primitive";
