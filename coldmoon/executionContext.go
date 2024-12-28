@@ -11,9 +11,11 @@ type ExecutionContextAdditionalState struct {
 	VariableEnvironment EnvironmentRecord
 	PrivateEnvironment  *PrivateEnvironment
 }
+
 type ExecutionContext struct {
 	Realm          *Realm
 	ScriptOrModule ScriptOrModule
 	Function       ObjectType
 	ECMAScriptCode *ExecutionContextAdditionalState
+	Generator      *GeneratorObject
 }

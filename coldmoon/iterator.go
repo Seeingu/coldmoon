@@ -23,7 +23,8 @@ func NewIteratorPrototype(realm *Realm) ObjectType {
 	var iterator BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		return thisValue
 	}
-	DefineBuiltinFunction(object, "@@iterator", iterator, 0, realm)
+
+	DefineBuiltinFunctionV2(realm, WellKnownSymbolsIterator, object, iterator, 0)
 	return object
 }
 
@@ -34,6 +35,8 @@ func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *Itera
 		panic("TypeError")
 	}
 	nextMethod := GetV(agent, iterator, NewStringPropertyKey("next"))
+	// TODO: not standard, for debug
+	Assert(nextMethod != UndefinedValue)
 	iteratorRecord := &IteratorRecord{
 		Iterator:   MustGetObject(iterator),
 		NextMethod: nextMethod,

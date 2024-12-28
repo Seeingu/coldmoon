@@ -601,6 +601,7 @@ func (vm *VM) execute(i Instruction) {
 		obj := MustGetObject(value)
 		iterator := CreateForInIterator(agent, obj)
 		nextMethod := iterator.Get(NewStringPropertyKey("next"))
+		Assert(nextMethod != UndefinedValue)
 		vm.iterator = &IteratorRecord{
 			Iterator:   iterator,
 			NextMethod: nextMethod,
@@ -1385,6 +1386,10 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 func (vm *VM) Run(executable *Executable) CompletionValue {
 	for vm.ip < len(executable.Instructions) {
 		i := executable.Instructions[vm.ip]
+		if i == InsYield {
+			vm.ip += 1
+			return Yield(vm.agent, vm.result)
+		}
 		vm.execute(i)
 		if vm.agent.exception != nil {
 			if !vm.exceptionJumpTargetStack.IsEmpty() {

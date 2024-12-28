@@ -545,6 +545,14 @@ func (i *IInstantiateAsyncFunctionExpression) String() string {
 	return "IInstantiateAsyncFunctionExpression " + i.FunctionExpression.String()
 }
 
+type IYield struct {
+	Instruction
+}
+
+func (i *IYield) String() string {
+	return "IYield"
+}
+
 // MARK: - GetNewTarget
 
 type IGetNewTarget struct {
@@ -715,4 +723,5 @@ var (
 	InsRegExpCreate              = &IRegExpCreate{}
 	InsRestoreLexicalEnvironment = &IRestoreLexicalEnvironment{}
 	InsPushLexicalEnvironment    = &IPushLexicalEnvironment{}
+	InsYield                     = &IYield{}
 )

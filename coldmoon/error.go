@@ -155,6 +155,7 @@ func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 			Object: object,
 			Name:   name,
 		}
+		errorObject.ref = errorObject
 		errorObject.InternalMethods().Set = errorInternalSet
 
 		if message != UndefinedValue {

@@ -201,7 +201,13 @@ func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argu
 
 func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
-	G := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
+	o := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
+	G := &GeneratorObject{
+		Object: o,
+	}
+	G.ref = G
+
+	GeneratorStart(agent, G, function)
 	return NewCompletionReturnValue((G).ToValue())
 }
 
