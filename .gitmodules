@@ -1,6 +1,3 @@
 [submodule "test262"]
 	path = test262
 	url = https://github.com/tc39/test262.git
-[submodule "thirdparty/icu4xgo"]
-	path = thirdparty/icu4xgo
-	url = https://github.com/Seeingu/icu4xgo
