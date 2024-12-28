@@ -1710,6 +1710,6 @@ func (vm *VM) debugPrintStack(msg string) {
 	fmt.Printf("Stack(%s): size: %d\n", msg, vm.stack.Len())
 
 	for i, v := range vm.stack.Data() {
-		fmt.Printf("%d: %s\n", i, printValue(v))
+		fmt.Printf("%d: %s\n", i, v.String())
 	}
 }

@@ -1,29 +1,40 @@
 package coldmoon
 
-import "fmt"
+import (
+	"fmt"
 
-func printObject(object ObjectType) string {
-	switch o := object.(type) {
-	case *Object:
-	case *NumberObject:
-	case *StringObject:
-		return o.Data
-	}
-	return "object"
+	"github.com/Seeingu/coldmoon/pkg"
+)
+
+type BytecodeContext struct {
+	vm                        *VM
+	exe                       *Executable
+	agent                     *Agent
+	containedInStrictCode     bool
+	labelContinueJumpIndexMap map[string]pkg.Stack[*IJump]
+	labelBreakJumpIndexMap    map[string]pkg.Stack[*IJump]
+	continueJumpIndices       pkg.Stack[*IJump]
+	breakJumpIndices          pkg.Stack[*IJump]
+	Label                     string
 }
 
-func printValue(v Value) string {
-	switch vv := v.(type) {
-	case *undefinedValue, *nullValue:
-		return vv.String()
-	case *ObjectValue:
-		return printObject(vv.Object)
-	case *StringValue:
-		return vv.Data
-	case *NumberValue:
-		return fmt.Sprintf("%f", vv.Data)
+// Run Instructions from last `ip` position from `VM`
+func (b *BytecodeContext) Run() CompletionValue {
+	if Debug.PrintBytecode {
+		fmt.Println("Executable: ", b.exe.String())
 	}
-	return "value"
+
+	result := b.vm.Run(b.exe)
+	if result.Data() != nil {
+		fmt.Println("Result: ", result.Data().String())
+	} else if result.IsError() {
+		fmt.Println("Error Result: ", result.Error().String())
+	}
+	return result
+}
+
+func (b *BytecodeContext) IsFinished() bool {
+	return b.vm.ip >= len(b.exe.Instructions)
 }
 
 func GenerateBytecode(agent *Agent, node ASTNode) *BytecodeContext {
@@ -35,25 +46,15 @@ func GenerateBytecode(agent *Agent, node ASTNode) *BytecodeContext {
 		agent:                 agent,
 		containedInStrictCode: false,
 	}
+	if Debug.PrintAST {
+		fmt.Println("AST: ", node.String())
+	}
 	node.Bytecode(exe, c)
+
 	return c
 }
 
 func GenerateAndRunBytecode(agent *Agent, node ASTNode) CompletionValue {
 	bytecode := GenerateBytecode(agent, node)
-
-	if Debug.PrintAST {
-		fmt.Println("AST: ", node.String())
-	}
-	if Debug.PrintBytecode {
-		fmt.Println("Executable: ", bytecode.exe.String())
-	}
-	result := bytecode.Run()
-	if result.Data() != nil {
-		fmt.Println("Result: ", result.Data().String())
-	} else if result.IsError() {
-		fmt.Println("Error Result: ", result.Error().String())
-	}
-
-	return result
+	return bytecode.Run()
 }
