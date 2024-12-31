@@ -734,7 +734,7 @@ func (p *Parser) asyncFunctionExpression() *PrimaryExpressionAsyncFunctionExpres
 }
 
 func (p *Parser) asyncGeneratorExpression() *PrimaryExpressionAsyncGeneratorExpression {
-	startOffset := p.tokenizer.Index
+	startOffset := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.Match(TAsync)
 	p.tokenizer.MustMatch(TFunction)
 	p.tokenizer.MustMatch(TStar)
@@ -745,7 +745,7 @@ func (p *Parser) asyncGeneratorExpression() *PrimaryExpressionAsyncGeneratorExpr
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeAsyncGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
 	return &PrimaryExpressionAsyncGeneratorExpression{
 		IdentifierName:   identifier,
 		FormalParameters: params,
@@ -755,7 +755,7 @@ func (p *Parser) asyncGeneratorExpression() *PrimaryExpressionAsyncGeneratorExpr
 }
 
 func (p *Parser) generatorExpression() *PrimaryExpressionGeneratorExpression {
-	startOffset := p.tokenizer.Index
+	startOffset := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TFunction)
 	p.tokenizer.MustMatch(TStar)
 	var identifier IdentifierName
@@ -768,7 +768,7 @@ func (p *Parser) generatorExpression() *PrimaryExpressionGeneratorExpression {
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
 	return &PrimaryExpressionGeneratorExpression{
 		IdentifierName:   identifier,
 		FormalParameters: params,
@@ -778,7 +778,7 @@ func (p *Parser) generatorExpression() *PrimaryExpressionGeneratorExpression {
 }
 
 func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
-	startOffset := p.tokenizer.Index
+	startOffset := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TFunction)
 	var identifier IdentifierName
 	if p.tokenizer.CurrentToken.Type == TIdentifier {
@@ -790,7 +790,7 @@ func (p *Parser) functionExpression() *PrimaryExpressionFunctionExpression {
 	p.tokenizer.MustMatch(TLeftBrace)
 	functionBody := p.functionBody(FunctionTypeNormal)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
 	return &PrimaryExpressionFunctionExpression{
 		Identifier:       identifier,
 		FormalParameters: params,
@@ -804,11 +804,11 @@ func (p *Parser) noLineTerminatorHere() {
 }
 
 func (p *Parser) classDeclaration() *DeclarationClass {
-	startIndex := p.tokenizer.Index
+	startIndex := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TClass)
 	identifier := p.bindingIdentifier()
 	classTail := p.classTail()
-	sourceText := p.SourceText[startIndex:p.tokenizer.Index]
+	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
 	return &DeclarationClass{
 		IdentifierName: identifier,
 		ClassTail:      classTail,
@@ -966,7 +966,7 @@ func (p *Parser) hoistableDeclaration() DeclarationHoistable {
 			FunctionDeclaration: functionDeclaration,
 		}
 	} else if t.Type == TAsync {
-		startOffset := p.tokenizer.Index
+		startOffset := p.tokenizer.CurrentStartIndex()
 		p.tokenizer.MustMatch(TAsync)
 		p.tokenizer.MustMatch(TFunction)
 		if p.tokenizer.CurrentToken.Type == TStar {
@@ -991,7 +991,7 @@ func (p *Parser) asyncFunctionDeclaration(startOffset int) *AsyncFunctionDeclara
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeAsync)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
 	return &AsyncFunctionDeclaration{
 		Identifier:       identifier,
 		FormalParameters: params,
@@ -1009,7 +1009,7 @@ func (p *Parser) asyncGeneratorDeclaration(startOffset int) *AsyncGeneratorDecla
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeAsyncGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
 	return &AsyncGeneratorDeclaration{
 		Identifier:       identifier,
 		FormalParameters: formalParams,
@@ -1019,7 +1019,7 @@ func (p *Parser) asyncGeneratorDeclaration(startOffset int) *AsyncGeneratorDecla
 }
 
 func (p *Parser) generatorDeclaration() *GeneratorDeclaration {
-	startOffset := p.tokenizer.Index
+	startOffset := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TFunction)
 	p.tokenizer.MustMatch(TStar)
 	identifier := p.bindingIdentifier()
@@ -1029,7 +1029,7 @@ func (p *Parser) generatorDeclaration() *GeneratorDeclaration {
 	p.tokenizer.MustMatch(TLeftBrace)
 	functionBody := p.functionBody(FunctionTypeGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
 	return &GeneratorDeclaration{
 		Identifier:       identifier,
 		FormalParameters: formalParams,
@@ -1902,7 +1902,7 @@ func (p *Parser) templateLiteral() *PrimaryExpressionTemplateLiteral {
 			TemplateLiteral: &TemplateLiteral{},
 		}
 	}
-	startIndex := p.tokenizer.Index
+	startIndex := p.tokenizer.CurrentStartIndex()
 	templateHead := p.tokenizer.CurrentToken
 	p.tokenizer.MustMatch(TTemplateHead)
 	var spans []*TemplateSpan
@@ -1928,7 +1928,7 @@ func (p *Parser) templateLiteral() *PrimaryExpressionTemplateLiteral {
 		expr = p.expression(p.acceptContextLowest())
 	}
 	p.tokenizer.MustMatch(TTemplateTail)
-	sourceText := p.SourceText[startIndex:p.tokenizer.Index]
+	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
 	return &PrimaryExpressionTemplateLiteral{
 		TemplateLiteral: &TemplateLiteral{
 			TemplateHead: templateHead.Value,
@@ -1939,14 +1939,14 @@ func (p *Parser) templateLiteral() *PrimaryExpressionTemplateLiteral {
 }
 
 func (p *Parser) classExpression() *PrimaryExpressionClassExpression {
-	startIndex := p.tokenizer.Index
+	startIndex := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TClass)
 	var identifier IdentifierName
 	if p.tokenizer.Match(TIdentifier) {
 		identifier = p.bindingIdentifier()
 	}
 	classTail := p.classTail()
-	sourceText := p.SourceText[startIndex:p.tokenizer.Index]
+	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
 	return &PrimaryExpressionClassExpression{
 		IdentifierName: identifier,
 		ClassTail:      classTail,
@@ -2067,13 +2067,13 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 		}
 	}
 	p.tokenizer.Match(TLeftParen)
-	start := p.tokenizer.Index
+	start := p.tokenizer.CurrentStartIndex()
 	formalParameters := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeNormal)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[start:p.tokenizer.Index]
+	sourceText := p.SourceText[start:p.tokenizer.CurrentStartIndex()]
 	m := MethodDefinitionTypeMethod
 	if methodType != MethodDefinitionTypeNil {
 		m = methodType

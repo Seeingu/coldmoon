@@ -172,6 +172,9 @@ func NewTokenizer(sourceText string) *Tokenizer {
 }
 
 func (t *Tokenizer) CurrentStartIndex() int {
+	if t.CurrentToken.Type == TEOF {
+		return t.Index
+	}
 	return t.CurrentToken.StartIndex
 }
 
