@@ -10,6 +10,6 @@ require (
 )
 
 require (
-	github.com/Seeingu/icu4xgo v0.1.1-0.20241227140626-da7519802c2e // indirect
+	github.com/Seeingu/icu4xgo v0.1.3-0.20241231132825-aedf4a2d3ee4 // indirect
 	golang.org/x/text v0.21.0 // indirect
 )
