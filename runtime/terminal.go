@@ -7,7 +7,7 @@ import "github.com/Seeingu/coldmoon/coldmoon"
 func RegisterTerminalRuntime(realm *coldmoon.Realm) {
 	global := realm.GlobalObject
 	console := CreateConsole(realm)
-	global.CreateDataProperty(coldmoon.PString("console").ToPropertyKey(), console.ToValue())
+	global.CreateDataProperty(coldmoon.CMString("console").ToPropertyKey(), console.ToValue())
 
 	// --- Non standard---
 	definePrint(realm)

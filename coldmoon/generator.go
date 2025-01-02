@@ -43,8 +43,8 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 		return GeneratorResumeAbrupt(agent, generator, C).ToValue()
 	}
 
-	DefineBuiltinFunctionV2(realm, PString("next"), g, next, 1)
-	DefineBuiltinFunctionV2(realm, PString("return"), g, iteratorReturn, 1)
+	DefineBuiltinFunctionV2(realm, CMString("next"), g, next, 1)
+	DefineBuiltinFunctionV2(realm, CMString("return"), g, iteratorReturn, 1)
 
 	DefineBuiltinPropertyP(g, "constructor", &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),
@@ -161,7 +161,7 @@ func GeneratorYield(agent *Agent, iteratorResult ObjectType) CompletionValue {
 	generator.GeneratorState = GeneratorStateSuspendedYield
 	agent.ExecutionContextStack.Pop()
 	generator.result = iteratorResult.ToValue()
-	return NewCompletionValue(iteratorResult.Get(PString("value").ToPropertyKey()))
+	return NewCompletionValue(iteratorResult.Get(CMString("value").ToPropertyKey()))
 }
 
 // 27.5.3.7

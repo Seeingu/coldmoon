@@ -600,7 +600,7 @@ func (vm *VM) execute(i Instruction) {
 		value := vm.result
 		obj := MustGetObject(value)
 		iterator := CreateForInIterator(agent, obj)
-		nextMethod := iterator.Get(PString("next").ToPropertyKey())
+		nextMethod := iterator.Get(CMString("next").ToPropertyKey())
 		Assert(nextMethod != UndefinedValue)
 		vm.iterator = &IteratorRecord{
 			Iterator:   iterator,

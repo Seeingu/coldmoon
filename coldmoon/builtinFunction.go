@@ -115,7 +115,7 @@ func CreateBuiltinFunctionV2(
 	}
 
 	typeName := "BuiltinFunction"
-	if nameString, ok := name.(PString); ok {
+	if nameString, ok := name.(CMString); ok {
 		typeName += " " + string(nameString)
 	}
 	object := NewObject(agent, prototype.ToObject(), typeName)
@@ -153,7 +153,7 @@ func CreateBuiltinFunction(
 		agent,
 		behavior,
 		length,
-		PString(name),
+		CMString(name),
 		args,
 	)
 }

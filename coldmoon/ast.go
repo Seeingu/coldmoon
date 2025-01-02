@@ -3800,7 +3800,7 @@ func (d *GeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	realm := c.agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := d.instantiateGeneratorFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(PString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(CMString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
 }
 
 // 15.5.3

@@ -130,7 +130,7 @@ func DefineBuiltinPropertyValue(object ObjectType, p PropertyConvertable, value 
 
 // Deprecated
 func DefineBuiltinPropertyV(object ObjectType, name string, value Value) {
-	DefineBuiltinPropertyValue(object, PString(name), value)
+	DefineBuiltinPropertyValue(object, CMString(name), value)
 }
 
 // BuiltinAccessorParams Enum
