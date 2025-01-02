@@ -42,13 +42,14 @@ type Value interface {
 	Call(this Value, argumentsList ArgumentsList) Value
 	CallNoArgs(this Value) Value
 	ToCompletion() CompletionValue
+	ToPropertyDescriptor() *PropertyDescriptor
 }
 
 // TODO(C): we should use convertable
 func NewPropertyDescriptorFromValue(value Value) *PropertyDescriptor {
 	return &PropertyDescriptor{
 		Value:        value,
-		Writable:     true,
+		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
 	}

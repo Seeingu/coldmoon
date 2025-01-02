@@ -43,6 +43,8 @@ func (o *Object) ToValue() Value {
 // Ref returns the reference of the object
 // If the object does not have a reference, it returns itself
 func (o *Object) Ref() ObjectType {
+	// TODO(C): we should ensure that the ref is not nil
+	// TODO(C): if is Object itself, should reference to the object explicitly
 	if o.ref == nil {
 		return o
 	}
