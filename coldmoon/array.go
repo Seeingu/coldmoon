@@ -252,20 +252,20 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		return array.ToValue()
 	}
 
-	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "Array", builtinFunctionArgs{
+	object := CreateBuiltinFunctionV2(realm.Agent, behavior, 1, CMString("Array"), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		isConstructor: true,
 	})
 
-	DefineBuiltinFunction(object, "isArray", isArray, 1, realm)
-	DefineBuiltinFunction(object, "of", of, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("isArray"), isArray, 1)
+	object.defineBuiltinFunction(realm, CMString("of"), of, 0)
 
 	// 23.1.2.5
 	var getter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		return this
 	}
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+	object.defineBuiltinAccessor(realm, BuiltinAccessorParams{
 		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 		Getter:              getter,
 	})
@@ -281,7 +281,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	object.ref = object
 
-	DefineBuiltinPropertyP(object.Object, "length", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("length"), &PropertyDescriptor{
 		Value:        NewNumberValue(0),
 		Writable:     true,
 		Enumerable:   false,
@@ -1324,45 +1324,45 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 
-	DefineBuiltinFunction(object, "join", join, 1, realm)
-	DefineBuiltinFunction(object, "toString", toString, 0, realm)
-	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
-	DefineBuiltinFunction(object, "push", push, 1, realm)
-	DefineBuiltinFunction(object, "pop", pop, 0, realm)
-	DefineBuiltinFunction(object, "map", arrayMap, 1, realm)
-	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
-	DefineBuiltinFunction(object, "includes", includes, 1, realm)
-	DefineBuiltinFunction(object, "indexOf", indexOf, 1, realm)
-	DefineBuiltinFunction(object, "find", find, 1, realm)
-	DefineBuiltinFunction(object, "findIndex", findIndex, 1, realm)
-	DefineBuiltinFunction(object, "findLast", findLast, 1, realm)
-	DefineBuiltinFunction(object, "findLastIndex", findLastIndex, 1, realm)
-	DefineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm)
-	DefineBuiltinFunction(object, "at", at, 1, realm)
-	DefineBuiltinFunction(object, "every", every, 1, realm)
-	DefineBuiltinFunction(object, "some", some, 1, realm)
-	DefineBuiltinFunction(object, "with", with, 2, realm)
-	DefineBuiltinFunction(object, "from", from, 1, realm)
-	DefineBuiltinFunction(object, "entries", entries, 0, realm)
-	DefineBuiltinFunction(object, "keys", keys, 0, realm)
-	DefineBuiltinFunction(object, "values", values, 0, realm)
-	DefineBuiltinFunction(object, "shift", shift, 0, realm)
-	DefineBuiltinFunction(object, "unshift", unshift, 1, realm)
-	DefineBuiltinFunction(object, "filter", filter, 1, realm)
-	DefineBuiltinFunction(object, "reduce", reduce, 1, realm)
-	DefineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm)
-	DefineBuiltinFunction(object, "concat", concat, 1, realm)
-	DefineBuiltinFunction(object, "slice", slice, 2, realm)
-	DefineBuiltinFunction(object, "fill", fill, 1, realm)
-	DefineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm)
-	DefineBuiltinFunction(object, "reverse", reverse, 0, realm)
-	DefineBuiltinFunction(object, "toReversed", toReversed, 0, realm)
-	DefineBuiltinFunction(object, "sort", sort, 1, realm)
-	DefineBuiltinFunction(object, "toSorted", toSorted, 1, realm)
-	DefineBuiltinFunction(object, "flat", flat, 0, realm)
-	DefineBuiltinFunction(object, "flatMap", flatMap, 1, realm)
-	DefineBuiltinFunction(object, "splice", splice, 2, realm)
-	DefineBuiltinFunction(object, "toSpliced", toSpliced, 2, realm)
+	object.defineBuiltinFunction(realm, CMString("join"), join, 1)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	object.defineBuiltinFunction(realm, CMString("forEach"), forEach, 1)
+	object.defineBuiltinFunction(realm, CMString("push"), push, 1)
+	object.defineBuiltinFunction(realm, CMString("pop"), pop, 0)
+	object.defineBuiltinFunction(realm, CMString("map"), arrayMap, 1)
+	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
+	object.defineBuiltinFunction(realm, CMString("includes"), includes, 1)
+	object.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
+	object.defineBuiltinFunction(realm, CMString("find"), find, 1)
+	object.defineBuiltinFunction(realm, CMString("findIndex"), findIndex, 1)
+	object.defineBuiltinFunction(realm, CMString("findLast"), findLast, 1)
+	object.defineBuiltinFunction(realm, CMString("findLastIndex"), findLastIndex, 1)
+	object.defineBuiltinFunction(realm, CMString("lastIndexOf"), lastIndexOf, 1)
+	object.defineBuiltinFunction(realm, CMString("at"), at, 1)
+	object.defineBuiltinFunction(realm, CMString("every"), every, 1)
+	object.defineBuiltinFunction(realm, CMString("some"), some, 1)
+	object.defineBuiltinFunction(realm, CMString("with"), with, 2)
+	object.defineBuiltinFunction(realm, CMString("from"), from, 1)
+	object.defineBuiltinFunction(realm, CMString("entries"), entries, 0)
+	object.defineBuiltinFunction(realm, CMString("keys"), keys, 0)
+	object.defineBuiltinFunction(realm, CMString("values"), values, 0)
+	object.defineBuiltinFunction(realm, CMString("shift"), shift, 0)
+	object.defineBuiltinFunction(realm, CMString("unshift"), unshift, 1)
+	object.defineBuiltinFunction(realm, CMString("filter"), filter, 1)
+	object.defineBuiltinFunction(realm, CMString("reduce"), reduce, 1)
+	object.defineBuiltinFunction(realm, CMString("reduceRight"), reduceRight, 1)
+	object.defineBuiltinFunction(realm, CMString("concat"), concat, 1)
+	object.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
+	object.defineBuiltinFunction(realm, CMString("fill"), fill, 1)
+	object.defineBuiltinFunction(realm, CMString("copyWithin"), copyWithin, 2)
+	object.defineBuiltinFunction(realm, CMString("reverse"), reverse, 0)
+	object.defineBuiltinFunction(realm, CMString("toReversed"), toReversed, 0)
+	object.defineBuiltinFunction(realm, CMString("sort"), sort, 1)
+	object.defineBuiltinFunction(realm, CMString("toSorted"), toSorted, 1)
+	object.defineBuiltinFunction(realm, CMString("flat"), flat, 0)
+	object.defineBuiltinFunction(realm, CMString("flatMap"), flatMap, 1)
+	object.defineBuiltinFunction(realm, CMString("splice"), splice, 2)
+	object.defineBuiltinFunction(realm, CMString("toSpliced"), toSpliced, 2)
 
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
 	unscopablesProps := []string{
