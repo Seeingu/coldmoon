@@ -10,11 +10,11 @@ type BooleanValue struct {
 }
 
 var (
-	FalseValue = &BooleanValue{Data: false}
-	TrueValue  = &BooleanValue{Data: true}
+	FalseValue = NewValue(&BooleanValue{Data: false})
+	TrueValue  = NewValue(&BooleanValue{Data: true})
 )
 
-func NewBooleanValue(data bool) *BooleanValue {
+func NewBooleanValue(data bool) Value {
 	if data {
 		return TrueValue
 	} else {

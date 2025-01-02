@@ -41,6 +41,8 @@ type Value interface {
 	ToBoolean() bool
 	Call(this Value, argumentsList ArgumentsList) Value
 	CallNoArgs(this Value) Value
+	// --- internal methods ---
+
 	ToCompletion() CompletionValue
 	ToPropertyDescriptor() *PropertyDescriptor
 }

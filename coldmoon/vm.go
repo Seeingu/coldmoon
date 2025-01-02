@@ -175,6 +175,7 @@ func (vm *VM) execute(i Instruction) {
 			value = r.GetValue(agent)
 		}
 
+		// TODO: when base value refactor is done, use baseValue.TypeString()
 		switch v := value.(type) {
 		case *undefinedValue:
 			vm.result = NewStringValue("undefined")
@@ -196,6 +197,8 @@ func (vm *VM) execute(i Instruction) {
 			} else {
 				vm.result = NewStringValue("object")
 			}
+		case *BaseValue:
+			vm.result = v.TypeString()
 		default:
 			panic("unreachable")
 		}
