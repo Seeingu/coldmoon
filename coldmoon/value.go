@@ -44,6 +44,16 @@ type Value interface {
 	ToCompletion() CompletionValue
 }
 
+// TODO(C): we should use convertable
+func NewPropertyDescriptorFromValue(value Value) *PropertyDescriptor {
+	return &PropertyDescriptor{
+		Value:        value,
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: true,
+	}
+}
+
 // MARK: - UndefinedValue
 
 type undefinedValue struct {

@@ -69,6 +69,7 @@ func DefineBuiltinFunctionWithAttributes(object ObjectType,
 	})
 }
 
+// Deprecated
 func DefineBuiltinPropertyP(object ObjectType, name string, p *PropertyDescriptor) {
 	object.DefinePropertyOrThrow(NewStringPropertyKey(name), p)
 }
@@ -83,6 +84,7 @@ type BuiltinPropertyParams struct {
 	Value               Value
 }
 
+// Deprecated: use object.DefineBuiltinProperty
 func DefineBuiltinProperty(object ObjectType, params BuiltinPropertyParams) {
 	var pk PropertyKey
 	if params.WellKnownSymbolsKey.Nil() {
@@ -102,6 +104,7 @@ func DefineBuiltinProperty(object ObjectType, params BuiltinPropertyParams) {
 	}
 }
 
+// Deprecated: use object.defineToStringTag
 func DefineToStringTagBuiltinProperty(object ObjectType, name string) {
 	DefineBuiltinProperty(object, BuiltinPropertyParams{
 		WellKnownSymbolsKey: WellKnownSymbolsToStringTag,
@@ -114,10 +117,7 @@ func DefineToStringTagBuiltinProperty(object ObjectType, name string) {
 	})
 }
 
-type PropertyConvertable interface {
-	ToPropertyKey() PropertyKey
-}
-
+// Deprecated
 func DefineBuiltinPropertyValue(object ObjectType, p PropertyConvertable, value Value) {
 	descriptor := &PropertyDescriptor{
 		Value:        value,

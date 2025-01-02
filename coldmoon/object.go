@@ -30,6 +30,8 @@ type Object struct {
 	ref ObjectType
 }
 
+var _ ObjectType = (*Object)(nil)
+
 func (o *Object) ToObject() *Object {
 	return o
 }
@@ -1000,4 +1002,38 @@ func SameObject(o1, o2 ObjectType) bool {
 
 func (o *Object) String() string {
 	return fmt.Sprintf("Object[%s]", o.typeName)
+}
+
+func (o *Object) defineBuiltinProperty(name PropertyConvertable, desc *PropertyDescriptor) {
+	o.Ref().DefinePropertyOrThrow(name.ToPropertyKey(), desc)
+}
+
+func (o *Object) defineToStringTag(name string) {
+	o.Ref().defineBuiltinProperty(
+		WellKnownSymbolsToStringTag,
+		NewPropertyDescriptorFromValue(
+			NewStringValue(name)),
+	)
+}
+
+func (o *Object) defineUnscopables(value Value) {
+	o.Ref().defineBuiltinProperty(
+		WellKnownSymbolsUnscopables,
+		NewPropertyDescriptorFromValue(value),
+	)
+}
+
+func (o *Object) defineBuiltinFunction(realm *Realm,
+	name PropertyConvertable,
+	fn BehaviorFn,
+	length JSInt,
+) {
+	f := CreateBuiltinFunctionV2(
+		realm.Agent,
+		fn,
+		length,
+		name,
+		builtinFunctionArgs{realm: realm},
+	)
+	o.defineBuiltinProperty(name, NewPropertyDescriptorFromValue(f.ToValue()))
 }

@@ -37,8 +37,22 @@ type ObjectType interface {
 	PrivateGet(privateName PrivateName) Value
 	ToCompletion() CompletionValue
 	ToValue() Value
+	// --- internal methods ---
+
 	String() string
 	Ref() ObjectType
+	// defineBuiltinProperty is an alias of DefinePropertyOrThrow
+	// used to define internal property
+	defineBuiltinProperty(name PropertyConvertable, desc *PropertyDescriptor)
+	// defineToStringTag defines @@toStringTag
+	defineToStringTag(name string)
+	defineUnscopables(value Value)
+	defineBuiltinFunction(
+		realm *Realm,
+		name PropertyConvertable,
+		fn BehaviorFn,
+		length JSInt,
+	)
 }
 
 func ObjectIs[O ObjectType](o ObjectType) bool {

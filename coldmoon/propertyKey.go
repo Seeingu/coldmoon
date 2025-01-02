@@ -5,6 +5,10 @@ import (
 	"strconv"
 )
 
+type PropertyConvertable interface {
+	ToPropertyKey() PropertyKey
+}
+
 type PropertyKey interface {
 	PropertyKeyOrPrivateName
 	Hash() string
