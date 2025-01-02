@@ -692,15 +692,16 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
-		return CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindKeyAndValue).ToValue()
+		return CreateArrayIterator(agent, o, objectOwnPropertiesKindKeyAndValue).ToValue()
 	}
 	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
-		return CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindKey).ToValue()
+		return CreateArrayIterator(agent, o, objectOwnPropertiesKindKey).ToValue()
 	}
 	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
-		return CreateArrayIterator(agent, o.(*ArrayObject), objectOwnPropertiesKindValue).ToValue()
+		iterator := CreateArrayIterator(agent, o, objectOwnPropertiesKindValue).ToValue()
+		return iterator
 	}
 	var shift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := ValueToObject(agent, this)
@@ -1363,7 +1364,6 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "splice", splice, 2, realm)
 	DefineBuiltinFunction(object, "toSpliced", toSpliced, 2, realm)
 
-	var unscopablesValue Value
 	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
 	unscopablesProps := []string{
 		"at",
@@ -1387,13 +1387,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		unscopablesList.CreateDataPropertyOrThrow(NewStringPropertyKey(prop), NewBooleanValue(true))
 	}
 
-	DefineBuiltinPropertyP(object, "@@unscopables", &PropertyDescriptor{
-		Value:        unscopablesValue,
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
-	DefineBuiltinPropertyP(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
+	object.defineUnscopables(unscopablesList.ToValue())
+	value := object.PropertyStorage().Get(NewStringPropertyKey("values"))
+	object.defineBuiltinProperty(WellKnownSymbolsIterator, value)
 
 	return object
 }

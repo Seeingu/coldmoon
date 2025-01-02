@@ -42,6 +42,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.ObjectPrototype = NewObjectPrototypeSkeleton(r)
 	NewFunctionPrototypeWithIntrinsicsBinding(r)
 	r.Intrinsics.ObjectPrototype = NewObjectPrototypeWithObject(r, r.Intrinsics.ObjectPrototype)
+	// TODO(C): Register without restricted dependency order
 	r.Intrinsics.BooleanPrototype = NewBooleanPrototype(r)
 	r.Intrinsics.BooleanConstructor = NewBooleanConstructor(r)
 	r.Intrinsics.ThrowTypeError = NewThrowTypeError(r)
@@ -58,6 +59,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.FunctionConstructor = NewFunctionConstructor(r)
 	r.Intrinsics.ArrayPrototype = NewArrayPrototype(r)
 	r.Intrinsics.ArrayConstructor = NewArrayConstructor(r)
+	r.Intrinsics.IteratorPrototype = NewIteratorPrototype(r)
 	r.Intrinsics.ArrayIteratorPrototype = NewArrayIteratorPrototype(r)
 	r.Intrinsics.ArrayPrototypeValues = MustGetObject(r.Intrinsics.ArrayPrototype.PropertyStorage().Get(NewStringPropertyKey("values")).Value)
 	r.Intrinsics.ArrayBufferPrototype = NewArrayBufferPrototype(r)
@@ -65,7 +67,6 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.StringPrototype = NewStringPrototype(r)
 	r.Intrinsics.StringConstructor = NewStringConstructor(r)
 	r.Intrinsics.StringIteratorPrototype = NewStringIteratorPrototype(r)
-	r.Intrinsics.IteratorPrototype = NewIteratorPrototype(r)
 	r.Intrinsics.GeneratorFunctionPrototype = NewGeneratorFunctionPrototype(r)
 	r.Intrinsics.GeneratorFunctionConstructor = NewGeneratorFunctionConstructor(r)
 	r.Intrinsics.GeneratorFunctionPrototypePrototype = NewGeneratorPrototype(r)

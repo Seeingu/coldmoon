@@ -35,6 +35,13 @@ const a = [1,2,3]
 for (const i in a) {
 	assert(i === '0' || i === '1' || i === '2');
 }
+
+const array1 = ['a', 'b', 'c'];
+const iterator1 = array1[Symbol.iterator]();
+
+for (const value of iterator1) {
+    assert(value === 'a' || value === 'b' || value === 'c');
+}
 `,
 		`
 const foo = function* () {
