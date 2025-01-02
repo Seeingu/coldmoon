@@ -658,6 +658,7 @@ func (i *ILoadIterator) String() string {
 	return "ILoadIterator"
 }
 
+// 14.7.5.4
 type IForDeclarationBindingInstantiation struct {
 	Instruction
 	LexicalDeclaration *DeclarationLexical

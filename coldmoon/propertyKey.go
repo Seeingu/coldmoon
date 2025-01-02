@@ -30,7 +30,7 @@ func NewSymbolPropertyKey(value *SymbolValue) SymbolPropertyKey {
 
 // TODO: use as index key
 func NewIntegerIndexPropertyKey(value JSInt) StringPropertyKey {
-	return NewStringPropertyKey(fmt.Sprintf("%f", value.ToNumber()))
+	return NewStringPropertyKey(fmt.Sprintf("%d", value))
 }
 
 type StringPropertyKey struct {

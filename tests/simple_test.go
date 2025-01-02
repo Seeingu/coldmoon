@@ -33,6 +33,7 @@ func TestBaseline(t *testing.T) {
 		`
 const a = [1,2,3]
 for (const i in a) {
+	assert(i === '0' || i === '1' || i === '2');
 }
 `,
 		`
