@@ -16,7 +16,7 @@ func main() {
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	runtime.DefineConsole(realm)
+	runtime.RegisterTerminalRuntime(realm)
 
 	// get args, if is file, read file and evaluate
 	args := os.Args[1:]
