@@ -53,6 +53,10 @@ type ObjectType interface {
 		fn BehaviorFn,
 		length JSInt,
 	)
+	defineBuiltinAccessor(
+		realm *Realm,
+		params BuiltinAccessorParams,
+	)
 }
 
 func ObjectIs[O ObjectType](o ObjectType) bool {

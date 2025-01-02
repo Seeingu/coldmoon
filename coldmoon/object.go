@@ -1023,7 +1023,8 @@ func (o *Object) defineUnscopables(value Value) {
 	)
 }
 
-func (o *Object) defineBuiltinFunction(realm *Realm,
+func (o *Object) defineBuiltinFunction(
+	realm *Realm,
 	name PropertyConvertable,
 	fn BehaviorFn,
 	length JSInt,
@@ -1036,4 +1037,37 @@ func (o *Object) defineBuiltinFunction(realm *Realm,
 		builtinFunctionArgs{realm: realm},
 	)
 	o.defineBuiltinProperty(name, NewPropertyDescriptorFromValue(f.ToValue()))
+}
+
+func (o *Object) defineBuiltinAccessor(realm *Realm, params BuiltinAccessorParams) {
+	getter := params.Getter
+	setter := params.Setter
+	var name string
+	if params.WellKnownSymbolsKey.Nil() {
+		name = params.Name
+	} else {
+		name = params.WellKnownSymbolsKey.ToName()
+	}
+	var get ObjectType
+	if getter != nil {
+		funName := "get " + name
+		get = CreateBuiltinFunction(realm.Agent, getter, 0, funName, builtinFunctionArgs{realm: realm})
+	}
+	var set ObjectType
+	if setter != nil {
+		funName := "set " + name
+		set = CreateBuiltinFunction(realm.Agent, setter, 1, funName, builtinFunctionArgs{realm: realm})
+	}
+	var pk PropertyKey
+	if !params.WellKnownSymbolsKey.Nil() {
+		pk = params.WellKnownSymbolsKey.ToPropertyKey()
+	} else {
+		pk = NewStringPropertyKey(name)
+	}
+	o.DefinePropertyOrThrow(pk, &PropertyDescriptor{
+		Get:          get,
+		Set:          set,
+		Enumerable:   false,
+		Configurable: true,
+	})
 }

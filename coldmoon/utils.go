@@ -141,6 +141,7 @@ type BuiltinAccessorParams struct {
 	Setter              BehaviorFn
 }
 
+// Deprecated: use object.defineBuiltinAccessor
 func DefineBuiltinAccessorV2(
 	realm *Realm,
 	object ObjectType,
