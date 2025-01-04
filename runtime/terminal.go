@@ -10,5 +10,6 @@ func RegisterTerminalRuntime(realm *coldmoon.Realm) {
 	global.CreateDataProperty(coldmoon.CMString("console").ToPropertyKey(), console.ToValue())
 
 	// --- Non standard---
+	defineAssert(realm)
 	definePrint(realm)
 }
