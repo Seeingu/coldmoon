@@ -13,6 +13,7 @@ import (
 
 func main() {
 	Debug.Enable()
+	InitializeConstants()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()

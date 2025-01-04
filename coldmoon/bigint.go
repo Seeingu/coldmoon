@@ -7,6 +7,8 @@ type BigIntValue struct {
 	Data *big.Int
 }
 
+var bigZero = big.NewInt(0)
+
 var _ Value = (*BigIntValue)(nil)
 
 func NewBigIntValue(v *big.Int) *BigIntValue {

@@ -10,8 +10,10 @@ type BooleanValue struct {
 }
 
 var (
-	FalseValue = NewValue(&BooleanValue{Data: false})
-	TrueValue  = NewValue(&BooleanValue{Data: true})
+	FalseValue = &BooleanValue{
+		Data: false,
+	}
+	TrueValue = &BooleanValue{Data: true}
 )
 
 func NewBooleanValue(data bool) Value {
@@ -24,20 +26,12 @@ func NewBooleanValue(data bool) Value {
 
 var _ Value = (*BooleanValue)(nil)
 
-func (b *BooleanValue) ToCompletion() CompletionValue {
-	return NewCompletionValue(b)
-}
-
 func (b *BooleanValue) String() string {
 	if b.Data {
 		return "true"
 	} else {
 		return "false"
 	}
-}
-
-func (b *BooleanValue) ToBoolean() bool {
-	return b.Data
 }
 
 // MARK: - BooleanObject

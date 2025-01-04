@@ -175,6 +175,7 @@ func TestHarness(t *testing.T) {
 	}
 
 	agent := NewAgent()
+	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	for _, f := range files {

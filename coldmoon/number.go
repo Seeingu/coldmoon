@@ -69,10 +69,18 @@ type NumberValue struct {
 var _ Value = (*NumberValue)(nil)
 
 func NewNumberValue(v JSNumber) *NumberValue {
-	return &NumberValue{
+	n := &NumberValue{
 		Data: v,
 	}
+	n.Value = NewBaseValue(n)
+	return n
 }
+
+var (
+	NaNValue              = NewNumberValue(JSNumberNaN)
+	InfinityValue         = NewNumberValue(JSNumberInf)
+	NegativeInfinityValue = NewNumberValue(JSNumberNegInf)
+)
 
 func (n *NumberValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(n)
@@ -150,16 +158,12 @@ func (n *NumberValue) Floor() JSNumber {
 
 // 6.1.6.1.1
 func (n *NumberValue) UnaryMinus() *NumberValue {
-	return &NumberValue{
-		Data: -n.Data,
-	}
+	return NewNumberValue(-n.Data)
 }
 
 // 6.1.6.1.2
 func (n *NumberValue) BitwiseNot() *NumberValue {
-	return &NumberValue{
-		Data: JSNumber(^int64(n.Data)),
-	}
+	return NewNumberValue(JSNumber(^int64(n.Data)))
 }
 
 // 6.1.6.1.3

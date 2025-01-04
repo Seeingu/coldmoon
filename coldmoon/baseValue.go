@@ -4,8 +4,6 @@ type BaseValue struct {
 	Value
 }
 
-var _ Value = (*BaseValue)(nil)
-
 func (b *BaseValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(b.Value)
 }
@@ -47,7 +45,34 @@ func (b *BaseValue) TypeString() *StringValue {
 	}
 }
 
-func NewValue(v Value) Value {
+func (b *BaseValue) ToBoolean() bool {
+	switch v := b.Value.(type) {
+	case *BooleanValue:
+		return v.Data
+	case *NumberValue:
+		return v.Data != 0 && !v.Data.IsNaN()
+	case *StringValue:
+		return v.Data != ""
+	case *SymbolValue:
+		return true
+	case *BigIntValue:
+		return v.Data.Cmp(bigZero) != 0
+	case *ObjectValue:
+		return true
+	case *nullValue:
+		return false
+	case *undefinedValue:
+		return false
+	default:
+		panic("unreachable")
+	}
+}
+
+func (b *BaseValue) String() string {
+	return b.Value.String()
+}
+
+func NewBaseValue(v Value) Value {
 	b := &BaseValue{
 		Value: v,
 	}

@@ -197,8 +197,6 @@ func (vm *VM) execute(i Instruction) {
 			} else {
 				vm.result = NewStringValue("object")
 			}
-		case *BaseValue:
-			vm.result = v.TypeString()
 		default:
 			panic("unreachable")
 		}

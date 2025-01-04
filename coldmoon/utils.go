@@ -205,3 +205,11 @@ func BindPrototypeAndConstructor(proto ObjectType, constructor ObjectType) {
 
 	DefineBuiltinPropertyV(proto, "constructor", constructor.ToValue())
 }
+
+// InitializeConstants initializes static constants
+func InitializeConstants() {
+	FalseValue.Value = NewBaseValue(FalseValue)
+	TrueValue.Value = NewBaseValue(TrueValue)
+	UndefinedValue.Value = NewBaseValue(UndefinedValue)
+	NullValue.Value = NewBaseValue(NullValue)
+}

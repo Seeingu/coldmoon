@@ -9,6 +9,7 @@ import (
 func testSource(t *testing.T, s string) {
 	Debug.Enable()
 	agent := NewAgent()
+	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	sourceText := s

@@ -57,46 +57,6 @@ func NewPropertyDescriptorFromValue(value Value) *PropertyDescriptor {
 	}
 }
 
-// MARK: - UndefinedValue
-
-type undefinedValue struct {
-	Value
-}
-
-var _ Value = (*undefinedValue)(nil)
-
-func (u *undefinedValue) ToCompletion() CompletionValue {
-	return NewCompletionValue(u)
-}
-
-func (u *undefinedValue) String() string {
-	return "undefined"
-}
-
-func (u *undefinedValue) ToBoolean() bool {
-	return false
-}
-
-var UndefinedValue = &undefinedValue{}
-
-type nullValue struct {
-	Value
-}
-
-var _ Value = (*nullValue)(nil)
-
-func (n *nullValue) String() string {
-	return "null"
-}
-
-func (n *nullValue) ToBoolean() bool {
-	return false
-}
-
-func (n *nullValue) ToCompletion() CompletionValue {
-	return NewCompletionValue(n)
-}
-
 type StringValue struct {
 	Value
 	Data string
@@ -122,15 +82,6 @@ func (s *StringValue) ToBoolean() bool {
 func NewStringValue(value string) *StringValue {
 	return &StringValue{Data: value}
 }
-
-var NullValue = &nullValue{}
-
-var NaNValue = &NumberValue{Data: JSNumberNaN}
-
-var (
-	InfinityValue         = &NumberValue{Data: JSNumberInf}
-	NegativeInfinityValue = &NumberValue{Data: JSNumberNegInf}
-)
 
 func NewValueFromObject(object ObjectType) Value {
 	return &ObjectValue{Object: object}
@@ -226,6 +177,7 @@ func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
 	return value
 }
 
+// TODO(C): replace with value.ToNumber
 func ToNumber(agent *Agent, value Value) *NumberValue {
 	switch value := value.(type) {
 	case *NumberValue:
@@ -233,12 +185,12 @@ func ToNumber(agent *Agent, value Value) *NumberValue {
 	case *undefinedValue:
 		return InfinityValue
 	case *nullValue:
-		return &NumberValue{Data: 0}
+		return NewNumberValue(0)
 	case *BooleanValue:
 		if value.Data {
-			return &NumberValue{Data: 1}
+			return NewNumberValue(1)
 		}
-		return &NumberValue{Data: 0}
+		return NewNumberValue(0)
 	case *StringValue:
 		return StringToNumber(value)
 	case *ObjectValue:
@@ -461,7 +413,7 @@ func ValueToObject(agent *Agent, value Value) ObjectType {
 // 7.1.4.1.1
 func StringToNumber(value *StringValue) *NumberValue {
 	if value.Data == "" {
-		return &NumberValue{Data: 0}
+		return NewNumberValue(0)
 	}
 
 	n, err := strconv.ParseFloat(strings.Trim(value.Data, " "), 64)
@@ -469,7 +421,7 @@ func StringToNumber(value *StringValue) *NumberValue {
 		return NaNValue
 	}
 
-	return &NumberValue{Data: JSNumber(n)}
+	return NewNumberValue(JSNumber(n))
 }
 
 // 7.1.14
@@ -999,6 +951,7 @@ func ParsePattern(pattern string, unicode bool, unicodeSets bool) (r *regexp2.Re
 	return
 }
 
+// Deprecated: use baseValue.TypeString
 func ValueType(value Value) string {
 	switch value.(type) {
 	case *undefinedValue:
