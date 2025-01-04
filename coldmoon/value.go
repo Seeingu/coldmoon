@@ -56,33 +56,6 @@ func NewPropertyDescriptorFromValue(value Value) *PropertyDescriptor {
 		Configurable: true,
 	}
 }
-
-type StringValue struct {
-	Value
-	Data string
-}
-
-var _ Value = (*StringValue)(nil)
-
-func (s *StringValue) ToCompletion() CompletionValue {
-	return NewCompletionValue(s)
-}
-
-func (s *StringValue) String() string {
-	return s.Data
-}
-
-func (s *StringValue) ToBoolean() bool {
-	if len(s.Data) == 0 {
-		return false
-	}
-	return true
-}
-
-func NewStringValue(value string) *StringValue {
-	return &StringValue{Data: value}
-}
-
 func NewValueFromObject(object ObjectType) Value {
 	return &ObjectValue{Object: object}
 }
@@ -431,9 +404,7 @@ func StringToBigInt(value *StringValue) (*BigIntValue, bool) {
 		return nil, false
 	}
 
-	return &BigIntValue{
-		Data: bigInt,
-	}, true
+	return NewBigIntValue(bigInt), true
 }
 
 func GetPrivateName(agent *Agent, value Value) (*PrivateName, bool) {
