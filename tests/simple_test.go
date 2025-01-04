@@ -3,6 +3,8 @@ package tests
 import (
 	"testing"
 
+	"github.com/Seeingu/coldmoon/runtime"
+
 	. "github.com/Seeingu/coldmoon/coldmoon"
 )
 
@@ -12,25 +14,25 @@ func testSource(t *testing.T, s string) {
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
+	runtime.RegisterTerminalRuntime(realm)
 	sourceText := s
-	evaluate(`
-function assert(a, msg) {
-	if (a) {
-		return;
-	}
-	if (msg) {
-		throw new Error('assertion failed: ' + msg);
-	} else {
-		throw new Error('assertion failed');
-	}
-}
-`, realm)
 	evaluate(sourceText, realm)
 	Debug.Disable()
 }
 
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
+		`
+const map1 = new Map();
+
+map1.set('0', 'foo');
+map1.set(1, 'bar');
+
+const iterator1 = map1[Symbol.iterator]();
+
+assertEqual(iterator1.next().value[0], 0);
+assertEqual(iterator1.next().value[1], 'bar');
+`,
 		`
 const map1 = new Map();
 map1.set('a', 1);

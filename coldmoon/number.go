@@ -17,6 +17,10 @@ func (n JSNumber) ToInt() JSInt {
 	return JSInt(n)
 }
 
+func (n JSNumber) IsFloatInt() bool {
+	return math.Mod(float64(n), 1.0) == 0
+}
+
 func (n JSNumber) IsNegInf() bool {
 	return n == JSNumber(math.Inf(-1))
 }
@@ -83,6 +87,9 @@ var (
 )
 
 func (n *NumberValue) String() string {
+	if n.Data.IsFloatInt() {
+		return fmt.Sprintf("%d", int64(n.Data))
+	}
 	return fmt.Sprintf("%f", n.Data)
 }
 

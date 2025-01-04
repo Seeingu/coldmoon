@@ -41,10 +41,7 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 			}
 			index++
 		}
-		if index >= numEntries {
-			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
-		}
-		mapIterator.Index = index
+		mapIterator.Index = index + 1
 		key := NewNumberValue(index.ToNumber())
 		value := entries[key.Hash()]
 

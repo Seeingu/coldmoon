@@ -10,7 +10,9 @@ func (b *BaseValue) ToCompletion() CompletionValue {
 
 func (b *BaseValue) Hash() string {
 	switch v := b.Value.(type) {
-	case *undefinedValue, *nullValue, *BooleanValue, *NumberValue, *StringValue, *SymbolValue, *BigIntValue:
+	case *undefinedValue, *nullValue, *BooleanValue, *StringValue, *SymbolValue, *BigIntValue:
+		return v.String()
+	case *NumberValue:
 		return v.String()
 	default:
 		panic("unimplemented")
