@@ -56,8 +56,11 @@ func NewPropertyDescriptorFromValue(value Value) *PropertyDescriptor {
 		Configurable: true,
 	}
 }
+
 func NewValueFromObject(object ObjectType) Value {
-	return &ObjectValue{Object: object}
+	ov := &ObjectValue{Object: object}
+	ov.Value = NewBaseValue(ov)
+	return ov
 }
 
 func ToPropertyDescriptor(agent *Agent, value Value) *PropertyDescriptor {
