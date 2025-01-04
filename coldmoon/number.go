@@ -82,10 +82,6 @@ var (
 	NegativeInfinityValue = NewNumberValue(JSNumberNegInf)
 )
 
-func (n *NumberValue) ToCompletion() CompletionValue {
-	return NewCompletionValue(n)
-}
-
 func (n *NumberValue) String() string {
 	return fmt.Sprintf("%f", n.Data)
 }
@@ -107,13 +103,6 @@ func (n *NumberValue) ToString(radix JSInt) string {
 		return "0"
 	}
 	return strconv.FormatFloat(n.Data.ToFloat(), 'f', -1, 64)
-}
-
-func (n *NumberValue) ToBoolean() bool {
-	if n.Data == 0 || math.IsNaN(n.Data.ToFloat()) {
-		return false
-	}
-	return true
 }
 
 func (n *NumberValue) IsNaN() bool {
