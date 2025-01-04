@@ -39,6 +39,8 @@ type ArgumentsList []Value
 type Value interface {
 	String() string
 	ToBoolean() bool
+	ToNumber(agent *Agent) *NumberValue
+
 	Call(this Value, argumentsList ArgumentsList) Value
 	CallNoArgs(this Value) Value
 	// --- internal methods ---
@@ -171,11 +173,6 @@ func ToNumber(agent *Agent, value Value) *NumberValue {
 		return StringToNumber(value)
 	case *ObjectValue:
 		primValue := ToPrimitive(agent, value, PreferredTypeNumber)
-
-		if _, ok := primValue.(*ObjectValue); !ok {
-			Assert(false)
-		}
-
 		return ToNumber(agent, primValue)
 	}
 	panic("TypeError")
@@ -364,6 +361,7 @@ func ToBigUint64(agent *Agent, value Value) uint64 {
 }
 
 // 7.1.18
+// TODO(P): use baseValue
 func ValueToObject(agent *Agent, value Value) ObjectType {
 	realm := agent.CurrentRealm()
 	switch v := value.(type) {

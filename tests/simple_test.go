@@ -32,6 +32,18 @@ function assert(a, msg) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`
+const object1 = {
+    [Symbol.toPrimitive](hint) {
+        if (hint === 'number') {
+            return 42;
+        }
+        return null;
+    },
+};
+
+assert(+object1 === 42);
+`,
+		`
 const a = [1,2,3]
 for (const i in a) {
 	assert(i === '0' || i === '1' || i === '2');

@@ -1073,3 +1073,26 @@ func (o *Object) defineBuiltinAccessor(realm *Realm, params BuiltinAccessorParam
 		Configurable: true,
 	})
 }
+
+func (o *Object) defineBuiltinFunctionWithAttributes(
+	realm *Realm,
+	name PropertyConvertable,
+	fn BehaviorFn,
+	length JSInt,
+	attr PropertyDescriptorAttributes,
+) {
+	functionName := name
+	f := CreateBuiltinFunctionV2(
+		realm.Agent,
+		fn,
+		length,
+		functionName,
+		builtinFunctionArgs{realm: realm},
+	)
+	o.defineBuiltinProperty(name, &PropertyDescriptor{
+		Value:        f.ToValue(),
+		Writable:     attr.Writable,
+		Configurable: attr.Configurable,
+		Enumerable:   attr.Enumerable,
+	})
+}

@@ -18,6 +18,34 @@ func (b *BaseValue) ToPropertyDescriptor() *PropertyDescriptor {
 	}
 }
 
+func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
+	switch value := b.Value.(type) {
+	case *NumberValue:
+		return value
+	case *undefinedValue:
+		return InfinityValue
+	case *nullValue:
+		return NewNumberValue(0)
+	case *BooleanValue:
+		if value.Data {
+			return NewNumberValue(1)
+		}
+		return NewNumberValue(0)
+	case *StringValue:
+		return StringToNumber(value)
+	case *ObjectValue:
+		primValue := ToPrimitive(agent, value, PreferredTypeNumber)
+
+		if _, ok := primValue.(*ObjectValue); !ok {
+			Assert(false)
+		}
+
+		return ToNumber(agent, primValue)
+	}
+	agent.ThrowTypeError("TypeError")
+	return nil
+}
+
 func (b *BaseValue) TypeString() *StringValue {
 	switch v := b.Value.(type) {
 	case *undefinedValue:

@@ -57,6 +57,14 @@ type ObjectType interface {
 		realm *Realm,
 		params BuiltinAccessorParams,
 	)
+
+	defineBuiltinFunctionWithAttributes(
+		realm *Realm,
+		name PropertyConvertable,
+		fn BehaviorFn,
+		length JSInt,
+		attr PropertyDescriptorAttributes,
+	)
 }
 
 func ObjectIs[O ObjectType](o ObjectType) bool {

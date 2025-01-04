@@ -491,6 +491,10 @@ func (p *MethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
 	})
 }
 
+func (p *MethodDefinition) String() string {
+	return "MethodDefinition " + p.PropertyName.String()
+}
+
 // MARK: - FieldDefinition
 
 type FieldDefinition struct {
@@ -572,7 +576,6 @@ func (p *PropertyNameComputed) Bytecode(e *Executable, c *BytecodeContext) {
 	if ExpressionAnalyze(p.Expression, AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
-	e.AddInstruction(InsLoad)
 }
 
 // MARK: - FunctionExpression

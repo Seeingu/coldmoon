@@ -196,11 +196,14 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 
 	DefineBuiltinFunction(object, "toString", toString, 0, realm)
 	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
-	DefineBuiltinFunctionWithAttributes(object, "@@toPrimitive", toPrimitive, 0, realm, PropertyDescriptorAttributes{
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	object.defineBuiltinFunctionWithAttributes(
+		realm,
+		WellKnownSymbolsToPrimitive, toPrimitive, 0,
+		PropertyDescriptorAttributes{
+			Writable:     false,
+			Enumerable:   false,
+			Configurable: true,
+		})
 	DefineToStringTagBuiltinProperty(object, "Symbol")
 
 	return object

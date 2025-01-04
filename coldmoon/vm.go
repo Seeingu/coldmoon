@@ -474,7 +474,7 @@ func (vm *VM) execute(i Instruction) {
 		}
 	case *IObjectDefineMethod:
 		propertyName := vm.stack.Pop()
-		object := MustGetObject(vm.stack.Pop())
+		object := ValueToObject(agent, vm.stack.Pop())
 		vm.MethodDefinitionEvaluation(methodDefinitionArgs{
 			PropertyName:             propertyName,
 			MethodType:               MethodDefinitionTypeMethod,
@@ -483,6 +483,7 @@ func (vm *VM) execute(i Instruction) {
 			AsyncFunctionExpression:  ins.AsyncFunctionExpression,
 			AsyncGeneratorExpression: ins.AsyncGeneratorExpression,
 		}, object, true)
+		vm.result = object.ToValue()
 	case *IObjectSpreadValue:
 		fromValue := vm.stack.Pop()
 		toValue := vm.stack.Pop()
@@ -1233,7 +1234,7 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 			nil,
 		)
 		SetFunctionName(methodDef.Closure, methodDef.Key, "")
-		DefineMethodProperty(object, methodDef.Key, methodDef.Closure, enumerable)
+		return &PrivateMethodDefinition{PrivateElement: DefineMethodProperty(object, methodDef.Key, methodDef.Closure, enumerable)}
 	case MethodDefinitionTypeGet:
 		propKeyOrPrivateName := propertyName
 		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment

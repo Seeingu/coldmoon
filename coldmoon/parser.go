@@ -2129,8 +2129,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 	var propertyName PropertyName
 	p.tokenizer.store()
 
-	// Prec: TComma + 1
-	accept := p.acceptContext(TYield)
+	accept := p.acceptContextHigherThan(TComma)
 	switch t.Type {
 	case TDotDotDot:
 		p.tokenizer.Next()
@@ -2138,7 +2137,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		return &PropertyDefinitionSpread{
 			Spread: expr,
 		}
-	case TIdentifier:
+	default:
 		if method, ok := parserRecoverOk(p, func() *MethodDefinition {
 			return p.methodDefinition(MethodDefinitionTypeNil)
 		}); ok {
