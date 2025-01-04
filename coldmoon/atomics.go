@@ -253,20 +253,20 @@ func NewAtomics(realm *Realm) ObjectType {
 		value := argumentsList[2]
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpXor)
 	}
-	DefineBuiltinFunction(object, "add", atomicsAdd, 3, realm)
-	DefineBuiltinFunction(object, "and", atomicsAnd, 3, realm)
-	DefineBuiltinFunction(object, "compareExchange", atomicsCompareExchange, 4, realm)
-	DefineBuiltinFunction(object, "exchange", atomicsExchange, 3, realm)
-	DefineBuiltinFunction(object, "isLockFree", atomicsIsLockFree, 1, realm)
-	DefineBuiltinFunction(object, "load", atomicsLoad, 2, realm)
-	DefineBuiltinFunction(object, "or", atomicsOr, 3, realm)
-	DefineBuiltinFunction(object, "store", atomicsStore, 3, realm)
-	DefineBuiltinFunction(object, "sub", atomicsSub, 3, realm)
-	DefineBuiltinFunction(object, "wait", atomicsWait, 4, realm)
-	DefineBuiltinFunction(object, "notify", atomicsNotify, 3, realm)
-	DefineBuiltinFunction(object, "xor", atomicsXor, 3, realm)
+	object.defineBuiltinFunction(realm, CMString("add"), atomicsAdd, 3)
+	object.defineBuiltinFunction(realm, CMString("and"), atomicsAnd, 3)
+	object.defineBuiltinFunction(realm, CMString("compareExchange"), atomicsCompareExchange, 4)
+	object.defineBuiltinFunction(realm, CMString("exchange"), atomicsExchange, 3)
+	object.defineBuiltinFunction(realm, CMString("isLockFree"), atomicsIsLockFree, 1)
+	object.defineBuiltinFunction(realm, CMString("load"), atomicsLoad, 2)
+	object.defineBuiltinFunction(realm, CMString("or"), atomicsOr, 3)
+	object.defineBuiltinFunction(realm, CMString("store"), atomicsStore, 3)
+	object.defineBuiltinFunction(realm, CMString("sub"), atomicsSub, 3)
+	object.defineBuiltinFunction(realm, CMString("wait"), atomicsWait, 4)
+	object.defineBuiltinFunction(realm, CMString("notify"), atomicsNotify, 3)
+	object.defineBuiltinFunction(realm, CMString("xor"), atomicsXor, 3)
 
-	DefineToStringTagBuiltinProperty(object, "Atomics")
+	object.defineToStringTag("Atomics")
 	return object
 }
 
