@@ -122,13 +122,13 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(JSNumber(len(m.MapValue.Data)))
 	}
 	var mapEntries BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return (CreateMapIterator(agent, this, objectOwnPropertiesKindKeyAndValue)).ToValue()
+		return CreateMapIterator(agent, this, objectOwnPropertiesKindKeyAndValue).ToValue()
 	}
 	var mapKeys BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return (CreateMapIterator(agent, this, objectOwnPropertiesKindKey)).ToValue()
+		return CreateMapIterator(agent, this, objectOwnPropertiesKindKey).ToValue()
 	}
 	var mapValues BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		return (CreateMapIterator(agent, this, objectOwnPropertiesKindValue)).ToValue()
+		return CreateMapIterator(agent, this, objectOwnPropertiesKindValue).ToValue()
 	}
 	var forEach BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)
@@ -149,20 +149,19 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		return UndefinedValue
 	}
 
-	DefineBuiltinFunction(object, "clear", mapClear, 0, realm)
-	DefineBuiltinFunction(object, "delete", mapDelete, 1, realm)
-	DefineBuiltinFunction(object, "get", mapGet, 1, realm)
-	DefineBuiltinFunction(object, "has", mapHas, 1, realm)
-	DefineBuiltinFunction(object, "set", mapSet, 2, realm)
+	object.defineBuiltinFunction(realm, CMString("clear"), mapClear, 0)
+	object.defineBuiltinFunction(realm, CMString("delete"), mapDelete, 1)
+	object.defineBuiltinFunction(realm, CMString("get"), mapGet, 1)
+	object.defineBuiltinFunction(realm, CMString("has"), mapHas, 1)
+	object.defineBuiltinFunction(realm, CMString("set"), mapSet, 2)
+	object.defineBuiltinFunction(realm, CMString("entries"), mapEntries, 0)
+	object.defineBuiltinFunction(realm, CMString("keys"), mapKeys, 0)
+	object.defineBuiltinFunction(realm, CMString("values"), mapValues, 0)
+	object.defineBuiltinFunction(realm, CMString("forEach"), forEach, 1)
+	object.defineBuiltinProperty(WellKnownSymbolsIterator, object.PropertyStorage().Get(NewStringPropertyKey("entries")))
+	object.defineToStringTag("Map")
 	object.defineBuiltinAccessor(realm, CMString("size"), builtinAccessorParams{
 		Getter: size,
 	})
-	DefineBuiltinFunction(object, "entries", mapEntries, 0, realm)
-	DefineBuiltinFunction(object, "keys", mapKeys, 0, realm)
-	DefineBuiltinFunction(object, "values", mapValues, 0, realm)
-	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
-
-	DefineBuiltinPropertyP(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("entries")))
-	DefineToStringTagBuiltinProperty(object, "Map")
 	return object
 }
