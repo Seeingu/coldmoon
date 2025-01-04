@@ -54,8 +54,7 @@ type ObjectType interface {
 		length JSInt,
 	)
 	defineBuiltinAccessor(
-		realm *Realm,
-		params BuiltinAccessorParams,
+		realm *Realm, pname PropertyConvertable, params builtinAccessorParams,
 	)
 
 	defineBuiltinFunctionWithAttributes(

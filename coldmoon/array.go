@@ -265,9 +265,8 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	var getter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		return this
 	}
-	object.defineBuiltinAccessor(realm, BuiltinAccessorParams{
-		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
-		Getter:              getter,
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
+		Getter: getter,
 	})
 	BindPrototypeAndConstructor(realm.Intrinsics.ArrayPrototype, object)
 

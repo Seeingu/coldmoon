@@ -7,6 +7,7 @@ import (
 
 type PropertyConvertable interface {
 	ToPropertyKey() PropertyKey
+	ToName() string
 }
 
 type PropertyKey interface {

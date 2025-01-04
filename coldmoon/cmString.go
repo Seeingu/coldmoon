@@ -12,3 +12,7 @@ func (p CMString) ToPropertyKey() PropertyKey {
 func (p CMString) ToValue() Value {
 	return NewStringValue(string(p))
 }
+
+func (p CMString) ToName() string {
+	return string(p)
+}

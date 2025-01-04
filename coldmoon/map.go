@@ -154,7 +154,9 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "get", mapGet, 1, realm)
 	DefineBuiltinFunction(object, "has", mapHas, 1, realm)
 	DefineBuiltinFunction(object, "set", mapSet, 2, realm)
-	DefineBuiltinAccessor(realm, object, "size", size, nil)
+	object.defineBuiltinAccessor(realm, CMString("size"), builtinAccessorParams{
+		Getter: size,
+	})
 	DefineBuiltinFunction(object, "entries", mapEntries, 0, realm)
 	DefineBuiltinFunction(object, "keys", mapKeys, 0, realm)
 	DefineBuiltinFunction(object, "values", mapValues, 0, realm)

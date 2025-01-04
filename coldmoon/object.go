@@ -1041,15 +1041,15 @@ func (o *Object) defineBuiltinFunction(
 	o.defineBuiltinProperty(name, NewPropertyDescriptorFromValue(f.ToValue()))
 }
 
-func (o *Object) defineBuiltinAccessor(realm *Realm, params BuiltinAccessorParams) {
+type builtinAccessorParams struct {
+	Getter BehaviorFn
+	Setter BehaviorFn
+}
+
+func (o *Object) defineBuiltinAccessor(realm *Realm, pname PropertyConvertable, params builtinAccessorParams) {
 	getter := params.Getter
 	setter := params.Setter
-	var name string
-	if params.WellKnownSymbolsKey.Nil() {
-		name = params.Name
-	} else {
-		name = params.WellKnownSymbolsKey.ToName()
-	}
+	name := pname.ToName()
 	var get ObjectType
 	if getter != nil {
 		funName := "get " + name
@@ -1060,12 +1060,7 @@ func (o *Object) defineBuiltinAccessor(realm *Realm, params BuiltinAccessorParam
 		funName := "set " + name
 		set = CreateBuiltinFunction(realm.Agent, setter, 1, funName, builtinFunctionArgs{realm: realm})
 	}
-	var pk PropertyKey
-	if !params.WellKnownSymbolsKey.Nil() {
-		pk = params.WellKnownSymbolsKey.ToPropertyKey()
-	} else {
-		pk = NewStringPropertyKey(name)
-	}
+	pk := pname.ToPropertyKey()
 	o.DefinePropertyOrThrow(pk, &PropertyDescriptor{
 		Get:          get,
 		Set:          set,
