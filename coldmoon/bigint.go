@@ -12,9 +12,11 @@ var bigZero = big.NewInt(0)
 var _ Value = (*BigIntValue)(nil)
 
 func NewBigIntValue(v *big.Int) *BigIntValue {
-	return &BigIntValue{
+	b := &BigIntValue{
 		Data: v,
 	}
+	b.Value = NewBaseValue(b)
+	return b
 }
 
 func NewBigIntFromBoolean(b bool) *BigIntValue {
@@ -22,20 +24,11 @@ func NewBigIntFromBoolean(b bool) *BigIntValue {
 	if b {
 		i = 1
 	}
-	return &BigIntValue{
-		Data: big.NewInt(i),
-	}
+	return NewBigIntValue(big.NewInt(i))
 }
 
 func (b *BigIntValue) String() string {
 	return b.Data.String()
-}
-
-func (b *BigIntValue) ToBoolean() bool {
-	if b.Data.Int64() == 0 {
-		return false
-	}
-	return true
 }
 
 func (b *BigIntValue) Equal(other BigIntValue) bool {
@@ -44,72 +37,52 @@ func (b *BigIntValue) Equal(other BigIntValue) bool {
 
 // 6.1.6.2.1
 func (b *BigIntValue) UnaryMinus() *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Neg(b.Data),
-	}
+	return NewBigIntValue(new(big.Int).Neg(b.Data))
 }
 
 // 6.1.6.2.2
 func (b *BigIntValue) BitwiseNot() *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Not(b.Data),
-	}
+	return NewBigIntValue(new(big.Int).Not(b.Data))
 }
 
 // 6.1.6.2.3
 func (b *BigIntValue) Exponentiate(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Exp(b.Data, other.Data, nil),
-	}
+	return NewBigIntValue(new(big.Int).Exp(b.Data, other.Data, nil))
 }
 
 // 6.1.6.2.4
 func (b *BigIntValue) Multiply(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Mul(b.Data, other.Data),
-	}
+	return NewBigIntValue(new(big.Int).Mul(b.Data, other.Data))
 }
 
 // 6.1.6.2.5
 func (b *BigIntValue) Divide(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Div(b.Data, other.Data),
-	}
+	return NewBigIntValue(new(big.Int).Div(b.Data, other.Data))
 }
 
 // 6.1.6.2.6
 func (b *BigIntValue) Remainder(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Rem(b.Data, other.Data),
-	}
+	return NewBigIntValue(new(big.Int).Rem(b.Data, other.Data))
 }
 
 // 6.1.6.2.7
 func (b *BigIntValue) Add(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Add(b.Data, other.Data),
-	}
+	return NewBigIntValue(new(big.Int).Add(b.Data, other.Data))
 }
 
 // 6.1.6.2.8
 func (b *BigIntValue) Subtract(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Sub(b.Data, other.Data),
-	}
+	return NewBigIntValue(new(big.Int).Sub(b.Data, other.Data))
 }
 
 // 6.1.6.2.9
 func (b *BigIntValue) LeftShift(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Lsh(b.Data, uint(other.Data.Int64())),
-	}
+	return NewBigIntValue(new(big.Int).Lsh(b.Data, uint(other.Data.Int64())))
 }
 
 // 6.1.6.2.10
 func (b *BigIntValue) SignedRightShift(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Rsh(b.Data, uint(other.Data.Int64())),
-	}
+	return NewBigIntValue(new(big.Int).Rsh(b.Data, uint(other.Data.Int64())))
 }
 
 // 6.1.6.2.11
@@ -124,23 +97,17 @@ func (b *BigIntValue) LessThan(other *BigIntValue) bool {
 
 // 6.1.6.2.18
 func (b *BigIntValue) BitwiseAnd(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).And(b.Data, other.Data),
-	}
+	return NewBigIntValue(new(big.Int).And(b.Data, other.Data))
 }
 
 // 6.1.6.2.19
 func (b *BigIntValue) BitwiseXor(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Xor(b.Data, other.Data),
-	}
+	return NewBigIntValue(new(big.Int).Xor(b.Data, other.Data))
 }
 
 // 6.1.6.2.20
 func (b *BigIntValue) BitwiseOr(other *BigIntValue) *BigIntValue {
-	return &BigIntValue{
-		Data: new(big.Int).Or(b.Data, other.Data),
-	}
+	return NewBigIntValue(new(big.Int).Or(b.Data, other.Data))
 }
 
 // MARK: - BigInt Object
@@ -246,7 +213,5 @@ func NumberToBigInt(agent *Agent, number *NumberValue) *BigIntValue {
 		panic("RangeError")
 	}
 
-	return &BigIntValue{
-		Data: big.NewInt(int64(number.Data)),
-	}
+	return NewBigIntValue(big.NewInt(int64(number.Data)))
 }
