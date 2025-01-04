@@ -1,9 +1,5 @@
 package coldmoon
 
-import (
-	"github.com/Seeingu/coldmoon/pkg"
-)
-
 type SetIteratorObject struct {
 	*Object
 	SetObject *SetObject
@@ -30,14 +26,13 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 		s := setIterator.SetObject
 		index := setIterator.Index
 		kind := setIterator.Kind
-		entries := s.SetValue.Data
-		numEntries := JSInt(entries.Size())
+		entries := s.items()
+		numEntries := JSInt(s.size())
 		if index >= numEntries {
 			return (CreateIterResultObject(realm.Agent, UndefinedValue, true)).ToValue()
 		}
 		var value Value
-		allEntries := pkg.IterAll(entries.Items())
-		value = allEntries[index]
+		value = entries[index]
 		setIterator.Index = index + 1
 		var result Value
 		switch kind {

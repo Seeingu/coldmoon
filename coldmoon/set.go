@@ -2,24 +2,54 @@ package coldmoon
 
 import (
 	"github.com/Seeingu/coldmoon/pkg"
-	goset "github.com/hashicorp/go-set/v3"
 )
-
-type SetValue struct {
-	Value
-	Data *goset.HashSet[Value, string]
-}
-
-func NewSetValue() *SetValue {
-	return &SetValue{
-		Data: goset.NewHashSet[Value, string](0),
-	}
-}
 
 type SetObject struct {
 	*Object
-	SetValue *SetValue
+	data            map[string]Value
+	orderedHashKeys []string
 }
+
+// MARK: - Set Value utils
+
+// items is a helper function that returns the values of the set in insertion order.
+func (s *SetObject) items() []Value {
+	ordered := make([]Value, 0, len(s.orderedHashKeys))
+	for _, key := range s.orderedHashKeys {
+		ordered = append(ordered, s.data[key])
+	}
+	return ordered
+}
+
+func (s *SetObject) get(value Value) Value {
+	return s.data[value.Hash()]
+}
+
+func (s *SetObject) has(value Value) bool {
+	_, ok := s.data[value.Hash()]
+	return ok
+}
+
+func (s *SetObject) size() int {
+	return len(s.data)
+}
+
+func (s *SetObject) add(value Value) {
+	s.data[value.Hash()] = value
+	s.orderedHashKeys = append(s.orderedHashKeys, value.Hash())
+}
+
+func (s *SetObject) delete(value Value) {
+	s.orderedHashKeys = pkg.SliceDelete(s.orderedHashKeys, value.Hash())
+	delete(s.data, value.Hash())
+}
+
+func (s *SetObject) clear() {
+	s.data = make(map[string]Value)
+	s.orderedHashKeys = make([]string, 0)
+}
+
+// MARK: - Set
 
 func NewSetConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
@@ -30,8 +60,9 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		}
 		o := OrdinaryCreateFromConstructor(agent, newTarget, "%SetObject.prototype%", nil)
 		s := &SetObject{
-			Object:   o,
-			SetValue: NewSetValue(),
+			Object:          o,
+			data:            make(map[string]Value),
+			orderedHashKeys: make([]string, 0),
 		}
 		s.ref = s
 		if IsUndefinedOrNil(iterable) {
@@ -77,32 +108,30 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	// 24.2.3.2
 	var setClear BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		set := RequireInternalSlot[*SetObject](thisValue)
-		for item := range set.SetValue.Data.Items() {
-			set.SetValue.Data.Remove(item)
-		}
+		set.clear()
 		return UndefinedValue
 	}
 	// 24.2.3.4
 	var setDelete BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		set.SetValue.Data.Remove(value)
+		set.delete(value)
 		return TrueValue
 	}
 	// 24.2.3.7
 	var setHas BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		return NewBooleanValue(set.SetValue.Data.Contains(value))
+		return NewBooleanValue(set.has(value))
 	}
 	var setSize BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		set := RequireInternalSlot[*SetObject](thisValue)
-		return NewNumberValue(JSNumber(set.SetValue.Data.Size()))
+		return NewNumberValue(JSNumber(set.size()))
 	}
 	var setAdd BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		set.SetValue.Data.Insert(value)
+		set.add(value)
 		return thisValue
 	}
 	var setEntries BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
@@ -120,8 +149,8 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		if !IsCallable(callbackFn) {
 			return agent.ThrowTypeError("callback is not callable")
 		}
-		entries := set.SetValue.Data.Items()
-		for item := range entries {
+		entries := set.items()
+		for _, item := range entries {
 			callbackFn.Call(thisArg, []Value{item, item, thisValue})
 		}
 		return UndefinedValue

@@ -10,6 +10,16 @@ func SliceSafeGet[T any](s []T, index int) (t T) {
 	return s[index]
 }
 
+// SliceDelete removes the first occurrence of item from the slice.
+func SliceDelete[T comparable](s []T, item T) []T {
+	for i, v := range s {
+		if v == item {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
+}
+
 // IterAll returns all items in the iterator.
 func IterAll[T any](i iter.Seq[T]) (items []T) {
 	for item := range i {
