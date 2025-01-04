@@ -80,25 +80,22 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var toUTCString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		t, err := time.Parse(time.RFC3339, time.Unix(int64(tv), 0).Format(time.RFC3339))
-		if err != nil {
-			panic("RangeError")
-		}
+		t := time.UnixMilli(int64(tv)).UTC()
 		return NewStringValue(t.Format(time.RFC1123))
 	}
 	var toDateString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := MustGetObject(this).(*DateObject)
 		tv := dateObject.Data
-		if tv.IsNaN() {
-			return NewStringValue("Invalid Date")
+		if !tv.IsValidDateTime() {
+			return NewStringValue(InvalidDate)
 		}
 		return NewStringValue(DateString(LocalTime(tv)))
 	}
 	var toTimeString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := MustGetObject(this).(*DateObject)
 		tv := dateObject.Data
-		if tv.IsNaN() {
-			return NewStringValue("Invalid Date")
+		if !tv.IsValidDateTime() {
+			return NewStringValue(InvalidDate)
 		}
 		return NewStringValue(TimeString(LocalTime(tv)) + TimeZoneString(tv))
 	}
@@ -117,7 +114,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		if tv.IsNaN() {
 			return NaNValue
 		}
-		return NewNumberValue(tv - LocalTime(tv)/MS_PER_MIN)
+		return NewNumberValue(tv - LocalTime(tv)/MS_PER_MIN.ToNumber())
 	}
 	var getDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
@@ -517,19 +514,19 @@ func NewDatePrototype(realm *Realm) ObjectType {
 }
 
 const (
-	MS_PER_DAY = JSNumber(86400000)
-	MS_PER_MIN = JSNumber(60000)
+	MS_PER_DAY = JSInt(86400000)
+	MS_PER_MIN = JSInt(60000)
 )
 
 // 21.4.1.3
 func Day(t JSNumber) JSNumber {
 	// FIXME: use time package
 	msPerDay := MS_PER_DAY
-	return t / msPerDay
+	return t / msPerDay.ToNumber()
 }
 
 func TimeWithinDay(t JSNumber) JSNumber {
-	return t.Mod(MS_PER_DAY)
+	return t.Mod(MS_PER_DAY.ToNumber())
 }
 
 func DaysInYear(y JSNumber) JSNumber {
@@ -550,16 +547,16 @@ func DayFromYear(y JSNumber) JSNumber {
 }
 
 func TimeFromYear(y JSNumber) JSNumber {
-	return MS_PER_DAY * DayFromYear(y)
+	return MS_PER_DAY.ToNumber() * DayFromYear(y)
 }
 
 func YearFromTime(t JSNumber) JSNumber {
-	year := t / ((365.2425 * MS_PER_DAY) + 1970)
+	year := t / ((365.2425 * MS_PER_DAY.ToNumber()) + 1970)
 	t2 := TimeFromYear(year)
 	if t2 > t {
 		return year - 1
 	}
-	if t2+(DaysInYear(year)*MS_PER_DAY) <= t {
+	if t2+(DaysInYear(year)*MS_PER_DAY.ToNumber()) <= t {
 		return year + 1
 	}
 	return year
@@ -696,7 +693,7 @@ func HourFromTime(t JSNumber) JSNumber {
 }
 
 func MinFromTime(t JSNumber) JSNumber {
-	return (t / MS_PER_MIN).Floor().Mod(60)
+	return (t / MS_PER_MIN.ToNumber()).Floor().Mod(60)
 }
 
 func SecFromTime(t JSNumber) JSNumber {
@@ -732,14 +729,51 @@ func MakeTime(hour, min, sec, ms JSNumber) JSNumber {
 	return hour*60*60*1000 + min*60*1000 + sec*1000 + ms
 }
 
+func daysFromCivil(year, month, day JSInt) JSInt {
+	y := year
+	if month <= 2 {
+		y -= 1
+	}
+	era := y / 400
+	yoe := y - era*400
+	var doy JSInt
+	if month > 2 {
+		doy = (153*(month-3) + 2) / (5 + day - 1)
+	} else {
+		doy = (153*(month+9) + 2) / (5 + day - 1)
+	}
+	// const doe = yoe * 365 + @divTrunc(yoe, 4) - @divTrunc(yoe, 100) + doy;
+	doe := yoe*365 + yoe/4 - yoe/100 + doy
+	return era*146097 + doe - 719468
+}
+
 // 21.4.1.28
 func MakeDay(year, month, date JSNumber) JSNumber {
-	return year*12 + month*30 + date
+	if year.IsNaN() || month.IsNaN() || date.IsNaN() {
+		return JSNumberNaN
+	}
+	y := year
+	m := month
+	dt := date
+	ym := (y + m/12).ToInt()
+	if ym.IsInf() {
+		return JSNumberNaN
+	}
+	mn := JSNumber(math.Mod(float64(m), 12)).ToInt()
+	t := daysFromCivil(ym, mn+1, 1) * MS_PER_DAY
+	return Day(t.ToNumber()) + dt - 1
 }
 
 // 21.4.1.29
 func MakeDate(day, time JSNumber) JSNumber {
-	return day*MS_PER_DAY + time
+	if day.IsInf() || time.IsInf() {
+		return JSNumberNaN
+	}
+	tv := day*MS_PER_DAY.ToNumber() + time
+	if tv.IsInf() {
+		return JSNumberNaN
+	}
+	return tv
 }
 
 // 21.4.1.30
@@ -822,11 +856,13 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			Object: o,
 			Data:   dv,
 		}
-		return (d).ToValue()
+		d.ref = d
+		return d.ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 7, "Date", builtinFunctionArgs{
-		realm:     realm,
-		prototype: realm.Intrinsics.FunctionPrototype,
+		realm:         realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		isConstructor: true,
 	})
 
 	var utc BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -915,15 +951,19 @@ func TimeZoneString(tv JSNumber) string {
 
 // 21.4.4.41.4
 func ToDateString(tv JSNumber) string {
-	if tv.IsNaN() {
-		return "Invalid Date"
+	if !tv.IsValidDateTime() {
+		return InvalidDate
 	}
 	t := LocalTime(tv)
 
-	s, err := time.Parse(time.RFC3339, time.Unix(int64(t), 0).Format(time.RFC3339))
-	if err != nil {
-		return "Invalid Date"
-	}
-	// Use go standard formatter
-	return s.Format(time.UnixDate)
+	s := time.UnixMilli(int64(t))
+	return s.Format(JsDateFormat)
 }
+
+// MARK: - Date constants
+
+const (
+	JsDateFormat = "Mon Jan _2 2006 15:04:05 MST-0700"
+	DateMaxValue = 8640000000000000
+	InvalidDate  = "Invalid Date"
+)

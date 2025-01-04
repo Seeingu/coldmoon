@@ -57,6 +57,13 @@ func (n JSNumber) Floor() JSNumber {
 	return JSNumber(math.Floor(float64(n)))
 }
 
+func (n JSNumber) IsValidDateTime() bool {
+	if n.IsNaN() || n > DateMaxValue {
+		return false
+	}
+	return true
+}
+
 var (
 	JSNumberInf    = JSNumber(math.Inf(1))
 	JSNumberNegInf = JSNumber(math.Inf(-1))

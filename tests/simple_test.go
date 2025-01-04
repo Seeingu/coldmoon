@@ -23,6 +23,17 @@ func testSource(t *testing.T, s string) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`
+const utcDate1 = new Date(Date.UTC(96, 1, 2, 3, 4, 5));
+const utcDate2 = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
+
+assertEqual(utcDate1.toUTCString(), "Fri, 02 Feb 1996 03:04:05 UTC");
+assertEqual(utcDate2.toUTCString(), "Sun, 31 Dec 1899 00:00:00 UTC");
+
+// check time zone
+//assertEqual(new Date(8.64e15).toString(), "Sat Sep 13 275760 08:00:00 CST+0800"); 
+assertEqual(new Date(8.64e15 + 1).toString(), "Invalid Date"); 
+`,
+		`
 const num1 = 42;
 const num2 = 3.14;
 const num3 = Number('123');
@@ -243,7 +254,7 @@ true && 1;
 true ? 2 : 1;
 2 ** 3;
 () => 123;
-Date.UTC(2012);`,
+`,
 	}
 	for _, sourceText := range sourceTexts {
 		testSource(t, sourceText)
