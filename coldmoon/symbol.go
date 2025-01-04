@@ -9,18 +9,20 @@ type SymbolValue struct {
 	IsPrivate   bool
 }
 
+func (a *Agent) CreateSymbol(desc string) *SymbolValue {
+	s := &SymbolValue{
+		Id:          a.symbolId,
+		Description: desc,
+	}
+	a.symbolId += 1
+	s.Value = NewBaseValue(s)
+	return s
+}
+
 var _ Value = (*SymbolValue)(nil)
 
 func (s *SymbolValue) String() string {
 	return "Symbol: " + s.Description
-}
-
-func (s *SymbolValue) ToBoolean() bool {
-	return true
-}
-
-func (s *SymbolValue) ToCompletion() CompletionValue {
-	return NewCompletionValue(s)
 }
 
 // 20.4.3.3.1

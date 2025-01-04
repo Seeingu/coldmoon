@@ -125,15 +125,6 @@ func (a *Agent) GetGlobalObject() *Object {
 	return a.CurrentRealm().GlobalObject
 }
 
-func (a *Agent) CreateSymbol(desc string) *SymbolValue {
-	s := &SymbolValue{
-		Id:          a.symbolId,
-		Description: desc,
-	}
-	a.symbolId += 1
-	return s
-}
-
 // 5.2.3.2
 func (a *Agent) ThrowException(exceptionType ExceptionType, message string) Value {
 	realm := a.CurrentRealm()
