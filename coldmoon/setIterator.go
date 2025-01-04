@@ -1,19 +1,26 @@
 package coldmoon
 
+import (
+	"github.com/Seeingu/coldmoon/pkg"
+)
+
 type SetIteratorObject struct {
 	*Object
 	SetObject *SetObject
 	Kind      objectOwnPropertiesKind
-	Index     uint64
+	Index     JSInt
 }
 
 func CreateSetIterator(agent *Agent, value Value, kind objectOwnPropertiesKind) *SetIteratorObject {
-	return &SetIteratorObject{
-		Object:    NewObject(agent, agent.CurrentRealm().Intrinsics.SetIteratorPrototype, "SetIterator"),
+	realm := agent.CurrentRealm()
+	s := &SetIteratorObject{
+		Object:    NewObject(agent, realm.Intrinsics.SetIteratorPrototype, "SetIterator"),
 		SetObject: RequireInternalSlot[*SetObject](value),
 		Kind:      kind,
 		Index:     0,
 	}
+	s.ref = s
+	return s
 }
 
 func NewSetIteratorPrototype(realm *Realm) ObjectType {
@@ -23,25 +30,15 @@ func NewSetIteratorPrototype(realm *Realm) ObjectType {
 		s := setIterator.SetObject
 		index := setIterator.Index
 		kind := setIterator.Kind
-
 		entries := s.SetValue.Data
-		numEntries := uint64(len(entries))
+		numEntries := JSInt(entries.Size())
 		if index >= numEntries {
 			return (CreateIterResultObject(realm.Agent, UndefinedValue, true)).ToValue()
 		}
 		var value Value
-		for index < numEntries {
-			if _, ok := entries[NewNumberValue(JSNumber(index))]; ok {
-				break
-			}
-			index++
-		}
-		if index >= numEntries {
-			return (CreateIterResultObject(realm.Agent, UndefinedValue, true)).ToValue()
-		}
-		setIterator.Index = index
-		key := NewNumberValue(JSNumber(index))
-		value = entries[key]
+		allEntries := pkg.IterAll(entries.Items())
+		value = allEntries[index]
+		setIterator.Index = index + 1
 		var result Value
 		switch kind {
 		case objectOwnPropertiesKindValue:

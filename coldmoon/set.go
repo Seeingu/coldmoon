@@ -1,9 +1,21 @@
 package coldmoon
 
+import (
+	"github.com/Seeingu/coldmoon/pkg"
+	goset "github.com/hashicorp/go-set/v3"
+)
+
 type SetValue struct {
 	Value
-	Data map[Value]Value
+	Data *goset.HashSet[Value, string]
 }
+
+func NewSetValue() *SetValue {
+	return &SetValue{
+		Data: goset.NewHashSet[Value, string](0),
+	}
+}
+
 type SetObject struct {
 	*Object
 	SetValue *SetValue
@@ -12,18 +24,18 @@ type SetObject struct {
 func NewSetConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	behavior := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		iterable := argumentsList[0]
+		iterable := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget == nil {
 			return agent.ThrowTypeError("new target is nil")
 		}
 		o := OrdinaryCreateFromConstructor(agent, newTarget, "%SetObject.prototype%", nil)
 		s := &SetObject{
 			Object:   o,
-			SetValue: &SetValue{},
+			SetValue: NewSetValue(),
 		}
 		s.ref = s
-		if iterable == UndefinedValue || iterable == NullValue {
-			return (s).ToValue()
+		if IsUndefinedOrNil(iterable) {
+			return s.ToValue()
 		}
 		adder := s.Get(NewStringPropertyKey("add"))
 		if !IsCallable(adder) {
@@ -32,23 +44,24 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		iteratorRecord := GetIterator(agent, iterable, IteratorKindSync)
 		for {
 			next := iteratorRecord.Data().IteratorStep()
-			if next.(*BooleanObject).Data == false {
-				return (s).ToValue()
+			if next == nil {
+				return s.ToValue()
 			}
 			nextItem := IteratorValue(next)
-			(MustGetObject(adder)).ToValue().Call((s).ToValue(), []Value{nextItem})
+			adder.Call(s.ToValue(), []Value{nextItem})
 		}
 	}
-	object := CreateBuiltinFunction(agent, behavior, 0, "SetObject", builtinFunctionArgs{
-		prototype: realm.Intrinsics.FunctionPrototype,
-		realm:     realm,
+	object := CreateBuiltinFunctionV2(agent, behavior, 0, CMString("SetObject"), builtinFunctionArgs{
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		realm:         realm,
+		isConstructor: true,
 	})
 
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
-		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-			return this
-		},
-		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+	species := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		return this
+	}
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
+		Getter: species,
 	})
 
 	BindPrototypeAndConstructor(realm.Intrinsics.SetPrototype, object)
@@ -64,31 +77,32 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	// 24.2.3.2
 	var setClear BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		set := RequireInternalSlot[*SetObject](thisValue)
-		set.SetValue.Data = make(map[Value]Value)
+		for item := range set.SetValue.Data.Items() {
+			set.SetValue.Data.Remove(item)
+		}
 		return UndefinedValue
 	}
 	// 24.2.3.4
 	var setDelete BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		delete(set.SetValue.Data, value)
+		set.SetValue.Data.Remove(value)
 		return TrueValue
 	}
 	// 24.2.3.7
 	var setHas BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		_, ok := set.SetValue.Data[value]
-		return NewBooleanValue(ok)
+		return NewBooleanValue(set.SetValue.Data.Contains(value))
 	}
 	var setSize BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		set := RequireInternalSlot[*SetObject](thisValue)
-		return NewNumberValue(JSNumber(len(set.SetValue.Data)))
+		return NewNumberValue(JSNumber(set.SetValue.Data.Size()))
 	}
 	var setAdd BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
-		set.SetValue.Data[value] = value
+		set.SetValue.Data.Insert(value)
 		return thisValue
 	}
 	var setEntries BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
@@ -106,15 +120,9 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		if !IsCallable(callbackFn) {
 			return agent.ThrowTypeError("callback is not callable")
 		}
-		entries := set.SetValue.Data
-		numEntries := uint64(len(entries))
-		index := uint64(0)
-		for index < numEntries {
-			if v, ok := entries[NewNumberValue(JSNumber(index))]; ok {
-				callbackFn.Call(thisArg, []Value{v, v, thisValue})
-			}
-			numEntries = uint64(len(entries))
-			index++
+		entries := set.SetValue.Data.Items()
+		for item := range entries {
+			callbackFn.Call(thisArg, []Value{item, item, thisValue})
 		}
 		return UndefinedValue
 	}
@@ -129,7 +137,7 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
 
 	DefineBuiltinPropertyP(object, "keys", object.PropertyStorage().Get(NewStringPropertyKey("values")))
-	DefineBuiltinPropertyP(object, "@@iterator", object.PropertyStorage().Get(NewStringPropertyKey("values")))
+	object.defineBuiltinProperty(WellKnownSymbolsIterator, object.PropertyStorage().Get(NewStringPropertyKey("values")))
 	DefineToStringTagBuiltinProperty(object, "Set")
 	return object
 }

@@ -22,7 +22,7 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 	iteratorRecord := GetIterator(agent, iterable, IteratorKindSync).Data()
 	for {
 		next := iteratorRecord.IteratorStep()
-		if next.(*BooleanObject).Data == false {
+		if next == nil {
 			return target
 		}
 

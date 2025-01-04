@@ -141,7 +141,7 @@ func CreateBuiltinFunctionV2(
 	return function
 }
 
-// Deprecated:
+// Deprecated: use CreateBuiltinFunctionV2
 func CreateBuiltinFunction(
 	agent *Agent,
 	behavior BehaviorFn,

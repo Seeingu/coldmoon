@@ -23,6 +23,17 @@ func testSource(t *testing.T, s string) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`
+const set1 = new Set();
+
+set1.add(42);
+set1.add('forty two');
+
+const iterator1 = set1[Symbol.iterator]();
+
+assertEqual(iterator1.next().value, 42);
+assertEqual(iterator1.next().value, 'forty two');
+`,
+		`
 const map1 = new Map();
 
 map1.set('0', 'foo');
