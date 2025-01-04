@@ -23,6 +23,26 @@ func testSource(t *testing.T, s string) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`
+const num1 = 42;
+const num2 = 3.14;
+const num3 = Number('123');
+const num4 = parseInt('123', 10);
+const num5 = parseFloat('3.14');
+const num6 = 0b1010; // binary
+const num7 = 0o52; // octal
+const num8 = 0x2A; // hexadecimal
+const num9 = 8.64e15;
+
+assert(num1 === 42);
+assert(num2 === 3.14);
+assert(num3 === 123);
+assert(num4 === 123);
+assert(num5 === 3.14);
+assert(num6 === 10);
+assert(num7 === 42);
+assert(num8 === 42);
+assert(num9 === 8640000000000000);
+`, `
 const set1 = new Set();
 
 set1.add(42);

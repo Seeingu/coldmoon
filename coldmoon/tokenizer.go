@@ -1,11 +1,15 @@
 package coldmoon
 
 import (
+	"strconv"
+
 	"github.com/Seeingu/coldmoon/pkg"
 	lo "github.com/samber/lo"
 )
 
 type TokenType int
+
+var hexDigits = append(lo.NumbersCharset, []rune("abcdefABCDEF")...)
 
 const (
 	// TLeftBrace {
@@ -560,28 +564,65 @@ func (t *Tokenizer) string() Token {
 
 // MARK: - Number
 func (t *Tokenizer) number() Token {
-	start := t.Index
-	for t.Index < t.Length {
-		ch := t.SourceText[t.Index]
-		if lo.Contains(lo.NumbersCharset, ch) {
-			t.Index++
-		} else {
-			break
+	var value string
+
+	switch {
+	case t.matchPrefix("0x", "0X"):
+		value = t.parseNumber(16, hexDigits)
+	case t.matchPrefix("0b", "0B"):
+		value = t.parseNumber(2, []rune{'0', '1'})
+	case t.matchPrefix("0o", "0O"):
+		value = t.parseNumber(8, []rune{'0', '1', '2', '3', '4', '5', '6', '7'})
+	default:
+		value = t.parseDecimalNumber()
+	}
+
+	return t.newToken(TNumber, value)
+}
+
+func (t *Tokenizer) matchPrefix(prefixes ...string) bool {
+	for _, prefix := range prefixes {
+		if t.Index+len(prefix) < t.Length && string(t.SourceText[t.Index:t.Index+len(prefix)]) == prefix {
+			t.Index += len(prefix)
+			return true
 		}
+	}
+	return false
+}
+
+func (t *Tokenizer) parseNumber(base int, validDigits []rune) string {
+	start := t.Index
+	for t.Index < t.Length && lo.Contains(validDigits, t.SourceText[t.Index]) {
+		t.Index++
+	}
+	value, err := strconv.ParseInt(string(t.SourceText[start:t.Index]), base, 64)
+	if err != nil {
+		panic(err)
+	}
+	return strconv.FormatInt(value, 10)
+}
+
+func (t *Tokenizer) parseDecimalNumber() string {
+	start := t.Index
+	for t.Index < t.Length && lo.Contains(lo.NumbersCharset, t.SourceText[t.Index]) {
+		t.Index++
 	}
 	if t.Index < t.Length && t.SourceText[t.Index] == '.' {
 		t.Index++
-		for t.Index < t.Length {
-			ch := t.SourceText[t.Index]
-			if lo.Contains(lo.NumbersCharset, ch) {
-				t.Index++
-			} else {
-				break
-			}
+		for t.Index < t.Length && lo.Contains(lo.NumbersCharset, t.SourceText[t.Index]) {
+			t.Index++
 		}
 	}
-	value := string(t.SourceText[start:t.Index])
-	return t.newToken(TNumber, value)
+	if t.Index < t.Length && (t.SourceText[t.Index] == 'e' || t.SourceText[t.Index] == 'E') {
+		t.Index++
+		if t.Index < t.Length && (t.SourceText[t.Index] == '+' || t.SourceText[t.Index] == '-') {
+			t.Index++
+		}
+		for t.Index < t.Length && lo.Contains(lo.NumbersCharset, t.SourceText[t.Index]) {
+			t.Index++
+		}
+	}
+	return string(t.SourceText[start:t.Index])
 }
 
 // MARK: - Identifier, Keyword
