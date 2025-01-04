@@ -432,7 +432,7 @@ func (vm *VM) execute(i Instruction) {
 			}
 
 			v, _ := ref.Base.Value()
-			baseObj := ValueToObject(agent, v)
+			baseObj := v.ToObject(agent)
 			var referencedName PropertyKey
 			if ref.ReferencedName.PrivateName != nil {
 				panic("unreachable")
@@ -474,7 +474,7 @@ func (vm *VM) execute(i Instruction) {
 		}
 	case *IObjectDefineMethod:
 		propertyName := vm.stack.Pop()
-		object := ValueToObject(agent, vm.stack.Pop())
+		object := vm.stack.Pop().ToObject(agent)
 		vm.MethodDefinitionEvaluation(methodDefinitionArgs{
 			PropertyName:             propertyName,
 			MethodType:               MethodDefinitionTypeMethod,

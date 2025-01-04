@@ -142,7 +142,7 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 			globalEnv := calleeRealm.GlobalEnv
 			thisValue = (globalEnv.GlobalThisValue).ToValue()
 		} else {
-			thisValue = (ValueToObject(agent, thisArgument)).ToValue()
+			thisValue = thisArgument.ToObject(agent).ToValue()
 		}
 	}
 

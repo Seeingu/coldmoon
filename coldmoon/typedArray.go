@@ -532,7 +532,7 @@ func SetTypedArrayFromArrayLike(agent *Agent, target *TypedArrayObject, targetOf
 		panic("TypeError")
 	}
 	targetLength := TypedArrayLength(targetRecord)
-	src := ValueToObject(agent, source)
+	src := source.ToObject(agent)
 	srcLength := src.LengthOfArrayLike()
 
 	if targetOffset.IsPositiveInf() {

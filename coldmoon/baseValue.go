@@ -8,6 +8,30 @@ func (b *BaseValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(b.Value)
 }
 
+// TODO: type error handling
+func (b *BaseValue) ToObject(agent *Agent) ObjectType {
+	realm := agent.CurrentRealm()
+	switch v := b.Value.(type) {
+	case *undefinedValue, *nullValue:
+		agent.ThrowTypeError("TypeError")
+	case *BooleanValue:
+		return NewBooleanObject(agent, v.Data, realm.Intrinsics.BooleanPrototype)
+	case *ObjectValue:
+		return v.Object
+	case *StringValue:
+		return NewStringObject(agent, v.Data, realm.Intrinsics.StringPrototype)
+	case *NumberValue:
+		return NewNumberObject(agent, v.Data, realm.Intrinsics.NumberPrototype)
+	case *SymbolValue:
+		return NewSymbolObject(agent, v, realm.Intrinsics.SymbolPrototype)
+	case *BigIntValue:
+		return NewBigIntObject(agent, v, realm.Intrinsics.BigIntPrototype)
+	default:
+		panic("unimplemented")
+	}
+	panic("unreachable")
+}
+
 func (b *BaseValue) ToPropertyDescriptor() *PropertyDescriptor {
 	return &PropertyDescriptor{
 		Value: b.Value,

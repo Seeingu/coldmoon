@@ -36,19 +36,6 @@ func (hint PreferredType) String() string {
 
 type ArgumentsList []Value
 
-type Value interface {
-	String() string
-	ToBoolean() bool
-	ToNumber(agent *Agent) *NumberValue
-
-	Call(this Value, argumentsList ArgumentsList) Value
-	CallNoArgs(this Value) Value
-	// --- internal methods ---
-
-	ToCompletion() CompletionValue
-	ToPropertyDescriptor() *PropertyDescriptor
-}
-
 // TODO(C): we should use convertable
 func NewPropertyDescriptorFromValue(value Value) *PropertyDescriptor {
 	return &PropertyDescriptor{
@@ -360,30 +347,6 @@ func ToBigUint64(agent *Agent, value Value) uint64 {
 	return int64bit.Lo
 }
 
-// 7.1.18
-// TODO(P): use baseValue
-func ValueToObject(agent *Agent, value Value) ObjectType {
-	realm := agent.CurrentRealm()
-	switch v := value.(type) {
-	case *undefinedValue, *nullValue:
-		panic("TypeError")
-	case *BooleanValue:
-		return NewBooleanObject(agent, v.Data, realm.Intrinsics.BooleanPrototype)
-	case *ObjectValue:
-		return v.Object
-	case *StringValue:
-		return NewStringObject(agent, v.Data, realm.Intrinsics.StringPrototype)
-	case *NumberValue:
-		return NewNumberObject(agent, v.Data, realm.Intrinsics.NumberPrototype)
-	case *SymbolValue:
-		return NewSymbolObject(agent, v, realm.Intrinsics.SymbolPrototype)
-	case *BigIntValue:
-		return NewBigIntObject(agent, v, realm.Intrinsics.BigIntPrototype)
-	default:
-		panic("unimplemented")
-	}
-}
-
 // 7.1.4.1.1
 func StringToNumber(value *StringValue) *NumberValue {
 	if value.Data == "" {
@@ -688,7 +651,7 @@ func IsStrictlyEqual(x Value, y Value) bool {
 
 // 7.3.3
 func GetV(agent *Agent, value Value, key PropertyKey) Value {
-	object := ValueToObject(agent, value)
+	object := value.ToObject(agent)
 	return object.InternalMethods().Get(object, key, value)
 }
 

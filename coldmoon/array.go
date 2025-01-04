@@ -335,7 +335,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 
 	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		array := ValueToObject(agent, this)
+		array := this.ToObject(agent)
 		fun := array.Get(NewStringPropertyKey("join"))
 		if !IsCallable(fun) {
 			fun = realm.Intrinsics.ObjectPrototype.Get(NewStringPropertyKey("toString"))
@@ -414,7 +414,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var includes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		searchElement := args[0]
 		fromIndex := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		if length == 0 {
 			return FalseValue
@@ -446,7 +446,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var indexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		searchElement := args[0]
 		fromIndex := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		if length == 0 {
 			return NewNumberValue(-1)
@@ -481,7 +481,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var find BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		predicate := args[0]
 		thisArg := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return findRec.Value
@@ -489,7 +489,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var findIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		predicate := args[0]
 		thisArg := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return NewNumberValue(findRec.Index.ToNumber())
@@ -497,7 +497,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var findLast BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		predicate := args[0]
 		thisArg := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return findRec.Value
@@ -505,7 +505,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var findLastIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		predicate := args[0]
 		thisArg := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return NewNumberValue(findRec.Index.ToNumber())
@@ -513,7 +513,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		searchElement := args[0]
 		fromIndex := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		if length == 0 {
 			return NewNumberValue(-1)
@@ -544,7 +544,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var at BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		index := args[0]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		relativeIndex := ToIntegerOrInfinity(agent, index)
 		k := relativeIndex
@@ -556,7 +556,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var every BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		callbackFn := args[0]
 		thisArg := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 
 		if !IsCallable(callbackFn) {
@@ -579,7 +579,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var some BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		callbackFn := args[0]
 		thisArg := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 
 		if !IsCallable(callbackFn) {
@@ -602,7 +602,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var with BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		index := args[0]
 		value := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		relativeIndex := ToIntegerOrInfinity(agent, index)
 
@@ -667,7 +667,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 
 		}
-		arrayLike := ValueToObject(agent, items)
+		arrayLike := items.ToObject(agent)
 		length := arrayLike.LengthOfArrayLike()
 		var a ObjectType
 		if IsConstructor(c) {
@@ -691,20 +691,20 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return a.ToValue()
 	}
 	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		return CreateArrayIterator(agent, o, objectOwnPropertiesKindKeyAndValue).ToValue()
 	}
 	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		return CreateArrayIterator(agent, o, objectOwnPropertiesKindKey).ToValue()
 	}
 	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		iterator := CreateArrayIterator(agent, o, objectOwnPropertiesKindValue).ToValue()
 		return iterator
 	}
 	var shift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		if length == 0 {
 			o.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow)
@@ -730,7 +730,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return first
 	}
 	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		argCount := JSInt(len(args))
 		if argCount == 0 {
@@ -761,7 +761,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var filter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		callbackFn := args[0]
 		thisArg := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
@@ -787,7 +787,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var reduce BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		callbackFn := args[0]
 		initialValue := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
@@ -829,7 +829,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var reduceRight BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		callbackFn := args[0]
 		initialValue := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
@@ -869,7 +869,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return accumulator
 	}
 	var concat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		A := ArraySpeciesCreate(agent, o, 0)
 		n := JSInt(0)
 
@@ -909,7 +909,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		start := args[0]
 		end := args[1]
@@ -961,7 +961,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		value := args[0]
 		start := args[1]
 		end := args[2]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 
 		relativeStart := ToIntegerOrInfinity(agent, start)
@@ -995,7 +995,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		target := args[0]
 		start := args[1]
 		end := args[2]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 
 		relativeTarget := ToIntegerOrInfinity(agent, target)
@@ -1062,7 +1062,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return o.ToValue()
 	}
 	var reverse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		middle := length / 2
 		lower := JSInt(0)
@@ -1096,7 +1096,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return o.ToValue()
 	}
 	var toReversed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 		A := ArrayCreate(agent, length, nil)
 		for k := JSInt(0); k < length; k++ {
@@ -1112,7 +1112,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if compareFn != UndefinedValue && !IsCallable(compareFn) {
 			panic("TypeError")
 		}
-		obj := ValueToObject(agent, this)
+		obj := this.ToObject(agent)
 		length := obj.LengthOfArrayLike()
 
 		sortCompare := SortCompare{
@@ -1137,7 +1137,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if compareFn != UndefinedValue && !IsCallable(compareFn) {
 			panic("TypeError")
 		}
-		obj := ValueToObject(agent, this)
+		obj := this.ToObject(agent)
 		length := obj.LengthOfArrayLike()
 
 		sortCompare := SortCompare{
@@ -1154,7 +1154,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var flat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		depth := args[0]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		sourceLen := o.LengthOfArrayLike()
 		var depthNum JSInt = 1
 		if depth != UndefinedValue {
@@ -1170,7 +1170,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var flatMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		mapperFunction := args[0]
 		thisArg := args[1]
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		sourceLen := o.LengthOfArrayLike()
 		if !IsCallable(mapperFunction) {
 			panic("TypeError")
@@ -1186,7 +1186,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if len(args) > 2 {
 			items = args[2:]
 		}
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 
 		var relativeStart JSInt = 0
@@ -1274,7 +1274,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if len(args) > 2 {
 			items = args[2:]
 		}
-		o := ValueToObject(agent, this)
+		o := this.ToObject(agent)
 		length := o.LengthOfArrayLike()
 
 		var relativeStart JSInt = 0
