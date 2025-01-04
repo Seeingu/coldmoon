@@ -32,6 +32,12 @@ assertEqual(utcDate2.toUTCString(), "Sun, 31 Dec 1899 00:00:00 UTC");
 // check time zone
 //assertEqual(new Date(8.64e15).toString(), "Sat Sep 13 275760 08:00:00 CST+0800"); 
 assertEqual(new Date(8.64e15 + 1).toString(), "Invalid Date"); 
+
+const date = new Date('December 17, 1995 03:24:00');
+
+date[Symbol.toPrimitive]('string');
+assertEqual(date[Symbol.toPrimitive]('number'), 819170640000);
+
 `,
 		`
 const num1 = 42;

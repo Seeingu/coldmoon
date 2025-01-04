@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"math"
+	"strings"
 	"time"
 )
 
@@ -20,7 +21,6 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return dateObject.Data.ToValue()
 	}
 	// 21.4.4.45
-	// TODO: Refactor: make hint type safe
 	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		hintValue := args[0]
 		if !ValueIsObject(this) {
@@ -28,7 +28,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		o := MustGetObject(this)
 		if !ValueIs[*StringValue](hintValue) {
-			panic("TypeError")
+			return agent.ThrowTypeError("is not a string")
 		}
 		hint := hintValue.(*StringValue).Data
 		var tryFirst PreferredType
@@ -37,7 +37,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		} else if hint == "number" {
 			tryFirst = PreferredTypeNumber
 		} else {
-			panic("TypeError")
+			return agent.ThrowTypeError("is not a valid hint")
 		}
 		return o.OrdinaryToPrimitive(tryFirst)
 	}
@@ -505,7 +505,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("setUTCMonth"), setUTCMonth, 2)
 	object.defineBuiltinFunction(realm, CMString("setUTCSeconds"), setUTCSeconds, 2)
 
-	DefineBuiltinFunctionWithAttributes(object, "@@toPrimitive", toPrimitive, 1, realm, PropertyDescriptorAttributes{
+	object.defineBuiltinFunctionWithAttributes(realm, WellKnownSymbolsToPrimitive, toPrimitive, 1, PropertyDescriptorAttributes{
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
@@ -929,9 +929,24 @@ func LocalTime(tv JSNumber) JSNumber {
 	return tv
 }
 
+// DateTimeStringFormat parses a string and returns a time value.
+// s can be "December 17, 1995 03:24:00"
+//
+//	or "1995-12-17T03:24:00"
 func DateTimeStringFormat(s string) JSNumber {
-	// TODO
-	return 0
+	if strings.Contains(s, "T") {
+		v, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return JSNumberNaN
+		}
+		return JSNumber(v.UnixMilli())
+	} else {
+		v, err := time.Parse("January 2, 2006 15:04:05", s)
+		if err != nil {
+			return JSNumberNaN
+		}
+		return JSNumber(v.UnixMilli())
+	}
 }
 
 func DateString(t JSNumber) string {

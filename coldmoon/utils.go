@@ -42,6 +42,7 @@ func DefineBuiltinFunction(object ObjectType,
 	DefineBuiltinPropertyV(object, name, f.ToValue())
 }
 
+// Deprecated: use object.DefineBuiltinFunctionWithAttributes
 func DefineBuiltinFunctionWithAttributes(object ObjectType,
 	name string,
 	fn BehaviorFn,
