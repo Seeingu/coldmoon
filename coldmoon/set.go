@@ -127,17 +127,17 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		return UndefinedValue
 	}
 
-	DefineBuiltinFunction(object, "add", setAdd, 1, realm)
-	DefineBuiltinFunction(object, "clear", setClear, 0, realm)
-	DefineBuiltinFunction(object, "delete", setDelete, 1, realm)
-	DefineBuiltinFunction(object, "has", setHas, 1, realm)
-	DefineBuiltinFunction(object, "size", setSize, 0, realm)
-	DefineBuiltinFunction(object, "entries", setEntries, 0, realm)
-	DefineBuiltinFunction(object, "values", setValues, 0, realm)
-	DefineBuiltinFunction(object, "forEach", forEach, 1, realm)
+	object.defineBuiltinFunction(realm, CMString("add"), setAdd, 1)
+	object.defineBuiltinFunction(realm, CMString("clear"), setClear, 0)
+	object.defineBuiltinFunction(realm, CMString("delete"), setDelete, 1)
+	object.defineBuiltinFunction(realm, CMString("has"), setHas, 1)
+	object.defineBuiltinFunction(realm, CMString("size"), setSize, 0)
+	object.defineBuiltinFunction(realm, CMString("entries"), setEntries, 0)
+	object.defineBuiltinFunction(realm, CMString("values"), setValues, 0)
+	object.defineBuiltinFunction(realm, CMString("forEach"), forEach, 1)
 
-	DefineBuiltinPropertyP(object, "keys", object.PropertyStorage().Get(NewStringPropertyKey("values")))
+	object.defineBuiltinProperty(CMString("keys"), object.PropertyStorage().Get(NewStringPropertyKey("values")))
 	object.defineBuiltinProperty(WellKnownSymbolsIterator, object.PropertyStorage().Get(NewStringPropertyKey("values")))
-	DefineToStringTagBuiltinProperty(object, "Set")
+	object.defineToStringTag("Set")
 	return object
 }
