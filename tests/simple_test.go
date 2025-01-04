@@ -32,6 +32,18 @@ function assert(a, msg) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`
+const map1 = new Map();
+map1.set('a', 1);
+map1.set('b', 2);
+map1.set('c', 3);
+assert(map1.get('a') === 1);
+map1.set('a', 97);
+assert(map1.get('a') === 97);
+assert(map1.size === 3);
+map1.delete('b');
+assert(map1.size === 2);
+`,
+		`
 const object1 = {
     [Symbol.toPrimitive](hint) {
         if (hint === 'number') {

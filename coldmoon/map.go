@@ -1,8 +1,16 @@
 package coldmoon
 
+import "github.com/Seeingu/coldmoon/pkg"
+
 type MapValue struct {
 	Value
-	Data map[Value]Value
+	Data map[string]Value
+}
+
+func NewMapValue() *MapValue {
+	return &MapValue{
+		Data: make(map[string]Value),
+	}
 }
 
 type MapObject struct {
@@ -33,17 +41,17 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 func NewMapConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		iterable := argumentsList[0]
+		iterable := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget == nil {
 			panic("TypeError")
 		}
 		o := OrdinaryCreateFromConstructor(agent, newTarget, "%Map.prototype%", nil)
 		m := &MapObject{
 			Object:   o,
-			MapValue: &MapValue{},
+			MapValue: NewMapValue(),
 		}
 		m.ref = m
-		if iterable == UndefinedValue || iterable == NullValue {
+		if IsUndefinedOrNil(iterable) {
 			return (m).ToValue()
 		}
 		adder := m.Get(NewStringPropertyKey("set"))
@@ -53,8 +61,9 @@ func NewMapConstructor(realm *Realm) ObjectType {
 		return (AddEntriesFromIterable(agent, m, iterable, MustGetObject(adder))).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, "Map", builtinFunctionArgs{
-		prototype: realm.Intrinsics.FunctionPrototype,
-		realm:     realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		realm:         realm,
+		isConstructor: true,
 	})
 
 	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
@@ -75,12 +84,12 @@ func NewMapPrototype(realm *Realm) ObjectType {
 
 	var mapClear BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)
-		m.MapValue.Data = make(map[Value]Value)
+		m.MapValue.Data = make(map[string]Value)
 		return UndefinedValue
 	}
 	var mapDelete BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)
-		key := arguments[0]
+		key := arguments[0].Hash()
 		if _, ok := m.MapValue.Data[key]; !ok {
 			return FalseValue
 		}
@@ -89,7 +98,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	}
 	var mapGet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)
-		key := arguments[0]
+		key := arguments[0].Hash()
 		if v, ok := m.MapValue.Data[key]; ok {
 			return v
 		}
@@ -97,13 +106,13 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	}
 	var mapHas BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)
-		key := arguments[0]
+		key := arguments[0].Hash()
 		_, ok := m.MapValue.Data[key]
 		return NewBooleanValue(ok)
 	}
 	var mapSet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		m := RequireInternalSlot[*MapObject](this)
-		key := arguments[0]
+		key := arguments[0].Hash()
 		value := arguments[1]
 		m.MapValue.Data[key] = value
 		return this
@@ -132,7 +141,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		numEntries := len(m.MapValue.Data)
 		index := 0
 		for ; index < numEntries; index++ {
-			if v, ok := entries[NewNumberValue(JSNumber(index))]; ok {
+			if v, ok := entries[NewNumberValue(JSNumber(index)).Hash()]; ok {
 				callbackFn.Call(thisArg, []Value{v, NewNumberValue(JSNumber(index)), this})
 			}
 			numEntries = len(m.MapValue.Data)
@@ -145,7 +154,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	DefineBuiltinFunction(object, "get", mapGet, 1, realm)
 	DefineBuiltinFunction(object, "has", mapHas, 1, realm)
 	DefineBuiltinFunction(object, "set", mapSet, 2, realm)
-	DefineBuiltinFunction(object, "size", size, 0, realm)
+	DefineBuiltinAccessor(realm, object, "size", size, nil)
 	DefineBuiltinFunction(object, "entries", mapEntries, 0, realm)
 	DefineBuiltinFunction(object, "keys", mapKeys, 0, realm)
 	DefineBuiltinFunction(object, "values", mapValues, 0, realm)

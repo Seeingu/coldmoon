@@ -758,7 +758,7 @@ var (
 func (t *Tokenizer) skipWhiteSpace() {
 	for t.Index < t.Length {
 		ch := t.SourceText[t.Index]
-		if lo.Contains(whitespace, ch) || lo.Contains(lineTerminators, rune(ch)) {
+		if lo.Contains(whitespace, ch) || lo.Contains(lineTerminators, ch) {
 			if ch == '\n' {
 				t.line++
 			}

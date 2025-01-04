@@ -10,7 +10,7 @@ func NewAsyncIteratorPrototype(realm *Realm) ObjectType {
 	asyncIterator := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		return this
 	}
-	DefineBuiltinFunction(object, "@@asyncIterator", asyncIterator, 0, realm)
+	object.defineBuiltinFunction(realm, WellKnownSymbolsAsyncIterator, asyncIterator, 0)
 
 	return object
 }

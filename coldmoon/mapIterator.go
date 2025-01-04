@@ -9,8 +9,9 @@ type MapIteratorObject struct {
 
 // 24.1.5.1
 func CreateMapIterator(agent *Agent, value Value, kind objectOwnPropertiesKind) *MapIteratorObject {
+	realm := agent.CurrentRealm()
 	m := &MapIteratorObject{
-		Object: NewObject(agent, agent.CurrentRealm().Intrinsics.MapIteratorPrototype, "MapIterator"),
+		Object: NewObject(agent, realm.Intrinsics.MapIteratorPrototype, "MapIterator"),
 		Map:    RequireInternalSlot[*MapObject](value),
 		Kind:   kind,
 		Index:  0,
@@ -35,7 +36,7 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 		}
 
 		for index < numEntries {
-			if _, ok := entries[NewNumberValue(index.ToNumber())]; ok {
+			if _, ok := entries[NewNumberValue(index.ToNumber()).Hash()]; ok {
 				break
 			}
 			index++
@@ -45,7 +46,7 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 		}
 		mapIterator.Index = index
 		key := NewNumberValue(index.ToNumber())
-		value := entries[key]
+		value := entries[key.Hash()]
 
 		var result Value
 		switch kind {

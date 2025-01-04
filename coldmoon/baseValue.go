@@ -8,6 +8,15 @@ func (b *BaseValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(b.Value)
 }
 
+func (b *BaseValue) Hash() string {
+	switch v := b.Value.(type) {
+	case *undefinedValue, *nullValue, *BooleanValue, *NumberValue, *StringValue, *SymbolValue, *BigIntValue:
+		return v.String()
+	default:
+		panic("unimplemented")
+	}
+}
+
 // TODO: type error handling
 func (b *BaseValue) ToObject(agent *Agent) ObjectType {
 	realm := agent.CurrentRealm()

@@ -1723,7 +1723,10 @@ func (p *Parser) memberExpression(left Expression) *MemberExpression {
 		p.tokenizer.Next()
 		identifier := p.tokenizer.CurrentToken
 		if identifier.Type != TIdentifier {
-			panic("memberExpression: expected identifier")
+			// keyword after dot is treated as identifier
+			if _, ok := keywordsMap[identifier.Value]; !ok {
+				panic("memberExpression: expected identifier")
+			}
 		}
 		p.tokenizer.Next()
 		property = &ASTPropertyIdentifier{

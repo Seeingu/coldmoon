@@ -13,4 +13,5 @@ type Value interface {
 	ToObject(agent *Agent) ObjectType
 	ToCompletion() CompletionValue
 	ToPropertyDescriptor() *PropertyDescriptor
+	Hash() string
 }
