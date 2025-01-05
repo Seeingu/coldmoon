@@ -17,10 +17,11 @@ func defineAssert(realm *coldmoon.Realm) {
 		if equality.ToBoolean() {
 			return coldmoon.UndefinedValue
 		}
+		txt := "assertion failed"
 		if msg == nil {
-			panic("assertion failed")
+			panic(txt)
 		}
-		panic("assertion failed: " + msg.String())
+		panic(txt + ": " + msg.String())
 	}
 
 	var assertEqual coldmoon.BehaviorFn = func(thisArgument coldmoon.Value, argumentsList []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.Value {
@@ -31,10 +32,11 @@ func defineAssert(realm *coldmoon.Realm) {
 		if equality {
 			return nil
 		}
+		txt := "assertion failed: a is " + a.String() + ", b is " + b.String()
 		if msg == nil {
-			panic("assertion failed")
+			panic(txt)
 		}
-		panic("assertion failed: " + msg.String())
+		panic(txt + "\nmsg: " + msg.String())
 	}
 	coldmoon.DefineBuiltinFunctionV2(realm, coldmoon.CMString("assert"), object, assert, 1)
 	coldmoon.DefineBuiltinFunctionV2(realm, coldmoon.CMString("assertEqual"), object, assertEqual, 2)
