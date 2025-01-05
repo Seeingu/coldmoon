@@ -29,7 +29,7 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) ObjectType {
 		}
 		index, err := p.GetIndex()
 		if err != nil {
-			panic(err)
+			return OrdinaryDefineOwnProperty(array, p, desc)
 		}
 		lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
 		Assert(lengthDesc.IsDataDescriptor())
