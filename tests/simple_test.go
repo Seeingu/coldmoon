@@ -23,6 +23,16 @@ func testSource(t *testing.T, s string) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`
+const str = 'table football';
+const regex = new RegExp('foo*');
+const globalRegex = new RegExp('foo*', 'g');
+assertEqual(regex.test(str), true);
+assertEqual(globalRegex.lastIndex, 0);
+assertEqual(globalRegex.test(str), true);
+assertEqual(globalRegex.lastIndex, 9);
+assertEqual(globalRegex.test(str), false);
+`,
+		`
 const utcDate1 = new Date(Date.UTC(96, 1, 2, 3, 4, 5));
 const utcDate2 = new Date(Date.UTC(0, 0, 0, 0, 0, 0));
 

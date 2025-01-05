@@ -3,6 +3,8 @@ package coldmoon
 import (
 	"strings"
 
+	"github.com/Seeingu/coldmoon/pkg"
+
 	"github.com/dlclark/regexp2"
 )
 
@@ -208,12 +210,12 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, target ObjectType) Value {
 		pattern := argumentsList[0]
-		flags := argumentsList[1]
+		flags := pkg.SliceSafeGet(argumentsList, 1)
 		patternIsRegexp := IsRegExp(pattern)
 		var newTarget ObjectType
 		if target == nil {
 			newTarget = agent.ActiveFunctionObject()
-			if patternIsRegexp && flags == UndefinedValue {
+			if patternIsRegexp && IsUndefinedOrNil(flags) {
 				patternConstructor := MustGetObject(pattern).Get(NewStringPropertyKey("constructor"))
 				if SameValue((newTarget).ToValue(), patternConstructor) {
 					return pattern
@@ -322,8 +324,11 @@ func RegExpExec(agent *Agent, regExp *RegExpObject, s string) CompletionObject {
 	exec := regExp.Get(NewStringPropertyKey("exec"))
 	if IsCallable(exec) {
 		result := exec.Call(regExp.ToValue(), []Value{NewStringValue(s)})
-		if !ValueIsObject(result) && result != nil {
+		if !ValueIsObject(result) && result != NullValue {
 			return NewCompletionObjectError(agent.ThrowException(TypeError, "RegExpExec: exec is not an object"))
+		}
+		if result == NullValue {
+			return NewCompletionObjectNull()
 		}
 		return NewCompletionObject(MustGetObject(result))
 	}
@@ -353,11 +358,8 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 		input = s
 	}
 
-	match, err := matcher.FindStringMatch(input)
-	if err != nil {
-		return NewCompletionObjectError(NewStringValue(err.Error()))
-	}
 	var matchRecord *MatchRecord
+	var match *regexp2.Match
 	for !matchSucceeded {
 		if lastIndex > length {
 			if global || sticky {
@@ -365,7 +367,8 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 			}
 			return NewCompletionObjectNull()
 		}
-		match, err = matcher.FindNextMatch(match)
+		r, err := matcher.FindStringMatch(input[lastIndex:])
+
 		if err != nil {
 			if sticky {
 				regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow)
@@ -373,7 +376,10 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 			}
 			lastIndex++
 			return NewCompletionObjectError(NewStringValue(err.Error()))
+		} else if r == nil {
+			return NewCompletionObjectNull()
 		} else {
+			match = r
 			matchSucceeded = true
 			matchRecord = &MatchRecord{
 				StartIndex: JSInt(match.Index),

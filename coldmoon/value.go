@@ -782,7 +782,9 @@ func RegExpAlloc(agent *Agent, newTarget ObjectType) ObjectType {
 	regexp := &RegExpObject{
 		Object: obj,
 	}
+	regexp.ref = regexp
 	regexp.DefinePropertyOrThrow(NewStringPropertyKey("lastIndex"), &PropertyDescriptor{
+		Value:        NewNumberValue(0),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: false,
@@ -799,7 +801,7 @@ func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) 
 		p = ToString(agent, pattern)
 	}
 	var f Value
-	if flags == UndefinedValue {
+	if IsUndefinedOrNil(flags) {
 		f = NewStringValue("")
 	} else {
 		f = ToString(agent, flags)
@@ -883,7 +885,7 @@ func ParsePattern(pattern string, unicode bool, unicodeSets bool) (r *regexp2.Re
 	if unicodeSets || unicode {
 		return regexp2.Compile(pattern, regexp2.Unicode)
 	}
-	return
+	return regexp2.Compile(pattern, regexp2.None)
 }
 
 // Deprecated: use baseValue.TypeString
