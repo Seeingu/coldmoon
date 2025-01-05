@@ -187,21 +187,41 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		return CreateRegExpStringIterator(agent, matcher.(*RegExpObject), s.Data, _global, _fullUnicode).ToValue()
 	}
 
-	DefineBuiltinFunction(object, "toString", toString, 0, realm)
-	DefineBuiltinFunction(object, "exec", exec, 1, realm)
-	DefineBuiltinFunction(object, "test", test, 1, realm)
-	DefineBuiltinFunction(object, "@@search", search, 1, realm)
-	DefineBuiltinFunction(object, "@@matchAll", matchAll, 1, realm)
-	DefineBuiltinAccessor(realm, object, "dotAll", dotAll, nil)
-	DefineBuiltinAccessor(realm, object, "global", global, nil)
-	DefineBuiltinAccessor(realm, object, "hasIndices", hasIndices, nil)
-	DefineBuiltinAccessor(realm, object, "ignoreCase", ignoreCase, nil)
-	DefineBuiltinAccessor(realm, object, "multiline", multiline, nil)
-	DefineBuiltinAccessor(realm, object, "sticky", sticky, nil)
-	DefineBuiltinAccessor(realm, object, "unicode", unicode, nil)
-	DefineBuiltinAccessor(realm, object, "unicodeSets", unicodeSets, nil)
-	DefineBuiltinAccessor(realm, object, "flags", flags, nil)
-	DefineBuiltinAccessor(realm, object, "source", source, nil)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	object.defineBuiltinFunction(realm, CMString("exec"), exec, 1)
+	object.defineBuiltinFunction(realm, CMString("test"), test, 1)
+	object.defineBuiltinFunction(realm, WellKnownSymbolsSearch, search, 1)
+	object.defineBuiltinFunction(realm, WellKnownSymbolsMatchAll, matchAll, 1)
+	object.defineBuiltinAccessor(realm, CMString("dotAll"), builtinAccessorParams{
+		Getter: dotAll,
+	})
+	object.defineBuiltinAccessor(realm, CMString("global"), builtinAccessorParams{
+		Getter: global,
+	})
+	object.defineBuiltinAccessor(realm, CMString("hasIndices"), builtinAccessorParams{
+		Getter: hasIndices,
+	})
+	object.defineBuiltinAccessor(realm, CMString("ignoreCase"), builtinAccessorParams{
+		Getter: ignoreCase,
+	})
+	object.defineBuiltinAccessor(realm, CMString("multiline"), builtinAccessorParams{
+		Getter: multiline,
+	})
+	object.defineBuiltinAccessor(realm, CMString("sticky"), builtinAccessorParams{
+		Getter: sticky,
+	})
+	object.defineBuiltinAccessor(realm, CMString("unicode"), builtinAccessorParams{
+		Getter: unicode,
+	})
+	object.defineBuiltinAccessor(realm, CMString("unicodeSets"), builtinAccessorParams{
+		Getter: unicodeSets,
+	})
+	object.defineBuiltinAccessor(realm, CMString("flags"), builtinAccessorParams{
+		Getter: flags,
+	})
+	object.defineBuiltinAccessor(realm, CMString("source"), builtinAccessorParams{
+		Getter: source,
+	})
 
 	return object
 }
@@ -249,17 +269,16 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 		o := RegExpAlloc(agent, target)
 		return RegExpInitialize(agent, o, p, f).Data().ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 2, "RegExp", builtinFunctionArgs{
+	object := CreateBuiltinFunctionV2(agent, behavior, 2, CMString("RegExp"), builtinFunctionArgs{
 		realm:         realm,
 		isConstructor: true,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 	})
 
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
 		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 			return this
 		},
-		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 
 	BindPrototypeAndConstructor(realm.Intrinsics.RegExpPrototype, object)
