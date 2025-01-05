@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"strconv"
+	"strings"
 )
 
 type boundName interface {
@@ -1183,10 +1184,39 @@ type PrimaryExpressionTemplateLiteral struct {
 	SourceText      string
 }
 
+// 13.2.8.6
 func (t *PrimaryExpressionTemplateLiteral) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IStoreConstant{
-		Value: NewStringValue(t.SourceText),
+	// NoSubstitutionTemplate
+	if len(t.TemplateLiteral.Spans) == 1 {
+		span := t.TemplateLiteral.Spans[0]
+		e.AddInstruction(&IStoreConstant{
+			Value: span.TV().ToValue(),
+		})
+		return
+	}
+	e.AddInstruction(&ILoadConstant{
+		Value: t.TemplateLiteral.TemplateHead.TV().ToValue(),
 	})
+	for i, span := range t.TemplateLiteral.Spans {
+		// --- Expression
+		span.Expression.Bytecode(e, c)
+		if ExpressionAnalyze(span.Expression, AnalyzeQueryIsReference) {
+			e.AddInstruction(InsGetValue)
+		}
+		// TODO: to string
+		e.AddInstruction(InsLoad)
+		e.AddInstruction(&IApplyStringOrNumericBinaryOperator{Operator: BinaryOperatorAddition})
+		e.AddInstruction(InsLoad)
+
+		// --- Text
+		e.AddInstruction(&ILoadConstant{
+			Value: span.TV().ToValue(),
+		})
+		e.AddInstruction(&IApplyStringOrNumericBinaryOperator{Operator: BinaryOperatorAddition})
+		if i < len(t.TemplateLiteral.Spans)-1 {
+			e.AddInstruction(InsLoad)
+		}
+	}
 }
 
 func (t *PrimaryExpressionTemplateLiteral) String() string {
@@ -1197,8 +1227,26 @@ type TemplateSpan struct {
 	Text       string
 	Expression Expression
 }
+
+// 12.9.6.1
+func (t *TemplateSpan) TV() CMString {
+	start := 0
+	end := len(t.Text)
+	if t.Text[0] == '`' || t.Text[0] == '}' {
+		start = 1
+	}
+	if strings.HasSuffix(t.Text, "${") {
+		end -= 2
+	}
+	if strings.HasSuffix(t.Text, "}") || strings.HasSuffix(t.Text, "`") {
+		end--
+	}
+	return CMString(t.Text[start:end])
+}
+
 type TemplateLiteral struct {
-	TemplateHead string
+	// TemplateHead is string only
+	TemplateHead *TemplateSpan
 	Spans        []*TemplateSpan
 }
 

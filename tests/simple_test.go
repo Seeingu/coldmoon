@@ -22,6 +22,12 @@ func testSource(t *testing.T, s string) {
 
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
+		"assertEqual(`string text line 1\nstring text line 2`, 'string text line 1\nstring text line 2');",
+		`
+const a = 5;
+const b = 10;
+` + "assertEqual(`Fifteen is ${a + b} and\nnot ${2 * a + b}.`, " +
+			"'Fifteen is 15 and\nnot 20.');",
 		`
 const str = 'table football';
 const regex = new RegExp('foo*');
