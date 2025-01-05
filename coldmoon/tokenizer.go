@@ -9,8 +9,6 @@ import (
 
 type TokenType int
 
-var hexDigits = append(lo.NumbersCharset, []rune("abcdefABCDEF")...)
-
 const (
 	// TLeftBrace {
 	TLeftBrace TokenType = iota
@@ -137,6 +135,12 @@ const (
 	TEOF
 )
 
+var (
+	identifierStartCharset = append(lo.LettersCharset, []rune{'$', '_'}...)
+	identifierCharset      = append(identifierStartCharset, lo.NumbersCharset...)
+	hexDigitCharset        = append(lo.NumbersCharset, []rune("abcdefABCDEF")...)
+)
+
 type Token struct {
 	Type       TokenType
 	Value      string
@@ -229,71 +233,63 @@ func (t *Tokenizer) peek() Token {
 	ch := t.SourceText[t.Index]
 	switch ch {
 	case '^':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		t.step()
+		if t.match('=') {
 			return t.newToken(TCaretEquals, "^=")
 		}
 		return t.newToken(TCaret, "^")
 	case ':':
-		t.Index++
+		t.step()
 		return t.newToken(TColon, ":")
 	case '{':
-		t.Index++
+		t.step()
 		return t.newToken(TLeftBrace, "{")
 	case '}':
 		if t.isTemplate {
 			return t.templateMiddleOrTail()
 		}
-		t.Index++
+		t.step()
 		return t.newToken(TRightBrace, "}")
 	case '[':
-		t.Index++
+		t.step()
 		return t.newToken(TLeftBracket, "[")
 	case ']':
-		t.Index++
+		t.step()
 		return t.newToken(TRightBracket, "]")
 	case '(':
-		t.Index++
+		t.step()
 		return t.newToken(TLeftParen, "(")
 	case ')':
-		t.Index++
+		t.step()
 		return t.newToken(TRightParen, ")")
 	case '&':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '&' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-				t.Index++
+		t.step()
+		if t.match('&') {
+			if t.match('=') {
 				return t.newToken(TAmpersandAmpersandEquals, "&&=")
 			}
 			return t.newToken(TAmpersandAmpersand, "&&")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		if t.match('=') {
 			return t.newToken(TAmpersandEquals, "&=")
 		}
 		return t.newToken(TAmpersand, "&")
 	case '%':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		t.step()
+		if t.match('=') {
 			return t.newToken(TPercentEquals, "%=")
 		}
 		return t.newToken(TPercent, "%")
 	case '/':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		t.step()
+		if t.match('=') {
 			return t.newToken(TDivideEquals, "/=")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '/' {
-			t.Index++
+		if t.match('/') {
 			comment := t.comment("//")
 			return t.newToken(TComment, comment)
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '*' {
-			t.Index++
+		if t.match('*') {
 			comment := t.comment("/*")
 			return t.newToken(TComment, comment)
 		}
@@ -304,89 +300,72 @@ func (t *Tokenizer) peek() Token {
 	case '`':
 		return t.templateHead()
 	case '*':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		t.step()
+		if t.match('=') {
 			return t.newToken(TStarEquals, "*=")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '*' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-				t.Index++
+		if t.match('*') {
+			if t.match('=') {
 				return t.newToken(TStarStarEquals, "**=")
 			}
 			return t.newToken(TStarStar, "**")
 		}
 		return t.newToken(TStar, "*")
 	case '.':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '.' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '.' {
-				t.Index++
+		t.step()
+		if t.match('.') {
+			if t.match('.') {
 				return t.newToken(TDotDotDot, "...")
 			}
 		}
 		return t.newToken(TDot, ".")
 	case ';':
-		t.Index++
+		t.step()
 		return t.newToken(TSemicolon, ";")
 	case ',':
-		t.Index++
+		t.step()
 		return t.newToken(TComma, ",")
 	case '<':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		t.step()
+		if t.match('=') {
 			return t.newToken(TLessThanEquals, "<=")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '<' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-				t.Index++
+		if t.match('<') {
+			if t.match('=') {
 				return t.newToken(TLeftShiftEquals, "<<=")
 			}
 			return t.newToken(TLeftShift, "<<")
 		}
 		return t.newToken(TLessThan, "<")
 	case '+':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '+' {
-			t.Index++
+		t.step()
+		if t.match('+') {
 			return t.newToken(TPlusPlus, "++")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		if t.match('=') {
 			return t.newToken(TPlusEquals, "+=")
 		}
 		return t.newToken(TPlus, "+")
 	case '-':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '-' {
-			t.Index++
+		t.step()
+		if t.match('-') {
 			return t.newToken(TMinusMinus, "--")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		if t.match('=') {
 			return t.newToken(TMinusEquals, "-=")
 		}
 		return t.newToken(TMinus, "-")
 	case '>':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		t.step()
+		if t.match('=') {
 			return t.newToken(TGreaterThanEquals, ">=")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '>' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-				t.Index++
+		if t.match('>') {
+			if t.match('=') {
 				return t.newToken(TRightShiftEquals, ">>=")
 			}
-			if t.Index < t.Length && t.SourceText[t.Index] == '>' {
-				t.Index++
-				if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-					t.Index++
+			if t.match('>') {
+				if t.match('=') {
 					return t.newToken(TUnsignedRightShiftEquals, ">>>=")
 				}
 				return t.newToken(TUnsignedRightShift, ">>>")
@@ -395,64 +374,52 @@ func (t *Tokenizer) peek() Token {
 		}
 		return t.newToken(TGreaterThan, ">")
 	case '=':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-				t.Index++
+		t.step()
+		if t.match('=') {
+			if t.match('=') {
 				return t.newToken(TStrictEquals, "===")
 			}
 			return t.newToken(TEqualsEquals, "==")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '>' {
-			t.Index++
+		if t.match('>') {
 			return t.newToken(TArrow, "=>")
 		}
 		return t.newToken(TEquals, "=")
 	case '|':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
+		t.step()
+		if t.match('=') {
 			return t.newToken(TPipeEquals, "|=")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '|' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-				t.Index++
+		if t.match('|') {
+			if t.match('=') {
 				return t.newToken(TPipePipeEquals, "||=")
 			}
 			return t.newToken(TPipePipe, "||")
 		}
 		return t.newToken(TPipe, "|")
 	case '!':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-				t.Index++
+		t.step()
+		if t.match('=') {
+			if t.match('=') {
 				return t.newToken(TStrictNotEquals, "!==")
-			} else {
-				return t.newToken(TNotEquals, "!=")
 			}
+			return t.newToken(TNotEquals, "!=")
 		}
 		return t.newToken(TNot, "!")
 	case '?':
-		t.Index++
-		if t.Index < t.Length && t.SourceText[t.Index] == '.' {
-			t.Index++
+		t.step()
+		if t.match('.') {
 			return t.newToken(TQuestionDot, "?.")
 		}
-		if t.Index < t.Length && t.SourceText[t.Index] == '?' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '=' {
-				t.Index++
+		if t.match('?') {
+			if t.match('=') {
 				return t.newToken(TQuestionQuestionEquals, "??=")
 			}
 			return t.newToken(TQuestionQuestion, "??")
 		}
 		return t.newToken(TQuestion, "?")
 	case '~':
-		t.Index++
+		t.step()
 		return t.newToken(TTilde, "~")
 	case '\'', '"':
 		return t.string()
@@ -469,45 +436,37 @@ func (t *Tokenizer) peek() Token {
 
 func (t *Tokenizer) templateMiddleOrTail() Token {
 	start := t.Index
-	t.Index++
-	for t.Index < t.Length {
-		ch := t.SourceText[t.Index]
-		if ch == '`' {
-			t.Index++
+	t.step()
+	for !t.atEnd() {
+		if t.match('`') {
 			t.isTemplate = false
 			return t.newToken(TTemplateTail, string(t.SourceText[start:t.Index-1]))
 		}
-		if ch == '$' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '{' {
-				t.Index++
+		if t.match('$') {
+			if t.match('{') {
 				t.isTemplate = true
 				return t.newToken(TTemplateMiddle, string(t.SourceText[start:t.Index-2]))
 			}
 		}
-		t.Index++
+		t.step()
 	}
 	panic("unterminated template")
 }
 
 func (t *Tokenizer) templateHead() Token {
 	start := t.Index
-	t.Index++
-	for t.Index < t.Length {
-		ch := t.SourceText[t.Index]
-		if ch == '`' {
-			t.Index++
+	t.step()
+	for !t.atEnd() {
+		if t.match('`') {
 			return t.newToken(TNoSubstitutionTemplate, string(t.SourceText[start:t.Index]))
 		}
-		if ch == '$' {
-			t.Index++
-			if t.Index < t.Length && t.SourceText[t.Index] == '{' {
-				t.Index++
+		if t.match('$') {
+			if t.match('{') {
 				t.isTemplate = true
 				return t.newToken(TTemplateHead, string(t.SourceText[start:t.Index-2]))
 			}
 		}
-		t.Index++
+		t.step()
 	}
 	panic("unterminated template")
 }
@@ -515,30 +474,24 @@ func (t *Tokenizer) templateHead() Token {
 func (t *Tokenizer) comment(commentType string) string {
 	startIndex := t.Index
 	if commentType == "//" {
-		for t.Index < t.Length {
+		for !t.atEnd() {
 			ch := t.SourceText[t.Index]
 			if lo.Contains(lineTerminators, ch) {
-				t.Index++
-				t.line++
+				t.step()
 				return string(t.SourceText[startIndex:t.Index])
 			}
-			t.Index++
+			t.step()
 		}
 	}
 	if commentType == "/*" {
-		for t.Index < t.Length {
-			ch := t.SourceText[t.Index]
-			if ch == '\n' {
-				t.line++
-			}
-			if ch == '*' {
-				t.Index++
-				if t.Index < t.Length && t.SourceText[t.Index] == '/' {
-					t.Index++
+		for !t.atEnd() {
+			if t.match('*') {
+				if t.match('/') {
+					t.step()
 					return string(t.SourceText[startIndex : t.Index-2])
 				}
 			}
-			t.Index++
+			t.step()
 		}
 	}
 	return ""
@@ -549,14 +502,14 @@ func (t *Tokenizer) string() Token {
 	// TODO: handle escape
 	start := t.Index + 1
 	quote := t.SourceText[t.Index]
-	t.Index++
-	for t.Index < t.Length {
+	t.step()
+	for !t.atEnd() {
 		ch := t.SourceText[t.Index]
 		if ch == quote {
-			t.Index++
+			t.step()
 			break
 		}
-		t.Index++
+		t.step()
 	}
 	value := string(t.SourceText[start : t.Index-1])
 	return t.newToken(TString, value)
@@ -568,7 +521,7 @@ func (t *Tokenizer) number() Token {
 
 	switch {
 	case t.matchPrefix("0x", "0X"):
-		value = t.parseNumber(16, hexDigits)
+		value = t.parseNumber(16, hexDigitCharset)
 	case t.matchPrefix("0b", "0B"):
 		value = t.parseNumber(2, []rune{'0', '1'})
 	case t.matchPrefix("0o", "0O"):
@@ -580,19 +533,9 @@ func (t *Tokenizer) number() Token {
 	return t.newToken(TNumber, value)
 }
 
-func (t *Tokenizer) matchPrefix(prefixes ...string) bool {
-	for _, prefix := range prefixes {
-		if t.Index+len(prefix) < t.Length && string(t.SourceText[t.Index:t.Index+len(prefix)]) == prefix {
-			t.Index += len(prefix)
-			return true
-		}
-	}
-	return false
-}
-
 func (t *Tokenizer) parseNumber(base int, validDigits []rune) string {
 	start := t.Index
-	for t.Index < t.Length && lo.Contains(validDigits, t.SourceText[t.Index]) {
+	for t.matchCharset(validDigits) {
 		t.Index++
 	}
 	value, err := strconv.ParseInt(string(t.SourceText[start:t.Index]), base, 64)
@@ -604,39 +547,30 @@ func (t *Tokenizer) parseNumber(base int, validDigits []rune) string {
 
 func (t *Tokenizer) parseDecimalNumber() string {
 	start := t.Index
-	for t.Index < t.Length && lo.Contains(lo.NumbersCharset, t.SourceText[t.Index]) {
-		t.Index++
+	// TODO(XXX): is there a better way to handle empty loop/condition
+	for t.matchCharset(lo.NumbersCharset) {
 	}
-	if t.Index < t.Length && t.SourceText[t.Index] == '.' {
-		t.Index++
-		for t.Index < t.Length && lo.Contains(lo.NumbersCharset, t.SourceText[t.Index]) {
-			t.Index++
+	if t.match('.') {
+		for t.matchCharset(lo.NumbersCharset) {
 		}
 	}
-	if t.Index < t.Length && (t.SourceText[t.Index] == 'e' || t.SourceText[t.Index] == 'E') {
-		t.Index++
-		if t.Index < t.Length && (t.SourceText[t.Index] == '+' || t.SourceText[t.Index] == '-') {
-			t.Index++
+	if t.matchCharset([]rune{'e', 'E'}) {
+		if t.matchCharset([]rune{'-', '+'}) {
 		}
-		for t.Index < t.Length && lo.Contains(lo.NumbersCharset, t.SourceText[t.Index]) {
-			t.Index++
+		for t.matchCharset(lo.NumbersCharset) {
 		}
 	}
 	return string(t.SourceText[start:t.Index])
 }
 
 // MARK: - Identifier, Keyword
-var (
-	identifierStartCharset = append(lo.LettersCharset, []rune{'$', '_'}...)
-	identifierCharset      = append(identifierStartCharset, lo.NumbersCharset...)
-)
 
 func (t *Tokenizer) identifierOrKeyword() Token {
 	start := t.Index
-	for t.Index < t.Length {
+	for !t.atEnd() {
 		ch := t.SourceText[t.Index]
 		if lo.Contains(identifierCharset, ch) {
-			t.Index++
+			t.step()
 		} else {
 			break
 		}
@@ -745,16 +679,13 @@ func (t *Tokenizer) tryToMatchRegularExpression() (token Token, ok bool) {
 
 func (t *Tokenizer) regularExpression() Token {
 	start := t.Index
-	for t.Index < t.Length {
-		ch := t.SourceText[t.Index]
-		if ch == '/' {
-			t.Index++
+	for !t.atEnd() {
+		if t.match('/') {
 			break
 		}
-		if ch == '\\' {
-			t.Index++
+		if t.match('\\') {
 		}
-		t.Index++
+		t.step()
 	}
 	value := string(t.SourceText[start : t.Index-1])
 	return t.newToken(TRegularExpression, value)
@@ -800,12 +731,60 @@ func (t *Tokenizer) skipWhiteSpace() {
 	for t.Index < t.Length {
 		ch := t.SourceText[t.Index]
 		if lo.Contains(whitespace, ch) || lo.Contains(lineTerminators, ch) {
-			if ch == '\n' {
-				t.line++
-			}
-			t.Index++
+			t.step()
 		} else {
 			break
 		}
 	}
+}
+
+// step increments the index and line number.
+// - step will not check if the index is at the end of the source text.
+func (t *Tokenizer) step() {
+	ch := t.SourceText[t.Index]
+	if ch == '\n' {
+		t.nextLine()
+	}
+	t.Index++
+}
+
+func (t *Tokenizer) atEnd() bool {
+	return t.Index >= t.Length
+}
+
+func (t *Tokenizer) matchPrefix(prefixes ...string) bool {
+	for _, prefix := range prefixes {
+		if t.Index+len(prefix) < t.Length && string(t.SourceText[t.Index:t.Index+len(prefix)]) == prefix {
+			t.Index += len(prefix)
+			return true
+		}
+	}
+	return false
+}
+
+// match consumes the current character if it matches the given character.
+func (t *Tokenizer) match(ch rune) bool {
+	if t.atEnd() {
+		return false
+	}
+	if t.SourceText[t.Index] == ch {
+		t.step()
+		return true
+	}
+	return false
+}
+
+func (t *Tokenizer) matchCharset(chars []rune) bool {
+	if t.atEnd() {
+		return false
+	}
+	if lo.Contains(chars, t.SourceText[t.Index]) {
+		t.step()
+		return true
+	}
+	return false
+}
+
+func (t *Tokenizer) nextLine() {
+	t.line++
 }
