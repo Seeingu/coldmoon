@@ -22,6 +22,33 @@ func testSource(t *testing.T, s string) {
 
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
+		`
+class Animal {
+    constructor(name) {
+        this.name = name;
+    }
+
+    speak() {
+        return this.name + ' makes a noise.';
+    }
+}
+
+class Dog extends Animal {
+    constructor(name) {
+        super(name); // call the super class constructor and pass in the name parameter
+    }
+
+    speak() {
+        return this.name + ' barks.';
+    }
+}
+
+const d = new Dog("Mitzie");
+assertEqual(d.name, "Mitzie");
+//assertEqual(d instanceof Dog, true);
+//assertEqual(d instanceof Animal, true);
+assertEqual(d.speak(), "Mitzie barks.");
+`,
 		"assertEqual(`string text line 1\nstring text line 2`, 'string text line 1\nstring text line 2');",
 		`
 const a = 5;

@@ -387,8 +387,17 @@ func (o *Object) CopyDataProperties(source Value, excludedItems []PropertyKey) {
 	}
 }
 
-func (o *Object) PrivateFieldAdd(privateName *PrivateName, value Value) {
-	// TODO
+// 7.3.27
+func (o *Object) PrivateFieldAdd(privateName PrivateName, value Value) {
+	// TODO: HostEnsureCanAddPrivateElement
+	entry := o.PrivateElementFind(privateName)
+	if entry != nil {
+		o.Agent().ThrowTypeError("private field already exists")
+	}
+	o.data.privateElements[privateName] = &PrivateElement{
+		Kind:  PrivateElementKindField,
+		Value: value,
+	}
 }
 
 // MARK: - DefineField
@@ -403,7 +412,7 @@ func (o *Object) DefineField(field *ClassFieldDefinition) {
 	switch name := fieldName.(type) {
 	case PropertyKey:
 		o.CreateDataPropertyOrThrow(name, initializer)
-	case *PrivateName:
+	case PrivateName:
 		o.PrivateFieldAdd(name, initializer)
 	default:
 		panic("unreachable")

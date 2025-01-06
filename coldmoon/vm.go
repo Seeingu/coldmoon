@@ -685,6 +685,7 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 			methodDefinition = ce.(*ClassElementMethodDefinition).MethodDefinition
 		}
 		propertyName := GenerateAndRunBytecode(vm.agent, methodDefinition.PropertyName)
+		Assert(propertyName.Data() != nil)
 		result.privateMethodDefinition = vm.MethodDefinitionEvaluation(methodDefinitionArgs{
 			PropertyName:       propertyName.Data(),
 			FunctionExpression: methodDefinition.FunctionExpression,
@@ -732,7 +733,11 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 		constructorParent = realm.Intrinsics.FunctionPrototype
 	} else {
 		agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
-		superclassRef := GenerateAndRunBytecode(agent, classTail.ClassHeritage)
+		superclassRef := GenerateAndRunBytecode(agent,
+			&StatementExpression{
+				Expression: classTail.ClassHeritage,
+			},
+		)
 		agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 		superclass := superclassRef.Data()
 		if superclass == nil {
@@ -1218,6 +1223,7 @@ type methodDefinitionArgs struct {
 }
 
 // 15.4.5
+// return PrivateMethodDefinition or nil(UNUSED)
 func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, object ObjectType, enumerable bool) *PrivateMethodDefinition {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
@@ -1234,7 +1240,11 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 			nil,
 		)
 		SetFunctionName(methodDef.Closure, methodDef.Key, "")
-		return &PrivateMethodDefinition{PrivateElement: DefineMethodProperty(object, methodDef.Key, methodDef.Closure, enumerable)}
+		privateElement := DefineMethodProperty(object, methodDef.Key, methodDef.Closure, enumerable)
+		if privateElement != nil {
+			return &PrivateMethodDefinition{PrivateElement: privateElement}
+		}
+		return nil
 	case MethodDefinitionTypeGet:
 		propKeyOrPrivateName := propertyName
 		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment

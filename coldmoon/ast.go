@@ -419,6 +419,7 @@ type PropertyDefinitionNameAndExpression struct {
 
 func (p *PropertyDefinitionNameAndExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	p.Name.Bytecode(e, c)
+	e.AddInstruction(InsLoad)
 
 	p.Expression.Bytecode(e, c)
 
@@ -526,7 +527,7 @@ func (p *PropertyNameLiteralIdentifier) String() string {
 }
 
 func (p *PropertyNameLiteralIdentifier) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&ILoadConstant{Value: NewStringValue(string(p.Identifier))})
+	e.AddInstruction(&IStoreConstant{Value: NewStringValue(string(p.Identifier))})
 }
 
 type PropertyNameLiteralString struct {
@@ -1134,6 +1135,10 @@ func (e *ExpressionSuperCall) Bytecode(ex *Executable, c *BytecodeContext) {
 	})
 }
 
+func (e *ExpressionSuperCall) String() string {
+	return "super(" + e.Arguments.String() + ")"
+}
+
 // MARK: - PrimaryExpression
 
 type ExpressionPrimary struct {
@@ -1186,27 +1191,31 @@ type PrimaryExpressionTemplateLiteral struct {
 
 // 13.2.8.6
 func (t *PrimaryExpressionTemplateLiteral) Bytecode(e *Executable, c *BytecodeContext) {
-	// NoSubstitutionTemplate
-	if len(t.TemplateLiteral.Spans) == 1 {
+	hasHead := t.TemplateLiteral.TemplateHead != nil
+	if hasHead {
+		e.AddInstruction(&ILoadConstant{
+			Value: t.TemplateLiteral.TemplateHead.TV().ToValue(),
+		})
+	} else {
+		// NoSubstitutionTemplate
 		span := t.TemplateLiteral.Spans[0]
 		e.AddInstruction(&IStoreConstant{
 			Value: span.TV().ToValue(),
 		})
 		return
 	}
-	e.AddInstruction(&ILoadConstant{
-		Value: t.TemplateLiteral.TemplateHead.TV().ToValue(),
-	})
 	for i, span := range t.TemplateLiteral.Spans {
 		// --- Expression
-		span.Expression.Bytecode(e, c)
-		if ExpressionAnalyze(span.Expression, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
+		if span.Expression != nil {
+			span.Expression.Bytecode(e, c)
+			if ExpressionAnalyze(span.Expression, AnalyzeQueryIsReference) {
+				e.AddInstruction(InsGetValue)
+			}
+			// TODO: to string
+			e.AddInstruction(InsLoad)
+			e.AddInstruction(&IApplyStringOrNumericBinaryOperator{Operator: BinaryOperatorAddition})
+			e.AddInstruction(InsLoad)
 		}
-		// TODO: to string
-		e.AddInstruction(InsLoad)
-		e.AddInstruction(&IApplyStringOrNumericBinaryOperator{Operator: BinaryOperatorAddition})
-		e.AddInstruction(InsLoad)
 
 		// --- Text
 		e.AddInstruction(&ILoadConstant{
@@ -1240,6 +1249,9 @@ func (t *TemplateSpan) TV() CMString {
 	}
 	if strings.HasSuffix(t.Text, "}") || strings.HasSuffix(t.Text, "`") {
 		end--
+	}
+	if start > end {
+		return CMString("")
 	}
 	return CMString(t.Text[start:end])
 }

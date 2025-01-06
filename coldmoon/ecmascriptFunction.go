@@ -394,12 +394,12 @@ func (e *ECMAScriptFunction) Construct(
 
 	var thisArgument Value
 	if kind == ConstructorKindBase {
-		thisArgument = (OrdinaryCreateFromConstructor(
+		thisArgument = OrdinaryCreateFromConstructor(
 			agent,
 			newTarget,
 			"%Object.prototype%",
 			nil,
-		)).ToValue()
+		).ToValue()
 	}
 
 	calleeContext := PrepareForOrdinaryCall(agent, function, newTarget)
@@ -422,7 +422,7 @@ func (e *ECMAScriptFunction) Construct(
 			return o.Object
 		}
 		if kind == ConstructorKindBase {
-			return thisArgument.(*ObjectValue).Object
+			return MustGetObject(thisArgument)
 		}
 		if result.Data() != UndefinedValue {
 			panic("TypeError")
@@ -548,7 +548,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 		proto = OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, nil)
 
 		proto.DefinePropertyOrThrow(NewStringPropertyKey("constructor"), &PropertyDescriptor{
-			Value:        (F).ToValue(),
+			Value:        F.ToValue(),
 			Writable:     writable,
 			Enumerable:   false,
 			Configurable: true,
@@ -577,6 +577,7 @@ type (
 )
 
 // 10.2.8
+// return PrivateElement or nil(UNUSED)
 func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, closure ObjectType, enumerable bool) *PrivateElement {
 	Assert(homeObject.IsExtensible())
 	switch k := key.(type) {

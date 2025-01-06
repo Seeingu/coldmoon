@@ -1743,10 +1743,10 @@ func (p *Parser) memberExpression(left Expression) *MemberExpression {
 }
 
 func (p *Parser) superProperty() (sp SuperProperty, ok bool) {
-	p.tokenizer.Match(TSuper)
 	if !p.inClassBody || p.inMethodDefinition {
 		return
 	}
+	p.tokenizer.Match(TSuper)
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
 	case TDot:
