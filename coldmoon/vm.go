@@ -175,32 +175,7 @@ func (vm *VM) execute(i Instruction) {
 			value = r.GetValue(agent)
 		}
 
-		// TODO: when base value refactor is done, use baseValue.TypeString()
-		switch v := value.(type) {
-		case *undefinedValue:
-			vm.result = NewStringValue("undefined")
-		case *nullValue:
-			vm.result = NewStringValue("object")
-		case *BooleanValue:
-			vm.result = NewStringValue("boolean")
-		case *NumberValue:
-			vm.result = NewStringValue("number")
-		case *StringValue:
-			vm.result = NewStringValue("string")
-		case *SymbolValue:
-			vm.result = NewStringValue("symbol")
-		case *BigIntValue:
-			vm.result = NewStringValue("bigint")
-		case *ObjectValue:
-			if v.Object.InternalMethods().Call != nil {
-				vm.result = NewStringValue("function")
-			} else {
-				vm.result = NewStringValue("object")
-			}
-		default:
-			panic("unreachable")
-		}
-
+		vm.result = NewStringValue(value.TypeString())
 	case *IToNumber:
 		value := vm.result
 		vm.result = ToNumber(vm.agent, value)

@@ -81,27 +81,27 @@ func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
 	return nil
 }
 
-func (b *BaseValue) TypeString() *StringValue {
+func (b *BaseValue) TypeString() string {
 	switch v := b.Value.(type) {
 	case *undefinedValue:
-		return NewStringValue("undefined")
+		return "undefined"
 	case *nullValue:
-		return NewStringValue("object")
+		return "object"
 	case *BooleanValue:
-		return NewStringValue("boolean")
+		return "boolean"
 	case *NumberValue:
-		return NewStringValue("number")
+		return "number"
 	case *StringValue:
-		return NewStringValue("string")
+		return "string"
 	case *SymbolValue:
-		return NewStringValue("symbol")
+		return "symbol"
 	case *BigIntValue:
-		return NewStringValue("bigint")
+		return "bigint"
 	case *ObjectValue:
 		if v.Object.InternalMethods().Call != nil {
-			return NewStringValue("function")
+			return "function"
 		} else {
-			return NewStringValue("object")
+			return "object"
 		}
 	default:
 		panic("unreachable")

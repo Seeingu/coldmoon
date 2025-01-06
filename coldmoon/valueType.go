@@ -6,11 +6,12 @@ type Value interface {
 
 	Call(this Value, argumentsList ArgumentsList) Value
 	CallNoArgs(this Value) Value
-	// --- internal methods ---
-
-	String() string
 	// 7.1.18
 	ToObject(agent *Agent) ObjectType
+	// --- internal methods ---
+
+	TypeString() string
+	String() string
 	ToCompletion() CompletionValue
 	ToPropertyDescriptor() *PropertyDescriptor
 	Hash() string
