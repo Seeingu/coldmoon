@@ -693,8 +693,7 @@ func (p *Parser) asyncArrowFunction() *PrimaryExpressionAsyncArrowFunction {
 		body = p.functionBody(FunctionTypeAsync)
 		p.tokenizer.MustMatch(TRightBrace)
 	} else {
-		// TODO(P): prec: greater than ,
-		e := p.expression(p.acceptContext(TYield))
+		e := p.expression(p.acceptContextHigherThan(TComma))
 		body = &FunctionBody{
 			StatementList: StatementList{
 				&StatementListItemStatement{
@@ -944,8 +943,7 @@ func (p *Parser) lexicalBinding() *LexicalBinding {
 	var init Expression
 	if p.tokenizer.CurrentToken.Type == TEquals {
 		p.tokenizer.Next()
-		// TODO(P)
-		init = p.expression(p.acceptContext(TYield))
+		init = p.expression(p.acceptContextHigherThan(TComma))
 	}
 	return &LexicalBinding{
 		Identifier:  identifier,
@@ -1782,8 +1780,7 @@ func (p *Parser) arguments() Arguments {
 		if t.Type == TRightParen {
 			break
 		}
-		// Precedence greater than TComma
-		expr := p.expression(p.acceptContext(TYield))
+		expr := p.expression(p.acceptContextHigherThan(TComma))
 		p.tokenizer.Match(TComma)
 		list = append(list, expr)
 	}
@@ -2286,8 +2283,7 @@ func (p *Parser) variableDeclaration() *VariableDeclaration {
 	identifier := p.bindingIdentifier()
 	var init Expression
 	if p.tokenizer.Match(TEquals) {
-		// Precedence greater than TComma
-		init = p.expression(p.acceptContext(TYield))
+		init = p.expression(p.acceptContextHigherThan(TComma))
 	}
 	return &VariableDeclaration{
 		BindingIdentifier: identifier,
