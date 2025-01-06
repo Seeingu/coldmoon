@@ -1023,15 +1023,14 @@ func (o *Object) defineBuiltinProperty(name PropertyConvertable, desc *PropertyD
 func (o *Object) defineToStringTag(name string) {
 	o.Ref().defineBuiltinProperty(
 		WellKnownSymbolsToStringTag,
-		NewPropertyDescriptorFromValue(
-			NewStringValue(name)),
+		NewStringValue(name).ToPropertyDescriptor(),
 	)
 }
 
 func (o *Object) defineUnscopables(value Value) {
 	o.Ref().defineBuiltinProperty(
 		WellKnownSymbolsUnscopables,
-		NewPropertyDescriptorFromValue(value),
+		value.ToPropertyDescriptor(),
 	)
 }
 
@@ -1048,7 +1047,7 @@ func (o *Object) defineBuiltinFunction(
 		name,
 		builtinFunctionArgs{realm: realm},
 	)
-	o.defineBuiltinProperty(name, NewPropertyDescriptorFromValue(f.ToValue()))
+	o.defineBuiltinProperty(name, f.ToValue().ToPropertyDescriptor())
 }
 
 type builtinAccessorParams struct {

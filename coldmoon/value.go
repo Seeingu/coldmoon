@@ -36,16 +36,6 @@ func (hint PreferredType) String() string {
 
 type ArgumentsList []Value
 
-// TODO(C): we should use convertable
-func NewPropertyDescriptorFromValue(value Value) *PropertyDescriptor {
-	return &PropertyDescriptor{
-		Value:        value,
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	}
-}
-
 func NewValueFromObject(object ObjectType) Value {
 	ov := &ObjectValue{Object: object}
 	ov.Value = NewBaseValue(ov)
