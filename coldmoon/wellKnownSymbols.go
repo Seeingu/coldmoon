@@ -32,7 +32,10 @@ func (w WellKnownSymbolsKey) ToName() string {
 	switch w {
 	case WellKnownSymbolsSpecies:
 		return "[Symbol.species]"
+	case WellKnownSymbolsToStringTag:
+		return "[Symbol.toStringTag]"
 	}
+	// TODO: manage all string tags in one place
 	panic("unimplemented")
 }
 

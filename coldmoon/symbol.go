@@ -63,87 +63,87 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 		return agent.CreateSymbol(descriptionString)
 	}
 
-	object := CreateBuiltinFunction(realm.Agent, behavior, 0, "Symbol", builtinFunctionArgs{
+	object := CreateBuiltinFunction(realm.Agent, behavior, 0, CMString("Symbol"), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		isConstructor: true,
 	})
 
 	// 20.4.2.1
-	DefineBuiltinPropertyP(object, "asyncIterator", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("asyncIterator"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsAsyncIterator],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "hasInstance", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("hasInstance"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsHasInstance],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "isConcatSpreadable", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("isConcatSpreadable"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "iterator", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("iterator"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsIterator],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "match", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("match"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsMatch],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "matchAll", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("matchAll"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsMatchAll],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinPropertyP(object, "replace", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("replace"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsReplace],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "search", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("search"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsSearch],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "species", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("species"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsSpecies],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "split", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("split"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsSplit],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "toPrimitive", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("toPrimitive"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsToPrimitive],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "toStringTag", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("toStringTag"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsToStringTag],
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
-	DefineBuiltinPropertyP(object, "unscopables", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("unscopables"), &PropertyDescriptor{
 		Value:        WellKnownSymbols[WellKnownSymbolsUnscopables],
 		Writable:     false,
 		Enumerable:   false,
@@ -171,8 +171,8 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 		return NewStringValue(keyForSymbol(agent, s))
 	}
 
-	DefineBuiltinFunction(object, "for", symbolFor, 1, realm)
-	DefineBuiltinFunction(object, "keyFor", keyFor, 1, realm)
+	object.defineBuiltinFunction(realm, CMString("for"), symbolFor, 1)
+	object.defineBuiltinFunction(realm, CMString("keyFor"), keyFor, 1)
 
 	BindPrototypeAndConstructor(realm.Intrinsics.SymbolPrototype, object)
 	return object
@@ -194,8 +194,8 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 		return this
 	}
 
-	DefineBuiltinFunction(object, "toString", toString, 0, realm)
-	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
 	object.defineBuiltinFunctionWithAttributes(
 		realm,
 		WellKnownSymbolsToPrimitive, toPrimitive, 0,
@@ -204,7 +204,7 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 			Enumerable:   false,
 			Configurable: true,
 		})
-	DefineToStringTagBuiltinProperty(object, "Symbol")
+	object.defineToStringTag("Symbol")
 
 	return object
 }

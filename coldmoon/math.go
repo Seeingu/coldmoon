@@ -12,55 +12,15 @@ type MathObject struct {
 func NewMathObject(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "Math")
 
-	DefineBuiltinPropertyP(object, "E", &PropertyDescriptor{
-		Value:        NewNumberValue(math.E),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "LN10", &PropertyDescriptor{
-		Value:        NewNumberValue(math.Ln10),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "LN2", &PropertyDescriptor{
-		Value:        NewNumberValue(math.Ln2),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "LOG2E", &PropertyDescriptor{
-		Value:        NewNumberValue(math.Log2E),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "LOG10E", &PropertyDescriptor{
-		Value:        NewNumberValue(math.Log10E),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "PI", &PropertyDescriptor{
-		Value:        NewNumberValue(math.Pi),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "SQRT1_2", &PropertyDescriptor{
-		Value:        NewNumberValue(JSNumber(math.Sqrt(1 / 2))),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "SQRT2", &PropertyDescriptor{
-		Value:        NewNumberValue(math.Sqrt2),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineToStringTagBuiltinProperty(object, "Math")
+	object.defineBuiltinProperty(CMString("E"), NewFrozenPropertyDescriptor(NewNumberValue(math.E)))
+	object.defineBuiltinProperty(CMString("LN10"), NewFrozenPropertyDescriptor(NewNumberValue(math.Ln10)))
+	object.defineBuiltinProperty(CMString("LN2"), NewFrozenPropertyDescriptor(NewNumberValue(math.Ln2)))
+	object.defineBuiltinProperty(CMString("LOG2E"), NewFrozenPropertyDescriptor(NewNumberValue(math.Log2E)))
+	object.defineBuiltinProperty(CMString("LOG10E"), NewFrozenPropertyDescriptor(NewNumberValue(math.Log10E)))
+	object.defineBuiltinProperty(CMString("PI"), NewFrozenPropertyDescriptor(NewNumberValue(math.Pi)))
+	object.defineBuiltinProperty(CMString("SQRT1_2"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(math.Sqrt(1/2)))))
+	object.defineBuiltinProperty(CMString("SQRT2"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(math.Sqrt2))))
+	object.defineToStringTag("Math")
 
 	agent := realm.Agent
 	var random BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
@@ -293,40 +253,40 @@ func NewMathObject(realm *Realm) ObjectType {
 		return NewNumberValue(JSNumber(int32(product)))
 	}
 
-	DefineBuiltinFunction(object, "random", random, 0, realm)
-	DefineBuiltinFunction(object, "abs", abs, 1, realm)
-	DefineBuiltinFunction(object, "ceil", ceil, 1, realm)
-	DefineBuiltinFunction(object, "floor", floor, 1, realm)
-	DefineBuiltinFunction(object, "pow", pow, 2, realm)
-	DefineBuiltinFunction(object, "round", round, 1, realm)
-	DefineBuiltinFunction(object, "trunc", trunc, 1, realm)
-	DefineBuiltinFunction(object, "clz32", clz32, 1, realm)
-	DefineBuiltinFunction(object, "sign", sign, 1, realm)
-	DefineBuiltinFunction(object, "acos", acos, 1, realm)
-	DefineBuiltinFunction(object, "acosh", acosh, 1, realm)
-	DefineBuiltinFunction(object, "asin", asin, 1, realm)
-	DefineBuiltinFunction(object, "asinh", asinh, 1, realm)
-	DefineBuiltinFunction(object, "atan", atan, 1, realm)
-	DefineBuiltinFunction(object, "atanh", atanh, 1, realm)
-	DefineBuiltinFunction(object, "cos", cos, 1, realm)
-	DefineBuiltinFunction(object, "cosh", cosh, 1, realm)
-	DefineBuiltinFunction(object, "sin", sin, 1, realm)
-	DefineBuiltinFunction(object, "sinh", sinh, 1, realm)
-	DefineBuiltinFunction(object, "tan", tan, 1, realm)
-	DefineBuiltinFunction(object, "tanh", tanh, 1, realm)
-	DefineBuiltinFunction(object, "sqrt", sqrt, 1, realm)
-	DefineBuiltinFunction(object, "cbrt", cbrt, 1, realm)
-	DefineBuiltinFunction(object, "exp", exp, 1, realm)
-	DefineBuiltinFunction(object, "expm1", expm1, 1, realm)
-	DefineBuiltinFunction(object, "log", log, 1, realm)
-	DefineBuiltinFunction(object, "log1p", log1p, 1, realm)
-	DefineBuiltinFunction(object, "log10", log10, 1, realm)
-	DefineBuiltinFunction(object, "log2", log2, 1, realm)
-	DefineBuiltinFunction(object, "atan2", atan2, 2, realm)
-	DefineBuiltinFunction(object, "fround", fround, 1, realm)
-	DefineBuiltinFunction(object, "imul", imul, 2, realm)
-	DefineBuiltinFunction(object, "max", mathMax, 2, realm)
-	DefineBuiltinFunction(object, "min", mathMin, 2, realm)
+	object.defineBuiltinFunction(realm, CMString("random"), random, 0)
+	object.defineBuiltinFunction(realm, CMString("abs"), abs, 1)
+	object.defineBuiltinFunction(realm, CMString("ceil"), ceil, 1)
+	object.defineBuiltinFunction(realm, CMString("floor"), floor, 1)
+	object.defineBuiltinFunction(realm, CMString("pow"), pow, 2)
+	object.defineBuiltinFunction(realm, CMString("round"), round, 1)
+	object.defineBuiltinFunction(realm, CMString("trunc"), trunc, 1)
+	object.defineBuiltinFunction(realm, CMString("clz32"), clz32, 1)
+	object.defineBuiltinFunction(realm, CMString("sign"), sign, 1)
+	object.defineBuiltinFunction(realm, CMString("acos"), acos, 1)
+	object.defineBuiltinFunction(realm, CMString("acosh"), acosh, 1)
+	object.defineBuiltinFunction(realm, CMString("asin"), asin, 1)
+	object.defineBuiltinFunction(realm, CMString("asinh"), asinh, 1)
+	object.defineBuiltinFunction(realm, CMString("atan"), atan, 1)
+	object.defineBuiltinFunction(realm, CMString("atanh"), atanh, 1)
+	object.defineBuiltinFunction(realm, CMString("cos"), cos, 1)
+	object.defineBuiltinFunction(realm, CMString("cosh"), cosh, 1)
+	object.defineBuiltinFunction(realm, CMString("sin"), sin, 1)
+	object.defineBuiltinFunction(realm, CMString("sinh"), sinh, 1)
+	object.defineBuiltinFunction(realm, CMString("tan"), tan, 1)
+	object.defineBuiltinFunction(realm, CMString("tanh"), tanh, 1)
+	object.defineBuiltinFunction(realm, CMString("sqrt"), sqrt, 1)
+	object.defineBuiltinFunction(realm, CMString("cbrt"), cbrt, 1)
+	object.defineBuiltinFunction(realm, CMString("exp"), exp, 1)
+	object.defineBuiltinFunction(realm, CMString("expm1"), expm1, 1)
+	object.defineBuiltinFunction(realm, CMString("log"), log, 1)
+	object.defineBuiltinFunction(realm, CMString("log1p"), log1p, 1)
+	object.defineBuiltinFunction(realm, CMString("log10"), log10, 1)
+	object.defineBuiltinFunction(realm, CMString("log2"), log2, 1)
+	object.defineBuiltinFunction(realm, CMString("atan2"), atan2, 2)
+	object.defineBuiltinFunction(realm, CMString("fround"), fround, 1)
+	object.defineBuiltinFunction(realm, CMString("imul"), imul, 2)
+	object.defineBuiltinFunction(realm, CMString("max"), mathMax, 2)
+	object.defineBuiltinFunction(realm, CMString("min"), mathMin, 2)
 
 	return object
 }

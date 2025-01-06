@@ -71,7 +71,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 			iterator.ObjectWasVisited = false
 		}
 	}
-	DefineBuiltinFunction(object, "next", next, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("next"), next, 0)
 
 	return object
 }

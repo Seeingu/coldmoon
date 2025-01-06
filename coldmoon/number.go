@@ -390,7 +390,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		numberObject.ref = numberObject
 		return (numberObject).ToValue()
 	}
-	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "Number", builtinFunctionArgs{
+	object := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("Number"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
@@ -430,60 +430,23 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		return NewBooleanValue(false)
 	}
 
-	DefineBuiltinFunction(object, "isFinite", isFinite, 1, realm)
-	DefineBuiltinFunction(object, "isInteger", isInteger, 1, realm)
-	DefineBuiltinFunction(object, "isNaN", isNaN, 1, realm)
-	DefineBuiltinFunction(object, "isSafeInteger", isSafeInteger, 1, realm)
-	DefineBuiltinPropertyP(object, "EPSILON", &PropertyDescriptor{
-		Value:        NewNumberValue(2.220446049250313e-16),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "MAX_SAFE_INTEGER", &PropertyDescriptor{
-		Value:        NewNumberValue(9007199254740991),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "MIN_SAFE_INTEGER", &PropertyDescriptor{
-		Value:        NewNumberValue(-9007199254740991),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "MAX_VALUE", &PropertyDescriptor{
-		Value:        NewNumberValue(1.7976931348623157e+308),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "MIN_VALUE", &PropertyDescriptor{
-		Value:        NewNumberValue(5e-324),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "NaN", &PropertyDescriptor{
-		Value:        NewNumberValue(JSNumberNaN),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "NEGATIVE_INFINITY", &PropertyDescriptor{
-		Value:        NewNumberValue(JSNumberNegInf),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyP(object, "POSITIVE_INFINITY", &PropertyDescriptor{
-		Value:        NewNumberValue(JSNumberInf),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
-	})
-	DefineBuiltinPropertyV(object, "parseFloat", (realm.Intrinsics.ParseFloat).ToValue())
-	DefineBuiltinPropertyV(object, "parseInt", (realm.Intrinsics.ParseInt).ToValue())
+	object.defineBuiltinFunction(realm, CMString("isFinite"), isFinite, 1)
+	object.defineBuiltinFunction(realm, CMString("isInteger"), isInteger, 1)
+	object.defineBuiltinFunction(realm, CMString("isNaN"), isNaN, 1)
+	object.defineBuiltinFunction(realm, CMString("isSafeInteger"), isSafeInteger, 1)
+
+	// TODO: do not use magic number
+	object.defineBuiltinProperty(CMString("EPSILON"), NewFrozenPropertyDescriptor(NewNumberValue(2.220446049250313e-16)))
+	object.defineBuiltinProperty(CMString("MAX_SAFE_INTEGER"), NewFrozenPropertyDescriptor(NewNumberValue(9007199254740991)))
+	object.defineBuiltinProperty(CMString("MIN_SAFE_INTEGER"), NewFrozenPropertyDescriptor(NewNumberValue(-9007199254740991)))
+	object.defineBuiltinProperty(CMString("MAX_VALUE"), NewFrozenPropertyDescriptor(NewNumberValue(1.7976931348623157e+308)))
+	object.defineBuiltinProperty(CMString("MIN_VALUE"), NewFrozenPropertyDescriptor(NewNumberValue(5e-324)))
+	object.defineBuiltinProperty(CMString("NEGATIVE_INFINITY"), NewFrozenPropertyDescriptor(NegativeInfinityValue))
+	object.defineBuiltinProperty(CMString("POSITIVE_INFINITY"), NewFrozenPropertyDescriptor(InfinityValue))
+	object.defineBuiltinProperty(CMString("NaN"), NewFrozenPropertyDescriptor(NaNValue))
+
+	object.defineBuiltinProperty(CMString("parseFloat"), realm.Intrinsics.ParseFloat.ToValue().ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("parseInt"), realm.Intrinsics.ParseInt.ToValue().ToPropertyDescriptor())
 
 	BindPrototypeAndConstructor(realm.Intrinsics.NumberPrototype, object)
 	return object
@@ -533,9 +496,9 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		return toString(thisNumberValue(agent, this), nil, nil)
 	}
 
-	DefineBuiltinFunction(object, "toString", toString, 0, realm)
-	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
-	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 1)
+	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
+	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
 
 	return object
 }

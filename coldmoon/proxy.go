@@ -486,7 +486,7 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 		return (ProxyCreate(agent, target, handler)).ToValue()
 	}
 
-	obj := CreateBuiltinFunction(agent, behavior, 2, "Proxy", builtinFunctionArgs{
+	obj := CreateBuiltinFunction(agent, behavior, 2, CMString("Proxy"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
@@ -508,7 +508,7 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 			p.Handler = nil
 			return UndefinedValue
 		}
-		revoker := CreateBuiltinFunction(agent, revokerClosure, 0, "", builtinFunctionArgs{
+		revoker := CreateBuiltinFunction(agent, revokerClosure, 0, CMString(""), builtinFunctionArgs{
 			revocableProxy: proxy,
 		})
 
@@ -517,7 +517,7 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 		result.CreateDataPropertyOrThrow(NewStringPropertyKey("revoke"), (revoker).ToValue())
 		return (result).ToValue()
 	}
-	DefineBuiltinFunction(obj, "revocable", revocable, 2, realm)
+	obj.defineBuiltinFunction(realm, CMString("revocable"), revocable, 2)
 
 	return obj
 }

@@ -71,7 +71,7 @@ func NewJSON(realm *Realm) *JSON {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "JSON")
 
-	DefineToStringTagBuiltinProperty(object, "JSON")
+	object.defineToStringTag("JSON")
 
 	var parse BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		text := argumentsList[0]
@@ -174,8 +174,8 @@ func NewJSON(realm *Realm) *JSON {
 		return NewStringValue(SerializeJSONProperty(agent, state, NewStringPropertyKey(""), wrapper))
 	}
 
-	DefineBuiltinFunction(object, "parse", parse, 2, realm)
-	DefineBuiltinFunction(object, "stringify", stringify, 3, realm)
+	object.defineBuiltinFunction(realm, CMString("parse"), parse, 2)
+	object.defineBuiltinFunction(realm, CMString("stringify"), stringify, 3)
 
 	j := &JSON{
 		Object: object,

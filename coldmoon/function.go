@@ -10,7 +10,7 @@ func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return UndefinedValue
 	}
-	f := CreateBuiltinFunction(realm.Agent, behavior, 0, "", builtinFunctionArgs{
+	f := CreateBuiltinFunction(realm.Agent, behavior, 0, CMString(""), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.ObjectPrototype,
 		prefix:        "",
@@ -48,7 +48,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 
 		panic("TypeError")
 	}
-	DefineBuiltinFunction(f, "toString", toString, 0, realm)
+	f.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
 
 	// 20.2.3.3
 	call := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
@@ -99,8 +99,8 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		SetFunctionName(F, NewStringPropertyKey(targetNameString), "bound")
 		return (F).ToValue()
 	}
-	DefineBuiltinFunction(f, "call", call, 1, realm)
-	DefineBuiltinFunction(f, "bind", bind, 1, realm)
+	f.defineBuiltinFunction(realm, CMString("call"), call, 1)
+	f.defineBuiltinFunction(realm, CMString("bind"), bind, 1)
 
 	apply := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		thisArg := argumentsList[0]
@@ -117,7 +117,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		argList := CreateListFromArrayLike(realm.Agent, argArray)
 		return fun.Call(thisArg, argList)
 	}
-	DefineBuiltinFunction(f, "apply", apply, 2, realm)
+	f.defineBuiltinFunction(realm, CMString("apply"), apply, 2)
 }
 
 type dynamicFunctionKind int
@@ -262,16 +262,16 @@ func CreateDynamicFunction(
 		MakeConstructor(function, false, nil)
 	case dynamicFunctionKindGenerator:
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
-		DefineBuiltinPropertyP(function, "prototype", &PropertyDescriptor{
-			Value:        (prototype).ToValue(),
+		function.defineBuiltinProperty(CMString("prototype"), &PropertyDescriptor{
+			Value:        prototype.ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
 		})
 	case dynamicFunctionKindAsyncGenerator:
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
-		DefineBuiltinPropertyP(function, "prototype", &PropertyDescriptor{
-			Value:        (prototype).ToValue(),
+		function.defineBuiltinProperty(CMString("prototype"), &PropertyDescriptor{
+			Value:        prototype.ToValue(),
 			Writable:     true,
 			Enumerable:   false,
 			Configurable: false,
@@ -304,7 +304,7 @@ func NewFunctionConstructor(realm *Realm) ObjectType {
 			bodyArg,
 		)).ToValue()
 	}
-	f := CreateBuiltinFunction(realm.Agent, behavior, 1, "Function", builtinFunctionArgs{
+	f := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("Function"), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		prefix:        "",

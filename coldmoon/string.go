@@ -158,7 +158,7 @@ func NewStringConstructor(realm *Realm) ObjectType {
 		return StringCreate(realm.Agent, s, GetPrototypeFromConstructor(newTarget, "%String.prototype%")).ToValue()
 	}
 
-	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "String", builtinFunctionArgs{
+	object := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("String"), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		isConstructor: true,
@@ -180,8 +180,8 @@ func NewStringConstructor(realm *Realm) ObjectType {
 		}
 		return NewStringValue(string(codePoints))
 	}
-	DefineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm)
-	DefineBuiltinFunction(object, "fromCodePoint", fromCodePoint, 1, realm)
+	object.defineBuiltinFunction(realm, CMString("fromCharCode"), fromCharCode, 1)
+	object.defineBuiltinFunction(realm, CMString("fromCodePoint"), fromCodePoint, 1)
 
 	return object
 }
@@ -520,29 +520,52 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewStringValue(s.Data[int(from):int(to)])
 	}
 
-	DefineBuiltinFunction(stringPrototype, "toString", toString, 0, realm)
-	DefineBuiltinFunction(stringPrototype, "valueOf", valueOf, 0, realm)
-	DefineBuiltinFunction(stringPrototype, "charAt", charAt, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "charCodeAt", charCodeAt, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "iterator", iterator, 0, realm)
-	DefineBuiltinFunction(stringPrototype, "at", at, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "slice", slice, 2, realm)
-	DefineBuiltinFunction(stringPrototype, "repeat", repeat, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "concat", concat, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "search", search, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "matchAll", matchAll, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "indexOf", indexOf, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "lastIndexOf", lastIndexOf, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "startsWith", startsWith, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "endsWith", endsWith, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "includes", includes, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "codePointAt", codePointAt, 1, realm)
-	DefineBuiltinFunction(stringPrototype, "toLowerCase", toLowerCase, 0, realm)
-	DefineBuiltinFunction(stringPrototype, "toUpperCase", toUpperCase, 0, realm)
-	DefineBuiltinFunction(stringPrototype, "trim", trim, 0, realm)
-	DefineBuiltinFunction(stringPrototype, "trimEnd", trimEnd, 0, realm)
-	DefineBuiltinFunction(stringPrototype, "trimStart", trimStart, 0, realm)
-	DefineBuiltinFunction(stringPrototype, "substring", substring, 2, realm)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("charAt"), charAt, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("charCodeAt"), charCodeAt, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("iterator"), iterator, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("at"), at, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("repeat"), repeat, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("concat"), concat, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("lastIndexOf"), lastIndexOf, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("startsWith"), startsWith, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("endsWith"), endsWith, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("includes"), includes, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("codePointAt"), codePointAt, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toLowerCase"), toLowerCase, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toUpperCase"), toUpperCase, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("trim"), trim, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("trimEnd"), trimEnd, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("trimStart"), trimStart, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("substring"), substring, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("charAt"), charAt, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("charCodeAt"), charCodeAt, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("iterator"), iterator, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("at"), at, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("repeat"), repeat, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("concat"), concat, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("lastIndexOf"), lastIndexOf, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("startsWith"), startsWith, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("endsWith"), endsWith, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("includes"), includes, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("codePointAt"), codePointAt, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toLowerCase"), toLowerCase, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toUpperCase"), toUpperCase, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("trim"), trim, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("trimEnd"), trimEnd, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("trimStart"), trimStart, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("substring"), substring, 2)
 
 	return stringPrototype
 }

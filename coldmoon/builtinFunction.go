@@ -92,9 +92,8 @@ type builtinFunctionArgs struct {
 	additionalFieldsV2 any
 }
 
-// TODO(P) 10.3.4
-
-func CreateBuiltinFunctionV2(
+// 10.3.4
+func CreateBuiltinFunction(
 	agent *Agent,
 	behavior BehaviorFn,
 	length JSInt,
@@ -139,23 +138,6 @@ func CreateBuiltinFunctionV2(
 	SetFunctionName(function, name.ToPropertyKey(), args.prefix)
 
 	return function
-}
-
-// Deprecated: use CreateBuiltinFunctionV2
-func CreateBuiltinFunction(
-	agent *Agent,
-	behavior BehaviorFn,
-	length JSInt,
-	name string,
-	args builtinFunctionArgs,
-) ObjectType {
-	return CreateBuiltinFunctionV2(
-		agent,
-		behavior,
-		length,
-		CMString(name),
-		args,
-	)
 }
 
 // MARK: - Class

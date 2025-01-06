@@ -495,7 +495,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	object := CreateBuiltinFunction(
 		agent,
 		behavior,
-		1, "Object",
+		1, CMString("Object"),
 		builtinFunctionArgs{
 			realm:         realm,
 			prototype:     realm.Intrinsics.FunctionPrototype,
@@ -785,34 +785,34 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			return UndefinedValue
 		}
 
-		adder := CreateBuiltinFunction(agent, closure, 2, "", builtinFunctionArgs{
+		adder := CreateBuiltinFunction(agent, closure, 2, CMString(""), builtinFunctionArgs{
 			additionalFieldsV2: &Captures{object: obj},
 		})
 		return AddEntriesFromIterable(agent, obj, iterable, adder).ToValue()
 	}
 
-	DefineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm)
-	DefineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm)
-	DefineBuiltinFunction(object, "create", create, 2, realm)
-	DefineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm)
-	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
-	DefineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm)
-	DefineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm)
-	DefineBuiltinFunction(object, "getOwnPropertyNames", getOwnPropertyNames, 1, realm)
-	DefineBuiltinFunction(object, "getOwnPropertySymbols", getOwnPropertySymbols, 1, realm)
-	DefineBuiltinFunction(object, "freeze", freeze, 1, realm)
-	DefineBuiltinFunction(object, "is", objectIs, 2, realm)
-	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
-	DefineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm)
-	DefineBuiltinFunction(object, "isSealed", isSealed, 1, realm)
-	DefineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm)
-	DefineBuiltinFunction(object, "seal", seal, 1, realm)
-	DefineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm)
-	DefineBuiltinFunction(object, "entries", entries, 1, realm)
-	DefineBuiltinFunction(object, "keys", keys, 1, realm)
-	DefineBuiltinFunction(object, "values", values, 1, realm)
-	DefineBuiltinFunction(object, "assign", assign, 2, realm)
-	DefineBuiltinFunction(object, "fromEntries", fromEntries, 1, realm)
+	object.defineBuiltinFunction(realm, CMString("hasOwn"), hasOwn, 2)
+	object.defineBuiltinFunction(realm, CMString("getPrototypeOf"), getPrototypeOf, 1)
+	object.defineBuiltinFunction(realm, CMString("create"), create, 2)
+	object.defineBuiltinFunction(realm, CMString("defineProperties"), defineProperties, 2)
+	object.defineBuiltinFunction(realm, CMString("defineProperty"), defineProperty, 3)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertyDescriptor"), getOwnPropertyDescriptor, 2)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertyDescriptors"), getOwnPropertyDescriptors, 1)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertyNames"), getOwnPropertyNames, 1)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertySymbols"), getOwnPropertySymbols, 1)
+	object.defineBuiltinFunction(realm, CMString("freeze"), freeze, 1)
+	object.defineBuiltinFunction(realm, CMString("is"), objectIs, 2)
+	object.defineBuiltinFunction(realm, CMString("isExtensible"), isExtensible, 1)
+	object.defineBuiltinFunction(realm, CMString("isFrozen"), isFrozen, 1)
+	object.defineBuiltinFunction(realm, CMString("isSealed"), isSealed, 1)
+	object.defineBuiltinFunction(realm, CMString("preventExtensions"), preventExtensions, 1)
+	object.defineBuiltinFunction(realm, CMString("seal"), seal, 1)
+	object.defineBuiltinFunction(realm, CMString("setPrototypeOf"), setPrototypeOf, 2)
+	object.defineBuiltinFunction(realm, CMString("entries"), entries, 1)
+	object.defineBuiltinFunction(realm, CMString("keys"), keys, 1)
+	object.defineBuiltinFunction(realm, CMString("values"), values, 1)
+	object.defineBuiltinFunction(realm, CMString("assign"), assign, 2)
+	object.defineBuiltinFunction(realm, CMString("fromEntries"), fromEntries, 1)
 
 	BindPrototypeAndConstructor(realm.Intrinsics.ObjectPrototype, object)
 
@@ -912,12 +912,12 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		return ValueInvoke(agent, o.ToValue(), NewStringPropertyKey("toString"), []Value{})
 	}
 
-	DefineBuiltinFunction(object, "toString", toString, 0, realm)
-	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
-	DefineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm)
-	DefineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm)
-	DefineBuiltinFunction(object, "propertyIsEnumerable", propertyIsEnumerable, 1, realm)
-	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
+	object.defineBuiltinFunction(realm, CMString("hasOwnProperty"), hasOwnProperty, 1)
+	object.defineBuiltinFunction(realm, CMString("isPrototypeOf"), isPrototypeOf, 1)
+	object.defineBuiltinFunction(realm, CMString("propertyIsEnumerable"), propertyIsEnumerable, 1)
+	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
 
 	return object
 }
@@ -1041,7 +1041,7 @@ func (o *Object) defineBuiltinFunction(
 	fn BehaviorFn,
 	length JSInt,
 ) {
-	f := CreateBuiltinFunctionV2(
+	f := CreateBuiltinFunction(
 		realm.Agent,
 		fn,
 		length,
@@ -1063,12 +1063,12 @@ func (o *Object) defineBuiltinAccessor(realm *Realm, pname PropertyConvertable, 
 	var get ObjectType
 	if getter != nil {
 		funName := "get " + name
-		get = CreateBuiltinFunction(realm.Agent, getter, 0, funName, builtinFunctionArgs{realm: realm})
+		get = CreateBuiltinFunction(realm.Agent, getter, 0, CMString(funName), builtinFunctionArgs{realm: realm})
 	}
 	var set ObjectType
 	if setter != nil {
 		funName := "set " + name
-		set = CreateBuiltinFunction(realm.Agent, setter, 1, funName, builtinFunctionArgs{realm: realm})
+		set = CreateBuiltinFunction(realm.Agent, setter, 1, CMString(funName), builtinFunctionArgs{realm: realm})
 	}
 	pk := pname.ToPropertyKey()
 	o.DefinePropertyOrThrow(pk, &PropertyDescriptor{
@@ -1087,7 +1087,7 @@ func (o *Object) defineBuiltinFunctionWithAttributes(
 	attr PropertyDescriptorAttributes,
 ) {
 	functionName := name
-	f := CreateBuiltinFunctionV2(
+	f := CreateBuiltinFunction(
 		realm.Agent,
 		fn,
 		length,

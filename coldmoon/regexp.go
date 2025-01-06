@@ -269,7 +269,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 		o := RegExpAlloc(agent, target)
 		return RegExpInitialize(agent, o, p, f).Data().ToValue()
 	}
-	object := CreateBuiltinFunctionV2(agent, behavior, 2, CMString("RegExp"), builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 2, CMString("RegExp"), builtinFunctionArgs{
 		realm:         realm,
 		isConstructor: true,
 		prototype:     realm.Intrinsics.FunctionPrototype,

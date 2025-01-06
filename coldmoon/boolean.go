@@ -82,7 +82,7 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 	object := CreateBuiltinFunction(
 		realm.Agent,
 		behavior,
-		1, "Boolean",
+		1, CMString("Boolean"),
 		builtinFunctionArgs{
 			realm:         realm,
 			prototype:     realm.Intrinsics.FunctionPrototype,
@@ -115,8 +115,8 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 		return NewBooleanValue(thisBooleanValue(realm.Agent, thisArgument))
 	}
 
-	DefineBuiltinFunction(object, "toString", toString, 0, realm)
-	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
 
 	return object
 }

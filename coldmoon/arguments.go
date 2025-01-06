@@ -207,7 +207,7 @@ func MakeArgGetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 		_captures := function.(*BuiltinFunction).AdditionalFields.ArgGetterSetterCaptures
 		return _captures.Env.GetBindingValue(agent, _captures.Name, false).Data()
 	}
-	getter := CreateBuiltinFunction(agent, getterClosure, 1, "", builtinFunctionArgs{
+	getter := CreateBuiltinFunction(agent, getterClosure, 1, CMString(""), builtinFunctionArgs{
 		additionalFields: &AdditionalFields{
 			ArgGetterSetterCaptures: captures,
 		},
@@ -228,7 +228,7 @@ func MakeArgSetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 		return UndefinedValue
 	}
 
-	setter := CreateBuiltinFunction(agent, setterClosure, 1, "", builtinFunctionArgs{
+	setter := CreateBuiltinFunction(agent, setterClosure, 1, CMString(""), builtinFunctionArgs{
 		additionalFields: &AdditionalFields{
 			ArgGetterSetterCaptures: captures,
 		},

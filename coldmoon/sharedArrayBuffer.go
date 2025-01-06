@@ -66,14 +66,13 @@ func NewSharedArrayBufferConstructor(realm *Realm) ObjectType {
 		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
 		return AllocateSharedArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 1, "SharedArrayBuffer", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString("SharedArrayBuffer"), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		isConstructor: true,
 	})
 
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
-		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
 		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 			return this
 		},
@@ -117,22 +116,19 @@ func NewSharedArrayBufferPrototype(realm *Realm) ObjectType {
 		end := argumentsList[1]
 		return sharedArrayBufferSlice(agent, this, start, end)
 	}
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
-		Name:   "byteLength",
+	object.defineBuiltinAccessor(realm, CMString("byteLength"), builtinAccessorParams{
 		Getter: byteLength,
 	})
-	DefineBuiltinFunction(object, "grow", grow, 1, realm)
-	DefineBuiltinFunction(object, "slice", slice, 2, realm)
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
-		Name:   "growable",
+	object.defineBuiltinFunction(realm, CMString("grow"), grow, 1)
+	object.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
+	object.defineBuiltinAccessor(realm, CMString("growable"), builtinAccessorParams{
 		Getter: growable,
 	})
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
-		Name:   "maxByteLength",
+	object.defineBuiltinAccessor(realm, CMString("maxByteLength"), builtinAccessorParams{
 		Getter: maxByteLength,
 	})
 
-	DefineToStringTagBuiltinProperty(object, "SharedArrayBuffer")
+	object.defineToStringTag("SharedArrayBuffer")
 	return object
 }
 

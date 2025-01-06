@@ -264,7 +264,7 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
 		return (AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Data()).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 1, "ArrayBuffer", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString("ArrayBuffer"), builtinFunctionArgs{
 		realm:         realm,
 		isConstructor: true,
 		prototype:     realm.Intrinsics.FunctionPrototype,
@@ -272,11 +272,10 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 
 	BindPrototypeAndConstructor(realm.Intrinsics.ArrayBufferPrototype, object)
 
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
 		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 			return this
 		},
-		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 	return object
 }
@@ -397,14 +396,20 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		return UndefinedValue
 	}
 
-	DefineBuiltinFunction(object, "isView", isView, 1, realm)
-	DefineBuiltinFunction(object, "slice", slice, 2, realm)
-	DefineBuiltinFunction(object, "resize", resize, 1, realm)
+	object.defineBuiltinFunction(realm, CMString("isView"), isView, 1)
+	object.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
+	object.defineBuiltinFunction(realm, CMString("resize"), resize, 1)
 
-	DefineBuiltinAccessor(realm, object, "byteLength", byteLength, nil)
-	DefineBuiltinAccessor(realm, object, "maxByteLength", maxByteLength, nil)
-	DefineBuiltinAccessor(realm, object, "resizable", resizable, nil)
+	object.defineBuiltinAccessor(realm, CMString("byteLength"), builtinAccessorParams{
+		Getter: byteLength,
+	})
+	object.defineBuiltinAccessor(realm, CMString("maxByteLength"), builtinAccessorParams{
+		Getter: maxByteLength,
+	})
+	object.defineBuiltinAccessor(realm, CMString("resizable"), builtinAccessorParams{
+		Getter: resizable,
+	})
 
-	DefineToStringTagBuiltinProperty(object, "ArrayBuffer")
+	object.defineToStringTag("ArrayBuffer")
 	return object
 }

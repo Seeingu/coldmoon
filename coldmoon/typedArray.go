@@ -334,42 +334,42 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		value := arguments[1]
 		return typedArrayWith(agent, this, index, value)
 	}
-	DefineBuiltinFunction(typedArray, "at", taAt, 1, realm)
-	DefineBuiltinFunction(typedArray, "buffer", taBuffer, 0, realm)
-	DefineBuiltinFunction(typedArray, "byteLength", taByteLength, 0, realm)
-	DefineBuiltinFunction(typedArray, "byteOffset", taByteOffset, 0, realm)
-	DefineBuiltinFunction(typedArray, "copyWithin", taCopyWithin, 2, realm)
-	DefineBuiltinFunction(typedArray, "entries", taEntries, 0, realm)
-	DefineBuiltinFunction(typedArray, "every", taEvery, 1, realm)
-	DefineBuiltinFunction(typedArray, "fill", taFill, 1, realm)
-	DefineBuiltinFunction(typedArray, "filter", taFilter, 1, realm)
-	DefineBuiltinFunction(typedArray, "find", taFind, 1, realm)
-	DefineBuiltinFunction(typedArray, "findIndex", taFindIndex, 1, realm)
-	DefineBuiltinFunction(typedArray, "findLast", taFindLast, 1, realm)
-	DefineBuiltinFunction(typedArray, "findLastIndex", taFindLastIndex, 1, realm)
-	DefineBuiltinFunction(typedArray, "forEach", taForEach, 1, realm)
-	DefineBuiltinFunction(typedArray, "includes", taIncludes, 1, realm)
-	DefineBuiltinFunction(typedArray, "indexOf", taIndexOf, 1, realm)
-	DefineBuiltinFunction(typedArray, "join", taJoin, 1, realm)
-	DefineBuiltinFunction(typedArray, "keys", taKeys, 0, realm)
-	DefineBuiltinFunction(typedArray, "lastIndexOf", taLastIndexOf, 1, realm)
-	DefineBuiltinFunction(typedArray, "length", taLength, 0, realm)
-	DefineBuiltinFunction(typedArray, "map", taMap, 1, realm)
-	DefineBuiltinFunction(typedArray, "reduce", taReduce, 1, realm)
-	DefineBuiltinFunction(typedArray, "reduceRight", taReduceRight, 1, realm)
-	DefineBuiltinFunction(typedArray, "reverse", taReverse, 0, realm)
-	DefineBuiltinFunction(typedArray, "toReversed", taToReversed, 0, realm)
-	DefineBuiltinFunction(typedArray, "set", taSet, 1, realm)
-	DefineBuiltinFunction(typedArray, "slice", taSlice, 2, realm)
-	DefineBuiltinFunction(typedArray, "some", taSome, 1, realm)
-	DefineBuiltinFunction(typedArray, "sort", taSort, 1, realm)
-	DefineBuiltinFunction(typedArray, "toSorted", taToSorted, 1, realm)
-	DefineBuiltinFunction(typedArray, "subarray", taSubarray, 2, realm)
-	DefineBuiltinFunction(typedArray, "toLocaleString", taToLocaleString, 0, realm)
-	DefineBuiltinFunction(typedArray, "values", taValues, 0, realm)
-	DefineBuiltinFunction(typedArray, "with", taWith, 1, realm)
+	typedArray.defineBuiltinFunction(realm, CMString("at"), taAt, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("buffer"), taBuffer, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("byteLength"), taByteLength, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("byteOffset"), taByteOffset, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("copyWithin"), taCopyWithin, 2)
+	typedArray.defineBuiltinFunction(realm, CMString("entries"), taEntries, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("every"), taEvery, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("fill"), taFill, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("filter"), taFilter, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("find"), taFind, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("findIndex"), taFindIndex, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("findLast"), taFindLast, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("findLastIndex"), taFindLastIndex, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("forEach"), taForEach, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("includes"), taIncludes, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("indexOf"), taIndexOf, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("join"), taJoin, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("keys"), taKeys, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("lastIndexOf"), taLastIndexOf, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("length"), taLength, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("map"), taMap, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("reduce"), taReduce, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("reduceRight"), taReduceRight, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("reverse"), taReverse, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("toReversed"), taToReversed, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("set"), taSet, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("slice"), taSlice, 2)
+	typedArray.defineBuiltinFunction(realm, CMString("some"), taSome, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("sort"), taSort, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("toSorted"), taToSorted, 1)
+	typedArray.defineBuiltinFunction(realm, CMString("subarray"), taSubarray, 2)
+	typedArray.defineBuiltinFunction(realm, CMString("toLocaleString"), taToLocaleString, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("values"), taValues, 0)
+	typedArray.defineBuiltinFunction(realm, CMString("with"), taWith, 1)
 
-	DefineBuiltinPropertyV(typedArray, "toString", realm.Intrinsics.ArrayPrototype.ToValue())
+	typedArray.defineBuiltinProperty(CMString("toString"), realm.Intrinsics.ArrayPrototype.ToValue().ToPropertyDescriptor())
 
 	toStringTag := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		if !ValueIsObject(this) {
@@ -380,9 +380,12 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 			return UndefinedValue
 		}
 		name := o.(*TypedArrayObject).TypedArrayName
+		// TODO: should not use internal String() method
 		return NewStringValue(name.String())
 	}
-	DefineBuiltinAccessor(realm, object, "%Symbol.toStringTag%", nil, toStringTag)
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsToStringTag, builtinAccessorParams{
+		Setter: toStringTag,
+	})
 	return typedArray
 }
 
@@ -390,7 +393,7 @@ func NewTypedArrayNamePrototype(realm *Realm, name TypedArrayName) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.TypedArrayPrototype, "TypedArrayNamePrototype "+name.String())
 
-	DefineBuiltinPropertyP(object, "BYTES_PER_ELEMENT", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("BYTES_PER_ELEMENT"), &PropertyDescriptor{
 		Value:        NewNumberValue(getTypedArraySizeFromName(name).ToNumber()),
 		Writable:     false,
 		Configurable: false,
@@ -649,7 +652,7 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		panic("TypeError")
 	}
-	object := CreateBuiltinFunction(agent, behavior, 0, "TypedArray", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 0, CMString("TypedArray"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
@@ -676,14 +679,13 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 		return newObj.ToValue()
 	}
 
-	DefineBuiltinFunction(object, "from", from, 1, realm)
-	DefineBuiltinFunction(object, "of", of, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("from"), from, 1)
+	object.defineBuiltinFunction(realm, CMString("of"), of, 0)
 	species := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return thisArgument
 	}
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
-		Getter:              species,
-		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
+		Getter: species,
 	})
 
 	BindPrototypeAndConstructor(realm.Intrinsics.TypedArrayPrototype, object)
@@ -696,7 +698,8 @@ func NewTypedArrayNameConstructor(realm *Realm, name TypedArrayName) ObjectType 
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return typedArrayBehavior(agent, name, thisArgument, argumentsList, newTarget)
 	}
-	object := CreateBuiltinFunction(agent, behavior, 3, name.String(), builtinFunctionArgs{
+	// TODO: should not use String()
+	object := CreateBuiltinFunction(agent, behavior, 3, CMString(name.String()), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.TypedArrayConstructor,
 		isConstructor: true,
@@ -704,7 +707,7 @@ func NewTypedArrayNameConstructor(realm *Realm, name TypedArrayName) ObjectType 
 
 	intrinsicName := IntrinsicName("%" + name.String() + ".prototype%")
 	intrinsic := realm.Intrinsics.Get(intrinsicName)
-	DefineBuiltinPropertyP(object, "BYTES_PER_ELEMENT", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("BYTES_PER_ELEMENT"), &PropertyDescriptor{
 		Value:        NewNumberValue(getTypedArraySizeFromName(name).ToNumber()),
 		Writable:     false,
 		Enumerable:   false,

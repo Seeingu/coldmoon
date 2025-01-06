@@ -9,6 +9,15 @@ type PropertyDescriptor struct {
 	Configurable bool
 }
 
+func NewFrozenPropertyDescriptor(value Value) *PropertyDescriptor {
+	return &PropertyDescriptor{
+		Value:        value,
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	}
+}
+
 type PropertyDescriptorAttributes struct {
 	Writable     bool
 	Enumerable   bool

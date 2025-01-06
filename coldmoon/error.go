@@ -57,7 +57,7 @@ func NewErrorConstructor(realm *Realm) ObjectType {
 		realm.Agent,
 		behavior,
 		1,
-		"Error",
+		CMString("Error"),
 		builtinFunctionArgs{
 			realm:         realm,
 			prototype:     realm.Intrinsics.FunctionPrototype,
@@ -87,9 +87,8 @@ func NewErrorPrototype(realm *Realm) ObjectType {
 
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "ErrorPrototype")
 
-	DefineBuiltinPropertyV(object, "name", NewStringValue("Error"))
-
-	DefineBuiltinPropertyV(object, "message", NewStringValue(""))
+	object.defineBuiltinProperty(CMString("name"), NewStringValue("Error").ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToPropertyDescriptor())
 
 	var toString BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		O, ok := thisValue.(*ObjectValue)
@@ -124,7 +123,7 @@ func NewErrorPrototype(realm *Realm) ObjectType {
 		return NewStringValue(nameString + ": " + msgString)
 	}
 
-	DefineBuiltinFunction(object, "toString", toString, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
 
 	return object
 }
@@ -170,7 +169,7 @@ func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 
 		return (errorObject).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 1, name, builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString(name), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.ErrorConstructor,
 		isConstructor: true,
@@ -186,8 +185,8 @@ func NewNativeErrorPrototype(realm *Realm, name string) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ErrorPrototype, name+"Prototype")
 
-	DefineBuiltinPropertyV(object, "name", NewStringValue(name))
-	DefineBuiltinPropertyV(object, "message", NewStringValue(""))
+	object.defineBuiltinProperty(CMString("name"), NewStringValue(name).ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToPropertyDescriptor())
 
 	return object
 }
@@ -225,7 +224,7 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 		})
 		return (errorObject).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 2, "AggregateError", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 2, CMString("AggregateError"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.ErrorConstructor,
 	})
@@ -236,7 +235,7 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 func NewAggregateErrorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ErrorPrototype, "AggregateErrorPrototype")
-	DefineBuiltinPropertyV(object, "name", NewStringValue("AggregateError"))
-	DefineBuiltinPropertyV(object, "message", NewStringValue(""))
+	object.defineBuiltinProperty(CMString("name"), NewStringValue("AggregateError").ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToPropertyDescriptor())
 	return object
 }

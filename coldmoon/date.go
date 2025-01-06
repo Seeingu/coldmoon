@@ -859,7 +859,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		d.ref = d
 		return d.ToValue()
 	}
-	object := CreateBuiltinFunctionV2(agent, behavior, 7, CMString("Date"), builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 7, CMString("Date"), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		isConstructor: true,

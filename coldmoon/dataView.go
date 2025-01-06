@@ -84,7 +84,7 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 		dataView.ByteOffset = offset
 		return (dataView).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 1, "DataView", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString("DataView"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
@@ -102,7 +102,9 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 		o := RequireInternalSlot[*DataView](this)
 		return (o.ViewedArrayBuffer).ToValue()
 	}
-	DefineBuiltinAccessor(realm, object, "buffer", buffer, nil)
+	object.defineBuiltinAccessor(realm, CMString("buffer"), builtinAccessorParams{
+		Getter: buffer,
+	})
 	byteLength := func(this Value, args []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*DataView](this)
 		viewRecord := MakeDataViewWithBufferWitnessRecord(o, SeqCst)
@@ -112,7 +114,9 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 		size := GetViewByteLength(viewRecord)
 		return NewNumberValue(size.ToNumber())
 	}
-	DefineBuiltinAccessor(realm, object, "byteLength", byteLength, nil)
+	object.defineBuiltinAccessor(realm, CMString("byteLength"), builtinAccessorParams{
+		Getter: byteLength,
+	})
 	byteOffset := func(this Value, args []Value, newTarget ObjectType) Value {
 		o := RequireInternalSlot[*DataView](this)
 		viewRecord := MakeDataViewWithBufferWitnessRecord(o, SeqCst)
@@ -122,7 +126,9 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 		offset := o.ByteOffset
 		return NewNumberValue(offset.ToNumber())
 	}
-	DefineBuiltinAccessor(realm, object, "byteOffset", byteOffset, nil)
+	object.defineBuiltinAccessor(realm, CMString("byteOffset"), builtinAccessorParams{
+		Getter: byteOffset,
+	})
 
 	getBigInt64 := func(this Value, args []Value, newTarget ObjectType) Value {
 		return GetViewValue(agent, this, args[0], 8).Data()
@@ -185,29 +191,28 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 		return SetViewValue(agent, this, args[0], args[1], 4).Data()
 	}
 
-	DefineBuiltinFunction(object, "getBigInt64", getBigInt64, 2, realm)
-	DefineBuiltinFunction(object, "getBigUint64", getBigUint64, 2, realm)
-	DefineBuiltinFunction(object, "getFloat32", getFloat32, 2, realm)
-	DefineBuiltinFunction(object, "getFloat64", getFloat64, 2, realm)
-	DefineBuiltinFunction(object, "getInt8", getInt8, 2, realm)
-	DefineBuiltinFunction(object, "getInt16", getInt16, 2, realm)
-	DefineBuiltinFunction(object, "getInt32", getInt32, 2, realm)
-	DefineBuiltinFunction(object, "getUint8", getUint8, 2, realm)
-	DefineBuiltinFunction(object, "getUint16", getUint16, 2, realm)
-	DefineBuiltinFunction(object, "getUint32", getUint32, 2, realm)
-	DefineBuiltinFunction(object, "setBigInt64", setBigInt64, 3, realm)
-	DefineBuiltinFunction(object, "setBigUint64", setBigUint64, 3, realm)
-	DefineBuiltinFunction(object, "setFloat32", setFloat32, 3, realm)
-	DefineBuiltinFunction(object, "setFloat64", setFloat64, 3, realm)
-	DefineBuiltinFunction(object, "setInt8", setInt8, 3, realm)
-	DefineBuiltinFunction(object, "setInt16", setInt16, 3, realm)
-	DefineBuiltinFunction(object, "setInt32", setInt32, 3, realm)
-	DefineBuiltinFunction(object, "setUint8", setUint8, 3, realm)
-	DefineBuiltinFunction(object, "setUint16", setUint16, 3, realm)
-	DefineBuiltinFunction(object, "setUint32", setUint32, 3, realm)
+	object.defineBuiltinFunction(realm, CMString("getBigInt64"), getBigInt64, 2)
+	object.defineBuiltinFunction(realm, CMString("getBigUint64"), getBigUint64, 2)
+	object.defineBuiltinFunction(realm, CMString("getFloat32"), getFloat32, 2)
+	object.defineBuiltinFunction(realm, CMString("getFloat64"), getFloat64, 2)
+	object.defineBuiltinFunction(realm, CMString("getInt8"), getInt8, 2)
+	object.defineBuiltinFunction(realm, CMString("getInt16"), getInt16, 2)
+	object.defineBuiltinFunction(realm, CMString("getInt32"), getInt32, 2)
+	object.defineBuiltinFunction(realm, CMString("getUint8"), getUint8, 2)
+	object.defineBuiltinFunction(realm, CMString("getUint16"), getUint16, 2)
+	object.defineBuiltinFunction(realm, CMString("getUint32"), getUint32, 2)
+	object.defineBuiltinFunction(realm, CMString("setBigInt64"), setBigInt64, 3)
+	object.defineBuiltinFunction(realm, CMString("setBigUint64"), setBigUint64, 3)
+	object.defineBuiltinFunction(realm, CMString("setFloat32"), setFloat32, 3)
+	object.defineBuiltinFunction(realm, CMString("setFloat64"), setFloat64, 3)
+	object.defineBuiltinFunction(realm, CMString("setInt8"), setInt8, 3)
+	object.defineBuiltinFunction(realm, CMString("setInt16"), setInt16, 3)
+	object.defineBuiltinFunction(realm, CMString("setInt32"), setInt32, 3)
+	object.defineBuiltinFunction(realm, CMString("setUint8"), setUint8, 3)
+	object.defineBuiltinFunction(realm, CMString("setUint16"), setUint16, 3)
+	object.defineBuiltinFunction(realm, CMString("setUint32"), setUint32, 3)
 
-	DefineToStringTagBuiltinProperty(object, "DataView")
-
+	object.defineToStringTag("DataView")
 	return object
 }
 

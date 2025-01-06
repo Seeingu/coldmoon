@@ -47,7 +47,7 @@ func (b *BaseValue) ToPropertyDescriptor() *PropertyDescriptor {
 	return &PropertyDescriptor{
 		Value: b.Value,
 		// TODO(C): check writable
-		Writable:     false,
+		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,
 	}

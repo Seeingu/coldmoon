@@ -212,21 +212,21 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return NewBooleanValue(ret)
 	}
 
-	DefineBuiltinFunction(object, "apply", apply, 3, realm)
-	DefineBuiltinFunction(object, "construct", construct, 3, realm)
-	DefineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm)
-	DefineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm)
-	DefineBuiltinFunction(object, "get", get, 1, realm)
-	DefineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 3, realm)
-	DefineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm)
-	DefineBuiltinFunction(object, "has", has, 2, realm)
-	DefineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm)
-	DefineBuiltinFunction(object, "ownKeys", ownKeys, 1, realm)
-	DefineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm)
-	DefineBuiltinFunction(object, "set", set, 3, realm)
-	DefineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm)
+	object.defineBuiltinFunction(realm, CMString("apply"), apply, 3)
+	object.defineBuiltinFunction(realm, CMString("construct"), construct, 3)
+	object.defineBuiltinFunction(realm, CMString("defineProperty"), defineProperty, 3)
+	object.defineBuiltinFunction(realm, CMString("deleteProperty"), deleteProperty, 2)
+	object.defineBuiltinFunction(realm, CMString("get"), get, 1)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertyDescriptor"), getOwnPropertyDescriptor, 3)
+	object.defineBuiltinFunction(realm, CMString("getPrototypeOf"), getPrototypeOf, 1)
+	object.defineBuiltinFunction(realm, CMString("has"), has, 2)
+	object.defineBuiltinFunction(realm, CMString("isExtensible"), isExtensible, 1)
+	object.defineBuiltinFunction(realm, CMString("ownKeys"), ownKeys, 1)
+	object.defineBuiltinFunction(realm, CMString("preventExtensions"), preventExtensions, 1)
+	object.defineBuiltinFunction(realm, CMString("set"), set, 3)
+	object.defineBuiltinFunction(realm, CMString("setPrototypeOf"), setPrototypeOf, 2)
 
-	DefineToStringTagBuiltinProperty(object, "Reflect")
+	object.defineToStringTag("Reflect")
 
 	return object
 }

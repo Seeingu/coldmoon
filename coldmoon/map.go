@@ -60,17 +60,16 @@ func NewMapConstructor(realm *Realm) ObjectType {
 		}
 		return (AddEntriesFromIterable(agent, m, iterable, MustGetObject(adder))).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 0, "Map", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 0, CMString("Map"), builtinFunctionArgs{
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		realm:         realm,
 		isConstructor: true,
 	})
 
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
 		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 			return this
 		},
-		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 
 	BindPrototypeAndConstructor(realm.Intrinsics.MapPrototype, object)

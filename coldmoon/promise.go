@@ -49,7 +49,7 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 			Reject:  UndefinedValue,
 		},
 	}
-	executor := CreateBuiltinFunction(agent, executorClosure, 2, "", builtinFunctionArgs{
+	executor := CreateBuiltinFunction(agent, executorClosure, 2, CMString(""), builtinFunctionArgs{
 		additionalFields: additionalFields,
 	})
 	promise := MustGetObject(constructor).Construct([]Value{(executor).ToValue()}, nil)
@@ -156,7 +156,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 					return f.(*BuiltinFunction).AdditionalFields.Value
 				}
 
-				valueThunk := CreateBuiltinFunction(agent, returnValue, 0, "", builtinFunctionArgs{
+				valueThunk := CreateBuiltinFunction(agent, returnValue, 0, CMString(""), builtinFunctionArgs{
 					additionalFields: &AdditionalFields{
 						Value: arguments[0],
 					},
@@ -164,11 +164,11 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(valueThunk).ToValue()})
 			}
 
-			thenFinally = (CreateBuiltinFunction(agent, thenFinallyClosure, 1, "", builtinFunctionArgs{
+			thenFinally = CreateBuiltinFunction(agent, thenFinallyClosure, 1, CMString(""), builtinFunctionArgs{
 				additionalFields: &AdditionalFields{
 					PromiseThenFinallyCaptures: captures,
 				},
-			})).ToValue()
+			}).ToValue()
 
 			catchFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
 				function := agent.ActiveFunctionObject()
@@ -185,26 +185,26 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 					return _reason
 				}
 
-				thrower := CreateBuiltinFunction(agent, throwReason, 0, "", builtinFunctionArgs{
+				thrower := CreateBuiltinFunction(agent, throwReason, 0, CMString(""), builtinFunctionArgs{
 					additionalFields: &AdditionalFields{
 						Value: reason,
 					},
 				})
 				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(thrower).ToValue()})
 			}
-			catchFinally = (CreateBuiltinFunction(agent, catchFinallyClosure, 1, "", builtinFunctionArgs{
+			catchFinally = CreateBuiltinFunction(agent, catchFinallyClosure, 1, CMString(""), builtinFunctionArgs{
 				additionalFields: &AdditionalFields{
 					PromiseThenFinallyCaptures: captures,
 				},
-			})).ToValue()
+			}).ToValue()
 		}
 		return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{thenFinally, catchFinally})
 	}
-	DefineBuiltinFunction(object, "then", then, 2, realm)
-	DefineBuiltinFunction(object, "catch", catch, 1, realm)
-	DefineBuiltinFunction(object, "finally", finally, 1, realm)
+	object.defineBuiltinFunction(realm, CMString("then"), then, 2)
+	object.defineBuiltinFunction(realm, CMString("catch"), catch, 1)
+	object.defineBuiltinFunction(realm, CMString("finally"), finally, 1)
 
-	DefineToStringTagBuiltinProperty(object, "Promise")
+	object.defineToStringTag("Promise")
 	return object
 }
 
@@ -230,7 +230,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		executor.Call(UndefinedValue, []Value{resolvingFunctions.Resolve})
 		return (promise).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 1, "Promise", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString("Promise"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
@@ -358,18 +358,17 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return result.Data()
 	}
-	DefineBuiltinFunction(object, "reject", reject, 1, realm)
-	DefineBuiltinFunction(object, "resolve", resolve, 1, realm)
-	DefineBuiltinFunction(object, "race", race, 1, realm)
-	DefineBuiltinFunction(object, "all", all, 1, realm)
-	DefineBuiltinFunction(object, "allSettled", allSettled, 1, realm)
-	DefineBuiltinFunction(object, "any", promiseAny, 1, realm)
+	object.defineBuiltinFunction(realm, CMString("reject"), reject, 1)
+	object.defineBuiltinFunction(realm, CMString("resolve"), resolve, 1)
+	object.defineBuiltinFunction(realm, CMString("race"), race, 1)
+	object.defineBuiltinFunction(realm, CMString("all"), all, 1)
+	object.defineBuiltinFunction(realm, CMString("allSettled"), allSettled, 1)
+	object.defineBuiltinFunction(realm, CMString("any"), promiseAny, 1)
 
-	DefineBuiltinAccessorV2(realm, object, BuiltinAccessorParams{
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
 		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 			return this
 		},
-		WellKnownSymbolsKey: WellKnownSymbolsSpecies,
 	})
 
 	BindPrototypeAndConstructor(realm.Intrinsics.PromisePrototype, object)
@@ -450,7 +449,7 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		Promise:         promise,
 		AlreadyResolved: alreadyResolved,
 	}
-	resolve := CreateBuiltinFunction(agent, stepsResolve, lengthResolve, "", builtinFunctionArgs{
+	resolve := CreateBuiltinFunction(agent, stepsResolve, lengthResolve, CMString(""), builtinFunctionArgs{
 		realm:            realm,
 		additionalFields: resolveAdditionalFields,
 	})
@@ -469,7 +468,7 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		Promise:         promise,
 		AlreadyResolved: alreadyResolved,
 	}
-	reject := CreateBuiltinFunction(agent, stepsReject, lengthReject, "", builtinFunctionArgs{
+	reject := CreateBuiltinFunction(agent, stepsReject, lengthReject, CMString(""), builtinFunctionArgs{
 		realm:            realm,
 		additionalFields: rejectAdditionalFields,
 	})
@@ -712,7 +711,7 @@ func PerformPromiseAll(
 			return UndefinedValue
 		}
 		length := JSInt(1)
-		onFulfilled := CreateBuiltinFunction(agent, steps, length, "", builtinFunctionArgs{
+		onFulfilled := CreateBuiltinFunction(agent, steps, length, CMString(""), builtinFunctionArgs{
 			additionalFieldsV2: &promiseAdditionalFields{
 				alreadyCalled:     false,
 				index:             uint64(index),
@@ -775,7 +774,7 @@ func PerformPromiseAllSettled(
 			return UndefinedValue
 		}
 		lengthFulfilled := JSInt(1)
-		onFulfilled := CreateBuiltinFunction(agent, stepsFulfilled, lengthFulfilled, "", builtinFunctionArgs{
+		onFulfilled := CreateBuiltinFunction(agent, stepsFulfilled, lengthFulfilled, CMString(""), builtinFunctionArgs{
 			additionalFieldsV2: &promiseAdditionalFields{
 				alreadyCalled:     false,
 				index:             uint64(index),
@@ -806,7 +805,7 @@ func PerformPromiseAllSettled(
 			return UndefinedValue
 		}
 		lengthRejected := JSInt(1)
-		onRejected := CreateBuiltinFunction(agent, stepsReject, lengthRejected, "", builtinFunctionArgs{
+		onRejected := CreateBuiltinFunction(agent, stepsReject, lengthRejected, CMString(""), builtinFunctionArgs{
 			additionalFieldsV2: &promiseAdditionalFields{
 				alreadyCalled:     false,
 				index:             uint64(index),
@@ -878,7 +877,7 @@ func PerformPromiseAny(
 			return UndefinedValue
 		}
 		length := JSInt(1)
-		onFulfilled := CreateBuiltinFunction(agent, stepsRejected, length, "", builtinFunctionArgs{
+		onFulfilled := CreateBuiltinFunction(agent, stepsRejected, length, CMString(""), builtinFunctionArgs{
 			additionalFieldsV2: &promiseAdditionalFields{
 				alreadyCalled:     false,
 				index:             uint64(index),

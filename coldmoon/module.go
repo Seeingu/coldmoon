@@ -56,7 +56,7 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 		(capability.Reject).ToValue().Call(UndefinedValue, []Value{argumentsList[0]})
 		return nil
 	}
-	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, "onRejected", builtinFunctionArgs{})
+	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, CMString("onRejected"), builtinFunctionArgs{})
 	var linkAndEvaluateClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		link := module.Link()
 		if link.IsAbrupt() {
@@ -69,12 +69,12 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 			(capability.Resolve).ToValue().Call(UndefinedValue, []Value{(namespace).ToValue()})
 			return nil
 		}
-		onFulfilled := CreateBuiltinFunction(agent, fulfilledClosure, 0, "", builtinFunctionArgs{})
+		onFulfilled := CreateBuiltinFunction(agent, fulfilledClosure, 0, CMString(""), builtinFunctionArgs{})
 		PerformPromiseThen(agent, evaluatePromise, (onFulfilled).ToValue(), (onRejected).ToValue(), nil)
 		return nil
 	}
 
-	linkAndEvaluate := CreateBuiltinFunction(agent, linkAndEvaluateClosure, 0, "", builtinFunctionArgs{})
+	linkAndEvaluate := CreateBuiltinFunction(agent, linkAndEvaluateClosure, 0, CMString(""), builtinFunctionArgs{})
 	PerformPromiseThen(agent, loadPromise, (linkAndEvaluate).ToValue(), (onRejected).ToValue(), nil)
 }
 

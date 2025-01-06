@@ -94,7 +94,7 @@ func NewIsFinite(realm *Realm) ObjectType {
 		return NewBooleanValue(number.IsFinite())
 	}
 
-	return CreateBuiltinFunction(realm.Agent, isFinite, 1, "isFinite", builtinFunctionArgs{
+	return CreateBuiltinFunction(realm.Agent, isFinite, 1, CMString("isFinite"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
@@ -105,7 +105,7 @@ func NewIsNaN(realm *Realm) ObjectType {
 		return NewBooleanValue(number.IsNaN())
 	}
 
-	return CreateBuiltinFunction(realm.Agent, isNaN, 1, "isNaN", builtinFunctionArgs{
+	return CreateBuiltinFunction(realm.Agent, isNaN, 1, CMString("isNaN"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
@@ -117,7 +117,7 @@ func NewEval(realm *Realm) ObjectType {
 		}
 		return PerformEval(realm.Agent, args[0], false, false)
 	}
-	return CreateBuiltinFunction(realm.Agent, eval, 1, "eval", builtinFunctionArgs{
+	return CreateBuiltinFunction(realm.Agent, eval, 1, CMString("eval"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
@@ -201,7 +201,7 @@ func NewParseInt(realm *Realm) ObjectType {
 		return NewNumberValue(JSNumber(sign) * JSNumber(mathInt))
 	}
 
-	return CreateBuiltinFunction(agent, parseInt, 2, "parseInt", builtinFunctionArgs{
+	return CreateBuiltinFunction(agent, parseInt, 2, CMString("parseInt"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
@@ -219,7 +219,7 @@ func NewParseFloat(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(JSNumber(f))
 	}
-	return CreateBuiltinFunction(agent, parseFloat, 1, "parseFloat", builtinFunctionArgs{
+	return CreateBuiltinFunction(agent, parseFloat, 1, CMString("parseFloat"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
@@ -231,7 +231,7 @@ func NewDecodeURI(realm *Realm) ObjectType {
 		preserveEscapeSet := ";/?:@&=+$,#"
 		return NewStringValue(decode(agent, uriString, preserveEscapeSet))
 	}
-	return CreateBuiltinFunction(agent, decodeURI, 1, "decodeURI", builtinFunctionArgs{
+	return CreateBuiltinFunction(agent, decodeURI, 1, CMString("decodeURI"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
@@ -243,7 +243,7 @@ func NewDecodeURIComponent(realm *Realm) ObjectType {
 		preserveEscapeSet := ""
 		return NewStringValue(decode(agent, uriString, preserveEscapeSet))
 	}
-	return CreateBuiltinFunction(agent, decodeURIComponent, 1, "decodeURIComponent", builtinFunctionArgs{
+	return CreateBuiltinFunction(agent, decodeURIComponent, 1, CMString("decodeURIComponent"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
@@ -255,7 +255,7 @@ func NewEncodeURI(realm *Realm) ObjectType {
 		extraUnescaped := ";/?:@&=+$,#"
 		return NewStringValue(encode(agent, uriString, extraUnescaped))
 	}
-	return CreateBuiltinFunction(agent, encodeURI, 1, "encodeURI", builtinFunctionArgs{
+	return CreateBuiltinFunction(agent, encodeURI, 1, CMString("encodeURI"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
@@ -267,7 +267,7 @@ func NewEncodeURIComponent(realm *Realm) ObjectType {
 		extraUnescaped := ""
 		return NewStringValue(encode(agent, uriString, extraUnescaped))
 	}
-	return CreateBuiltinFunction(agent, encodeURIComponent, 1, "encodeURIComponent", builtinFunctionArgs{
+	return CreateBuiltinFunction(agent, encodeURIComponent, 1, CMString("encodeURIComponent"), builtinFunctionArgs{
 		realm: realm,
 	})
 }

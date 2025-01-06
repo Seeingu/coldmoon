@@ -24,7 +24,7 @@ func NewIteratorPrototype(realm *Realm) ObjectType {
 		return thisValue
 	}
 
-	DefineBuiltinFunctionV2(realm, WellKnownSymbolsIterator, object, iterator, 0)
+	DefineBuiltinFunction(realm, WellKnownSymbolsIterator, object, iterator, 0)
 	return object
 }
 

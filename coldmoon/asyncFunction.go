@@ -18,7 +18,7 @@ func NewAsyncFunctionConstructor(realm *Realm) ObjectType {
 			bodyArg,
 		)).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 1, "AsyncFunction", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString("AsyncFunction"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionConstructor,
 	})
@@ -32,7 +32,7 @@ func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.FunctionPrototype, "AsyncFunctionPrototype")
 
-	DefineToStringTagBuiltinProperty(object, "AsyncFunction")
+	object.defineToStringTag("AsyncFunction")
 	return object
 }
 

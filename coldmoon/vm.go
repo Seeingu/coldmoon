@@ -762,7 +762,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 			agent,
 			defaultConstructor,
 			0,
-			"constructor",
+			CMString("constructor"),
 			builtinFunctionArgs{
 				prototype:     constructorParent,
 				realm:         realm,

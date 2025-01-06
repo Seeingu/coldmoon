@@ -13,21 +13,21 @@ func NewThrowTypeError(realm *Realm) ObjectType {
 		realm.Agent,
 		behavior,
 		0,
-		"",
+		CMString(""),
 		builtinFunctionArgs{
 			realm: realm,
 		},
 	)
 	object.(*BuiltinFunction).SetExtensible(false)
 
-	DefineBuiltinPropertyP(object, "length", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("length"), &PropertyDescriptor{
 		Value:        NewNumberValue(0),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: false,
 	})
 
-	DefineBuiltinPropertyP(object, "name", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("name"), &PropertyDescriptor{
 		Value:        NewStringValue(""),
 		Writable:     false,
 		Enumerable:   false,

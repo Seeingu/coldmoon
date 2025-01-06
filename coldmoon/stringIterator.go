@@ -20,7 +20,7 @@ func NewStringIteratorPrototype(realm *Realm) ObjectType {
 		stringIterator.Index += 1
 		return (CreateIterResultObject(agent, result, false)).ToValue()
 	}
-	DefineBuiltinFunction(object, "next", next, 0, realm)
-	DefineToStringTagBuiltinProperty(object, "String Iterator")
+	object.defineBuiltinFunction(realm, CMString("next"), next, 0)
+	object.defineToStringTag("String Iterator")
 	return object
 }

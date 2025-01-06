@@ -18,11 +18,11 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 			bodyArg,
 		)).ToValue()
 	}
-	object := CreateBuiltinFunction(agent, behavior, 1, "GeneratorFunction", builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString("GeneratorFunction"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionConstructor,
 	})
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("prototype"), &PropertyDescriptor{
 		Value:        (realm.Intrinsics.GeneratorFunctionPrototype).ToValue(),
 		Writable:     false,
 		Enumerable:   false,
@@ -33,18 +33,13 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 
 func NewGeneratorFunctionPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype, "GeneratorFunctionPrototype")
-	DefineBuiltinPropertyP(object, "constructor", &PropertyDescriptor{
-		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionConstructor),
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: true,
-	})
-	DefineBuiltinPropertyP(object, "prototype", &PropertyDescriptor{
+	object.defineBuiltinProperty(CMString("constructor"), NewValueFromObject(realm.Intrinsics.GeneratorFunctionConstructor).ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("prototype"), &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototypePrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineToStringTagBuiltinProperty(object, "GeneratorFunction")
+	object.defineToStringTag("GeneratorFunction")
 	return object
 }

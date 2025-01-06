@@ -144,7 +144,7 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 		return ToBigInt(agent, prim)
 	}
 
-	object := CreateBuiltinFunction(realm.Agent, behavior, 1, "BigInt", builtinFunctionArgs{
+	object := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("BigInt"), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		isConstructor: true,
@@ -184,12 +184,11 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 		return toString(thisBigIntValue(this), nil, nil)
 	}
 
-	DefineBuiltinFunction(object, "toString", toString, 0, realm)
-	DefineBuiltinFunction(object, "valueOf", valueOf, 0, realm)
-	DefineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
+	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
 
-	DefineToStringTagBuiltinProperty(object, "BigInt")
-
+	object.defineToStringTag("BigInt")
 	return object
 }
 

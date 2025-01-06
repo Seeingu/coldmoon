@@ -38,6 +38,6 @@ func defineAssert(realm *coldmoon.Realm) {
 		}
 		panic(txt + "\nmsg: " + msg.String())
 	}
-	coldmoon.DefineBuiltinFunctionV2(realm, coldmoon.CMString("assert"), object, assert, 1)
-	coldmoon.DefineBuiltinFunctionV2(realm, coldmoon.CMString("assertEqual"), object, assertEqual, 2)
+	coldmoon.DefineBuiltinFunction(realm, coldmoon.CMString("assert"), object, assert, 1)
+	coldmoon.DefineBuiltinFunction(realm, coldmoon.CMString("assertEqual"), object, assertEqual, 2)
 }

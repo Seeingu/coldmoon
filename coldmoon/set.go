@@ -82,7 +82,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 			adder.Call(s.ToValue(), []Value{nextItem})
 		}
 	}
-	object := CreateBuiltinFunctionV2(agent, behavior, 0, CMString("SetObject"), builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 0, CMString("SetObject"), builtinFunctionArgs{
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		realm:         realm,
 		isConstructor: true,

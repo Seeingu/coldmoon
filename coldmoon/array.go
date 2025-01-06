@@ -252,7 +252,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		return array.ToValue()
 	}
 
-	object := CreateBuiltinFunctionV2(realm.Agent, behavior, 1, CMString("Array"), builtinFunctionArgs{
+	object := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("Array"), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.FunctionPrototype,
 		isConstructor: true,

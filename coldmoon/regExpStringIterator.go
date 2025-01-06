@@ -49,7 +49,7 @@ func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 		}
 		return (CreateIterResultObject(agent, (match.Data()).ToValue(), false)).ToValue()
 	}
-	DefineBuiltinFunction(object, "next", next, 0, realm)
-	DefineToStringTagBuiltinProperty(object, "RegExp String Iterator")
+	object.defineBuiltinFunction(realm, CMString("next"), next, 0)
+	object.defineToStringTag("RegExp String Iterator")
 	return object
 }

@@ -7,6 +7,6 @@ type IntlObject struct {
 func NewIntlObject(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "Intl")
-	DefineToStringTagBuiltinProperty(object, "Intl")
+	object.defineToStringTag("Intl")
 	return object
 }

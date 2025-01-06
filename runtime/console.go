@@ -20,11 +20,11 @@ func CreateConsole(realm *coldmoon.Realm) coldmoon.ObjectType {
 		jsPrint(thisArgument, argumentsList, newTarget)
 		return coldmoon.UndefinedValue
 	}
-	coldmoon.DefineBuiltinFunctionV2(realm, coldmoon.CMString("log"), object, consoleLog, 1)
+	coldmoon.DefineBuiltinFunction(realm, coldmoon.CMString("log"), object, consoleLog, 1)
 
 	return object
 }
 
 func definePrint(realm *coldmoon.Realm) {
-	coldmoon.DefineBuiltinFunctionV2(realm, coldmoon.CMString("print"), realm.GlobalObject, jsPrint, 1)
+	coldmoon.DefineBuiltinFunction(realm, coldmoon.CMString("print"), realm.GlobalObject, jsPrint, 1)
 }

@@ -43,16 +43,16 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 		return GeneratorResumeAbrupt(agent, generator, C).ToValue()
 	}
 
-	DefineBuiltinFunctionV2(realm, CMString("next"), g, next, 1)
-	DefineBuiltinFunctionV2(realm, CMString("return"), g, iteratorReturn, 1)
+	DefineBuiltinFunction(realm, CMString("next"), g, next, 1)
+	DefineBuiltinFunction(realm, CMString("return"), g, iteratorReturn, 1)
 
-	DefineBuiltinPropertyP(g, "constructor", &PropertyDescriptor{
+	g.defineBuiltinProperty(CMString("constructor"), &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),
 		Writable:     false,
 		Enumerable:   false,
 		Configurable: true,
 	})
-	DefineToStringTagBuiltinProperty(g, "Generator")
+	g.defineToStringTag("Generator")
 
 	return g
 }
