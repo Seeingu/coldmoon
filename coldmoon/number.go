@@ -100,7 +100,7 @@ func (n *NumberValue) String() string {
 	return fmt.Sprintf("%f", n.Data)
 }
 
-func (n *NumberValue) ToString(radix JSInt) string {
+func (n *NumberValue) ToString() CMString {
 	if math.IsNaN(n.Data.ToFloat()) {
 		return "NaN"
 	}
@@ -116,7 +116,7 @@ func (n *NumberValue) ToString(radix JSInt) string {
 		}
 		return "0"
 	}
-	return strconv.FormatFloat(n.Data.ToFloat(), 'f', -1, 64)
+	return CMString(strconv.FormatFloat(n.Data.ToFloat(), 'f', -1, 64))
 }
 
 func (n *NumberValue) IsNaN() bool {
@@ -483,9 +483,10 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		}
 
 		if radixMV < 2 || radixMV > 36 {
-			panic("RangeError")
+			return agent.ThrowRangeError("Radix must be an integer between 2 and 36, inclusive.")
 		}
-		return NewStringValue(x.ToString(radixMV))
+		// TODO: pass radix
+		return x.ToString().ToValue()
 	}
 
 	var valueOf BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {

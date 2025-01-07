@@ -5,6 +5,7 @@ type Value interface {
 	ToNumber(agent *Agent) *NumberValue
 
 	Call(this Value, argumentsList ArgumentsList) Value
+	ToString() CMString
 	CallNoArgs(this Value) Value
 	// 7.1.18
 	ToObject(agent *Agent) ObjectType

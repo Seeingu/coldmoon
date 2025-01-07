@@ -19,6 +19,11 @@ func (b *BaseValue) Hash() string {
 	}
 }
 
+// TODO(I): this is a backdoor method, every value should implement this method
+func (b *BaseValue) ToString() CMString {
+	return CMString(b.String())
+}
+
 // TODO: type error handling
 func (b *BaseValue) ToObject(agent *Agent) ObjectType {
 	realm := agent.CurrentRealm()
