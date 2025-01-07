@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"math/big"
 	"strconv"
 	"strings"
 )
@@ -20,6 +21,7 @@ type AnalyzeQuery int
 
 const (
 	AnalyzeQueryIsReference AnalyzeQuery = iota
+	AnalyzeQueryIsIdentifierReference
 	AnalyzeQueryIsStringLiteral
 )
 
@@ -808,11 +810,18 @@ const (
 type LiteralNumeric struct {
 	Literal
 	Value string
+	Type  NumericType
 }
 
 var _ Literal = (*LiteralNumeric)(nil)
 
+// 12.9.3.3
 func (l *LiteralNumeric) NumericValue() (Value, error) {
+	if l.Type == NumericTypeBigInt {
+		bi := big.NewInt(0)
+		bi.SetString(l.Value, 10)
+		return NewBigIntValue(bi), nil
+	}
 	num, err := strconv.ParseFloat(l.Value, 64)
 	if err != nil {
 		return nil, err
@@ -877,23 +886,27 @@ func (e *expressionDefaultImpl) AssignmentTargetType() AssignmentTargetType {
 }
 
 func ExpressionAnalyze(e Expression, a AnalyzeQuery) bool {
+	switch ee := e.(type) {
+	case PrimaryExpression:
+		return PrimaryExpressionAnalyze(ee, a)
+	case *ExpressionPrimary:
+		return PrimaryExpressionAnalyze(ee.PrimaryExpression, a)
+	}
 	switch a {
 	case AnalyzeQueryIsReference:
-		switch ee := e.(type) {
-		case PrimaryExpression:
-			return PrimaryExpressionAnalyze(ee, a)
+		switch e.(type) {
 		case *MemberExpression, SuperProperty:
 			return true
 		default:
 			return false
 		}
 	case AnalyzeQueryIsStringLiteral:
-		switch ee := e.(type) {
-		case *ExpressionPrimary:
-			return PrimaryExpressionAnalyze(ee.PrimaryExpression, a)
+		switch e.(type) {
 		default:
 			return false
 		}
+	case AnalyzeQueryIsIdentifierReference:
+		return false
 	}
 	panic("unreachable")
 }
@@ -1160,7 +1173,7 @@ func (e *ExpressionPrimary) String() string {
 
 func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
 	switch a {
-	case AnalyzeQueryIsReference:
+	case AnalyzeQueryIsReference, AnalyzeQueryIsIdentifierReference:
 		switch pe := e.(type) {
 		case *PrimaryExpressionIdentifierReference:
 			return true
@@ -1169,6 +1182,7 @@ func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
 		default:
 			return false
 		}
+
 	case AnalyzeQueryIsStringLiteral:
 		switch pe := e.(type) {
 		case *PrimaryExpressionLiteral:
@@ -2082,7 +2096,6 @@ type UnaryExpression struct {
 }
 
 func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	u.Operand.Bytecode(e, c)
 	switch u.Operator {
 	case UnaryOperatorDelete:
 		u.Operand.Bytecode(e, c)
@@ -2094,6 +2107,7 @@ func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
 			e.AddInstruction(&IDelete{})
 		}
 	case UnaryOperatorVoid:
+		u.Operand.Bytecode(e, c)
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
@@ -2101,24 +2115,39 @@ func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
 			Value: UndefinedValue,
 		})
 	case UnaryOperatorTypeof:
-		e.AddInstruction(InsTypeof)
+		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsIdentifierReference) {
+			identifier := u.Operand.(*PrimaryExpressionIdentifierReference).Identifier
+			e.AddInstruction(&ITypeOfIdentifier{
+				IdentifierName: string(identifier),
+			})
+		} else {
+			u.Operand.Bytecode(e, c)
+			if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
+				e.AddInstruction(InsGetValue)
+			}
+			e.AddInstruction(InsTypeof)
+		}
 	case UnaryOperatorAddition:
+		u.Operand.Bytecode(e, c)
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
 		e.AddInstruction(InsToNumber)
 	case UnaryOperatorSubtraction:
+		u.Operand.Bytecode(e, c)
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
 		e.AddInstruction(InsToNumeric)
 		e.AddInstruction(InsUnaryMinus)
 	case UnaryOperatorLogicalNot:
+		u.Operand.Bytecode(e, c)
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
 		e.AddInstruction(&ILogicalNot{})
 	case UnaryOperatorBitwiseNot:
+		u.Operand.Bytecode(e, c)
 		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
 			e.AddInstruction(InsGetValue)
 		}
@@ -2240,16 +2269,15 @@ func (s *StatementDefaultImpl) String() string {
 
 func StatementAnalyze(s Statement, a AnalyzeQuery) bool {
 	exprStmt, isExpr := s.(*StatementExpression)
+	if isExpr {
+		return ExpressionAnalyze(exprStmt.Expression, a)
+	}
 	switch a {
+	case AnalyzeQueryIsIdentifierReference:
+		return false
 	case AnalyzeQueryIsReference:
-		if isExpr {
-			return ExpressionAnalyze(exprStmt.Expression, a)
-		}
 		return false
 	case AnalyzeQueryIsStringLiteral:
-		if isExpr {
-			return ExpressionAnalyze(exprStmt.Expression, a)
-		}
 		return false
 	}
 	panic("unreachable")

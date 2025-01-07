@@ -159,22 +159,21 @@ func (vm *VM) execute(i Instruction) {
 			"",
 		)
 		vm.result = closure.ToValue()
-	case *ITypeof:
-		var r *ReferenceRecord
-		if !vm.referenceStack.IsEmpty() {
-			r = vm.referenceStack.Peek()
-		}
+		// 13.5.3.1 reference
+	case *ITypeOfIdentifier:
+		r := agent.ResolveBinding(ins.IdentifierName, nil, false)
 		if r != nil {
 			if r.IsUnresolvableReference() {
 				vm.result = NewStringValue("undefined")
 				return
 			}
 		}
-		value := vm.result
-		if r != nil {
-			value = r.GetValue(agent)
-		}
 
+		value := r.GetValue(agent)
+		vm.result = NewStringValue(value.TypeString())
+		// 13.5.3.1 value
+	case *ITypeof:
+		value := vm.result
 		vm.result = NewStringValue(value.TypeString())
 	case *IToNumber:
 		value := vm.result

@@ -188,6 +188,15 @@ func (i *ITypeof) String() string {
 	return "ITypeof"
 }
 
+type ITypeOfIdentifier struct {
+	Instruction
+	IdentifierName string
+}
+
+func (i *ITypeOfIdentifier) String() string {
+	return "ITypeOfIdentifier " + i.IdentifierName
+}
+
 // MARK: - Call
 
 type ICall struct {
