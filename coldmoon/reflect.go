@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/Seeingu/coldmoon/pkg"
+
 type ReflectObject struct {
 	*Object
 }
@@ -14,7 +16,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		argumentsList := arguments[2]
 
 		if !IsCallable(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.apply called on non-callable")
 		}
 
 		args := CreateListFromArrayLike(agent, argumentsList)
@@ -27,18 +29,18 @@ func NewReflectObject(realm *Realm) ObjectType {
 		newTarget := arguments[2]
 
 		if !IsConstructor(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.construct called on non-constructor")
 		}
 
 		if len(arguments) <= 2 {
 			newTarget = target
 		} else if !IsConstructor(newTarget) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.construct second argument is not a constructor")
 		}
 
 		args := CreateListFromArrayLike(agent, argumentsList)
 
-		return (ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object)).ToValue()
+		return ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object).ToValue()
 	}
 	var defineProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
@@ -46,7 +48,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		attributes := arguments[2]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.defineProperty called on non-object")
 		}
 
 		key := ToPropertyKey(agent, propertyKey)
@@ -65,7 +67,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		propertyKey := arguments[1]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.deleteProperty called on non-object")
 		}
 
 		key := ToPropertyKey(agent, propertyKey)
@@ -78,10 +80,10 @@ func NewReflectObject(realm *Realm) ObjectType {
 	var get BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
 		propertyKey := arguments[1]
-		receiver := arguments[2]
+		receiver := pkg.SliceSafeGet(arguments, 2)
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.get called on non-object")
 		}
 
 		key := ToPropertyKey(agent, propertyKey)
@@ -95,7 +97,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		propertyKey := arguments[1]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.getOwnPropertyDescriptor called on non-object")
 		}
 
 		key := ToPropertyKey(agent, propertyKey)
@@ -107,25 +109,25 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return (desc.FromPropertyDescriptor(agent, desc)).ToValue()
 		}
 
-		panic("return undefined")
+		return UndefinedValue
 	}
 	var getPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.getPrototypeOf called on non-object")
 		}
 
 		targetObject := MustGetObject(target)
 
-		return (targetObject.InternalMethods().GetPrototypeOf(targetObject)).ToValue()
+		return targetObject.InternalMethods().GetPrototypeOf(targetObject).ToValue()
 	}
 	var has BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
 		propertyKey := arguments[1]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.has called on non-object")
 		}
 
 		key := ToPropertyKey(agent, propertyKey)
@@ -138,7 +140,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		target := arguments[0]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.isExtensible called on non-object")
 		}
 
 		targetObject := MustGetObject(target)
@@ -149,7 +151,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		target := arguments[0]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.ownKeys called on non-object")
 		}
 
 		targetObject := MustGetObject(target)
@@ -165,7 +167,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		target := arguments[0]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.preventExtensions called on non-object")
 		}
 
 		targetObject := MustGetObject(target)
@@ -173,14 +175,15 @@ func NewReflectObject(realm *Realm) ObjectType {
 		ret := targetObject.InternalMethods().PreventExtensions(targetObject)
 		return NewBooleanValue(ret)
 	}
+	// 28.1.12
 	var set BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
 		propertyKey := arguments[1]
 		value := arguments[2]
-		receiver := arguments[3]
+		receiver := pkg.SliceSafeGet(arguments, 3)
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.set called on non-object")
 		}
 
 		key := ToPropertyKey(agent, propertyKey)
@@ -199,13 +202,13 @@ func NewReflectObject(realm *Realm) ObjectType {
 		proto := arguments[1]
 
 		if !ValueIsObject(target) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.setPrototypeOf called on non-object")
 		}
 
 		targetObject := MustGetObject(target)
 
 		if proto != nil && !ValueIsObject(proto) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Reflect.setPrototypeOf called with non-object prototype")
 		}
 
 		ret := targetObject.InternalMethods().SetPrototypeOf(targetObject, MustGetObject(proto))

@@ -23,6 +23,21 @@ func testSource(t *testing.T, s string) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`
+const duck = {
+    name: "Maurice",
+    color: "white",
+    greeting() {
+        console.log("Quaaaack! My name is" + this.name);
+    },
+};
+
+assert(Reflect.has(duck, "color"));
+assert(Reflect.has(duck, "haircut") === false);
+assert(Reflect.ownKeys(duck).length===3);
+assert(Reflect.set(duck, "eyes", "black"));
+assertEqual(Reflect.get(duck, "eyes"), "black");
+`,
+		`
 const previouslyMaxSafeInteger = 9007199254740991n;
 const alsoHuge = BigInt(9007199254740991);
 const hugeString = BigInt("9007199254740991");
