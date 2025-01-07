@@ -23,8 +23,12 @@ func (o *ObjectValue) ToCompletion() CompletionValue {
 	return NewCompletionValue(o)
 }
 
+func (o *ObjectValue) ToString() CMString {
+	pk := CMString("toString").ToPropertyKey()
+	return o.Object.Get(pk).CallNoArgs(o).ToString()
+}
+
 // String is for internal use only.
-// TODO: JS standard toString() should use ToString() instead.
 func (o *ObjectValue) String() string {
 	return "ObjectValue: " + o.Object.String()
 }
