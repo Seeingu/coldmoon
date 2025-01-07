@@ -9,14 +9,14 @@ func NewAsyncFunctionConstructor(realm *Realm) ObjectType {
 		if bodyArg == nil {
 			bodyArg = NewStringValue("")
 		}
-		return (CreateDynamicFunction(
+		return CreateDynamicFunction(
 			agent,
 			C,
 			newTarget,
 			dynamicFunctionKindAsync,
 			parameterArgs,
 			bodyArg,
-		)).ToValue()
+		).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, CMString("AsyncFunction"), builtinFunctionArgs{
 		realm:     realm,

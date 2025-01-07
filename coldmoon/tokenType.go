@@ -73,6 +73,7 @@ const (
 	TDivideEquals
 	TIdentifier
 	TNumber
+	TBigInt
 	TString
 	TRegularExpression
 	TTrue

@@ -1,6 +1,10 @@
 package coldmoon
 
-import "math/big"
+import (
+	"math/big"
+
+	"github.com/Seeingu/coldmoon/pkg"
+)
 
 type BigIntValue struct {
 	Value
@@ -25,6 +29,10 @@ func NewBigIntFromBoolean(b bool) *BigIntValue {
 		i = 1
 	}
 	return NewBigIntValue(big.NewInt(i))
+}
+
+func (b *BigIntValue) ToString() CMString {
+	return CMString(b.Data.String() + "n")
 }
 
 func (b *BigIntValue) String() string {
@@ -132,7 +140,7 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 		value := argumentsList[0]
 
 		if newTarget != nil {
-			panic("TypeError")
+			return agent.ThrowTypeError("BigInt is not a constructor.")
 		}
 
 		prim := ToPrimitive(agent, value, PreferredTypeNumber)
@@ -159,8 +167,9 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "BigIntPrototype")
 
+	// 21.2.3.3
 	toString := func(this Value, arguments []Value, newTarget ObjectType) Value {
-		radix := arguments[0]
+		radix := pkg.SliceSafeGet(arguments, 0)
 
 		x := thisBigIntValue(this)
 
@@ -172,10 +181,10 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 		}
 
 		if radixMV < 2 || radixMV > 36 {
-			panic("RangeError")
+			return agent.ThrowRangeError("Radix must be an integer between 2 and 36, inclusive.")
 		}
 
-		return NewStringValue(x.String())
+		return x.ToString().ToValue()
 	}
 	valueOf := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		return thisBigIntValue(this)

@@ -120,7 +120,7 @@ func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
 				return result
 			}
 
-			panic("TypeError")
+			return agent.ThrowTypeError("could not convert object to primitive")
 		}
 		preferredType := hint
 		if preferredType == PreferredTypeDefault {
@@ -306,7 +306,8 @@ func ToBigInt(agent *Agent, value Value) *BigIntValue {
 	case *BigIntValue:
 		return p
 	case *StringValue:
-		n, _ := StringToBigInt(p)
+		n, ok := StringToBigInt(p)
+		Assert(ok)
 		return n
 	default:
 		panic("unreachable")
@@ -354,7 +355,19 @@ func StringToNumber(value *StringValue) *NumberValue {
 // 7.1.14
 func StringToBigInt(value *StringValue) (*BigIntValue, bool) {
 	bigInt := new(big.Int)
-	if _, ok := bigInt.SetString(value.Data, 10); !ok {
+	base := 10
+	rawString := value.Data
+	if strings.HasPrefix(value.Data, "0x") || strings.HasPrefix(value.Data, "0X") {
+		rawString = value.Data[2:]
+		base = 16
+	} else if strings.HasPrefix(value.Data, "0b") || strings.HasPrefix(value.Data, "0B") {
+		rawString = value.Data[2:]
+		base = 2
+	} else if strings.HasPrefix(value.Data, "0o") || strings.HasSuffix(value.Data, "0O") {
+		rawString = value.Data[2:]
+		base = 8
+	}
+	if _, ok := bigInt.SetString(rawString, base); !ok {
 		return nil, false
 	}
 

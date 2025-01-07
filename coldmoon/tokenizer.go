@@ -388,6 +388,7 @@ func (t *Tokenizer) string() Token {
 }
 
 // MARK: - Number
+// TODO: parse later, use StringToBigInt
 func (t *Tokenizer) number() Token {
 	var value string
 
@@ -400,6 +401,10 @@ func (t *Tokenizer) number() Token {
 		value = t.parseNumber(8, []rune{'0', '1', '2', '3', '4', '5', '6', '7'})
 	default:
 		value = t.parseDecimalNumber()
+	}
+
+	if t.matchCharset([]rune{'n', 'N'}) {
+		return t.newToken(TBigInt, value)
 	}
 
 	return t.newToken(TNumber, value)

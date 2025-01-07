@@ -122,7 +122,7 @@ func NewJSON(realm *Realm) *JSON {
 						case *StringValue:
 							item = vv.Data
 						case *NumberValue:
-							item = vv.ToString(10)
+							item = string(vv.ToString())
 						case *ObjectValue:
 							if ObjectIs[*StringObject](vv.Object) || ObjectIs[*NumberObject](vv.Object) {
 								item = ToString(agent, v).Data

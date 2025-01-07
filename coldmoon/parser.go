@@ -2023,7 +2023,7 @@ func (p *Parser) propertyName() (PropertyName, bool) {
 		propertyName = &PropertyNameLiteralString{
 			StringLiteral: stringLiteral,
 		}
-	case TNumber:
+	case TNumber, TBigInt:
 		numberLiteral := p.numericLiteral()
 		propertyName = &PropertyNameLiteralNumeric{
 			NumericLiteral: numberLiteral,
@@ -2217,7 +2217,7 @@ func (p *Parser) literal() Literal {
 		return &LiteralNull{}
 	case TUndefined:
 		return &LiteralUndefined{}
-	case TNumber:
+	case TNumber, TBigInt:
 		return p.numericLiteral()
 	case TString:
 		return p.stringLiteral()
@@ -2230,11 +2230,15 @@ func (p *Parser) literal() Literal {
 
 func (p *Parser) numericLiteral() *LiteralNumeric {
 	t := p.tokenizer.CurrentToken
-	if t.Type != TNumber {
-		panic("numericLiteral: expected number")
+	var numericType NumericType
+	if t.Type == TBigInt {
+		numericType = NumericTypeBigInt
+	} else {
+		numericType = NumericTypeNumber
 	}
 	return &LiteralNumeric{
 		Value: t.Value,
+		Type:  numericType,
 	}
 }
 
