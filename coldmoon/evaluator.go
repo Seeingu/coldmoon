@@ -10,9 +10,9 @@ func Evaluate(source string, realm *Realm) {
 		}
 	}
 	for _, job := range agent.QueuedPromiseJobs.Data() {
-		previousRealm := agent.runningExecutionContext().Realm
-		agent.runningExecutionContext().Realm = job.realm
+		previousRealm := agent.RunningExecutionContext().Realm
+		agent.RunningExecutionContext().Realm = job.realm
 		job.job.Fun(job.job.Captures)
-		agent.runningExecutionContext().Realm = previousRealm
+		agent.RunningExecutionContext().Realm = previousRealm
 	}
 }

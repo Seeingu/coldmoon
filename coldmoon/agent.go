@@ -52,17 +52,17 @@ func NewAgent() *Agent {
 	return a
 }
 
-func (a *Agent) runningExecutionContext() *ExecutionContext {
+func (a *Agent) RunningExecutionContext() *ExecutionContext {
 	Assert(a.ExecutionContextStack.Len() > 0)
 	return a.ExecutionContextStack.Peek()
 }
 
 func (a *Agent) CurrentRealm() *Realm {
-	return a.runningExecutionContext().Realm
+	return a.RunningExecutionContext().Realm
 }
 
 func (a *Agent) ActiveFunctionObject() ObjectType {
-	return a.runningExecutionContext().Function.Ref()
+	return a.RunningExecutionContext().Function.Ref()
 }
 
 // 9.4.1
@@ -84,15 +84,15 @@ func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
 // 9.4.2
 func (a *Agent) ResolveBinding(name string, env EnvironmentRecord, strict bool) *ReferenceRecord {
 	if env == nil {
-		Assert(a.runningExecutionContext().ECMAScriptCode != nil)
-		env = a.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		Assert(a.RunningExecutionContext().ECMAScriptCode != nil)
+		env = a.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 	}
 	return GetIdentifierReference(env, name, strict)
 }
 
 // 9.4.3
 func (a *Agent) GetThisEnvironment() EnvironmentRecord {
-	env := a.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	env := a.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 
 	for {
 		exists := env.HasThisBinding()

@@ -22,7 +22,7 @@ func PerformEval(agent *Agent, x Value, strictCaller bool, direct bool) Value {
 
 	strictEval := strictCaller || script.ECMAScriptCode.IsStrict()
 
-	runningContext := agent.runningExecutionContext()
+	runningContext := agent.RunningExecutionContext()
 	var lexEnv EnvironmentRecord
 	var varEnv EnvironmentRecord
 	var privateEnv *PrivateEnvironment

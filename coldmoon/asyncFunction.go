@@ -37,13 +37,13 @@ func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
 }
 
 func AsyncFunctionStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction) {
-	runningContext := agent.runningExecutionContext()
+	runningContext := agent.RunningExecutionContext()
 	asyncContext := runningContext
 	AsyncBlockStart(agent, promiseCapability, asyncFunction, asyncContext)
 }
 
 func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction, asyncContext *ExecutionContext) {
-	runningContext := agent.runningExecutionContext()
+	runningContext := agent.RunningExecutionContext()
 
 	closure := func() {
 		result := asyncFunction.EvaluateBody()
@@ -59,5 +59,5 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 
 	agent.ExecutionContextStack.Push(asyncContext)
 	closure()
-	Assert(runningContext == agent.runningExecutionContext())
+	Assert(runningContext == agent.RunningExecutionContext())
 }

@@ -386,11 +386,11 @@ func (vm *VM) execute(i Instruction) {
 		name := ins.IdentifierName
 		thrownValue := vm.exception
 		vm.exception = nil
-		oldEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		oldEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		catchEnv := NewDeclarativeEnvironment(oldEnv)
 		catchEnv.CreateMutableBinding(string(name), false)
 		catchEnv.InitializeBinding(string(name), thrownValue)
-		vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = catchEnv
+		vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = catchEnv
 	case *IDelete:
 		ref := vm.referenceStack.Peek()
 		if ref.IsUnresolvableReference() {
@@ -588,7 +588,7 @@ func (vm *VM) execute(i Instruction) {
 		vm.stackPush(vm.iterator.NextMethod, "ILoadIterator")
 		vm.stackPush((vm.iterator.Iterator).ToValue(), "ILoadIterator")
 	case *IPushLexicalEnvironment:
-		vm.envStack.Push(vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment)
+		vm.envStack.Push(vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment)
 	case *IPopLexicalEnvironment:
 		vm.envStack.Pop()
 	case *IInitializeReferencedBinding:
@@ -598,7 +598,7 @@ func (vm *VM) execute(i Instruction) {
 	case *IForDeclarationBindingInstantiation:
 		vm.forDeclarationBindingInstantiation(ins.LexicalDeclaration)
 	case *IRestoreLexicalEnvironment:
-		vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = vm.envStack.Peek()
+		vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = vm.envStack.Peek()
 	default:
 		panic("unreachable")
 	}
@@ -617,7 +617,7 @@ func (vm *VM) forDeclarationBindingInstantiation(lexicalDeclaration *Declaration
 			iterationEnv.CreateMutableBinding(string(name), false)
 		}
 	}
-	vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = iterationEnv
+	vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = iterationEnv
 }
 
 func (vm *VM) getSuperConstructor() Value {
@@ -676,13 +676,13 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding string, className string) ObjectType {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
-	env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 	classEnv := NewDeclarativeEnvironment(env)
 	if classBinding != "" {
 		classEnv.CreateImmutableBinding(classBinding, true)
 	}
 
-	outerPrivateEnvironment := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	outerPrivateEnvironment := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 	classPrivateEnvironment := NewPrivateEnvironment(outerPrivateEnvironment)
 
 	if len(classTail.ClassBody.ClassElementList.Items) > 0 {
@@ -706,13 +706,13 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 		protoParent = realm.Intrinsics.ObjectPrototype
 		constructorParent = realm.Intrinsics.FunctionPrototype
 	} else {
-		agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
+		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
 		superclassRef := GenerateAndRunBytecode(agent,
 			&StatementExpression{
 				Expression: classTail.ClassHeritage,
 			},
 		)
-		agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 		superclass := superclassRef.Data()
 		if superclass == nil {
 			protoParent = nil
@@ -731,8 +731,8 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 
 	proto := OrdinaryObjectCreate(agent, protoParent, nil)
 	constructor := classTail.ClassBody.ConstructorMethod()
-	agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
-	agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = classPrivateEnvironment
+	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
+	agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = classPrivateEnvironment
 
 	var function ObjectType
 	if constructor == nil {
@@ -810,8 +810,8 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 			result, err = vm.ClassElementEvaluation(classElement, function)
 		}
 		if err != nil {
-			agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
-			agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+			agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+			agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
 			panic(err)
 		}
 		if result.classFieldDefinition != nil {
@@ -867,7 +867,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 		}
 	}
 
-	agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 	if classBinding != "" {
 		classEnv.InitializeBinding(classBinding, function.ToValue())
 	}
@@ -889,7 +889,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 		block.BodyFunction.ToValue().Call(function.ToValue(), nil)
 	}
 
-	agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+	agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
 
 	return function
 }
@@ -908,7 +908,7 @@ func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *DeclarationCla
 			panic("unreachable")
 		}
 
-		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		vm.InitializeBoundName(className, value.ToValue(), env)
 		return value
 	} else {
@@ -935,8 +935,8 @@ func (vm *VM) InitializeBoundName(name string, value Value, env EnvironmentRecor
 
 func (vm *VM) InstantiateAsyncArrowFunctionExpression(functionExpression *PrimaryExpressionAsyncArrowFunction, name string) ObjectType {
 	realm := vm.agent.CurrentRealm()
-	env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-	privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 	sourceText := functionExpression.SourceText
 	closure := OrdinaryFunctionCreate(
 		vm.agent,
@@ -956,10 +956,10 @@ func (vm *VM) InstantiateAsyncFunctionExpression(functionExpression *PrimaryExpr
 	realm := vm.agent.CurrentRealm()
 	if functionExpression.Identifier != "" {
 		name := string(functionExpression.Identifier)
-		outerEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		outerEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		funcEnv := NewDeclarativeEnvironment(outerEnv)
 		funcEnv.CreateImmutableBinding(name, false)
-		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			vm.agent,
@@ -975,8 +975,8 @@ func (vm *VM) InstantiateAsyncFunctionExpression(functionExpression *PrimaryExpr
 		funcEnv.InitializeBinding(name, (closure).ToValue())
 		return closure
 	} else {
-		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			vm.agent,
@@ -997,10 +997,10 @@ func (vm *VM) InstantiateAsyncGeneratorFunctionExpression(functionExpression *Pr
 	realm := vm.agent.CurrentRealm()
 	if functionExpression.IdentifierName != "" {
 		name := string(functionExpression.IdentifierName)
-		outerEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		outerEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		funcEnv := NewDeclarativeEnvironment(outerEnv)
 		funcEnv.CreateImmutableBinding(name, false)
-		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			vm.agent,
@@ -1025,8 +1025,8 @@ func (vm *VM) InstantiateAsyncGeneratorFunctionExpression(functionExpression *Pr
 		funcEnv.InitializeBinding(name, (closure).ToValue())
 		return closure
 	} else {
-		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			vm.agent,
@@ -1054,8 +1054,8 @@ func (vm *VM) InstantiateAsyncGeneratorFunctionExpression(functionExpression *Pr
 func (vm *VM) ClassStaticBlockDefinitionEvaluation(classStaticBlock *ClassElementStaticBlock, homeObject ObjectType) *ClassStaticBlockDefinition {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
-	lex := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-	privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	lex := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 	sourceText := ""
 	formalParameters := &FormalParameters{}
 	var bodyFunction *ECMAScriptFunction
@@ -1091,8 +1091,8 @@ func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, h
 	var initializer ObjectType
 	if fieldDefinition.Initializer != nil {
 		formalParameterList := &FormalParameters{}
-		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := ""
 		functionBody := &FunctionBody{
 			StatementList: StatementList{
@@ -1133,10 +1133,10 @@ func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *Primary
 	realm := vm.agent.CurrentRealm()
 	if functionExpression.IdentifierName != "" {
 		name := string(functionExpression.IdentifierName)
-		outerEnv := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		outerEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		funcEnv := NewDeclarativeEnvironment(outerEnv)
 		funcEnv.CreateImmutableBinding(name, false)
-		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			vm.agent,
@@ -1161,8 +1161,8 @@ func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *Primary
 		funcEnv.InitializeBinding(name, (closure).ToValue())
 		return closure
 	} else {
-		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			vm.agent,
@@ -1221,8 +1221,8 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 		return nil
 	case MethodDefinitionTypeGet:
 		propKeyOrPrivateName := propertyName
-		env := vm.agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := vm.agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		formalParameterList := &FormalParameters{}
 		closure := OrdinaryFunctionCreate(
@@ -1260,8 +1260,8 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 	case MethodDefinitionTypeSet:
 		propKeyOrPrivateName := propertyName
 		propKey := ToPropertyKey(vm.agent, propertyName)
-		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			agent,
@@ -1294,8 +1294,8 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 		}
 	case MethodDefinitionTypeGenerator:
 		propKey := ToPropertyKey(vm.agent, propertyName)
-		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		generatorExpression := methodDefinition.GeneratorExpression
 		sourceText := generatorExpression.SourceText
 		closure := OrdinaryFunctionCreate(
@@ -1323,8 +1323,8 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 	case MethodDefinitionTypeAsync:
 		a := methodDefinition.AsyncFunctionExpression
 		propKey := ToPropertyKey(vm.agent, propertyName)
-		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := a.SourceText
 		closure := OrdinaryFunctionCreate(
 			agent,
@@ -1342,8 +1342,8 @@ func (vm *VM) MethodDefinitionEvaluation(methodDefinition methodDefinitionArgs, 
 	case MethodDefinitionTypeAsyncGenerator:
 		a := methodDefinition.AsyncGeneratorExpression
 		propKey := ToPropertyKey(vm.agent, propertyName)
-		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := a.SourceText
 		closure := OrdinaryFunctionCreate(
 			agent,
@@ -1587,10 +1587,10 @@ func InstantiateOrdinaryFunctionExpression(
 	if functionExpression.Identifier != "" {
 		Assert(name == "")
 		name = string(functionExpression.Identifier)
-		outerEnv := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		outerEnv := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 		funcEnv := NewDeclarativeEnvironment(outerEnv)
 		funcEnv.CreateImmutableBinding(name, false)
-		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			agent,
@@ -1608,8 +1608,8 @@ func InstantiateOrdinaryFunctionExpression(
 		funcEnv.InitializeBinding(name, (closure).ToValue())
 		return closure
 	} else {
-		env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 		sourceText := functionExpression.SourceText
 		closure := OrdinaryFunctionCreate(
 			agent,
@@ -1632,9 +1632,9 @@ func InstantiateOrdinaryFunctionExpression(
 func InstantiateArrowFunctionExpression(agent *Agent, arrowFunction *PrimaryExpressionArrowFunction, name string) ObjectType {
 	realm := agent.CurrentRealm()
 
-	env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 
-	privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 
 	sourceText := arrowFunction.SourceText
 
@@ -1662,8 +1662,8 @@ type DefineMethodRecord struct {
 func DefineMethod(agent *Agent, functionExpression *PrimaryExpressionFunctionExpression, propertyName Value, object ObjectType, proto ObjectType) *DefineMethodRecord {
 	realm := agent.CurrentRealm()
 	propKey := ToPropertyKey(agent, propertyName)
-	env := agent.runningExecutionContext().ECMAScriptCode.LexicalEnvironment
-	privateEnv := agent.runningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 	var prototype ObjectType
 	if proto == nil {
 		prototype = realm.Intrinsics.FunctionPrototype

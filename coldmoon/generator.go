@@ -60,12 +60,12 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 // 27.5.3.1
 func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody *ECMAScriptFunction) {
 	Assert(generator.GeneratorState == GeneratorStateSuspendedStart)
-	genContext := agent.runningExecutionContext()
+	genContext := agent.RunningExecutionContext()
 	genContext.Generator = generator
 
 	closure := func(bytecode *BytecodeContext) ObjectType {
 		a := bytecode.agent
-		acGenContext := a.runningExecutionContext()
+		acGenContext := a.RunningExecutionContext()
 		acGenerator := acGenContext.Generator
 		if bytecode.IsFinished() {
 			a.ExecutionContextStack.Pop()
@@ -103,11 +103,11 @@ func GeneratorResume(agent *Agent, generator Value, value Value) ObjectType {
 	Assert(state == GeneratorStateSuspendedStart || state == GeneratorStateSuspendedYield)
 	g := RequireInternalSlot[*GeneratorObject](generator)
 	genContext := g.GeneratorContext
-	// methodContext := agent.runningExecutionContext()
+	// methodContext := agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
 	agent.ExecutionContextStack.Push(genContext)
 	result := g.closure(g.bytecode)
-	// Assert(methodContext == agent.runningExecutionContext())
+	// Assert(methodContext == agent.RunningExecutionContext())
 	return result
 }
 
@@ -127,7 +127,7 @@ func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion Compl
 	}
 
 	genContext := g.GeneratorContext
-	// methodContext:= agent.runningExecutionContext()
+	// methodContext:= agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
 	agent.ExecutionContextStack.Push(genContext)
 	result := g.closure(g.bytecode)
@@ -144,7 +144,7 @@ const (
 )
 
 func GetGeneratorKind(agent *Agent) GeneratorKind {
-	ec := agent.runningExecutionContext()
+	ec := agent.RunningExecutionContext()
 	if ec.Generator == nil {
 		return GeneratorKindNonGenerator
 	}
@@ -154,7 +154,7 @@ func GetGeneratorKind(agent *Agent) GeneratorKind {
 
 // 27.5.3.6
 func GeneratorYield(agent *Agent, iteratorResult ObjectType) CompletionValue {
-	genContext := agent.runningExecutionContext()
+	genContext := agent.RunningExecutionContext()
 	Assert(genContext.Generator != nil)
 	generator := genContext.Generator
 	Assert(GetGeneratorKind(agent) == GeneratorKindSync)

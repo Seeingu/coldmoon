@@ -65,7 +65,7 @@ func BuiltinConstruct(b ObjectType, argumentsList []Value, newTarget ObjectType)
 // 10.3.3
 func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 	a := b.Agent()
-	callerContext := a.runningExecutionContext()
+	callerContext := a.RunningExecutionContext()
 	_ = callerContext
 
 	calleeContext := &ExecutionContext{

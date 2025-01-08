@@ -86,7 +86,7 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Val
 	function := e
 
 	calleeContext := PrepareForOrdinaryCall(agent, function, nil)
-	Assert(calleeContext == agent.runningExecutionContext())
+	Assert(calleeContext == agent.RunningExecutionContext())
 
 	if function.IsClassConstructor {
 		panic("TypeError")
@@ -213,7 +213,7 @@ func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, arguments
 
 // 10.2.11
 func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) CompletionValue {
-	calleeContext := agent.runningExecutionContext()
+	calleeContext := agent.RunningExecutionContext()
 	code := function.ECMAScriptCode
 	strict := function.Strict
 	formals := function.FormalParameters
@@ -403,7 +403,7 @@ func (e *ECMAScriptFunction) Construct(
 	}
 
 	calleeContext := PrepareForOrdinaryCall(agent, function, newTarget)
-	Assert(calleeContext == agent.runningExecutionContext())
+	Assert(calleeContext == agent.RunningExecutionContext())
 
 	if kind == ConstructorKindBase {
 		OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
