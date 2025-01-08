@@ -1405,10 +1405,10 @@ func (vm *VM) Run(executable *Executable) CompletionValue {
 // 13.3.6.2
 func evaluateCall(agent *Agent, function Value, this Value, arguments []Value) Value {
 	if _, ok := function.(*ObjectValue); !ok {
-		panic("TypeError: function is not an object")
+		return agent.ThrowTypeError("function is not an object")
 	}
 	if !IsCallable(function) {
-		panic("TypeError: function is not callable")
+		return agent.ThrowTypeError("function is not callable")
 	}
 	return function.Call(this, arguments)
 }
@@ -1439,7 +1439,7 @@ func directEval(agent *Agent, arguments []Value, strict bool) Value {
 // 13.3.5.1.1
 func evaluateNew(agent *Agent, constructor Value, arguments []Value) Value {
 	if !IsConstructor(constructor) {
-		panic("TypeError: constructor is not a constructor")
+		return agent.ThrowTypeError("constructor is not a constructor")
 	}
 	o := MustGetObject(constructor)
 	return o.Construct(arguments, nil).ToValue()

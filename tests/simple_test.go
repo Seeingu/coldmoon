@@ -16,12 +16,24 @@ func testSource(t *testing.T, s string) {
 	realm := agent.CurrentRealm()
 	runtime.RegisterTerminalRuntime(realm)
 	sourceText := s
-	evaluate(sourceText, realm)
+	Evaluate(sourceText, realm)
 	Debug.Disable()
 }
 
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
+		`
+let a = ''
+const promiseA = new Promise((resolve, reject) => {
+    resolve(777);
+});
+promiseA.then((val) => {
+	a += val
+	assert(a === '1777');
+});
+a += '1'
+assert(a === '1');
+`,
 		`
 const duck = {
     name: "Maurice",

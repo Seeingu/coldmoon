@@ -62,7 +62,7 @@ func (a *Agent) CurrentRealm() *Realm {
 }
 
 func (a *Agent) ActiveFunctionObject() ObjectType {
-	return a.runningExecutionContext().Function
+	return a.runningExecutionContext().Function.Ref()
 }
 
 // 9.4.1

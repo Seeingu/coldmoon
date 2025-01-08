@@ -35,18 +35,8 @@ func runTestHarness(realm *Realm, f string, debug bool) {
 	}
 }
 
-func evaluate(source string, realm *Realm) {
-	result := ParseScript(source, realm, nil).Evaluate()
-	if o, ok := ValueGetObject(result); ok {
-		if e, ok := o.(*ErrorObject); ok {
-			println("Return Error: ", e.Message)
-			panic(e)
-		}
-	}
-}
-
 func evaluateFile(fileName string, realm *Realm) {
-	evaluate(mustReadFile(fileName), realm)
+	Evaluate(mustReadFile(fileName), realm)
 }
 
 func readDir(dir string) []string {

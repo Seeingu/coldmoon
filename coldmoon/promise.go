@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/Seeingu/coldmoon/pkg"
+
 // MARK: - PromiseState
 
 type PromiseState int
@@ -23,9 +25,11 @@ func (p *PromiseCapability) ToImportedModulePayload() ImportedModulePayload {
 	}
 }
 
+// 27.2.1.5
 func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 	if !IsConstructor(constructor) {
-		panic("TypeError")
+		agent.ThrowTypeError("is not a constructor")
+		return nil
 	}
 	var executorClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		resolve := argumentsList[0]
@@ -33,11 +37,11 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 		function := agent.ActiveFunctionObject()
 		additionalFields := function.(*BuiltinFunction).AdditionalFields
 		resolvingFunctions := additionalFields.ResolvingFunctions
-		if resolvingFunctions.Resolve != nil {
-			panic("TypeError")
+		if !IsUndefinedOrNil(resolvingFunctions.Resolve) {
+			return agent.ThrowTypeError("already called")
 		}
-		if resolvingFunctions.Reject != nil {
-			panic("TypeError")
+		if !IsUndefinedOrNil(resolvingFunctions.Reject) {
+			return agent.ThrowTypeError("already called")
 		}
 		resolvingFunctions.Resolve = resolve
 		resolvingFunctions.Reject = reject
@@ -52,12 +56,14 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 	executor := CreateBuiltinFunction(agent, executorClosure, 2, CMString(""), builtinFunctionArgs{
 		additionalFields: additionalFields,
 	})
-	promise := MustGetObject(constructor).Construct([]Value{(executor).ToValue()}, nil)
+	promise := MustGetObject(constructor).Construct([]Value{executor.ToValue()}, nil)
 	if !IsCallable(additionalFields.ResolvingFunctions.Resolve) {
-		panic("TypeError")
+		agent.ThrowTypeError("TypeError")
+		return nil
 	}
 	if !IsCallable(additionalFields.ResolvingFunctions.Reject) {
-		panic("TypeError")
+		agent.ThrowTypeError("TypeError")
+		return nil
 	}
 	return &PromiseCapability{
 		Promise: promise,
@@ -107,12 +113,16 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "PromisePrototype")
 
+	// 27.2.5.4
 	var then BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		onFulfilled := arguments[0]
-		onRejected := arguments[1]
+		onRejected := pkg.SliceSafeGet(arguments, 1)
+		if onRejected == nil {
+			onRejected = UndefinedValue
+		}
 		promise := this
 		if !ValueIsPromise(promise) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Promise.prototype.then called on incompatible receiver")
 		}
 		promiseObject := MustGetObject(promise)
 		C := promiseObject.SpeciesConstructor(realm.Intrinsics.Promise)
@@ -128,7 +138,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 		promise := this
 		onFinally := arguments[0]
 		if !ValueIsObject(promise) {
-			panic("TypeError")
+			return agent.ThrowTypeError("Promise.prototype.finally called on incompatible receiver")
 		}
 		C := MustGetObject(promise).SpeciesConstructor(realm.Intrinsics.Promise)
 		Assert(IsConstructor(C.Data().ToValue()))
@@ -213,10 +223,10 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		executor := arguments[0]
 		if newTarget == nil {
-			panic("TypeError")
+			return agent.ThrowTypeError("TypeError")
 		}
 		if !IsCallable(executor) {
-			panic("TypeError")
+			return agent.ThrowTypeError("TypeError")
 		}
 		o := OrdinaryCreateFromConstructor(agent, newTarget, "%Promise.prototype", nil)
 		promise := &PromiseObject{
@@ -225,30 +235,32 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 			PromiseResult:    UndefinedValue,
 			PromiseIsHandled: false,
 		}
+		promise.ref = promise
 
 		resolvingFunctions := CreateResolvingFunctions(agent, promise)
-		executor.Call(UndefinedValue, []Value{resolvingFunctions.Resolve})
-		return (promise).ToValue()
+		executor.Call(UndefinedValue, []Value{resolvingFunctions.Resolve, resolvingFunctions.Reject})
+		return promise.ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, CMString("Promise"), builtinFunctionArgs{
-		realm:     realm,
-		prototype: realm.Intrinsics.FunctionPrototype,
+		realm:         realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		isConstructor: true,
 	})
 
 	var reject BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		reason := arguments[0]
 		C := this
 		capability := NewPromiseCapability(agent, C)
-		(capability.Reject).ToValue().Call(UndefinedValue, []Value{reason})
-		return (capability.Promise).ToValue()
+		capability.Reject.ToValue().Call(UndefinedValue, []Value{reason})
+		return capability.Promise.ToValue()
 	}
 	var resolve BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		resolution := arguments[0]
 		C := this
 		if !ValueIsObject(C) {
-			panic("TypeError")
+			return agent.ThrowTypeError("TypeError")
 		}
-		return (PromiseResolve(agent, MustGetObject(C), resolution)).ToValue()
+		return PromiseResolve(agent, MustGetObject(C), resolution).ToValue()
 	}
 	race := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		iterable := arguments[0]
@@ -408,48 +420,53 @@ func IfAbruptRejectPromise[T any](agent *Agent, value Completion[T], capability 
 	return true
 }
 
+// 27.2.1.3.2
+func stepsResolve(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
+	resolution := arguments[0]
+	F := agent.ActiveFunctionObject()
+	additionalFields := F.(*BuiltinFunction).AdditionalFields
+	promise := additionalFields.Promise
+	alreadyResolved := additionalFields.AlreadyResolved
+
+	if alreadyResolved.Value {
+		return UndefinedValue
+	}
+	alreadyResolved.Value = true
+	if SameValue(resolution, promise.ToValue()) {
+		agent.ThrowException(TypeError, "self resolution")
+		RejectPromise(agent, promise, agent.exception)
+		return UndefinedValue
+	}
+	if !ValueIsObject(resolution) {
+		FulfillPromise(agent, promise, resolution)
+		return UndefinedValue
+	}
+	then := MustGetObject(resolution).Get(NewStringPropertyKey("then"))
+	if !IsCallable(then) {
+		FulfillPromise(agent, promise, resolution)
+		return UndefinedValue
+	}
+
+	thenJobCallback := agent.HostHooks.HostMakeJobCallback(MustGetObject(then))
+	job := NewPromiseResolveThenableJob(agent, promise, MustGetObject(resolution), thenJobCallback)
+	agent.HostHooks.HostEnqueuePromiseJob(agent, job.Job, job.Realm)
+	return UndefinedValue
+}
+
 // 27.2.1.3
 func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFunctions {
 	realm := agent.CurrentRealm()
 	alreadyResolved := &AlreadyResolved{Value: false}
 
-	var stepsResolve BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		resolution := arguments[0]
-		F := agent.ActiveFunctionObject()
-		additionalFields := F.(*BuiltinFunction).AdditionalFields
-		_promise := additionalFields.Promise
-		_alreadyResolved := additionalFields.AlreadyResolved
-
-		if _alreadyResolved.Value {
-			return UndefinedValue
-		}
-		_alreadyResolved.Value = true
-		if SameValue(resolution, (_promise).ToValue()) {
-			agent.ThrowException(TypeError, "self resolution")
-			RejectPromise(agent, _promise, agent.exception)
-			return UndefinedValue
-		}
-		if !ValueIsObject(resolution) {
-			FulfillPromise(agent, _promise, resolution)
-			return UndefinedValue
-		}
-		then := MustGetObject(resolution).Get(NewStringPropertyKey("then"))
-		if !IsCallable(then) {
-			FulfillPromise(agent, _promise, resolution)
-			return UndefinedValue
-		}
-
-		thenJobCallback := agent.HostHooks.HostMakeJobCallback(MustGetObject(then))
-		job := NewPromiseResolveThenableJob(agent, _promise, MustGetObject(resolution), thenJobCallback)
-		agent.HostHooks.HostEnqueuePromiseJob(agent, job.Job, job.Realm)
-		return UndefinedValue
-	}
 	lengthResolve := JSInt(1)
 	resolveAdditionalFields := &AdditionalFields{
 		Promise:         promise,
 		AlreadyResolved: alreadyResolved,
 	}
-	resolve := CreateBuiltinFunction(agent, stepsResolve, lengthResolve, CMString(""), builtinFunctionArgs{
+
+	resolve := CreateBuiltinFunction(agent, func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		return stepsResolve(agent, thisArgument, argumentsList, newTarget)
+	}, lengthResolve, CMString(""), builtinFunctionArgs{
 		realm:            realm,
 		additionalFields: resolveAdditionalFields,
 	})
@@ -473,8 +490,8 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		additionalFields: rejectAdditionalFields,
 	})
 	return &ResolvingFunctions{
-		Resolve: (resolve).ToValue(),
-		Reject:  (reject).ToValue(),
+		Resolve: resolve.ToValue(),
+		Reject:  reject.ToValue(),
 	}
 }
 
