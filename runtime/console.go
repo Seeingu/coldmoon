@@ -1,11 +1,17 @@
 package runtime
 
-import "github.com/Seeingu/coldmoon/coldmoon"
+import (
+	"strings"
+
+	"github.com/Seeingu/coldmoon/coldmoon"
+)
 
 func jsPrint(this coldmoon.Value, arguments []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.Value {
+	var sb []string
 	for _, arg := range arguments {
-		println(arg.ToString())
+		sb = append(sb, string(arg.ToString()))
 	}
+	println(strings.Join(sb, " "))
 	return coldmoon.UndefinedValue
 }
 
