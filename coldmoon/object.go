@@ -124,7 +124,6 @@ func (o *Object) IsExtensible() bool {
 	return o.InternalMethods().IsExtensible(o)
 }
 
-// TODO(C): use property key convertable
 // 7.3.2
 func (o *Object) Get(key PropertyKey) Value {
 	return o.InternalMethods().Get(o.Ref(), key, o.ToValue())

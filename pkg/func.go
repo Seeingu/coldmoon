@@ -24,6 +24,6 @@ func RecoverFromFunc[T any](f func() T) (r T, err error) {
 
 // GetFunctionName
 // see: https://stackoverflow.com/questions/7052693/how-to-get-the-name-of-a-function-in-go
-func GetFunctionName(i interface{}) string {
+func GetFunctionName(i any) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }

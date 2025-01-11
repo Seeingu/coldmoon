@@ -5,13 +5,13 @@ import (
 )
 
 type Realm struct {
-	AgentSignifier interface{}
+	AgentSignifier any
 	Intrinsics     *Intrinsics
 	GlobalObject   *Object
 	GlobalEnv      *GlobalEnvironment
-	TemplateMap    interface{}
-	LoadedModules  interface{}
-	HostDefined    interface{}
+	TemplateMap    any
+	LoadedModules  any
+	HostDefined    any
 	Agent          *Agent
 	Rng            rand.Rand
 }

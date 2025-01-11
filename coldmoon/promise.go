@@ -541,8 +541,8 @@ type PromiseThenFinallyCaptures struct {
 }
 
 type Job struct {
-	Fun      func(captures interface{}) Value
-	Captures interface{}
+	Fun      func(captures any) Value
+	Captures any
 }
 
 type PromiseReactionJob struct {
@@ -558,7 +558,7 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 		Argument: argument,
 	}
 
-	fun := func(_captures interface{}) Value {
+	fun := func(_captures any) Value {
 		captures := _captures.(*PromiseJobReactionCaptures)
 		agent := captures.Agent
 		reaction := captures.Reaction
@@ -918,7 +918,7 @@ func NewPromiseResolveThenableJob(agent *Agent, promise *PromiseObject, thenable
 		Thenable:         thenable,
 		ThenJobCallback:  thenJobCallback,
 	}
-	fun := func(_captures interface{}) Value {
+	fun := func(_captures any) Value {
 		captures := _captures.(*PromiseJobThenableReactionCaptures)
 		agent := captures.Agent
 		promiseToResolve := captures.PromiseToResolve

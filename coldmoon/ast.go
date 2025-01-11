@@ -267,7 +267,7 @@ func (p *PrimaryExpressionParenthesizedExpression) String() string {
 // MARK: - ArrayLiteral
 
 type (
-	ArrayElement        interface{}
+	ArrayElement        any
 	ArrayElementElision struct {
 		ArrayElement
 	}

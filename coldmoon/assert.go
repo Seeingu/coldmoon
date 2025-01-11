@@ -2,6 +2,6 @@ package coldmoon
 
 func Assert(t bool) {
 	if !t {
-		panic("")
+		panic("throw error from Assert")
 	}
 }

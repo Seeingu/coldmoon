@@ -569,7 +569,7 @@ func MakeMethod(F *ECMAScriptFunction, homeObject ObjectType) {
 }
 
 type (
-	PropertyKeyOrPrivateName     interface{}
+	PropertyKeyOrPrivateName     any
 	PropertyKeyOrPrivateNameName struct {
 		PropertyKeyOrPrivateName
 		PrivateName PrivateName
