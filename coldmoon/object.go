@@ -32,10 +32,6 @@ type Object struct {
 
 var _ ObjectType = (*Object)(nil)
 
-func (o *Object) ToObject() *Object {
-	return o
-}
-
 func (o *Object) ToValue() Value {
 	return NewValueFromObject(o.Ref())
 }

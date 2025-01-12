@@ -117,7 +117,7 @@ func CreateBuiltinFunction(
 	if nameString, ok := name.(CMString); ok {
 		typeName += " " + string(nameString)
 	}
-	object := NewObject(agent, prototype.ToObject(), typeName)
+	object := NewObject(agent, prototype, typeName)
 	object.SetExtensible(true)
 	function := &BuiltinFunction{
 		Object:             object,

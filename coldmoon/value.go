@@ -466,7 +466,7 @@ func IsConstructor(value Value) bool {
 	if !isObject {
 		return false
 	}
-	if objectValue.Object.ToObject().InternalMethods().Construct != nil {
+	if objectValue.Object.InternalMethods().Construct != nil {
 		return true
 	}
 

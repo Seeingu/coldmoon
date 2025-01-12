@@ -18,7 +18,7 @@ var errorInternalSet SetFn = func(o ObjectType, p PropertyKey, v Value, receiver
 			o.(*ErrorObject).Message = v.String()
 		}
 	}
-	return OrdinarySet(o.ToObject(), p, v, receiver)
+	return OrdinarySet(o, p, v, receiver)
 }
 
 func NewErrorConstructor(realm *Realm) ObjectType {

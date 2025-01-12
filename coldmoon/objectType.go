@@ -19,7 +19,6 @@ type ObjectType interface {
 		predicate Value,
 		thisArg Value,
 	) FoundResult
-	ToObject() *Object
 	Get(key PropertyKey) Value
 	Set(key PropertyKey, value Value, throw setThrowType)
 	Agent() *Agent
