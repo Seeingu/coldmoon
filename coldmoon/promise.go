@@ -32,44 +32,45 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 		return nil
 	}
 	var executorClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		resolve := argumentsList[0]
-		reject := argumentsList[1]
-		function := agent.ActiveFunctionObject()
-		additionalFields := function.(*BuiltinFunction).AdditionalFields
-		resolvingFunctions := additionalFields.ResolvingFunctions
-		if !IsUndefinedOrNil(resolvingFunctions.Resolve) {
-			return agent.ThrowTypeError("already called")
-		}
-		if !IsUndefinedOrNil(resolvingFunctions.Reject) {
-			return agent.ThrowTypeError("already called")
-		}
-		resolvingFunctions.Resolve = resolve
-		resolvingFunctions.Reject = reject
-		return UndefinedValue
+		return executorClosure(agent, thisArgument, argumentsList, newTarget)
 	}
-	additionalFields := &AdditionalFields{
-		ResolvingFunctions: &ResolvingFunctions{
-			Resolve: UndefinedValue,
-			Reject:  UndefinedValue,
-		},
+	resolvingFunctions := &ResolvingFunctions{
+		Resolve: UndefinedValue,
+		Reject:  UndefinedValue,
 	}
 	executor := CreateBuiltinFunction(agent, executorClosure, 2, CMString(""), builtinFunctionArgs{
-		additionalFields: additionalFields,
+		additionalFieldsV2: resolvingFunctions,
 	})
 	promise := MustGetObject(constructor).Construct([]Value{executor.ToValue()}, nil)
-	if !IsCallable(additionalFields.ResolvingFunctions.Resolve) {
+	if !IsCallable(resolvingFunctions.Resolve) {
 		agent.ThrowTypeError("TypeError")
 		return nil
 	}
-	if !IsCallable(additionalFields.ResolvingFunctions.Reject) {
+	if !IsCallable(resolvingFunctions.Reject) {
 		agent.ThrowTypeError("TypeError")
 		return nil
 	}
 	return &PromiseCapability{
 		Promise: promise.(*PromiseObject),
-		Resolve: MustGetObject(additionalFields.ResolvingFunctions.Resolve),
-		Reject:  MustGetObject(additionalFields.ResolvingFunctions.Reject),
+		Resolve: MustGetObject(resolvingFunctions.Resolve),
+		Reject:  MustGetObject(resolvingFunctions.Reject),
 	}
+}
+
+func executorClosure(agent *Agent, thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	resolve := argumentsList[0]
+	reject := argumentsList[1]
+	function := agent.ActiveFunctionObject()
+	resolvingFunctions := function.(*BuiltinFunction).AdditionalFieldsV2.(*ResolvingFunctions)
+	if !IsUndefinedOrNil(resolvingFunctions.Resolve) {
+		return agent.ThrowTypeError("already called")
+	}
+	if !IsUndefinedOrNil(resolvingFunctions.Reject) {
+		return agent.ThrowTypeError("already called")
+	}
+	resolvingFunctions.Resolve = resolve
+	resolvingFunctions.Reject = reject
+	return UndefinedValue
 }
 
 // MARK: - PromiseReaction
@@ -115,19 +116,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 
 	// 27.2.5.4
 	var then BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		onFulfilled := arguments[0]
-		onRejected := pkg.SliceSafeGet(arguments, 1)
-		if onRejected == nil {
-			onRejected = UndefinedValue
-		}
-		promise := this
-		if !ValueIsPromise(promise) {
-			return agent.ThrowTypeError("Promise.prototype.then called on incompatible receiver")
-		}
-		promiseObject := MustGetObject(promise)
-		C := promiseObject.SpeciesConstructor(realm.Intrinsics.Promise)
-		resultCapability := NewPromiseCapability(agent, C.Data().ToValue())
-		return PerformPromiseThen(agent, promiseObject, onFulfilled, onRejected, resultCapability)
+		return promiseThen(agent, this, arguments, newTarget)
 	}
 	var catch BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		onRejected := arguments[0]
@@ -135,80 +124,7 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 		return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{UndefinedValue, onRejected})
 	}
 	var finally BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		promise := this
-		onFinally := arguments[0]
-		if !ValueIsObject(promise) {
-			return agent.ThrowTypeError("Promise.prototype.finally called on incompatible receiver")
-		}
-		C := MustGetObject(promise).SpeciesConstructor(realm.Intrinsics.Promise)
-		Assert(IsConstructor(C.Data().ToValue()))
-		var thenFinally Value
-		var catchFinally Value
-		if !IsCallable(onFinally) {
-			thenFinally = onFinally
-			catchFinally = onFinally
-		} else {
-			thenFinally = (realm.Intrinsics.FunctionPrototype).ToValue()
-			catchFinally = (realm.Intrinsics.FunctionPrototype).ToValue()
-			captures := &PromiseThenFinallyCaptures{
-				OnFinally:   onFinally,
-				Constructor: C.Data(),
-			}
-			thenFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
-				function := agent.ActiveFunctionObject()
-				_captures := function.(*BuiltinFunction).AdditionalFields.PromiseThenFinallyCaptures
-				onFinally := _captures.OnFinally
-				result := onFinally.CallNoArgs(UndefinedValue)
-				p := PromiseResolve(agent, _captures.Constructor, result)
-
-				var returnValue BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-					f := agent.ActiveFunctionObject()
-					return f.(*BuiltinFunction).AdditionalFields.Value
-				}
-
-				valueThunk := CreateBuiltinFunction(agent, returnValue, 0, CMString(""), builtinFunctionArgs{
-					additionalFields: &AdditionalFields{
-						Value: arguments[0],
-					},
-				})
-				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(valueThunk).ToValue()})
-			}
-
-			thenFinally = CreateBuiltinFunction(agent, thenFinallyClosure, 1, CMString(""), builtinFunctionArgs{
-				additionalFields: &AdditionalFields{
-					PromiseThenFinallyCaptures: captures,
-				},
-			}).ToValue()
-
-			catchFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
-				function := agent.ActiveFunctionObject()
-				_captures := function.(*BuiltinFunction).AdditionalFields.PromiseThenFinallyCaptures
-				onFinally := _captures.OnFinally
-				result := onFinally.CallNoArgs(UndefinedValue)
-				p := PromiseResolve(agent, _captures.Constructor, result)
-				reason := arguments[0]
-
-				var throwReason BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-					f := agent.ActiveFunctionObject()
-					_reason := f.(*BuiltinFunction).AdditionalFields.Value
-					agent.exception = _reason
-					return _reason
-				}
-
-				thrower := CreateBuiltinFunction(agent, throwReason, 0, CMString(""), builtinFunctionArgs{
-					additionalFields: &AdditionalFields{
-						Value: reason,
-					},
-				})
-				return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(thrower).ToValue()})
-			}
-			catchFinally = CreateBuiltinFunction(agent, catchFinallyClosure, 1, CMString(""), builtinFunctionArgs{
-				additionalFields: &AdditionalFields{
-					PromiseThenFinallyCaptures: captures,
-				},
-			}).ToValue()
-		}
-		return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{thenFinally, catchFinally})
+		return promiseFinally(agent, this, arguments, newTarget)
 	}
 	object.defineBuiltinFunction(realm, CMString("then"), then, 2)
 	object.defineBuiltinFunction(realm, CMString("catch"), catch, 1)
@@ -216,6 +132,102 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 
 	object.defineToStringTag("Promise")
 	return object
+}
+
+// 27.2.5.4
+func promiseThen(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
+	realm := agent.CurrentRealm()
+	onFulfilled := arguments[0]
+	onRejected := pkg.SliceSafeGet(arguments, 1)
+	if onRejected == nil {
+		onRejected = UndefinedValue
+	}
+	promise := this
+	if !ValueIsPromise(promise) {
+		return agent.ThrowTypeError("Promise.prototype.then called on incompatible receiver")
+	}
+	promiseObject := MustGetObject(promise)
+	C := promiseObject.SpeciesConstructor(realm.Intrinsics.Promise)
+	resultCapability := NewPromiseCapability(agent, C.Data().ToValue())
+	return PerformPromiseThen(agent, promiseObject, onFulfilled, onRejected, resultCapability)
+}
+
+func promiseFinally(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
+	promise := this
+	realm := agent.CurrentRealm()
+	onFinally := arguments[0]
+	if !ValueIsObject(promise) {
+		return agent.ThrowTypeError("Promise.prototype.finally called on incompatible receiver")
+	}
+	C := MustGetObject(promise).SpeciesConstructor(realm.Intrinsics.Promise)
+	Assert(IsConstructor(C.Data().ToValue()))
+	var thenFinally Value
+	var catchFinally Value
+	if !IsCallable(onFinally) {
+		thenFinally = onFinally
+		catchFinally = onFinally
+	} else {
+		thenFinally = (realm.Intrinsics.FunctionPrototype).ToValue()
+		catchFinally = (realm.Intrinsics.FunctionPrototype).ToValue()
+		captures := &PromiseThenFinallyCaptures{
+			OnFinally:   onFinally,
+			Constructor: C.Data(),
+		}
+		thenFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
+			return thenFinallyClosure(agent, this, arguments, newTarget)
+		}
+
+		thenFinally = CreateBuiltinFunction(agent, thenFinallyClosure, 1, CMString(""), builtinFunctionArgs{
+			additionalFieldsV2: captures,
+		}).ToValue()
+
+		catchFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
+			return catchFinallyClosure(agent, this, arguments, newTarget)
+		}
+		catchFinally = CreateBuiltinFunction(agent, catchFinallyClosure, 1, CMString(""), builtinFunctionArgs{
+			additionalFieldsV2: captures,
+		}).ToValue()
+	}
+	return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{thenFinally, catchFinally})
+}
+
+func thenFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
+	function := agent.ActiveFunctionObject()
+	captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*PromiseThenFinallyCaptures)
+	onFinally := captures.OnFinally
+	result := onFinally.CallNoArgs(UndefinedValue)
+	p := PromiseResolve(agent, captures.Constructor, result)
+
+	var returnValue BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		f := agent.ActiveFunctionObject()
+		return f.(*BuiltinFunction).AdditionalFieldsV2.(Value)
+	}
+
+	valueThunk := CreateBuiltinFunction(agent, returnValue, 0, CMString(""), builtinFunctionArgs{
+		additionalFieldsV2: arguments[0],
+	})
+	return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(valueThunk).ToValue()})
+}
+
+func catchFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
+	function := agent.ActiveFunctionObject()
+	captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*PromiseThenFinallyCaptures)
+	onFinally := captures.OnFinally
+	result := onFinally.CallNoArgs(UndefinedValue)
+	p := PromiseResolve(agent, captures.Constructor, result)
+	reason := arguments[0]
+
+	var throwReason BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		f := agent.ActiveFunctionObject()
+		_reason := f.(*BuiltinFunction).AdditionalFieldsV2.(Value)
+		agent.exception = _reason
+		return _reason
+	}
+
+	thrower := CreateBuiltinFunction(agent, throwReason, 0, CMString(""), builtinFunctionArgs{
+		additionalFieldsV2: reason,
+	})
+	return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(thrower).ToValue()})
 }
 
 func NewPromiseConstructor(realm *Realm) ObjectType {
@@ -401,15 +413,8 @@ type ArgGetterSetterCaptures struct {
 	Env  EnvironmentRecord
 }
 
-// TODO: use interface
 type AdditionalFields struct {
-	Promise                    *PromiseObject
-	AlreadyResolved            *AlreadyResolved
-	ResolvingFunctions         *ResolvingFunctions
-	PromiseThenFinallyCaptures *PromiseThenFinallyCaptures
-	Value                      Value
-	ArgGetterSetterCaptures    *ArgGetterSetterCaptures
-	ClassConstructorFields     *ClassConstructorFields
+	ClassConstructorFields *ClassConstructorFields
 }
 
 func IfAbruptRejectPromise[T any](agent *Agent, value Completion[T], capability *PromiseCapability) bool {
@@ -420,11 +425,28 @@ func IfAbruptRejectPromise[T any](agent *Agent, value Completion[T], capability 
 	return true
 }
 
+// 27.2.1.3.1
+func stepsReject(
+	agent *Agent, this Value, arguments []Value, newTarget ObjectType,
+) Value {
+	F := agent.ActiveFunctionObject()
+	additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*stepsRejectAdditionalFields)
+	alreadyResolved := additionalFields.AlreadyResolved
+	promise := additionalFields.Promise
+	if alreadyResolved.Value {
+		return UndefinedValue
+	}
+	alreadyResolved.Value = true
+	promise.PromiseState = PromiseStateRejected
+	promise.PromiseResult = arguments[0]
+	return UndefinedValue
+}
+
 // 27.2.1.3.2
 func stepsResolve(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
 	resolution := arguments[0]
 	F := agent.ActiveFunctionObject()
-	additionalFields := F.(*BuiltinFunction).AdditionalFields
+	additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*stepsResolveAdditionalFields)
 	promise := additionalFields.Promise
 	alreadyResolved := additionalFields.AlreadyResolved
 
@@ -453,13 +475,22 @@ func stepsResolve(agent *Agent, this Value, arguments []Value, newTarget ObjectT
 	return UndefinedValue
 }
 
+type stepsResolveAdditionalFields struct {
+	Promise         *PromiseObject
+	AlreadyResolved *AlreadyResolved
+}
+type stepsRejectAdditionalFields struct {
+	Promise         *PromiseObject
+	AlreadyResolved *AlreadyResolved
+}
+
 // 27.2.1.3
 func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFunctions {
 	realm := agent.CurrentRealm()
 	alreadyResolved := &AlreadyResolved{Value: false}
 
 	lengthResolve := JSInt(1)
-	resolveAdditionalFields := &AdditionalFields{
+	resolveAdditionalFields := &stepsResolveAdditionalFields{
 		Promise:         promise,
 		AlreadyResolved: alreadyResolved,
 	}
@@ -467,27 +498,21 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 	resolve := CreateBuiltinFunction(agent, func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		return stepsResolve(agent, thisArgument, argumentsList, newTarget)
 	}, lengthResolve, CMString(""), builtinFunctionArgs{
-		realm:            realm,
-		additionalFields: resolveAdditionalFields,
+		realm:              realm,
+		additionalFieldsV2: resolveAdditionalFields,
 	})
 
 	var stepsReject BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		if alreadyResolved.Value {
-			return UndefinedValue
-		}
-		alreadyResolved.Value = true
-		promise.PromiseState = PromiseStateRejected
-		promise.PromiseResult = arguments[0]
-		return UndefinedValue
+		return stepsReject(agent, this, arguments, newTarget)
 	}
 	lengthReject := JSInt(1)
-	rejectAdditionalFields := &AdditionalFields{
+	rejectAdditionalFields := &stepsRejectAdditionalFields{
 		Promise:         promise,
 		AlreadyResolved: alreadyResolved,
 	}
 	reject := CreateBuiltinFunction(agent, stepsReject, lengthReject, CMString(""), builtinFunctionArgs{
-		realm:            realm,
-		additionalFields: rejectAdditionalFields,
+		realm:              realm,
+		additionalFieldsV2: rejectAdditionalFields,
 	})
 	return &ResolvingFunctions{
 		Resolve: resolve.ToValue(),
@@ -751,7 +776,7 @@ func PerformPromiseAllSettled(
 	resultCapability *PromiseCapability,
 	promiseResolve ObjectType,
 ) CompletionValue {
-	values := []Value{}
+	var values []Value
 	remainingElements := &RemainingElements{Value: 1}
 	var index int = 0
 	for {

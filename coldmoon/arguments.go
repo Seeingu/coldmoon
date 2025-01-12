@@ -204,13 +204,11 @@ func MakeArgGetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 	}
 	var getterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		function := agent.ActiveFunctionObject()
-		_captures := function.(*BuiltinFunction).AdditionalFields.ArgGetterSetterCaptures
+		_captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*ArgGetterSetterCaptures)
 		return _captures.Env.GetBindingValue(agent, _captures.Name, false).Data()
 	}
 	getter := CreateBuiltinFunction(agent, getterClosure, 1, CMString(""), builtinFunctionArgs{
-		additionalFields: &AdditionalFields{
-			ArgGetterSetterCaptures: captures,
-		},
+		additionalFieldsV2: captures,
 	})
 	return getter
 }
@@ -223,15 +221,13 @@ func MakeArgSetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 	}
 	var setterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		function := agent.ActiveFunctionObject()
-		_captures := function.(*BuiltinFunction).AdditionalFields.ArgGetterSetterCaptures
+		_captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*ArgGetterSetterCaptures)
 		_captures.Env.SetMutableBinding(_captures.Name, arguments[0], false)
 		return UndefinedValue
 	}
 
 	setter := CreateBuiltinFunction(agent, setterClosure, 1, CMString(""), builtinFunctionArgs{
-		additionalFields: &AdditionalFields{
-			ArgGetterSetterCaptures: captures,
-		},
+		additionalFieldsV2: captures,
 	})
 	return setter
 }
