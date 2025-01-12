@@ -1,35 +1,5 @@
 package coldmoon
 
-import "fmt"
-
-type SymbolValue struct {
-	Value
-	Id          uint64
-	Description string
-	IsPrivate   bool
-}
-
-func (a *Agent) CreateSymbol(desc string) *SymbolValue {
-	s := &SymbolValue{
-		Id:          a.symbolId,
-		Description: desc,
-	}
-	a.symbolId += 1
-	s.Value = NewBaseValue(s)
-	return s
-}
-
-var _ Value = (*SymbolValue)(nil)
-
-func (s *SymbolValue) String() string {
-	return "Symbol: " + s.Description
-}
-
-// 20.4.3.3.1
-func (s *SymbolValue) SymbolDescriptiveString() string {
-	return fmt.Sprintf("Symbol(%s)", s.Description)
-}
-
 // MARK: - SymbolObject
 
 type SymbolObject struct {
@@ -168,7 +138,7 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 		if !ok {
 			panic("TypeError")
 		}
-		return NewStringValue(keyForSymbol(agent, s))
+		return NewStringValue(KeyForSymbol(agent, s))
 	}
 
 	object.defineBuiltinFunction(realm, CMString("for"), symbolFor, 1)
@@ -182,12 +152,12 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "SymbolPrototype")
 
 	toString := func(this Value, arguments []Value, newTarget ObjectType) Value {
-		symbol := thisSymbolValue(this)
+		symbol := ThisSymbolValue(this)
 
 		return NewStringValue(symbol.SymbolDescriptiveString())
 	}
 	valueOf := func(this Value, arguments []Value, newTarget ObjectType) Value {
-		symbol := thisSymbolValue(this)
+		symbol := ThisSymbolValue(this)
 		return symbol
 	}
 	toPrimitive := func(this Value, arguments []Value, newTarget ObjectType) Value {
@@ -207,27 +177,4 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 	object.defineToStringTag("Symbol")
 
 	return object
-}
-
-func thisSymbolValue(v Value) *SymbolValue {
-	if symbol, ok := v.(*SymbolValue); ok {
-		return symbol
-	}
-	if object, ok := v.(*ObjectValue); ok {
-		s, ok := object.Object.(*SymbolObject)
-		if ok {
-			return s.Data
-		}
-	}
-
-	panic("TypeError")
-}
-
-func keyForSymbol(agent *Agent, symbol *SymbolValue) string {
-	for _, value := range agent.GlobalSymbolRegistry {
-		if value.Id == symbol.Id {
-			return value.Description
-		}
-	}
-	return ""
 }

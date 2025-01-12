@@ -2,8 +2,9 @@ package coldmoon
 
 // ReferenceRecordBase Enum
 type ReferenceRecordBase struct {
-	value        Value
-	env          EnvironmentRecord
+	value Value
+	env   EnvironmentRecord
+	// TODO(WM): use reference literal
 	unresolvable bool
 }
 
@@ -79,7 +80,7 @@ func (r *ReferenceRecord) IsPrivateReference() bool {
 // 6.2.5.5
 func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 	if r.IsUnresolvableReference() {
-		panic("ReferenceError")
+		return agent.ThrowException(ReferenceError, "Unresolvable reference")
 	}
 	if r.IsPropertyReference() {
 		value, _ := r.Base.Value()
@@ -109,7 +110,8 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 	if r.IsUnresolvableReference() {
 		if r.Strict {
-			panic("ReferenceError")
+			agent.ThrowException(ReferenceError, "Unresolvable reference")
+			return
 		}
 		globalObj := agent.GetGlobalObject()
 		globalObj.Set(NewStringPropertyKey(r.ReferencedName.String), value, setThrowTypeIgnore)
@@ -121,7 +123,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 		baseObj := v.ToObject(agent)
 
 		if r.IsPrivateReference() {
-			panic("implement me")
+			panic("unimplemented")
 		}
 
 		var referencedName PropertyKey
@@ -139,7 +141,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 			value,
 			r.GetThisValue())
 		if !succeeded && r.Strict {
-			panic("TypeError")
+			agent.ThrowTypeError("Failed to set value")
 		}
 		return
 	}

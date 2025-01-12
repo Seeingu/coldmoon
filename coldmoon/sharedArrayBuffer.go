@@ -24,7 +24,6 @@ func AllocateSharedArrayBuffer(
 			return agent.ThrowRangeExceptionObject("byteLength > maxByteLength")
 		}
 	}
-	//
 	obj := OrdinaryCreateFromConstructor(
 		agent,
 		constructor,

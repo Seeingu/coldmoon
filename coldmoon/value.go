@@ -42,6 +42,7 @@ func NewValueFromObject(object ObjectType) Value {
 	return ov
 }
 
+// TODO(WM): make this a method on BaseValue
 func ToPropertyDescriptor(agent *Agent, value Value) *PropertyDescriptor {
 	if value == UndefinedValue {
 		return nil
@@ -105,6 +106,7 @@ func ToPropertyDescriptor(agent *Agent, value Value) *PropertyDescriptor {
 	return desc
 }
 
+// TODO(WM): make this a method on BaseValue
 // 7.1.1
 func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
 	if objectValue, isObject := value.(*ObjectValue); isObject {
@@ -919,11 +921,13 @@ func MustGetObject(value Value) ObjectType {
 	return value.(*ObjectValue).Object
 }
 
+// TODO(WM): make this a method on BaseValue
 func ValueIsObject(value Value) bool {
 	_, ok := value.(*ObjectValue)
 	return ok
 }
 
+// TODO(WM): make this a method on BaseValue
 func ValueIsPromise(value Value) bool {
 	objectValue, ok := value.(*ObjectValue)
 	if !ok {
@@ -933,6 +937,7 @@ func ValueIsPromise(value Value) bool {
 	return ok
 }
 
+// TODO(WM): make this a method on BaseValue
 func ValueGetObject(value Value) (object ObjectType, ok bool) {
 	v, ok := ValueGet[*ObjectValue](value)
 	if ok {

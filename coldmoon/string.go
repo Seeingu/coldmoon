@@ -7,25 +7,6 @@ import (
 	"github.com/samber/lo"
 )
 
-// MARK: - String Value
-
-type StringValue struct {
-	Value
-	Data string
-}
-
-var _ Value = (*StringValue)(nil)
-
-func (s *StringValue) String() string {
-	return s.Data
-}
-
-func NewStringValue(value string) *StringValue {
-	s := &StringValue{Data: value}
-	s.Value = NewBaseValue(s)
-	return s
-}
-
 // MARK: - String Object
 
 type StringObject struct {
@@ -195,32 +176,32 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 	agent := realm.Agent
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := thisStringValue(agent, thisArgument)
+		s := ThisStringValue(agent, thisArgument)
 		return NewStringValue(s)
 	}
 	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		return NewStringValue(thisStringValue(agent, thisArgument))
+		return NewStringValue(ThisStringValue(agent, thisArgument))
 	}
 	toLowerCase := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := thisStringValue(agent, this)
+		s := ThisStringValue(agent, this)
 		return NewStringValue(strings.ToLower(s))
 	}
 	toUpperCase := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := thisStringValue(agent, this)
+		s := ThisStringValue(agent, this)
 		return NewStringValue(strings.ToUpper(s))
 	}
 	trim := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := thisStringValue(agent, this)
+		s := ThisStringValue(agent, this)
 		return NewStringValue(strings.TrimSpace(s))
 	}
 	trimEnd := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := thisStringValue(agent, this)
+		s := ThisStringValue(agent, this)
 		return NewStringValue(strings.TrimRightFunc(s, func(r rune) bool {
 			return strings.ContainsRune(" \t\n\v\f\r", r)
 		}))
 	}
 	trimStart := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := thisStringValue(agent, this)
+		s := ThisStringValue(agent, this)
 		return NewStringValue(strings.TrimLeftFunc(s, func(r rune) bool {
 			return strings.ContainsRune(" \t\n\v\f\r", r)
 		}))
@@ -568,25 +549,6 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("substring"), substring, 2)
 
 	return stringPrototype
-}
-
-func thisStringValue(agent *Agent, v Value) string {
-	switch v := v.(type) {
-	case *StringValue:
-		return v.Data
-	case *ObjectValue:
-		s, ok := v.Object.(*StringObject)
-		if ok {
-			return s.Data
-		}
-
-	}
-	panic("TypeError")
-}
-
-// 22.1.3.32.1
-func (s *StringValue) TrimString() string {
-	return strings.TrimSpace(s.Data)
 }
 
 func StringIndexOf(s string, searchString string, position int) int {
