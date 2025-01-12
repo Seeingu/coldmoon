@@ -1,22 +1,34 @@
 package tests
 
 import (
+	"os"
+	"path"
 	"testing"
 
-	"github.com/Seeingu/coldmoon/runtime"
+	cr "github.com/Seeingu/coldmoon/runtime"
 
 	. "github.com/Seeingu/coldmoon/coldmoon"
 )
 
-func testSource(t *testing.T, s string) {
+func testSource(t *testing.T, source string) {
 	Debug.Enable()
 	agent := NewAgent()
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	runtime.RegisterTerminalRuntime(realm)
-	sourceText := s
-	Evaluate(sourceText, realm)
+	cr.RegisterTerminalRuntime(realm)
+	Evaluate(source, realm)
+	Debug.Disable()
+}
+
+func testModule(t *testing.T, f string) {
+	Debug.Enable()
+	agent := NewAgent()
+	InitializeConstants()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	cr.RegisterTerminalRuntime(realm)
+	EvaluateModule(resolveTestdataPath(f), realm)
 	Debug.Disable()
 }
 
@@ -353,5 +365,19 @@ true ? 2 : 1;
 	}
 	for _, sourceText := range sourceTexts {
 		testSource(t, sourceText)
+	}
+}
+
+func resolveTestdataPath(f string) string {
+	dir, _ := os.Getwd()
+	return path.Join(dir, "..", "testdata", f)
+}
+
+func TestModule(t *testing.T) {
+	sourceFiles := []string{
+		"simple_import.js",
+	}
+	for _, f := range sourceFiles {
+		testModule(t, f)
 	}
 }

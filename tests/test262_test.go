@@ -5,6 +5,8 @@ import (
 	"path"
 	"testing"
 
+	"github.com/Seeingu/coldmoon/pkg"
+
 	. "github.com/Seeingu/coldmoon/coldmoon"
 )
 
@@ -13,19 +15,11 @@ func makeTest262Path(p string) string {
 	return path.Join(dir, "..", p)
 }
 
-func mustReadFile(filePath string) string {
-	f, err := os.ReadFile(filePath)
-	if err != nil {
-		panic(err)
-	}
-	return string(f)
-}
-
 func runTestHarness(realm *Realm, f string, debug bool) {
 	if debug {
 		Debug.Enable()
 	}
-	content := mustReadFile(makeTest262Path("./test262/harness/" + f))
+	content := pkg.MustReadFile(makeTest262Path("./test262/harness/" + f))
 	v := ParseScript(content, realm, nil).Evaluate()
 	defer func() {
 		Debug.Disable()
@@ -36,7 +30,7 @@ func runTestHarness(realm *Realm, f string, debug bool) {
 }
 
 func evaluateFile(fileName string, realm *Realm) {
-	Evaluate(mustReadFile(fileName), realm)
+	Evaluate(pkg.MustReadFile(fileName), realm)
 }
 
 func readDir(dir string) []string {
