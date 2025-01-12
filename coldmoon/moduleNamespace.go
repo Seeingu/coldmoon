@@ -7,14 +7,14 @@ type (
 	ModuleNamespace struct {
 		*Object
 		// [[Module]]
-		Module *ModuleRecord
+		Module ModuleRecord
 		// [[Exports]]
 		Exports Exports
 	}
 )
 
-func ModuleNamespaceCreate(agent *Agent, module *ModuleRecord, exports []string) ObjectType {
-	Assert(module.SourceTextModule == nil)
+func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []string) ObjectType {
+	Assert(module == nil)
 
 	sortedExports := exports
 
@@ -37,22 +37,7 @@ func ModuleNamespaceCreate(agent *Agent, module *ModuleRecord, exports []string)
 	internalMethods.PreventExtensions = func(o ObjectType) bool {
 		return true
 	}
-	internalMethods.GetOwnProperty = func(o ObjectType, p PropertyKey) *PropertyDescriptor {
-		if _, ok := p.(SymbolPropertyKey); ok {
-			return OrdinaryGetOwnProperty(o, p)
-		}
-		_exports := o.(*ModuleNamespace).Exports
-		if !lo.Contains(_exports, p.ToValue().String()) {
-			return nil
-		}
-		value := o.InternalMethods().Get(o, p, o.ToValue())
-		return &PropertyDescriptor{
-			Value:        value,
-			Writable:     true,
-			Enumerable:   true,
-			Configurable: false,
-		}
-	}
+	internalMethods.GetOwnProperty = moduleNamespaceGetOwnProperty
 	internalMethods.DefineOwnProperty = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
 		if _, ok := p.(SymbolPropertyKey); ok {
 			return OrdinaryDefineOwnProperty(o, p, desc)
@@ -86,25 +71,7 @@ func ModuleNamespaceCreate(agent *Agent, module *ModuleRecord, exports []string)
 		return lo.Contains(_exports, p.ToValue().String())
 	}
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
-		if _, ok := p.(SymbolPropertyKey); ok {
-			return OrdinaryGet(o, p, receiver)
-		}
-		_exports := o.(*ModuleNamespace).Exports
-		if !lo.Contains(_exports, p.ToValue().String()) {
-			return UndefinedValue
-		}
-		m := o.(*ModuleNamespace).Module
-		binding := m.ResolveExport(p.ToValue().String(), nil)
-		targetModule := binding.Module
-		if binding.BindingName.Namespace {
-			return GetModuleNamespace(agent, targetModule).ToValue()
-		}
-		targetEnv := targetModule.SourceTextModule.Environment
-		if targetEnv == nil {
-			panic("ReferenceError")
-		}
-		bindingName := targetEnv.GetBindingValue(agent, binding.BindingName.String, true)
-		return bindingName.Data()
+		return moduleNamespaceGet(agent, o, p, receiver)
 	}
 	internalMethods.Set = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool {
 		return false
@@ -129,6 +96,45 @@ func ModuleNamespaceCreate(agent *Agent, module *ModuleRecord, exports []string)
 	}
 
 	object.defineToStringTag("Module")
-	module.SourceTextModule.Namespace = M
+	module.Namespace = M
 	return M
+}
+
+func moduleNamespaceGetOwnProperty(o ObjectType, p PropertyKey) *PropertyDescriptor {
+	if _, ok := p.(SymbolPropertyKey); ok {
+		return OrdinaryGetOwnProperty(o, p)
+	}
+	exports := o.(*ModuleNamespace).Exports
+	if !lo.Contains(exports, p.ToValue().String()) {
+		return nil
+	}
+	value := o.InternalMethods().Get(o, p, o.ToValue())
+	return &PropertyDescriptor{
+		Value:        value,
+		Writable:     true,
+		Enumerable:   true,
+		Configurable: false,
+	}
+}
+
+func moduleNamespaceGet(agent *Agent, o ObjectType, p PropertyKey, receiver Value) Value {
+	if _, ok := p.(SymbolPropertyKey); ok {
+		return OrdinaryGet(o, p, receiver)
+	}
+	exports := o.(*ModuleNamespace).Exports
+	if !lo.Contains(exports, p.ToValue().String()) {
+		return UndefinedValue
+	}
+	m := o.(*ModuleNamespace).Module
+	binding := m.(*SourceTextModule).ResolveExport(p.ToValue().String(), nil)
+	targetModule := binding.Module.(*SourceTextModule)
+	if binding.BindingName.Namespace {
+		return GetModuleNamespace(agent, targetModule).ToValue()
+	}
+	targetEnv := targetModule.Environment
+	if targetEnv == nil {
+		panic("ReferenceError")
+	}
+	bindingName := targetEnv.GetBindingValue(agent, binding.BindingName.String, true)
+	return bindingName.Data()
 }

@@ -568,7 +568,8 @@ func (vm *VM) execute(i Instruction) {
 			agent,
 			referrer,
 			specifierString.Data,
-			nil,
+			// TODO: check host defined
+			HostDefined{},
 			promiseCapability.ToImportedModulePayload(),
 		)
 		vm.result = (promiseCapability.Promise).ToValue()

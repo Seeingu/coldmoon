@@ -2,11 +2,25 @@ package coldmoon
 
 // 16.2.1.4
 
-type ModuleRecord struct {
-	*SourceTextModule
+type ModuleRecord interface {
+	_moduleRecord()
 }
 
-type GraphLoadingState struct{}
+type ResolveSet struct {
+	// [[Module]]
+	Module ModuleRecord
+	// [[ExportName]]
+	ExportName string
+}
+
+// GraphLoadingState Record
+type GraphLoadingState struct {
+	IsLoading           bool
+	PendingModulesCount int
+	PromiseCapability   *PromiseCapability
+	Visited             []ModuleRecord
+	HostDefined         HostDefined
+}
 
 // ImportedModuleReferrer Enum
 type ImportedModuleReferrer struct {
@@ -21,20 +35,20 @@ type ImportedModulePayload struct {
 	PromiseCapability *PromiseCapability
 }
 
-func GetImportedModule(referrer *SourceTextModule, specifier string) *ModuleRecord {
-	// TODO
-	return nil
+// 16.2.1.7
+func GetImportedModule(referrer *SourceTextModule, specifier string) ModuleRecord {
+	return referrer.LoadedModules[specifier]
 }
 
-func GetModuleNamespace(agent *Agent, module *ModuleRecord) ObjectType {
-	namespace := module.SourceTextModule.Namespace
+func GetModuleNamespace(agent *Agent, module *SourceTextModule) ObjectType {
+	namespace := module.Namespace
 	if namespace == nil {
 		exportedNames := module.GetExportedNames()
 
 		unambiguousNames := make([]string, 0)
 		for _, name := range exportedNames {
 			resolution := module.ResolveExport(name, nil)
-			if resolution != nil && !resolution.Ambiguous {
+			if resolution != nil && !resolution.IsAmbiguous() {
 				unambiguousNames = append(unambiguousNames, name)
 			}
 		}
@@ -49,8 +63,8 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 		return
 	}
 
-	module := moduleCompletion.Data()
-	loadPromise := module.LoadRequestedModules(agent, nil)
+	module := moduleCompletion.Data().(*SourceTextModule)
+	loadPromise := module.LoadRequestedModules(module.HostDefined)
 
 	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		(capability.Reject).ToValue().Call(UndefinedValue, []Value{argumentsList[0]})
@@ -58,15 +72,15 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 	}
 	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, CMString("onRejected"), builtinFunctionArgs{})
 	var linkAndEvaluateClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		link := module.Link()
-		if link.IsAbrupt() {
-			(capability.Reject).ToValue().Call(UndefinedValue, []Value{link.Error()})
+		err := module.Link()
+		if err != nil {
+			capability.Reject.ToValue().Call(UndefinedValue, []Value{err})
 			return nil
 		}
 		evaluatePromise := module.Evaluate()
 		var fulfilledClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 			namespace := GetModuleNamespace(agent, module)
-			(capability.Resolve).ToValue().Call(UndefinedValue, []Value{(namespace).ToValue()})
+			capability.Resolve.ToValue().Call(UndefinedValue, []Value{(namespace).ToValue()})
 			return nil
 		}
 		onFulfilled := CreateBuiltinFunction(agent, fulfilledClosure, 0, CMString(""), builtinFunctionArgs{})
@@ -91,6 +105,11 @@ func FinishLoadingImportedModule(
 			_, ok := referrer.Script.LoadedModules[specifier]
 			if !ok {
 				referrer.Script.LoadedModules[specifier] = module
+			}
+		} else if referrer.Module != nil {
+			_, ok := referrer.Module.LoadedModules[specifier]
+			if !ok {
+				referrer.Module.LoadedModules[specifier] = module
 			}
 		}
 	}

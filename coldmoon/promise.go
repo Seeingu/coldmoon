@@ -14,7 +14,7 @@ const (
 
 // 27.2.1.1
 type PromiseCapability struct {
-	Promise ObjectType
+	Promise *PromiseObject
 	Resolve ObjectType
 	Reject  ObjectType
 }
@@ -66,7 +66,7 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 		return nil
 	}
 	return &PromiseCapability{
-		Promise: promise,
+		Promise: promise.(*PromiseObject),
 		Resolve: MustGetObject(additionalFields.ResolvingFunctions.Resolve),
 		Reject:  MustGetObject(additionalFields.ResolvingFunctions.Reject),
 	}

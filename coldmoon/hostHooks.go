@@ -1,5 +1,11 @@
 package coldmoon
 
+import (
+	"path"
+
+	"github.com/Seeingu/coldmoon/pkg"
+)
+
 // 19.2.1.2
 func HostEnsureCanCompileStrings(realm *Realm) {
 }
@@ -64,7 +70,24 @@ func HostFinalizeImportMeta(meta ObjectType, module *SourceTextModule) {
 	// return UNUSED
 }
 
-func HostLoadImportedModule(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined *HostDefined, payload ImportedModulePayload) {
-	result := NewCompletionModule(nil)
+func HostLoadImportedModule(
+	agent *Agent,
+	referrer ImportedModuleReferrer,
+	specifier string,
+	hostDefined HostDefined,
+	payload ImportedModulePayload,
+) {
+	filePath := resolveModulePath(specifier, hostDefined)
+	sourceText := pkg.MustReadFile(filePath)
+	module := ParseModule(sourceText, agent.CurrentRealm(), HostDefined{
+		FileName: path.Base(filePath),
+		BaseDir:  path.Dir(filePath),
+	})
+	result := NewCompletionModule(module)
 	FinishLoadingImportedModule(agent, referrer, specifier, payload, result)
+}
+
+// TODO: handle protocols
+func resolveModulePath(specifier string, hostDefined HostDefined) string {
+	return path.Join(hostDefined.BaseDir, specifier)
 }

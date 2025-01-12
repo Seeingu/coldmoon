@@ -126,18 +126,18 @@ func NewCompletionObjectNull() CompletionObject {
 // MARK: - Module
 
 type CompletionModule struct {
-	completionDefaultImpl[*ModuleRecord]
+	completionDefaultImpl[ModuleRecord]
 }
 
-func NewCompletionModule(module *ModuleRecord) CompletionModule {
-	c := newCompletionNormal(completionNormalArgs[*ModuleRecord]{
+func NewCompletionModule(module ModuleRecord) CompletionModule {
+	c := newCompletionNormal(completionNormalArgs[ModuleRecord]{
 		data: module,
 	})
 	return CompletionModule{c}
 }
 
 func NewCompletionModuleError(err Value) CompletionModule {
-	c := newCompletionError[*ModuleRecord](err)
+	c := newCompletionError[ModuleRecord](err)
 	return CompletionModule{c}
 }
 

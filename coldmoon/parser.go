@@ -81,7 +81,8 @@ func (p *Parser) moduleItem() ModuleItem {
 	}
 }
 
-func (p *Parser) exportDeclaration() (m *ModuleItemExportDeclaration) {
+func (p *Parser) exportDeclaration() *ModuleItemExportDeclaration {
+	m := &ModuleItemExportDeclaration{}
 	p.tokenizer.MustMatch(TExport)
 	if p.tokenizer.Match(TDefault) {
 		if d, ok := parserRecoverOk(p, p.hoistableDeclaration); ok {
@@ -106,7 +107,7 @@ func (p *Parser) exportDeclaration() (m *ModuleItemExportDeclaration) {
 	} else {
 		panic("exportDeclaration: unimplemented")
 	}
-	return
+	return m
 }
 
 func (p *Parser) exportFrom() *ExportFrom {
@@ -137,6 +138,7 @@ func (p *Parser) exportFromClause() (e *ExportFromClause) {
 }
 
 func (p *Parser) moduleExportName() (m *ModuleExportName, ok bool) {
+	m = &ModuleExportName{}
 	if id, _ok := parserRecoverOk(p, p.bindingIdentifier); _ok {
 		m.IdentifierName = id
 		ok = _ok
@@ -161,7 +163,9 @@ func (p *Parser) namedExports() (n *NamedExports, ok bool) {
 }
 
 func (p *Parser) exportSpecifierList() (s *ExportsList, ok bool) {
-	p.tokenizer.MustMatch(TLeftBrace)
+	if !p.tokenizer.Match(TLeftBrace) {
+		return
+	}
 	var items []*ExportSpecifier
 	for {
 		item, ok := p.exportSpecifier()
@@ -215,19 +219,61 @@ func (p *Parser) importDeclaration() *ModuleItemImportDeclaration {
 }
 
 func (p *Parser) importClause() *ImportClause {
-	identifier, ok := parserRecoverOk(p, p.bindingIdentifier)
+	if identifier, ok := parserRecoverOk(p, p.bindingIdentifier); ok {
+		return &ImportClause{
+			ImportedDefaultBinding: identifier,
+		}
+	} else {
+		return &ImportClause{
+			NamedImports: p.importsList(),
+		}
+	}
+}
+
+func (p *Parser) importsList() *ImportsList {
+	p.tokenizer.MustMatch(TLeftBrace)
+	var items []*ImportSpecifier
+	for {
+		item, ok := p.importSpecifier()
+		if !ok {
+			break
+		}
+		items = append(items, item)
+		if p.tokenizer.Match(TComma) {
+			continue
+		}
+		if p.tokenizer.CurrentToken.Type == TRightBrace {
+			break
+		}
+	}
+	p.tokenizer.MustMatch(TRightBrace)
+	return &ImportsList{
+		Items: items,
+	}
+}
+
+func (p *Parser) importSpecifier() (s *ImportSpecifier, ok bool) {
+	name, ok := p.moduleExportName()
 	if !ok {
-		panic("importClause: expected binding identifier")
+		return
 	}
-	return &ImportClause{
-		ImportedDefaultBinding: identifier,
+	if p.tokenizer.Match(TAs) {
+		alias := p.bindingIdentifier()
+		return &ImportSpecifier{
+			ModuleExportName: name,
+			ImportedBinding:  alias,
+		}, true
 	}
+	return &ImportSpecifier{
+		ImportedBinding: name.IdentifierName,
+	}, true
 }
 
 // MARK: - ParserContext
 
 type ParserContext struct {
 	FileName string
+	BaseDir  string
 }
 
 // MARK: - Precedence

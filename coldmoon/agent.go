@@ -28,7 +28,7 @@ type HostHooks struct {
 	HostEnsureCanAddPrivateElement func()
 	HostGetImportMetaProperties    func(module *SourceTextModule) ImportMetaProperties
 	HostFinalizeImportMeta         func(meta ObjectType, module *SourceTextModule)
-	HostLoadImportedModule         func(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined *HostDefined, payload ImportedModulePayload)
+	HostLoadImportedModule         func(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined HostDefined, payload ImportedModulePayload)
 }
 
 func NewAgent() *Agent {

@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// Deprecated
 type boundName interface {
 	BoundNames() (l []IdentifierName)
 }
@@ -850,7 +851,7 @@ type LiteralString struct {
 
 var _ Literal = (*LiteralString)(nil)
 
-// 12.9.4.2
+// 12.9.4.2: SV
 func (l *LiteralString) StringValue() Value {
 	return NewStringValue(l.Value)
 }
@@ -3735,6 +3736,7 @@ type DeclarationHoistable interface {
 
 // MARK: - FunctionDeclaration
 
+// TODO: use FunctionDeclaration directly
 type DeclarationHoistableFunction struct {
 	DeclarationHoistable
 	*declarationDefaultImpl
@@ -3744,6 +3746,10 @@ type DeclarationHoistableFunction struct {
 func (d *DeclarationHoistableFunction) _declaration() {}
 func (d *DeclarationHoistableFunction) Bytecode(e *Executable, c *BytecodeContext) {
 	d.FunctionDeclaration.Bytecode(e, c)
+}
+
+func (d *DeclarationHoistableFunction) BoundNames() []IdentifierName {
+	return d.FunctionDeclaration.BoundNames()
 }
 
 func (d *DeclarationHoistableFunction) String() string {
@@ -4271,6 +4277,15 @@ type FunctionDeclaration struct {
 	SourceText       string
 }
 
+var _ StaticSemanticsBoundNames = (*FunctionDeclaration)(nil)
+
+func (f *FunctionDeclaration) BoundNames() (l []IdentifierName) {
+	if f.Identifier != "" {
+		l = append(l, f.Identifier)
+	}
+	return
+}
+
 // 15.2.2
 func (f *FunctionDeclaration) functionBodyContainsUseStrict() bool {
 	return f.Body.StatementList.ContainsDirective("use strict")
@@ -4544,21 +4559,124 @@ func (s *Script) IsStrict() bool {
 
 // MARK: - Module
 
+// Module :
+// - ModuleBody[opt]
 type Module struct {
-	ASTNode
 	ModuleItemList ModuleItemList
 }
 
+var (
+	_ ASTNode                       = (*Module)(nil)
+	_ StaticSemanticsModuleRequests = (*Module)(nil)
+	_ StaticSemanticsImportEntries  = (*Module)(nil)
+	_ StaticSemanticsExportEntries  = (*Module)(nil)
+)
+
 func (m *Module) Bytecode(e *Executable, c *BytecodeContext) {
-	m.ModuleItemList.Bytecode(e, c)
+	for _, moduleItem := range m.ModuleItemList {
+		if stmt, ok := moduleItem.(*ModuleItemStatementListItem); ok {
+			stmt.Bytecode(e, c)
+		}
+		if stmt, ok := moduleItem.(*ModuleItemExportDeclaration); ok {
+			stmt.Bytecode(e, c)
+		}
+
+	}
+}
+
+func (m *Module) String() string {
+	return m.ModuleItemList.String()
+}
+
+func (m *Module) moduleRequests() []string {
+	return m.ModuleItemList.moduleRequests()
+}
+
+func (m *Module) importEntries() (l []ImportEntryRecord) {
+	for _, item := range m.ModuleItemList {
+		switch stmt := item.(type) {
+		case *ModuleItemImportDeclaration:
+			moduleRequest := stmt.ImportDeclaration.ModuleSpecifier.StringValue().String()
+			if stmt.ImportDeclaration.ImportClause != nil {
+				i := stmt.ImportDeclaration.ImportClause
+				if i.ImportedDefaultBinding != "" {
+					l = append(l, ImportEntryRecord{
+						ImportName:    "default",
+						ModuleRequest: moduleRequest,
+						LocalName:     string(i.ImportedDefaultBinding),
+					})
+				} else if i.NamespaceImport != "" {
+					l = append(l, ImportEntryRecord{
+						ImportName:    ImportNameNamespaceObject,
+						ModuleRequest: moduleRequest,
+						LocalName:     string(i.NamespaceImport),
+					})
+				} else if i.NamedImports != nil {
+					for _, specifier := range i.NamedImports.Items {
+						if specifier.ModuleExportName != nil {
+							var importName ImportName
+							if specifier.ModuleExportName.IdentifierName != "" {
+								importName = ImportName(specifier.ModuleExportName.IdentifierName)
+							} else {
+								importName = ImportName(specifier.ModuleExportName.StringLiteral.StringValue().String())
+							}
+							localName := string(specifier.ImportedBinding)
+							l = append(l, ImportEntryRecord{
+								ImportName:    importName,
+								ModuleRequest: moduleRequest,
+								LocalName:     localName,
+							})
+						} else {
+							l = append(l, ImportEntryRecord{
+								ImportName:    ImportName(specifier.ImportedBinding),
+								ModuleRequest: moduleRequest,
+								LocalName:     string(specifier.ImportedBinding),
+							})
+						}
+					}
+				} else {
+					panic("unimplemented")
+				}
+			}
+		default:
+			continue
+		}
+	}
+	return
+}
+
+func (m *Module) exportEntries() (l []ExportEntry) {
+	for _, item := range m.ModuleItemList {
+		switch stmt := item.(type) {
+		case *ModuleItemStatementListItem, *ModuleItemImportDeclaration:
+			continue
+		case *ModuleItemExportDeclaration:
+			l = append(l, stmt.exportEntries()...)
+		default:
+			panic("unimplemented")
+		}
+	}
+	return
 }
 
 type ModuleItemList []ModuleItem
 
-func (m ModuleItemList) Bytecode(e *Executable, c *BytecodeContext) {
+var _ StaticSemanticsModuleRequests = (ModuleItemList)(nil)
+
+func (m ModuleItemList) String() string {
+	var sb string
 	for _, item := range m {
-		item.Bytecode(e, c)
+		sb += item.String()
+		sb += "\n"
 	}
+	return sb
+}
+
+func (m ModuleItemList) moduleRequests() (l []string) {
+	for _, item := range m {
+		l = append(l, item.moduleRequests()...)
+	}
+	return
 }
 
 func (m ModuleItemList) VarScopedDeclarations() (l []*VariableDeclaration) {
@@ -4566,10 +4684,14 @@ func (m ModuleItemList) VarScopedDeclarations() (l []*VariableDeclaration) {
 		switch stmt := item.(type) {
 		case *ModuleItemStatementListItem:
 			l = append(l, stmt.StatementListItem.VarScopedDeclarations()...)
-		case *ModuleItemImportDeclaration:
-			panic("not implemented")
 		case *ModuleItemExportDeclaration:
-			panic("not implemented")
+			if stmt.VariableStatement != nil {
+				l = append(l, stmt.VariableStatement.VarScopedDeclarations()...)
+			}
+		case *ModuleItemImportDeclaration:
+			continue
+		default:
+			panic("unimplemented")
 		}
 	}
 	return
@@ -4577,38 +4699,70 @@ func (m ModuleItemList) VarScopedDeclarations() (l []*VariableDeclaration) {
 
 // MARK: - ModuleItem
 
+// TODO: convert to struct
+// ModuleItem :
+// - ImportDeclaration
+// - ExportDeclaration
+// - StatementListItem[~Yield, +Await, ~Return]
 type ModuleItem interface {
-	ASTNode
-	_moduleItem()
+	String() string
+	StaticSemanticsModuleRequests
 }
 
 // MARK: - ModuleItem: StatementListItem
 
 type ModuleItemStatementListItem struct {
-	ModuleItem
 	StatementListItem StatementListItem
+}
+
+var _ ModuleItem = (*ModuleItemStatementListItem)(nil)
+
+func (m *ModuleItemStatementListItem) moduleRequests() (l []string) {
+	return
 }
 
 func (m *ModuleItemStatementListItem) Bytecode(e *Executable, c *BytecodeContext) {
 	m.StatementListItem.Bytecode(e, c)
 }
 
-func (m *ModuleItemStatementListItem) _moduleItem() {}
+func (m *ModuleItemStatementListItem) String() string {
+	return m.StatementListItem.String()
+}
 
 // MARK: - ModuleItem: ImportDeclaration
 
 type ModuleItemImportDeclaration struct {
-	ModuleItem
 	ImportDeclaration *ImportDeclaration
 }
 
-func (m *ModuleItemImportDeclaration) _moduleItem() {}
+var _ ModuleItem = (*ModuleItemImportDeclaration)(nil)
+
+func (m *ModuleItemImportDeclaration) moduleRequests() (l []string) {
+	l = append(l, m.ImportDeclaration.ModuleSpecifier.StringValue().String())
+	return
+}
+
+func (m *ModuleItemImportDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
+	panic("unimplemented")
+}
+
+func (m *ModuleItemImportDeclaration) String() string {
+	return m.ImportDeclaration.String()
+}
 
 // MARK: - ModuleItem: ExportDeclaration
 
-// ModuleItemExportDeclaration Enum
+// TODO: rename
+// ExportDeclaration :
+//   - export ExportFromClause FromClause ;
+//   - export NamedExports ;
+//   - export VariableStatement[~Yield, +Await]
+//   - export Declaration[~Yield, +Await]
+//   - export default HoistableDeclaration[~Yield, +Await, +Default]
+//   - export default ClassDeclaration[~Yield, +Await, +Default]
+//   - export default [lookahead ∉ { function, async [no LineTerminator here] function,
+//     class}] AssignmentExpression[+In, ~Yield, +Await] ;
 type ModuleItemExportDeclaration struct {
-	ModuleItem
 	ExportFrom                  *ExportFrom
 	NamedExports                *NamedExports
 	Declaration                 Declaration
@@ -4616,6 +4770,81 @@ type ModuleItemExportDeclaration struct {
 	DefaultHoistableDeclaration DeclarationHoistable
 	DefaultClassDeclaration     *DeclarationClass
 	DefaultExpression           Expression
+}
+
+var (
+	_ ModuleItem                   = (*ModuleItemExportDeclaration)(nil)
+	_ StaticSemanticsExportEntries = (*ModuleItemExportDeclaration)(nil)
+	_ ASTNode                      = (*ModuleItemExportDeclaration)(nil)
+)
+
+func (m *ModuleItemExportDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
+	if m.ExportFrom != nil || m.NamedExports != nil {
+		return
+	} else if m.Declaration != nil {
+		m.Declaration.Bytecode(e, c)
+	} else if m.VariableStatement != nil {
+		m.VariableStatement.Bytecode(e, c)
+	} else if m.DefaultHoistableDeclaration != nil {
+		m.DefaultHoistableDeclaration.Bytecode(e, c)
+	} else if m.DefaultClassDeclaration != nil {
+		m.DefaultClassDeclaration.Bytecode(e, c)
+	} else if m.DefaultExpression != nil {
+		m.DefaultExpression.Bytecode(e, c)
+	} else {
+		panic("unreachable")
+	}
+}
+
+func (m *ModuleItemExportDeclaration) String() string {
+	if m.ExportFrom != nil {
+		panic("unimplemented")
+	} else if m.NamedExports != nil {
+		panic("unimplemented")
+	} else if m.Declaration != nil {
+		return m.Declaration.String()
+	} else if m.VariableStatement != nil {
+		return m.VariableStatement.String()
+	} else if m.DefaultHoistableDeclaration != nil {
+		return m.DefaultHoistableDeclaration.String()
+	} else if m.DefaultClassDeclaration != nil {
+		return m.DefaultClassDeclaration.String()
+	} else if m.DefaultExpression != nil {
+		return m.DefaultExpression.String()
+	}
+	return "ModuleItemExportDeclaration"
+}
+
+func (m *ModuleItemExportDeclaration) moduleRequests() (l []string) {
+	if m.ExportFrom != nil {
+		l = append(l, m.ExportFrom.ModuleSpecifier.StringValue().String())
+	}
+	return
+}
+
+func (m *ModuleItemExportDeclaration) exportEntries() (l []ExportEntry) {
+	if m.ExportFrom != nil {
+		panic("unimplemented")
+	} else if m.NamedExports != nil {
+		panic("unimplemented")
+	} else if m.Declaration != nil {
+		boundNames := m.Declaration.BoundNames()
+		for _, name := range boundNames {
+			l = append(l, ExportEntry{
+				ExportName: string(name),
+				LocalName:  string(name),
+			})
+		}
+	} else if m.VariableStatement != nil {
+		panic("unimplemented")
+	} else if m.DefaultHoistableDeclaration != nil {
+		panic("unimplemented")
+	} else if m.DefaultClassDeclaration != nil {
+		panic("unimplemented")
+	} else if m.DefaultExpression != nil {
+		panic("unimplemented")
+	}
+	return
 }
 
 type ExportFrom struct {
@@ -4641,29 +4870,133 @@ type ExportSpecifier struct {
 	Alias *ModuleExportName
 }
 
-// Enum
+// ModuleExportName :
+// - IdentifierName
+// - StringLiteral
 type ModuleExportName struct {
 	IdentifierName IdentifierName
 	StringLiteral  *LiteralString
+}
+
+func (m *ModuleExportName) String() string {
+	if m.IdentifierName != "" {
+		return string(m.IdentifierName)
+	}
+	return m.StringLiteral.String()
 }
 
 func (m *ModuleItemExportDeclaration) _moduleItem() {}
 
 // MARK: - Import
 
+// ImportDeclaration :
+// - import ImportClause FromClause ;
+// - import ModuleSpecifier ;
 type ImportDeclaration struct {
-	ASTNode
-	ImportClause    *ImportClause
+	// FromClause :
+	// - from ModuleSpecifier
+	// optional
+	ImportClause *ImportClause
+	// Not null
 	ModuleSpecifier *LiteralString
 }
 
+func (i *ImportDeclaration) BoundNames() (l []IdentifierName) {
+	if i.ImportClause != nil {
+		return i.ImportClause.BoundNames()
+	}
+	return
+}
+
+// 16.2.2.2
+
+func (i *ImportDeclaration) String() string {
+	if i.ImportClause != nil {
+		return "ImportDeclaration " + i.ImportClause.String()
+	}
+	return "ImportDeclaration"
+}
+
+// ImportClause :
+// - ImportedDefaultBinding
+// - NameSpaceImport
+// - NamedImports
+// - ImportedDefaultBinding, NameSpaceImport
+// - ImportedDefaultBinding, NamedImports
 type ImportClause struct {
 	ImportedDefaultBinding IdentifierName
 	NamespaceImport        IdentifierName
-	NamedImports           ImportsList
+	// NamedImports :
+	// - { }
+	// - { ImportsList }
+	// - { ImportsList, }
+	NamedImports *ImportsList
 }
 
-type ImportsList struct{}
+func (i *ImportClause) BoundNames() (l []IdentifierName) {
+	if i.ImportedDefaultBinding != "" {
+		l = append(l, i.ImportedDefaultBinding)
+	} else if i.NamedImports != nil {
+		for _, s := range i.NamedImports.Items {
+			if s.ImportedBinding != "" {
+				l = append(l, s.ImportedBinding)
+			}
+		}
+	} else {
+		panic("unimplemented")
+	}
+	return
+}
+
+func (i *ImportClause) String() string {
+	var sb string
+	if i.ImportedDefaultBinding != "" {
+		sb += string(i.ImportedDefaultBinding)
+	}
+	if i.NamespaceImport != "" {
+		sb += " " + string(i.NamespaceImport)
+	}
+	if i.NamedImports != nil {
+		sb += " " + i.NamedImports.String()
+	}
+	return sb
+}
+
+// ImportsList :
+// - ImportSpecifier
+// - ImportsList, ImportSpecifier
+type ImportsList struct {
+	Items []*ImportSpecifier
+}
+
+func (i *ImportsList) String() string {
+	var sb string
+	for i, item := range i.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+// ImportSpecifier :
+// - ImportedBinding
+// - ModuleExportName as ImportedBinding
+type ImportSpecifier struct {
+	// ImportedBinding :
+	// - BindingIdentifier[~Yield, +Await]
+	// TODO: change to BindingIdentifier
+	ImportedBinding  IdentifierName
+	ModuleExportName *ModuleExportName
+}
+
+func (i *ImportSpecifier) String() string {
+	if i.ModuleExportName != nil {
+		return i.ModuleExportName.String() + " as " + string(i.ImportedBinding)
+	}
+	return string(i.ImportedBinding)
+}
 
 // MARK: - YieldExpression
 

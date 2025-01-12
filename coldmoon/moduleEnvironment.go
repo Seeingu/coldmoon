@@ -14,6 +14,7 @@ var _ EnvironmentRecord = (*ModuleEnvironment)(nil)
 func NewModuleEnvironment(outerEnv EnvironmentRecord) *ModuleEnvironment {
 	return &ModuleEnvironment{
 		DeclarativeEnvironment: NewDeclarativeEnvironment(outerEnv),
+		IndirectBindings:       make(map[string]*IndirectBinding),
 	}
 }
 
