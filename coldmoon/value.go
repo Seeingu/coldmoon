@@ -721,7 +721,7 @@ func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsLis
 
 // 7.3.21
 func OrdinaryHasInstance(agent *Agent, c Value, value Value) Completion[bool] {
-	if IsCallable(c) {
+	if !IsCallable(c) {
 		return NewNormalCompletion(false)
 	}
 	o := MustGetObject(c)

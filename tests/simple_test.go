@@ -104,8 +104,8 @@ class Dog extends Animal {
 
 const d = new Dog("Mitzie");
 assertEqual(d.name, "Mitzie");
-//assertEqual(d instanceof Dog, true);
-//assertEqual(d instanceof Animal, true);
+assert(d instanceof Dog);
+assert(d instanceof Animal);
 assertEqual(d.speak(), "Mitzie barks.");
 assertEqual(%[1]sstring text line 1\nstring text line 2%[1]s, 'string text line 1\nstring text line 2');
 `, "`"),

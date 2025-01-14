@@ -30,6 +30,7 @@ func (g *GlobalEnvironment) CreateGlobalVarBinding(name string, deletable bool) 
 	}
 }
 
+// 9.1.1.4.4
 func (g *GlobalEnvironment) InitializeBinding(name string, value Value) {
 	if g.DeclarativeRecord.HasBinding(name) {
 		g.DeclarativeRecord.InitializeBinding(name, value)

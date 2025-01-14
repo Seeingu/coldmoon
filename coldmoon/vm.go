@@ -677,7 +677,9 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding string, className string) ObjectType {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
+	// outer env of class
 	env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	// the class env
 	classEnv := NewDeclarativeEnvironment(env)
 	if classBinding != "" {
 		classEnv.CreateImmutableBinding(classBinding, true)
@@ -925,6 +927,7 @@ func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *DeclarationCla
 	}
 }
 
+// 8.6.2.1
 func (vm *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord) {
 	if env == nil {
 		lhs := vm.agent.ResolveBinding(name, nil, true)
@@ -1449,7 +1452,8 @@ func evaluateNew(agent *Agent, constructor Value, arguments []Value) Value {
 // 13.10.2
 func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
 	if _, ok := target.(*ObjectValue); !ok {
-		panic("TypeError: target is not an object")
+		agent.ThrowTypeError("target is not an object")
+		return false
 	}
 	symbol := WellKnownSymbols[WellKnownSymbolsHasInstance]
 	instOfHandler := GetMethod(
@@ -1461,7 +1465,8 @@ func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
 	}
 
 	if !IsCallable(target) {
-		panic("TypeError: target is not callable")
+		agent.ThrowTypeError("target is not callable")
+		return false
 	}
 	return OrdinaryHasInstance(agent, target, value).Data()
 }
