@@ -5,6 +5,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	cr "github.com/Seeingu/coldmoon/runtime"
 
 	. "github.com/Seeingu/coldmoon/coldmoon"
@@ -80,7 +81,7 @@ assertEqual(hugeBin.toString(), "9007199254740991n");
 assert(typeof 1n === "bigint");
 assert(typeof BigInt("1") === "bigint")
 `,
-		`
+		heredoc.Docf(`
 class Animal {
     constructor(name) {
         this.name = name;
@@ -106,13 +107,15 @@ assertEqual(d.name, "Mitzie");
 //assertEqual(d instanceof Dog, true);
 //assertEqual(d instanceof Animal, true);
 assertEqual(d.speak(), "Mitzie barks.");
-`,
-		"assertEqual(`string text line 1\nstring text line 2`, 'string text line 1\nstring text line 2');",
-		`
+assertEqual(%[1]sstring text line 1\nstring text line 2%[1]s, 'string text line 1\nstring text line 2');
+`, "`"),
+		heredoc.Docf(
+			`
 const a = 5;
 const b = 10;
-` + "assertEqual(`Fifteen is ${a + b} and\nnot ${2 * a + b}.`, " +
-			"'Fifteen is 15 and\nnot 20.');",
+assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
+'Fifteen is 15 and\nnot 20.');
+`, "`"),
 		`
 const str = 'table football';
 const regex = new RegExp('foo*');
