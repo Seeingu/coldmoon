@@ -36,6 +36,18 @@ func testModule(t *testing.T, f string) {
 func TestBaseline(t *testing.T) {
 	sourceTexts := []string{
 		`
+const target = {
+    message1: "hello",
+    message2: "everyone",
+};
+
+const handler1 = {};
+
+const proxy1 = new Proxy(target, handler1);
+assertEqual(proxy1.message1, "hello"); 
+assertEqual(proxy1.message2, "everyone"); 
+`,
+		`
 let a = ''
 const promiseA = new Promise((resolve, reject) => {
     resolve(777);

@@ -22,6 +22,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		Target:  MustGetObject(target),
 		Handler: MustGetObject(handler),
 	}
+	p.ref = p
 
 	getPrototypeOf := func(o ObjectType) ObjectType {
 		proxy := o.(*ProxyObject)
@@ -481,14 +482,15 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 		target := arguments[0]
 		handler := arguments[1]
 		if newTarget == nil {
-			panic("TypeError")
+			return agent.ThrowTypeError("Proxy is not a constructor")
 		}
 		return (ProxyCreate(agent, target, handler)).ToValue()
 	}
 
 	obj := CreateBuiltinFunction(agent, behavior, 2, CMString("Proxy"), builtinFunctionArgs{
-		realm:     realm,
-		prototype: realm.Intrinsics.FunctionPrototype,
+		realm:         realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		isConstructor: true,
 	})
 
 	var revocable BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
