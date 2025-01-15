@@ -3,7 +3,6 @@ module github.com/Seeingu/coldmoon
 go 1.23.4
 
 require (
-	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/Seeingu/icu4xgo v0.1.3-0.20241231132825-aedf4a2d3ee4
 	github.com/bits-and-blooms/bitset v1.20.0
 	github.com/dlclark/regexp2 v1.11.4

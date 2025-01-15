@@ -1,11 +1,11 @@
 package tests
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"testing"
 
-	"github.com/MakeNowJust/heredoc"
 	cr "github.com/Seeingu/coldmoon/runtime"
 
 	. "github.com/Seeingu/coldmoon/coldmoon"
@@ -93,7 +93,7 @@ assertEqual(hugeBin.toString(), "9007199254740991n");
 assert(typeof 1n === "bigint");
 assert(typeof BigInt("1") === "bigint")
 `,
-		heredoc.Docf(`
+		fmt.Sprintf(`
 class Animal {
     constructor(name) {
         this.name = name;
@@ -121,7 +121,7 @@ assert(d instanceof Animal);
 assertEqual(d.speak(), "Mitzie barks.");
 assertEqual(%[1]sstring text line 1\nstring text line 2%[1]s, 'string text line 1\nstring text line 2');
 `, "`"),
-		heredoc.Docf(
+		fmt.Sprintf(
 			`
 const a = 5;
 const b = 10;
