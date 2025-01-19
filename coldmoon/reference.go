@@ -47,6 +47,23 @@ type ReferenceRecord struct {
 	ThisValue      Value
 }
 
+type ReferenceRecordValue struct {
+	Value
+	ReferenceRecord *ReferenceRecord
+}
+
+func NewReferenceRecordValue(referenceRecord *ReferenceRecord) *ReferenceRecordValue {
+	r := &ReferenceRecordValue{
+		ReferenceRecord: referenceRecord,
+	}
+	r.Value = NewBaseValue(r)
+	return r
+}
+
+func (r *ReferenceRecordValue) String() string {
+	return "ReferenceRecordValue"
+}
+
 func NewReferenceRecord(base *ReferenceRecordBase, referencedName *ReferencedName, strict bool, thisValue Value) *ReferenceRecord {
 	return &ReferenceRecord{
 		Base:           base,
