@@ -2162,6 +2162,11 @@ func (u *UnaryExpression) String() string {
 
 // MARK: - CallExpression
 
+// ArgumentList[Yield, Await] :
+// AssignmentExpression[+In, ?Yield, ?Await]
+// ... AssignmentExpression[+In, ?Yield, ?Await]
+// ArgumentList[?Yield, ?Await] , AssignmentExpression[+In, ?Yield, ?Await]
+// ArgumentList[?Yield, ?Await] , ... AssignmentExpression[+In, ?Yield, ?Await]
 type Arguments []Expression
 
 func (a Arguments) String() string {
@@ -2175,6 +2180,7 @@ func (a Arguments) String() string {
 	return sb
 }
 
+// 13.3.8.1 ArgumentListEvaluation
 func (a Arguments) Bytecode(e *Executable, c *BytecodeContext) {
 	for _, arg := range a {
 		arg.Bytecode(e, c)
@@ -2182,6 +2188,7 @@ func (a Arguments) Bytecode(e *Executable, c *BytecodeContext) {
 			e.AddInstruction(InsGetValue)
 		}
 		e.AddInstruction(InsLoad)
+		// TODO: Spread
 	}
 }
 
@@ -2197,20 +2204,13 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 	c.Callee.Bytecode(e, bc)
 
 	e.AddInstruction(&IPushReference{})
-	isReference := ExpressionAnalyze(c.Callee, AnalyzeQueryIsReference)
-	if isReference {
+	if ExpressionAnalyze(c.Callee, AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
 
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(InsLoadThisValue)
-	for _, arg := range c.Arguments {
-		arg.Bytecode(e, bc)
-		if ExpressionAnalyze(arg, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(InsLoad)
-	}
+	c.Arguments.Bytecode(e, bc)
 
 	strict := bc.containedInStrictCode
 

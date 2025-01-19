@@ -262,7 +262,7 @@ func (vm *VM) execute(i Instruction) {
 		r := vm.referenceStack.Pop()
 		vm.result = r.GetValue(agent)
 	case *IArrayCreate:
-		vm.result = ArrayCreate(vm.agent, 0, nil).ToValue()
+		vm.result = ArrayCreate(vm.agent, ins.Length, nil).ToValue()
 	case *IArraySetLength:
 		length := JSInt(ins.Length)
 		array := vm.result.(*ObjectValue).Object

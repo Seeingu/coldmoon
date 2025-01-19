@@ -298,6 +298,7 @@ func (i *IInstantiateArrowFunctionExpression) String() string {
 
 type IArrayCreate struct {
 	Instruction
+	Length JSInt
 }
 
 func (i *IArrayCreate) String() string {
