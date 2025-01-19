@@ -19,6 +19,13 @@ func (b *BaseValue) Hash() string {
 	}
 }
 
+func (b *BaseValue) GetValue(agent *Agent) Value {
+	if r, ok := b.Value.(*ReferenceRecordValue); ok {
+		return r.ReferenceRecord.GetValue(agent)
+	}
+	return b.Value
+}
+
 // TODO(I): this is a backdoor method, every value should implement this method
 func (b *BaseValue) ToString() CMString {
 	return CMString(b.String())

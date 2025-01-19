@@ -9,6 +9,7 @@ type Value interface {
 	CallNoArgs(this Value) Value
 	// 7.1.18
 	ToObject(agent *Agent) ObjectType
+	AOGetValue
 	// --- internal methods ---
 
 	TypeString() string
