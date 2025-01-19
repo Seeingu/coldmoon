@@ -14,6 +14,7 @@ type boundName interface {
 type ASTNode interface {
 	String() string
 	Bytecode(e *Executable, c *BytecodeContext)
+	RuntimeSemanticsEvaluation
 }
 
 // MARK: - AnalyzeQuery
@@ -101,21 +102,33 @@ func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLite
 // MARK: - IdentifierReference
 
 type (
-	IdentifierName                       string
-	PrivateIdentifierName                string
-	PrimaryExpressionIdentifierReference struct {
-		PrimaryExpression
-		Identifier IdentifierName
-	}
+	IdentifierName        string
+	PrivateIdentifierName string
 )
 
-func (p *PrimaryExpressionIdentifierReference) _primaryExpression() {}
+// TODO(SM): should be rename to IdentifierReference
+// IdentifierReference [Yield, Await] :
+// Identifier
+// [~Yield] yield
+// [~Await] await
+type PrimaryExpressionIdentifierReference struct {
+	PrimaryExpression
+	Identifier IdentifierName
+}
+
 func (p *PrimaryExpressionIdentifierReference) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
 }
 
+// 13.1.3
 func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IResolveBinding{Name: p.Identifier, Strict: c.containedInStrictCode})
+}
+
+// Evaluation 13.1.3
+func (p *PrimaryExpressionIdentifierReference) Evaluation(i *IR, c *BytecodeContext) {
+	i.AddInstruction(&IResolveBinding{Name: p.Identifier, Strict: c.containedInStrictCode})
+	i.Return()
 }
 
 func (p *PrimaryExpressionIdentifierReference) String() string {
@@ -124,18 +137,35 @@ func (p *PrimaryExpressionIdentifierReference) String() string {
 
 // MARK: - Literal
 
+// TODO(SM): should be rename to Literal
+// Literal :
+// NullLiteral
+// BooleanLiteral
+// NumericLiteral
+// StringLiteral
 type PrimaryExpressionLiteral struct {
 	PrimaryExpression
 	Literal Literal
 }
 
-func (p *PrimaryExpressionLiteral) _primaryExpression() {}
 func (p *PrimaryExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
 func (p *PrimaryExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
 	p.Literal.Bytecode(e, c)
+}
+
+// Evaluation Literal : BooleanLiteral
+func (p *PrimaryExpressionLiteral) Evaluation(i *IR, c *BytecodeContext) {
+	// TODO(SM): WIP: other literals
+	b := p.Literal.(*LiteralBoolean)
+	if b.Bool {
+		i.Value(TrueValue)
+	} else {
+		i.Value(FalseValue)
+	}
+	i.Return()
 }
 
 func (p *PrimaryExpressionLiteral) String() string {
@@ -2192,6 +2222,53 @@ func (a Arguments) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 }
 
+// TODO(WIP): Spread, Template
+// Evaluation 13.3.8.1
+// ArgumentListEvaluation
+// TODO(XXX): can we split it out based on different types of arguments?
+func (a Arguments) Evaluation(i *IR, b *BytecodeContext) {
+	// Assigment
+	if len(a) == 0 {
+		i.List("")
+		return
+	}
+	i.AddInstruction(&IEnterBlock{})
+
+	if len(a) == 1 {
+		a[0].Evaluation(i, b)
+		i.Let("ref")
+
+		i.GetValue("ref")
+		i.Let("arg")
+		i.List("arg")
+	} else if len(a) > 1 {
+		a[:len(a)-1].Evaluation(i, b)
+		i.Let("precedingArgs")
+
+		a[len(a)-1].Evaluation(i, b)
+		i.Let("ref")
+
+		i.GetValue("ref")
+		i.Let("arg")
+		i.List("arg")
+		i.Let("_argList")
+
+		i.AddInstruction(&IListConcatenation{"precedingArgs", "_argList"})
+		i.Return()
+	}
+
+	i.AddInstruction(&ILeaveBlock{})
+}
+
+// CallExpression [Yield, Await] :
+// CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await]
+// SuperCall[?Yield, ?Await]
+// ImportCall[?Yield, ?Await]
+// CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+// CallExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
+// CallExpression[?Yield, ?Await]. IdentifierName
+// CallExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+// CallExpression[?Yield, ?Await]. PrivateIdentifier
 type CallExpression struct {
 	Expression
 	Callee    Expression
@@ -2200,6 +2277,7 @@ type CallExpression struct {
 
 var _ Expression = (*CallExpression)(nil)
 
+// 13.3.6.1
 func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 	c.Callee.Bytecode(e, bc)
 
@@ -2223,6 +2301,35 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 	)
 
 	e.AddInstruction(&IPopReference{})
+}
+
+// TODO(SM): WIP
+// Evaluation 13.3.6.1
+func (c *CallExpression) Evaluation(i *IR, b *BytecodeContext) {
+	ref := c.Callee.(*PrimaryExpressionIdentifierReference)
+	ref.Evaluation(i, b)
+	i.Let("ref")
+
+	i.GetValue("ref")
+	i.Let("func")
+
+	// TODO: this ref
+	// i.This(c)
+	// i.Let("thisCall")
+
+	// TODO: IsInTailPosition
+	// i.IsInTailPosition()
+	// i.Let("tailPosition")
+
+	c.Arguments.Evaluation(i, b)
+	i.Let("Arguments")
+	i.AddInstruction(&IEvaluateCall{
+		fun:          "func",
+		ref:          "ref",
+		arguments:    "Arguments",
+		tailPosition: "tailPosition",
+	})
+	i.Return()
 }
 
 func (c *CallExpression) String() string {
@@ -2567,12 +2674,16 @@ var _ Statement = (*StatementExpression)(nil)
 func (s *StatementExpression) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return
 }
-func (s *StatementExpression) _statement() {}
+
 func (s *StatementExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	s.Expression.Bytecode(e, c)
 	if ExpressionAnalyze(s.Expression, AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
+}
+
+func (s *StatementExpression) Evaluation(i *IR, b *BytecodeContext) {
+	s.Expression.Evaluation(i, b)
 }
 
 func (s *StatementExpression) String() string {
@@ -4483,6 +4594,10 @@ func (s *StatementListItemStatement) Bytecode(e *Executable, c *BytecodeContext)
 	s.Statement.Bytecode(e, c)
 }
 
+func (s *StatementListItemStatement) Evaluation(i *IR, b *BytecodeContext) {
+	s.Statement.Evaluation(i, b)
+}
+
 func (s *StatementListItemStatement) String() string {
 	return s.Statement.String()
 }
@@ -4534,6 +4649,10 @@ func (e *ExpressionStatement) Bytecode(ex *Executable, c *BytecodeContext) {
 	e.Expression.Bytecode(ex, c)
 }
 
+func (e *ExpressionStatement) Evaluation(i *IR, b *BytecodeContext) {
+	e.Expression.Evaluation(i, b)
+}
+
 func (e *ExpressionStatement) String() string {
 	return e.Expression.String()
 }
@@ -4581,6 +4700,20 @@ func (m *Module) Bytecode(e *Executable, c *BytecodeContext) {
 			stmt.Bytecode(e, c)
 		}
 
+	}
+}
+
+// TODO: spec reference
+func (m *Module) Evaluation(i *IR, b *BytecodeContext) {
+	for _, moduleItem := range m.ModuleItemList {
+		switch stmt := moduleItem.(type) {
+		case *ModuleItemImportDeclaration:
+			panic("unimplemented")
+		case *ModuleItemStatementListItem:
+			stmt.Evaluation(i, b)
+		default:
+			panic("unimplemented")
+		}
 	}
 }
 
@@ -4725,6 +4858,10 @@ func (m *ModuleItemStatementListItem) Bytecode(e *Executable, c *BytecodeContext
 	m.StatementListItem.Bytecode(e, c)
 }
 
+func (m *ModuleItemStatementListItem) Evaluation(i *IR, b *BytecodeContext) {
+	m.StatementListItem.Evaluation(i, b)
+}
+
 func (m *ModuleItemStatementListItem) String() string {
 	return m.StatementListItem.String()
 }
@@ -4779,37 +4916,43 @@ var (
 )
 
 func (m *ModuleItemExportDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	if m.ExportFrom != nil || m.NamedExports != nil {
+	switch {
+	case m.ExportFrom != nil || m.NamedExports != nil:
 		return
-	} else if m.Declaration != nil {
+	case m.Declaration != nil:
 		m.Declaration.Bytecode(e, c)
-	} else if m.VariableStatement != nil {
+	case m.VariableStatement != nil:
 		m.VariableStatement.Bytecode(e, c)
-	} else if m.DefaultHoistableDeclaration != nil {
+	case m.DefaultHoistableDeclaration != nil:
 		m.DefaultHoistableDeclaration.Bytecode(e, c)
-	} else if m.DefaultClassDeclaration != nil {
+	case m.DefaultClassDeclaration != nil:
 		m.DefaultClassDeclaration.Bytecode(e, c)
-	} else if m.DefaultExpression != nil {
+	case m.DefaultExpression != nil:
 		m.DefaultExpression.Bytecode(e, c)
-	} else {
+	default:
 		panic("unreachable")
 	}
 }
 
+func (m *ModuleItemExportDeclaration) Evaluation(i *IR, b *BytecodeContext) {
+	panic("unimplemented")
+}
+
 func (m *ModuleItemExportDeclaration) String() string {
-	if m.ExportFrom != nil {
+	switch {
+	case m.ExportFrom != nil:
 		panic("unimplemented")
-	} else if m.NamedExports != nil {
+	case m.NamedExports != nil:
 		panic("unimplemented")
-	} else if m.Declaration != nil {
+	case m.Declaration != nil:
 		return m.Declaration.String()
-	} else if m.VariableStatement != nil {
+	case m.VariableStatement != nil:
 		return m.VariableStatement.String()
-	} else if m.DefaultHoistableDeclaration != nil {
+	case m.DefaultHoistableDeclaration != nil:
 		return m.DefaultHoistableDeclaration.String()
-	} else if m.DefaultClassDeclaration != nil {
+	case m.DefaultClassDeclaration != nil:
 		return m.DefaultClassDeclaration.String()
-	} else if m.DefaultExpression != nil {
+	case m.DefaultExpression != nil:
 		return m.DefaultExpression.String()
 	}
 	return "ModuleItemExportDeclaration"
