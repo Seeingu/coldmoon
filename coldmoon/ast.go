@@ -705,6 +705,15 @@ func (a *ASTPropertyExpression) String() string {
 	return a.Expression.String()
 }
 
+// MemberExpression [Yield, Await] :
+// PrimaryExpression[?Yield, ?Await]
+// MemberExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
+// MemberExpression[?Yield, ?Await]. IdentifierName
+// MemberExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+// SuperProperty[?Yield, ?Await]
+// MetaProperty
+// new MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+// MemberExpression[?Yield, ?Await]. PrivateIdentifier
 type MemberExpression struct {
 	Expression
 	Member   Expression
@@ -740,6 +749,41 @@ func (m *MemberExpression) Bytecode(e *Executable, c *BytecodeContext) {
 			Name:   prop.Identifier,
 		})
 	}
+}
+
+// Evaluation 13.3.2.1
+func (m *MemberExpression) Evaluation(i *IR, b *BytecodeContext) {
+	i.AddInstruction(&IEnterBlock{})
+	defer func() {
+		i.AddInstruction(&ILeaveBlock{})
+	}()
+	m.Member.Evaluation(i, b)
+	i.Let("baseReference")
+
+	i.GetValue("baseReference")
+	i.Let("baseValue")
+
+	strict := b.containedInStrictCode
+
+	switch prop := m.Property.(type) {
+	case *ASTPropertyExpression:
+		prop.Expression.Evaluation(i, b)
+		i.Let("Expression")
+
+		i.AddInstruction(&IEvaluatePropertyAccessWithExpressionKeyV2{
+			baseValue:  "baseValue",
+			expression: "Expression",
+			strict:     strict,
+		})
+	case *ASTPropertyIdentifier:
+		i.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKeyV2{
+			baseValue:      "baseValue",
+			identifierName: prop.Identifier,
+			strict:         strict,
+		})
+
+	}
+	i.Return()
 }
 
 func (m *MemberExpression) String() string {
@@ -2233,6 +2277,9 @@ func (a Arguments) Evaluation(i *IR, b *BytecodeContext) {
 		return
 	}
 	i.AddInstruction(&IEnterBlock{})
+	defer func() {
+		i.AddInstruction(&ILeaveBlock{})
+	}()
 
 	if len(a) == 1 {
 		a[0].Evaluation(i, b)
@@ -2256,8 +2303,6 @@ func (a Arguments) Evaluation(i *IR, b *BytecodeContext) {
 		i.AddInstruction(&IListConcatenation{"precedingArgs", "_argList"})
 		i.Return()
 	}
-
-	i.AddInstruction(&ILeaveBlock{})
 }
 
 // CallExpression [Yield, Await] :
@@ -2306,8 +2351,11 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 // TODO(SM): WIP
 // Evaluation 13.3.6.1
 func (c *CallExpression) Evaluation(i *IR, b *BytecodeContext) {
-	ref := c.Callee.(*PrimaryExpressionIdentifierReference)
-	ref.Evaluation(i, b)
+	i.AddInstruction(&IEnterBlock{})
+	defer func() {
+		i.AddInstruction(&ILeaveBlock{})
+	}()
+	c.Callee.Evaluation(i, b)
 	i.Let("ref")
 
 	i.GetValue("ref")

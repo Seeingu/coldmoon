@@ -41,10 +41,13 @@ type ReferencedName struct {
 
 type ReferenceRecord struct {
 	// [[Base]]: Value, EnvironmentRecord, or UNRESOLVABLE
-	Base           *ReferenceRecordBase
+	Base *ReferenceRecordBase
+	// [[ReferencedName]]
 	ReferencedName *ReferencedName
-	Strict         bool
-	ThisValue      Value
+	// [[Strict]]
+	Strict bool
+	// [[ThisValue]]
+	ThisValue Value
 }
 
 type ReferenceRecordValue struct {

@@ -88,6 +88,27 @@ func (i *IValue) String() string {
 	return "Value " + i.value.String()
 }
 
+type IEvaluatePropertyAccessWithExpressionKeyV2 struct {
+	baseValue  string
+	expression string
+	strict     bool
+}
+
+func (i *IEvaluatePropertyAccessWithExpressionKeyV2) String() string {
+	return "EvaluatePropertyAccessWithExpressionKey " + i.baseValue
+}
+
+// 13.3.4
+type IEvaluatePropertyAccessWithIdentifierKeyV2 struct {
+	baseValue      string
+	identifierName IdentifierName
+	strict         bool
+}
+
+func (i *IEvaluatePropertyAccessWithIdentifierKeyV2) String() string {
+	return "EvaluatePropertyAccessWithIdentifierKey " + i.baseValue
+}
+
 type IR struct {
 	instructions []Instruction
 }
@@ -199,6 +220,17 @@ func (v *VM2) Run(ir *IR) CompletionValue {
 			v.blocks = append(v.blocks, make(valueMap))
 		case *ILeaveBlock:
 			v.blocks = v.blocks[:len(v.blocks)-1]
+		case *IEvaluatePropertyAccessWithIdentifierKeyV2:
+			baseValue := v.valueMap()[ins.baseValue]
+			// TODO: use 13.1.2 Static Semantics: StringValue
+			propertyNameString := ins.identifierName
+			v.lastValue = NewReferenceRecordValue(
+				NewReferenceRecord(
+					&ReferenceRecordBase{value: baseValue},
+					&ReferencedName{String: string(propertyNameString)},
+					ins.strict,
+					nil,
+				))
 		default:
 			panic("unknown instruction")
 		}
