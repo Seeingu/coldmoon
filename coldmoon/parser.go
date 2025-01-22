@@ -1711,7 +1711,7 @@ func (p *Parser) logicalExpression(left Expression, accept *acceptContext) *Expr
 	panic("logicalExpression: unexpected token")
 }
 
-func (p *Parser) equalityExpression(left Expression, accept *acceptContext) *ExpressionEqualityExpression {
+func (p *Parser) equalityExpression(left Expression, accept *acceptContext) *EqualityExpression {
 	t := p.tokenizer.CurrentToken
 	tokenTypes := []TokenType{
 		TEqualsEquals,
@@ -1722,7 +1722,7 @@ func (p *Parser) equalityExpression(left Expression, accept *acceptContext) *Exp
 	if lo.Contains(tokenTypes, t.Type) {
 		p.tokenizer.Next()
 		right := p.expression(accept)
-		return &ExpressionEqualityExpression{
+		return &EqualityExpression{
 			Operator: operatorEqualityMap[t.Type],
 			Left:     left,
 			Right:    right,

@@ -2043,7 +2043,7 @@ func (e EqualityOperator) String() string {
 // RelationalExpression[?In, ?Yield, ?Await]
 // EqualityExpression[?In, ?Yield, ?Await] !==
 // RelationalExpression[?In, ?Yield, ?Await]
-type ExpressionEqualityExpression struct {
+type EqualityExpression struct {
 	Expression
 	// EqualityExpression
 	Left     Expression
@@ -2053,7 +2053,7 @@ type ExpressionEqualityExpression struct {
 	Right Expression
 }
 
-func (e *ExpressionEqualityExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+func (e *EqualityExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 	ex.AddDebug("Equality: " + e.String())
 	e.Left.Bytecode(ex, c)
 	if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
@@ -2082,7 +2082,7 @@ func (e *ExpressionEqualityExpression) Bytecode(ex *Executable, c *BytecodeConte
 }
 
 // 13.11.1
-func (e *ExpressionEqualityExpression) Evaluation(i *IR, b *BytecodeContext) {
+func (e *EqualityExpression) Evaluation(i *IR, b *BytecodeContext) {
 	i.BlockEvaluation(e.Left, b)
 	i.Let("lref")
 
@@ -2111,7 +2111,7 @@ func (e *ExpressionEqualityExpression) Evaluation(i *IR, b *BytecodeContext) {
 	}
 }
 
-func (e *ExpressionEqualityExpression) String() string {
+func (e *EqualityExpression) String() string {
 	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
 }
 
