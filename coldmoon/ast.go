@@ -156,16 +156,9 @@ func (p *PrimaryExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
 	p.Literal.Bytecode(e, c)
 }
 
-// Evaluation Literal : BooleanLiteral
+// Evaluation Literal 13.2.3.1
 func (p *PrimaryExpressionLiteral) Evaluation(i *IR, c *BytecodeContext) {
-	// TODO(SM): WIP: other literals
-	b := p.Literal.(*LiteralBoolean)
-	if b.Bool {
-		i.Value(TrueValue)
-	} else {
-		i.Value(FalseValue)
-	}
-	i.Return()
+	i.BlockEvaluation(p.Literal, c)
 }
 
 func (p *PrimaryExpressionLiteral) String() string {
@@ -816,6 +809,11 @@ func (l *LiteralNull) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: NullValue})
 }
 
+func (l *LiteralNull) Evaluation(i *IR, c *BytecodeContext) {
+	i.Value(NullValue)
+	i.Return()
+}
+
 func (l *LiteralNull) String() string {
 	return "null"
 }
@@ -828,6 +826,12 @@ var _ Literal = (*LiteralUndefined)(nil)
 
 func (l *LiteralUndefined) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
+}
+
+// 13.2.3.1
+func (l *LiteralUndefined) Evaluation(i *IR, c *BytecodeContext) {
+	i.Value(UndefinedValue)
+	i.Return()
 }
 
 func (l *LiteralUndefined) String() string {
@@ -843,6 +847,15 @@ var _ Literal = (*LiteralBoolean)(nil)
 
 func (l *LiteralBoolean) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: NewBooleanValue(l.Bool)})
+}
+
+func (l *LiteralBoolean) Evaluation(i *IR, c *BytecodeContext) {
+	if l.Bool {
+		i.Value(TrueValue)
+	} else {
+		i.Value(FalseValue)
+	}
+	i.Return()
 }
 
 func (l *LiteralBoolean) String() string {
@@ -908,6 +921,15 @@ func (l *LiteralNumeric) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: v})
 }
 
+func (l *LiteralNumeric) Evaluation(i *IR, c *BytecodeContext) {
+	v, err := l.NumericValue()
+	if err != nil {
+		panic(err)
+	}
+	i.Value(v)
+	i.Return()
+}
+
 func (l *LiteralNumeric) String() string {
 	return l.Value
 }
@@ -928,6 +950,12 @@ func (l *LiteralString) StringValue() Value {
 
 func (l *LiteralString) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: l.StringValue()})
+}
+
+// 13.2.3.1
+func (l *LiteralString) Evaluation(i *IR, c *BytecodeContext) {
+	i.Value(l.StringValue())
+	i.Return()
 }
 
 func (l *LiteralString) String() string {
