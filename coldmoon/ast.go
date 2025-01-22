@@ -2035,11 +2035,22 @@ func (e EqualityOperator) String() string {
 	return ""
 }
 
+// EqualityExpression [In, Yield, Await] :
+// RelationalExpression[?In, ?Yield, ?Await]
+// EqualityExpression[?In, ?Yield, ?Await] == RelationalExpression[?In, ?Yield, ?Await]
+// EqualityExpression[?In, ?Yield, ?Await] != RelationalExpression[?In, ?Yield, ?Await]
+// EqualityExpression[?In, ?Yield, ?Await] ===
+// RelationalExpression[?In, ?Yield, ?Await]
+// EqualityExpression[?In, ?Yield, ?Await] !==
+// RelationalExpression[?In, ?Yield, ?Await]
 type ExpressionEqualityExpression struct {
 	Expression
+	// EqualityExpression
 	Left     Expression
 	Operator EqualityOperator
-	Right    Expression
+	// TODO(SM): relational expression
+	// RelationalExpression
+	Right Expression
 }
 
 func (e *ExpressionEqualityExpression) Bytecode(ex *Executable, c *BytecodeContext) {
@@ -2067,6 +2078,36 @@ func (e *ExpressionEqualityExpression) Bytecode(ex *Executable, c *BytecodeConte
 	case EqualityOperatorStrictNotEqual:
 		ex.AddInstruction(InsStrictlyEqual)
 		ex.AddInstruction(InsLogicalNot)
+	}
+}
+
+// 13.11.1
+func (e *ExpressionEqualityExpression) Evaluation(i *IR, b *BytecodeContext) {
+	i.BlockEvaluation(e.Left, b)
+	i.Let("lref")
+
+	i.GetValue("lref")
+	i.Let("lval")
+
+	i.BlockEvaluation(e.Right, b)
+	i.Let("rref")
+
+	i.GetValue("rref")
+	i.Let("rval")
+
+	switch e.Operator {
+	case EqualityOperatorEqual:
+		i.IsLooselyEqual("rval", "lval")
+	case EqualityOperatorNotEqual:
+		i.IsLooselyEqual("rval", "lval")
+		i.Let("temp")
+		i.LogicalNot("temp")
+	case EqualityOperatorStrictEqual:
+		i.IsStrictlyEqual("rval", "lval")
+	case EqualityOperatorStrictNotEqual:
+		i.IsStrictlyEqual("rval", "lval")
+		i.Let("temp")
+		i.LogicalNot("temp")
 	}
 }
 

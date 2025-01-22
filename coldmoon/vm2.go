@@ -109,6 +109,34 @@ func (i *IEvaluatePropertyAccessWithIdentifierKeyV2) String() string {
 	return "EvaluatePropertyAccessWithIdentifierKey " + i.baseValue
 }
 
+type IIsLooselyEqual struct {
+	x string
+	y string
+}
+
+func (i *IIsLooselyEqual) String() string {
+	return "IsLooselyEqual " + i.x + " " + i.y
+}
+
+type IIsStrictlyEqual struct {
+	x string
+	y string
+}
+
+func (i *IIsStrictlyEqual) String() string {
+	return "IsStrictlyEqual " + i.x + " " + i.y
+}
+
+type ILogicalNotV2 struct {
+	value string
+}
+
+func (i *ILogicalNotV2) String() string {
+	return "LogicalNot " + i.value
+}
+
+// MARK: - IR
+
 type IR struct {
 	instructions []Instruction
 }
@@ -151,6 +179,21 @@ func (i *IR) This(v Value) {
 
 func (i *IR) Value(v Value) {
 	i.instructions = append(i.instructions, &IValue{value: v})
+}
+
+func (i *IR) IsLooselyEqual(x, y string) {
+	i.instructions = append(i.instructions, &IIsLooselyEqual{x: x, y: y})
+	i.Return()
+}
+
+func (i *IR) IsStrictlyEqual(x, y string) {
+	i.instructions = append(i.instructions, &IIsStrictlyEqual{x: x, y: y})
+	i.Return()
+}
+
+func (i *IR) LogicalNot(x string) {
+	i.instructions = append(i.instructions, &ILogicalNotV2{value: x})
+	i.Return()
 }
 
 // List initialize a list value
@@ -240,6 +283,17 @@ func (v *VM2) Run(ir *IR) CompletionValue {
 					ins.strict,
 					nil,
 				))
+		case *IIsLooselyEqual:
+			x := v.valueMap()[ins.x]
+			y := v.valueMap()[ins.y]
+			v.lastValue = NewBooleanValue(IsLooselyEqual(v.agent, x, y))
+		case *IIsStrictlyEqual:
+			x := v.valueMap()[ins.x]
+			y := v.valueMap()[ins.y]
+			v.lastValue = NewBooleanValue(IsStrictlyEqual(x, y))
+		case *ILogicalNotV2:
+			value := v.valueMap()[ins.value]
+			v.lastValue = NewBooleanValue(!value.ToBoolean())
 		default:
 			panic("unknown instruction")
 		}
