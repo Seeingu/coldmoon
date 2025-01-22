@@ -153,9 +153,18 @@ func (i *IR) Value(v Value) {
 	i.instructions = append(i.instructions, &IValue{value: v})
 }
 
+// List initialize a list value
 func (i *IR) List(init string) {
 	i.instructions = append(i.instructions, &IList{init: init})
 	i.Return()
+}
+
+func (i *IR) BlockEvaluation(expr RuntimeSemanticsEvaluation, b *BytecodeContext) {
+	i.AddInstruction(&IEnterBlock{})
+	defer func() {
+		i.AddInstruction(&ILeaveBlock{})
+	}()
+	expr.Evaluation(i, b)
 }
 
 type valueMap = map[string]Value

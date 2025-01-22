@@ -753,10 +753,6 @@ func (m *MemberExpression) Bytecode(e *Executable, c *BytecodeContext) {
 
 // Evaluation 13.3.2.1
 func (m *MemberExpression) Evaluation(i *IR, b *BytecodeContext) {
-	i.AddInstruction(&IEnterBlock{})
-	defer func() {
-		i.AddInstruction(&ILeaveBlock{})
-	}()
 	m.Member.Evaluation(i, b)
 	i.Let("baseReference")
 
@@ -767,7 +763,7 @@ func (m *MemberExpression) Evaluation(i *IR, b *BytecodeContext) {
 
 	switch prop := m.Property.(type) {
 	case *ASTPropertyExpression:
-		prop.Expression.Evaluation(i, b)
+		i.BlockEvaluation(prop.Expression, b)
 		i.Let("Expression")
 
 		i.AddInstruction(&IEvaluatePropertyAccessWithExpressionKeyV2{
@@ -2276,10 +2272,6 @@ func (a Arguments) Evaluation(i *IR, b *BytecodeContext) {
 		i.List("")
 		return
 	}
-	i.AddInstruction(&IEnterBlock{})
-	defer func() {
-		i.AddInstruction(&ILeaveBlock{})
-	}()
 
 	if len(a) == 1 {
 		a[0].Evaluation(i, b)
@@ -2351,11 +2343,7 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 // TODO(SM): WIP
 // Evaluation 13.3.6.1
 func (c *CallExpression) Evaluation(i *IR, b *BytecodeContext) {
-	i.AddInstruction(&IEnterBlock{})
-	defer func() {
-		i.AddInstruction(&ILeaveBlock{})
-	}()
-	c.Callee.Evaluation(i, b)
+	i.BlockEvaluation(c.Callee, b)
 	i.Let("ref")
 
 	i.GetValue("ref")
@@ -2369,7 +2357,7 @@ func (c *CallExpression) Evaluation(i *IR, b *BytecodeContext) {
 	// i.IsInTailPosition()
 	// i.Let("tailPosition")
 
-	c.Arguments.Evaluation(i, b)
+	i.BlockEvaluation(c.Arguments, b)
 	i.Let("Arguments")
 	i.AddInstruction(&IEvaluateCall{
 		fun:          "func",
