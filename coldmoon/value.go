@@ -541,8 +541,9 @@ const (
 	IsLessThanOrderRightFirst
 )
 
+// TODO: standardalize
 // 7.2.13
-func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) bool {
+func IsLessThanV2(agent *Agent, x, y Value, order isLessThanOrder) Value {
 	var px, py Value
 	if order == IsLessThanOrderLeftFirst {
 		px = ToPrimitive(agent, x, PreferredTypeNumber)
@@ -554,15 +555,20 @@ func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) bool {
 	pxString, isPxString := px.(*StringValue)
 	pyString, isPyString := px.(*StringValue)
 	if isPxString && isPyString {
-		return pxString.Data < pyString.Data
+		return NewBooleanValue(pxString.Data < pyString.Data)
 	} else {
 		nx := ToNumber(agent, px)
 		ny := ToNumber(agent, py)
 		if nx.IsNaN() || ny.IsNaN() {
-			return false
+			return FalseValue
 		}
-		return nx.Data < ny.Data
+		return NewBooleanValue(nx.Data < ny.Data)
 	}
+}
+
+// 7.2.13
+func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) bool {
+	return IsLessThanV2(agent, x, y, order).ToBoolean()
 }
 
 // 7.2.14

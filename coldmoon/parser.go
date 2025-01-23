@@ -1731,7 +1731,7 @@ func (p *Parser) equalityExpression(left Expression, accept *acceptContext) *Equ
 	panic("equalityExpression: unexpected token")
 }
 
-func (p *Parser) relationalExpression(left Expression, accept *acceptContext) *ExpressionRelationalExpression {
+func (p *Parser) relationalExpression(left Expression, accept *acceptContext) *RelationalExpression {
 	t := p.tokenizer.CurrentToken
 	tokenTypes := []TokenType{
 		TLessThan,
@@ -1744,7 +1744,7 @@ func (p *Parser) relationalExpression(left Expression, accept *acceptContext) *E
 	if lo.Contains(tokenTypes, t.Type) {
 		p.tokenizer.Next()
 		right := p.expression(accept)
-		return &ExpressionRelationalExpression{
+		return &RelationalExpression{
 			Operator: operatorRelationMap[t.Type],
 			Left:     left,
 			Right:    right,

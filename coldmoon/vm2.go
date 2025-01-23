@@ -21,6 +21,14 @@ func (i *IReturnV2) String() string {
 	return "Return "
 }
 
+type IReturnBlock struct {
+	value string
+}
+
+func (i *IReturnBlock) String() string {
+	return "ReturnBlock " + i.value
+}
+
 type IGetValueV2 struct {
 	name string
 }
@@ -48,6 +56,28 @@ type IEvaluateCall struct {
 
 func (i *IEvaluateCall) String() string {
 	return "EvaluateCall " + i.fun
+}
+
+type IIsLessThan struct {
+	x     string
+	y     string
+	order isLessThanOrder
+}
+
+func (i *IIsLessThan) String() string {
+	return "IsLessThan " + i.x + " " + i.y
+}
+
+// IIfEqual match if x and y is equal
+// if x == y, execute next instruction
+// else skip next instruction
+type IIfEqual struct {
+	x string
+	y string
+}
+
+func (i *IIfEqual) String() string {
+	return "IfEqual " + i.x + " " + i.y
 }
 
 type IEnterBlock struct{}
@@ -164,6 +194,14 @@ func (i *IR) Return() {
 	i.instructions = append(i.instructions, &IReturnV2{})
 }
 
+func (i *IR) ReturnBlock(value string) {
+	i.instructions = append(i.instructions, &IReturnBlock{value})
+}
+
+func (i *IR) IfEqual(x, y string) {
+	i.instructions = append(i.instructions, &IIfEqual{x, y})
+}
+
 func (i *IR) GetValue(name string) {
 	i.instructions = append(i.instructions, &IGetValueV2{name})
 	i.Return()
@@ -193,6 +231,11 @@ func (i *IR) IsStrictlyEqual(x, y string) {
 
 func (i *IR) LogicalNot(x string) {
 	i.instructions = append(i.instructions, &ILogicalNotV2{value: x})
+	i.Return()
+}
+
+func (i *IR) IsLessThan(x, y string, order isLessThanOrder) {
+	i.instructions = append(i.instructions, &IIsLessThan{x: x, y: y, order: order})
 	i.Return()
 }
 
@@ -233,6 +276,21 @@ func (v *VM2) valueMap() valueMap {
 	return v.blocks[len(v.blocks)-1]
 }
 
+// getValue get value from valueMap
+func (v *VM2) getValue(name string) Value {
+	switch name {
+	case "undefined":
+		return UndefinedValue
+	case "null":
+		return NullValue
+	case "true":
+		return TrueValue
+	case "false":
+		return FalseValue
+	}
+	return v.valueMap()[name]
+}
+
 func (v *VM2) Run(ir *IR) CompletionValue {
 	for v.ip < len(ir.instructions) {
 		i := ir.instructions[v.ip]
@@ -245,8 +303,12 @@ func (v *VM2) Run(ir *IR) CompletionValue {
 			Assert(v.lastValue != nil)
 			v.value = v.lastValue
 			v.lastValue = nil
+		case *IReturnBlock:
+			v.value = v.getValue(ins.value)
+			v.lastValue = nil
+			v.skipBlock(ir)
 		case *IGetValueV2:
-			ref := v.valueMap()[ins.name]
+			ref := v.getValue(ins.name)
 			v.lastValue = ref.GetValue(v.agent)
 		case *IThis:
 			v.lastValue = ins.value
@@ -255,12 +317,12 @@ func (v *VM2) Run(ir *IR) CompletionValue {
 		case *IList:
 			var list []Value
 			if ins.init != "" {
-				list = []Value{v.valueMap()[ins.init]}
+				list = []Value{v.getValue(ins.init)}
 			}
 			v.lastValue = NewListValue(list)
 		case *IListConcatenation:
-			list1 := v.valueMap()[ins.list1].(*ListValue).Values
-			list2 := v.valueMap()[ins.list2].(*ListValue).Values
+			list1 := v.getValue(ins.list1).(*ListValue).Values
+			list2 := v.getValue(ins.list2).(*ListValue).Values
 			v.lastValue = NewListValue(append(list1, list2...))
 		case *IResolveBinding:
 			v.lastValue = NewReferenceRecordValue(
@@ -273,7 +335,7 @@ func (v *VM2) Run(ir *IR) CompletionValue {
 		case *ILeaveBlock:
 			v.blocks = v.blocks[:len(v.blocks)-1]
 		case *IEvaluatePropertyAccessWithIdentifierKeyV2:
-			baseValue := v.valueMap()[ins.baseValue]
+			baseValue := v.getValue(ins.baseValue)
 			// TODO: use 13.1.2 Static Semantics: StringValue
 			propertyNameString := ins.identifierName
 			v.lastValue = NewReferenceRecordValue(
@@ -284,16 +346,26 @@ func (v *VM2) Run(ir *IR) CompletionValue {
 					nil,
 				))
 		case *IIsLooselyEqual:
-			x := v.valueMap()[ins.x]
-			y := v.valueMap()[ins.y]
+			x := v.getValue(ins.x)
+			y := v.getValue(ins.y)
 			v.lastValue = NewBooleanValue(IsLooselyEqual(v.agent, x, y))
 		case *IIsStrictlyEqual:
-			x := v.valueMap()[ins.x]
-			y := v.valueMap()[ins.y]
+			x := v.getValue(ins.x)
+			y := v.getValue(ins.y)
 			v.lastValue = NewBooleanValue(IsStrictlyEqual(x, y))
 		case *ILogicalNotV2:
-			value := v.valueMap()[ins.value]
+			value := v.getValue(ins.value)
 			v.lastValue = NewBooleanValue(!value.ToBoolean())
+		case *IIsLessThan:
+			x := v.getValue(ins.x)
+			y := v.getValue(ins.y)
+			v.lastValue = IsLessThanV2(v.agent, x, y, ins.order)
+		case *IIfEqual:
+			x := v.getValue(ins.x)
+			y := v.getValue(ins.y)
+			if !IsStrictlyEqual(x, y) {
+				v.ip++
+			}
 		default:
 			panic("unknown instruction")
 		}
@@ -305,6 +377,15 @@ func (v *VM2) Run(ir *IR) CompletionValue {
 	}
 
 	return v.value.ToCompletion()
+}
+
+func (v *VM2) skipBlock(ir *IR) {
+	for i := v.ip; i < len(ir.instructions); i++ {
+		if _, ok := ir.instructions[i].(*ILeaveBlock); ok {
+			v.ip = i - 1
+			return
+		}
+	}
 }
 
 // EvaluateCall ( func, ref, arguments, tailPosition )
@@ -330,8 +411,8 @@ func (v *VM2) EvaluateCall(ins *IEvaluateCall) Value {
 	} else {
 		thisValue = UndefinedValue
 	}
-	arguments := v.valueMap()[ins.arguments].(*ListValue).Values
-	fun := v.valueMap()[ins.fun]
+	arguments := v.getValue(ins.arguments).(*ListValue).Values
+	fun := v.getValue(ins.fun)
 	if !ValueIsObject(fun) {
 		return agent.ThrowTypeError("function is not an object")
 	}

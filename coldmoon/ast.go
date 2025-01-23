@@ -2155,14 +2155,24 @@ var operatorRelationMap = map[TokenType]RelationalOperator{
 	TIn:                RelationalOperatorIn,
 }
 
-type ExpressionRelationalExpression struct {
+// RelationalExpression [In, Yield, Await] :
+// ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] < ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] > ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] <= ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] >= ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] instanceof
+// ShiftExpression[?Yield, ?Await]
+// [+In] RelationalExpression[+In, ?Yield, ?Await] in ShiftExpression[?Yield, ?Await]
+// [+In] PrivateIdentifier in ShiftExpression[?Yield, ?Await]
+type RelationalExpression struct {
 	Expression
 	Left     Expression
 	Operator RelationalOperator
 	Right    Expression
 }
 
-func (e *ExpressionRelationalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+func (e *RelationalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 	e.Left.Bytecode(ex, c)
 	if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
 		ex.AddInstruction(InsGetValue)
@@ -2191,7 +2201,55 @@ func (e *ExpressionRelationalExpression) Bytecode(ex *Executable, c *BytecodeCon
 	}
 }
 
-func (e *ExpressionRelationalExpression) String() string {
+// 13.10.1
+func (e *RelationalExpression) Evaluation(i *IR, b *BytecodeContext) {
+	i.BlockEvaluation(e.Left, b)
+	i.Let("lref")
+
+	i.GetValue("lref")
+	i.Let("lval")
+
+	i.BlockEvaluation(e.Right, b)
+	i.Let("rref")
+
+	i.GetValue("rref")
+	i.Let("rval")
+
+	switch e.Operator {
+	case RelationalOperatorLessThan, RelationalOperatorGreaterThan:
+		var order isLessThanOrder
+		if e.Operator == RelationalOperatorLessThan {
+			order = IsLessThanOrderLeftFirst
+		} else {
+			order = IsLessThanOrderRightFirst
+		}
+		i.IsLessThan("lval", "rval", order)
+		i.Let("r")
+		i.IfEqual("r", "undefined")
+		i.ReturnBlock("false")
+		i.ReturnBlock("r")
+	case RelationalOperatorLessThanOrEqual, RelationalOperatorGreaterThanOrEqual:
+		var order isLessThanOrder
+		if e.Operator == RelationalOperatorLessThanOrEqual {
+			order = IsLessThanOrderRightFirst
+		} else {
+			order = IsLessThanOrderLeftFirst
+		}
+		i.IsLessThan("lval", "rval", order)
+		i.Let("r")
+		i.IfEqual("r", "undefined")
+		i.ReturnBlock("false")
+		i.IfEqual("r", "true")
+		i.ReturnBlock("false")
+		i.ReturnBlock("true")
+	case RelationalOperatorInstanceof:
+		panic("unimplemented")
+	case RelationalOperatorIn:
+		panic("unimplemented")
+	}
+}
+
+func (e *RelationalExpression) String() string {
 	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
 }
 
@@ -2339,18 +2397,15 @@ func (a Arguments) Evaluation(i *IR, b *BytecodeContext) {
 	// Assigment
 	if len(a) == 0 {
 		i.List("")
-		return
-	}
-
-	if len(a) == 1 {
-		a[0].Evaluation(i, b)
+	} else if len(a) == 1 {
+		i.BlockEvaluation(a[0], b)
 		i.Let("ref")
 
 		i.GetValue("ref")
 		i.Let("arg")
 		i.List("arg")
 	} else if len(a) > 1 {
-		a[:len(a)-1].Evaluation(i, b)
+		i.BlockEvaluation(a[:len(a)-1], b)
 		i.Let("precedingArgs")
 
 		a[len(a)-1].Evaluation(i, b)
