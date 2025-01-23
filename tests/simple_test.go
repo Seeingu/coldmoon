@@ -383,6 +383,28 @@ true ? 2 : 1;
 	}
 }
 
+func TestBaseline2(t *testing.T) {
+	sourceTexts := []string{
+		`
+true;
+false;
+null;
+2;
+assert(2 != 1);
+assert(2 > 1);
+assert(2 >= 2);
+assert(2 < 31);
+`,
+	}
+	DevFeatures.ToggleNewVM(true)
+	defer func() {
+		DevFeatures.ToggleNewVM(false)
+	}()
+	for _, sourceText := range sourceTexts {
+		testSource(t, sourceText)
+	}
+}
+
 func resolveTestdataPath(f string) string {
 	dir, _ := os.Getwd()
 	return path.Join(dir, "..", "testdata", f)

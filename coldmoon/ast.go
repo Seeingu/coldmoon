@@ -4696,6 +4696,12 @@ func (s StatementList) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 }
 
+func (s StatementList) Evaluation(i *IR, b *BytecodeContext) {
+	for _, item := range s {
+		item.Evaluation(i, b)
+	}
+}
+
 func (s StatementList) String() string {
 	var str string
 	for _, item := range s {
@@ -4826,6 +4832,10 @@ type Script struct {
 
 func (s *Script) Bytecode(e *Executable, c *BytecodeContext) {
 	s.StatementList.Bytecode(e, c)
+}
+
+func (s *Script) Evaluation(i *IR, c *BytecodeContext) {
+	s.StatementList.Evaluation(i, c)
 }
 
 func (s *Script) String() string {
