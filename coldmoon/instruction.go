@@ -671,7 +671,7 @@ func (i *ILoadIterator) String() string {
 // 14.7.5.4
 type IForDeclarationBindingInstantiation struct {
 	Instruction
-	LexicalDeclaration *DeclarationLexical
+	LexicalDeclaration *LexicalDeclaration
 }
 
 func (i *IForDeclarationBindingInstantiation) String() string {

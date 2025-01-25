@@ -949,7 +949,7 @@ func (p *Parser) fieldDefinition() *FieldDefinition {
 	}
 }
 
-func (p *Parser) lexicalDeclaration() *DeclarationLexical {
+func (p *Parser) lexicalDeclaration() *LexicalDeclaration {
 	t := p.tokenizer.CurrentToken
 	var lexicalType LetOrConst
 	if t.Type == TLet {
@@ -962,7 +962,7 @@ func (p *Parser) lexicalDeclaration() *DeclarationLexical {
 	p.tokenizer.Next()
 	list := p.bindingList()
 	p.automaticSemicolonInsertion()
-	return &DeclarationLexical{
+	return &LexicalDeclaration{
 		Type:        lexicalType,
 		BindingList: list,
 	}

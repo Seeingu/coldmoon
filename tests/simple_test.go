@@ -386,6 +386,13 @@ true ? 2 : 1;
 func TestBaseline2(t *testing.T) {
 	sourceTexts := []string{
 		`
+function toString(a) {
+    return a;
+}
+let a = toString(10);
+assert(a + 'hello' === '10hello');
+`,
+		`
 true;
 false;
 null;

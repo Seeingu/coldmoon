@@ -102,7 +102,7 @@ func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLite
 // MARK: - IdentifierReference
 
 type (
-	IdentifierName        string
+	IdentifierName        = string
 	PrivateIdentifierName string
 )
 
@@ -127,8 +127,9 @@ func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable, c *Byteco
 
 // Evaluation 13.1.3
 func (p *PrimaryExpressionIdentifierReference) Evaluation(i *IR, c *BytecodeContext) {
-	i.AddInstruction(&IResolveBinding{Name: p.Identifier, Strict: c.containedInStrictCode})
-	i.Return()
+	i.StringValue(p.Identifier)
+	i.Let("id")
+	i.ResolveBinding("id", c.containedInStrictCode)
 }
 
 func (p *PrimaryExpressionIdentifierReference) String() string {
@@ -772,7 +773,7 @@ func (m *MemberExpression) Evaluation(i *IR, b *BytecodeContext) {
 		})
 
 	}
-	i.Return()
+	i.GetLastValue()
 }
 
 func (m *MemberExpression) String() string {
@@ -811,7 +812,7 @@ func (l *LiteralNull) Bytecode(e *Executable, c *BytecodeContext) {
 
 func (l *LiteralNull) Evaluation(i *IR, c *BytecodeContext) {
 	i.Value(NullValue)
-	i.Return()
+	i.GetLastValue()
 }
 
 func (l *LiteralNull) String() string {
@@ -831,7 +832,7 @@ func (l *LiteralUndefined) Bytecode(e *Executable, c *BytecodeContext) {
 // 13.2.3.1
 func (l *LiteralUndefined) Evaluation(i *IR, c *BytecodeContext) {
 	i.Value(UndefinedValue)
-	i.Return()
+	i.GetLastValue()
 }
 
 func (l *LiteralUndefined) String() string {
@@ -855,7 +856,7 @@ func (l *LiteralBoolean) Evaluation(i *IR, c *BytecodeContext) {
 	} else {
 		i.Value(FalseValue)
 	}
-	i.Return()
+	i.GetLastValue()
 }
 
 func (l *LiteralBoolean) String() string {
@@ -927,7 +928,7 @@ func (l *LiteralNumeric) Evaluation(i *IR, c *BytecodeContext) {
 		panic(err)
 	}
 	i.Value(v)
-	i.Return()
+	i.GetLastValue()
 }
 
 func (l *LiteralNumeric) String() string {
@@ -955,7 +956,7 @@ func (l *LiteralString) Bytecode(e *Executable, c *BytecodeContext) {
 // 13.2.3.1
 func (l *LiteralString) Evaluation(i *IR, c *BytecodeContext) {
 	i.Value(l.StringValue())
-	i.Return()
+	i.GetLastValue()
 }
 
 func (l *LiteralString) String() string {
@@ -1832,6 +1833,30 @@ func (b *ExpressionBinaryExpression) Bytecode(e *Executable, c *BytecodeContext)
 	})
 }
 
+// 13.15.4
+func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(i *IR, c *BytecodeContext) {
+	i.BlockEvaluation(b.Left, c)
+	i.Let("lref")
+	i.GetValue("lref")
+	i.Let("lval")
+
+	i.BlockEvaluation(b.Right, c)
+	i.Let("rref")
+	i.GetValue("rref")
+	i.Let("rval")
+
+	i.AddInstruction(&IEvaluateStringOrNumericBinaryExpression{
+		left:     "lval",
+		right:    "rval",
+		operator: b.Operator,
+	})
+}
+
+func (b *ExpressionBinaryExpression) Evaluation(i *IR, c *BytecodeContext) {
+	b.EvaluateStringOrNumericBinaryExpression(i, c)
+	i.GetLastValue()
+}
+
 func (b *ExpressionBinaryExpression) String() string {
 	return b.Left.String() + " " + b.Operator.String() + " " + b.Right.String()
 }
@@ -2225,9 +2250,15 @@ func (e *RelationalExpression) Evaluation(i *IR, b *BytecodeContext) {
 		}
 		i.IsLessThan("lval", "rval", order)
 		i.Let("r")
-		i.IfEqual("r", "undefined")
-		i.ReturnBlock("false")
-		i.ReturnBlock("r")
+		i.IsStrictlyEqual("r", "undefined")
+		i.Let("cond")
+		i.IfTrue("cond", func() {
+			i.GetValueFromName("false")
+			i.GetLastValue()
+		}, func() {
+			i.GetValueFromName("r")
+			i.GetLastValue()
+		})
 	case RelationalOperatorLessThanOrEqual, RelationalOperatorGreaterThanOrEqual:
 		var order isLessThanOrder
 		if e.Operator == RelationalOperatorLessThanOrEqual {
@@ -2237,11 +2268,20 @@ func (e *RelationalExpression) Evaluation(i *IR, b *BytecodeContext) {
 		}
 		i.IsLessThan("lval", "rval", order)
 		i.Let("r")
-		i.IfEqual("r", "undefined")
-		i.ReturnBlock("false")
-		i.IfEqual("r", "true")
-		i.ReturnBlock("false")
-		i.ReturnBlock("true")
+		i.IsStrictlyEqual("r", "undefined")
+		i.Let("r_is_undefined")
+		// TODO: or short circuit
+		i.IsStrictlyEqual("r", "true")
+		i.Let("r_is_true")
+		i.Or("r_is_undefined", "r_is_true")
+		i.Let("cond")
+		i.IfTrue("cond", func() {
+			i.GetValueFromName("false")
+			i.GetLastValue()
+		}, func() {
+			i.GetValueFromName("true")
+			i.GetLastValue()
+		})
 	case RelationalOperatorInstanceof:
 		panic("unimplemented")
 	case RelationalOperatorIn:
@@ -2408,7 +2448,7 @@ func (a Arguments) Evaluation(i *IR, b *BytecodeContext) {
 		i.BlockEvaluation(a[:len(a)-1], b)
 		i.Let("precedingArgs")
 
-		a[len(a)-1].Evaluation(i, b)
+		i.BlockEvaluation(a[len(a)-1], b)
 		i.Let("ref")
 
 		i.GetValue("ref")
@@ -2417,7 +2457,7 @@ func (a Arguments) Evaluation(i *IR, b *BytecodeContext) {
 		i.Let("_argList")
 
 		i.AddInstruction(&IListConcatenation{"precedingArgs", "_argList"})
-		i.Return()
+		i.GetLastValue()
 	}
 }
 
@@ -2489,7 +2529,7 @@ func (c *CallExpression) Evaluation(i *IR, b *BytecodeContext) {
 		arguments:    "Arguments",
 		tailPosition: "tailPosition",
 	})
-	i.Return()
+	i.GetLastValue()
 }
 
 func (c *CallExpression) String() string {
@@ -2926,6 +2966,11 @@ func (f *FunctionBody) Bytecode(e *Executable, c *BytecodeContext) {
 		c.containedInStrictCode = strictBefore
 	}()
 	f.StatementList.Bytecode(e, c)
+}
+
+// TODO(spec)
+func (f *FunctionBody) Evaluation(ir *IR, c *BytecodeContext) {
+	f.StatementList.Evaluation(ir, c)
 }
 
 func (f *FunctionBody) String() string {
@@ -3448,7 +3493,7 @@ func (f *ForStatementInitializerVariable) String() string {
 
 type ForStatementInitializerLexicalDeclaration struct {
 	ForStatementInitializer
-	LexicalDeclaration *DeclarationLexical
+	LexicalDeclaration *LexicalDeclaration
 }
 
 func (f *ForStatementInitializerLexicalDeclaration) String() string {
@@ -3558,33 +3603,33 @@ const (
 	ForInOfStatementTypeOf
 )
 
-// ForInOfStatement [Yield, Await, Return] :
+// ForInOfStatement [Yield, Await, GetLastValue] :
 // - for ( [lookahead ≠ let [] LeftHandSideExpression[?Yield, ?Await] in
-//   - Expression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//   - Expression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
 //
 // - for ( var ForBinding[?Yield, ?Await] in Expression[+In, ?Yield, ?Await] )
-//   - Statement[?Yield, ?Await, ?Return]
+//   - Statement[?Yield, ?Await, ?GetLastValue]
 //
 // - for ( ForDeclaration[?Yield, ?Await] in Expression[+In, ?Yield, ?Await] )
-//   - Statement[?Yield, ?Await, ?Return]
+//   - Statement[?Yield, ?Await, ?GetLastValue]
 //
 // - for ( [lookahead ∉ { let, async of}] LeftHandSideExpression[?Yield, ?Await] of
-//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
 //
 // - for ( var ForBinding[?Yield, ?Await] of AssignmentExpression[+In, ?Yield, ?Await]
-//   - ) Statement[?Yield, ?Await, ?Return]
+//   - ) Statement[?Yield, ?Await, ?GetLastValue]
 //
 // - for ( ForDeclaration[?Yield, ?Await] of AssignmentExpression[+In, ?Yield, ?Await]
-//   - ) Statement[?Yield, ?Await, ?Return]
+//   - ) Statement[?Yield, ?Await, ?GetLastValue]
 //
 // - [+Await] for await ( [lookahead ≠ let] LeftHandSideExpression[?Yield, ?Await] of
-//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
 //
 // - [+Await] for await ( var ForBinding[?Yield, ?Await] of
-//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
 //
 // - [+Await] for await ( ForDeclaration[?Yield, ?Await] of
-//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
 type ForInOfStatement struct {
 	IterationStatement
 	Type        ForInOfStatementType
@@ -3665,7 +3710,7 @@ func (f *ForInOfStatement) forInOfHeadEvaluation(e *Executable, c *BytecodeConte
 	if iterationKind == ForInOfIterationKindEnumerate {
 		e.AddInstruction(InsLoad)
 		// a. If exprValue is either undefined or null, then
-		//     i. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
+		//     i. GetLastValue Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
 		e.AddInstruction(InsLoad)
 		e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
 		e.AddInstruction(InsLooselyEqual)
@@ -3758,7 +3803,7 @@ func (f *ForInOfStatement) forInOfBodyEvaluation(
 			e.AddInstruction(InsPopReference)
 		}
 	} else {
-		lexicalDeclaration := &DeclarationLexical{
+		lexicalDeclaration := &LexicalDeclaration{
 			BindingList: &BindingList{
 				Items: make([]*LexicalBinding, 0),
 			},
@@ -3948,6 +3993,9 @@ func (s *StatementContinue) String() string {
 
 // MARK: - ReturnStatement
 
+// ReturnStatement [Yield, Await] :
+// - return ;
+// - return [no LineTerminator here] Expression[+In, ?Yield, ?Await] ;
 type StatementReturn struct {
 	*StatementDefaultImpl
 	Expression Expression
@@ -3965,6 +4013,19 @@ func (s *StatementReturn) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsReturn)
 }
 
+func (s *StatementReturn) Evaluation(i *IR, c *BytecodeContext) {
+	if s.Expression == nil {
+		i.Return("undefined")
+	} else {
+		i.BlockEvaluation(s.Expression, c)
+		i.Let("exprRef")
+		i.GetValue("exprRef")
+		i.Let("exprValue")
+		// TODO: GetGeneratorKind
+		i.Return("exprValue")
+	}
+}
+
 func (s *StatementReturn) String() string {
 	if s.Expression != nil {
 		return "CompletionTypeReturn " + s.Expression.String()
@@ -3974,9 +4035,12 @@ func (s *StatementReturn) String() string {
 
 // MARK: - Declaration
 
+// Declaration [Yield, Await] :
+// HoistableDeclaration[?Yield, ?Await, ~Default]
+// ClassDeclaration[?Yield, ?Await, ~Default]
+// LexicalDeclaration[+In, ?Yield, ?Await]
 type Declaration interface {
 	ASTNode
-	_declaration()
 	BoundNames() []IdentifierName
 }
 type declarationDefaultImpl struct {
@@ -3989,7 +4053,7 @@ func DeclarationBoundNames(d Declaration) (l []IdentifierName) {
 		return
 	case *DeclarationClass:
 		return decl.BoundNames()
-	case *DeclarationLexical:
+	case *LexicalDeclaration:
 		return decl.BoundNames()
 	}
 	panic("unreachable")
@@ -4001,6 +4065,12 @@ func DeclarationAnalyze(d Declaration, a AnalyzeQuery) bool {
 
 // MARK: - HoistableDeclaration
 
+// TODO: use HoistableDeclaration
+// HoistableDeclaration [Yield, Await, Default] :
+// - FunctionDeclaration[?Yield, ?Await, ?Default]
+// - GeneratorDeclaration[?Yield, ?Await, ?Default]
+// - AsyncFunctionDeclaration[?Yield, ?Await, ?Default]
+// - AsyncGeneratorDeclaration[?Yield, ?Await, ?Default]
 type DeclarationHoistable interface {
 	Declaration
 }
@@ -4014,9 +4084,12 @@ type DeclarationHoistableFunction struct {
 	FunctionDeclaration *FunctionDeclaration
 }
 
-func (d *DeclarationHoistableFunction) _declaration() {}
 func (d *DeclarationHoistableFunction) Bytecode(e *Executable, c *BytecodeContext) {
 	d.FunctionDeclaration.Bytecode(e, c)
+}
+
+func (d *DeclarationHoistableFunction) Evaluation(i *IR, c *BytecodeContext) {
+	d.FunctionDeclaration.Evaluation(i, c)
 }
 
 func (d *DeclarationHoistableFunction) BoundNames() []IdentifierName {
@@ -4442,28 +4515,40 @@ const (
 	LetOrConstConst
 )
 
-type DeclarationLexical struct {
+// LexicalDeclaration [In, Yield, Await] :
+// LetOrConst BindingList[?In, ?Yield, ?Await] ;
+type LexicalDeclaration struct {
 	Declaration
 	Type        LetOrConst
 	BindingList *BindingList
 }
 
-func (d *DeclarationLexical) IsConstantDeclaration() bool {
+func (d *LexicalDeclaration) IsConstantDeclaration() bool {
 	return d.Type == LetOrConstConst
 }
 
-func (d *DeclarationLexical) Bytecode(e *Executable, c *BytecodeContext) {
+func (d *LexicalDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	d.BindingList.Bytecode(e, c)
 }
 
-func (d *DeclarationLexical) String() string {
+// Evaluation 14.3.1.2
+func (d *LexicalDeclaration) Evaluation(i *IR, c *BytecodeContext) {
+	i.BlockEvaluation(d.BindingList, c)
+	// return EMPTY
+	i.GetValueFromName("undefined")
+}
+
+func (d *LexicalDeclaration) String() string {
 	return "LexicalDeclaration " + d.BindingList.String()
 }
 
-func (d *DeclarationLexical) BoundNames() (l []IdentifierName) {
+func (d *LexicalDeclaration) BoundNames() (l []IdentifierName) {
 	return d.BindingList.BoundNames()
 }
 
+// BindingList [In, Yield, Await] :
+// - LexicalBinding[?In, ?Yield, ?Await]
+// - BindingList[?In, ?Yield, ?Await] , LexicalBinding[?In, ?Yield, ?Await]
 type BindingList struct {
 	ASTNode
 	Items []*LexicalBinding
@@ -4482,6 +4567,12 @@ func (b *BindingList) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 }
 
+func (b *BindingList) Evaluation(i *IR, c *BytecodeContext) {
+	for _, item := range b.Items {
+		i.BlockEvaluation(item, c)
+	}
+}
+
 func (b *BindingList) String() string {
 	var sb string
 	for i, item := range b.Items {
@@ -4494,10 +4585,11 @@ func (b *BindingList) String() string {
 }
 
 // LexicalBinding [In, Yield, Await] :
-// BindingIdentifier[?Yield, ?Await] Initializer[?In, ?Yield, ?Await] opt
-// BindingPattern[?Yield, ?Await] Initializer[?In, ?Yield, ?Await]
+// - BindingIdentifier[?Yield, ?Await] Initializer[?In, ?Yield, ?Await] opt
+// - BindingPattern[?Yield, ?Await] Initializer[?In, ?Yield, ?Await]
 type LexicalBinding struct {
 	ASTNode
+	// BindingIdentifier
 	Identifier     IdentifierName
 	BindingPattern *BindingPattern
 	Initializer    Expression
@@ -4531,6 +4623,43 @@ func (l *LexicalBinding) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 }
 
+// 14.3.1.2
+func (l *LexicalBinding) Evaluation(i *IR, c *BytecodeContext) {
+	switch {
+	case l.Identifier != "" && l.Initializer == nil:
+		i.StringValue(l.Identifier)
+		i.Let("bindingId")
+		i.ResolveBinding("bindingId", false)
+		i.Let("lhs")
+		i.InitializeReferencedBinding("lhs", "undefined")
+		i.GetValueFromName("undefined")
+	case l.Identifier != "":
+		i.StringValue(l.Identifier)
+		i.Let("bindingId")
+		i.ResolveBinding("bindingId", false)
+		i.Let("lhs")
+
+		i.Value(NewExpressionValue(l.Initializer))
+		i.GetLastValue()
+		i.Let("expr")
+		i.IsAnonymousFunctionDefinition("expr")
+		i.Let("hasInitializer")
+		i.IfTrue("hasInitializer", func() {
+			i.NamedEvaluation("expr", "bindingId")
+			i.Let("value")
+		}, func() {
+			i.BlockEvaluation(l.Initializer, c)
+			i.Let("rhs")
+			i.GetValue("rhs")
+			i.Let("value")
+		})
+		i.InitializeReferencedBinding("lhs", "value")
+		i.GetValueFromName("undefined")
+	default:
+		panic("unimplemented")
+	}
+}
+
 func (l *LexicalBinding) String() string {
 	if l.Initializer != nil {
 		return string(l.Identifier) + " = " + l.Initializer.String()
@@ -4540,6 +4669,21 @@ func (l *LexicalBinding) String() string {
 
 // MARK: - FunctionDeclaration
 
+// FunctionDeclaration [Yield, Await, Default] :
+// - function BindingIdentifier[?Yield, ?Await] ( FormalParameters[~Yield, ~Await] ) {
+// - FunctionBody[~Yield, ~Await] }
+// - [+Default] function ( FormalParameters[~Yield, ~Await] ) {
+// - FunctionBody[~Yield, ~Await] }
+//
+// - FunctionExpression :
+//   - function BindingIdentifier[~Yield, ~Await] opt ( FormalParameters[~Yield, ~Await] )
+//   - { FunctionBody[~Yield, ~Await] }
+//
+// - FunctionBody[Yield, Await] :
+//   - FunctionStatementList[?Yield, ?Await]
+//
+// - FunctionStatementList[Yield, Await] :
+//   - StatementList[?Yield, ?Await, +GetLastValue] opt
 type FunctionDeclaration struct {
 	ASTNode
 	Identifier       IdentifierName
@@ -4587,7 +4731,18 @@ func (f *FunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	realm := c.agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := f.instantiateOrdinaryFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), function.ToValue(), setThrowTypeIgnore)
+}
+
+// Evaluation 15.2.6
+func (f *FunctionDeclaration) Evaluation(i *IR, c *BytecodeContext) {
+	// TODO(SM): check spec
+	realm := c.agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := f.instantiateOrdinaryFunctionObject(c.agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), function.ToValue(), setThrowTypeIgnore)
+	// return EMPTY
+	i.GetValueFromName("undefined")
 }
 
 func (f *FunctionDeclaration) String() string {
@@ -4716,6 +4871,9 @@ func (s StatementList) String() string {
 	return str
 }
 
+// StatementListItem [Yield, Await, GetLastValue] :
+// Statement[?Yield, ?Await, ?GetLastValue]
+// Declaration[?Yield, ?Await]
 type StatementListItem interface {
 	ASTNode
 	VarScopedDeclarations() []*VariableDeclaration
@@ -4785,7 +4943,7 @@ func (s *StatementListItemDeclaration) VarDeclaredNames() (l []IdentifierName) {
 
 func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDeclaration) {
 	switch d := s.Declaration.(type) {
-	case *DeclarationLexical:
+	case *LexicalDeclaration:
 		for _, bindingItem := range d.BindingList.Items {
 			l = append(l, &VariableDeclaration{
 				BindingIdentifier: bindingItem.Identifier,
@@ -4793,13 +4951,16 @@ func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDec
 			})
 		}
 	default:
-
 	}
 	return
 }
 
 func (s *StatementListItemDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	s.Declaration.Bytecode(e, c)
+}
+
+func (s *StatementListItemDeclaration) Evaluation(i *IR, b *BytecodeContext) {
+	s.Declaration.Evaluation(i, b)
 }
 
 func (s *StatementListItemDeclaration) String() string {
@@ -5006,7 +5167,7 @@ func (m ModuleItemList) VarScopedDeclarations() (l []*VariableDeclaration) {
 // ModuleItem :
 // - ImportDeclaration
 // - ExportDeclaration
-// - StatementListItem[~Yield, +Await, ~Return]
+// - StatementListItem[~Yield, +Await, ~GetLastValue]
 type ModuleItem interface {
 	String() string
 	StaticSemanticsModuleRequests

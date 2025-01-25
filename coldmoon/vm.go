@@ -352,7 +352,7 @@ func (vm *VM) execute(i Instruction) {
 		right := vm.stackPop()
 		left := vm.stackPop()
 		operator := ins.Operator
-		vm.result = applyStringOrNumericBinaryOperator(
+		vm.result = ApplyStringOrNumericBinaryOperator(
 			vm.agent, left, right, operator,
 		)
 		// EvaluateNew
@@ -605,7 +605,7 @@ func (vm *VM) execute(i Instruction) {
 	}
 }
 
-func (vm *VM) forDeclarationBindingInstantiation(lexicalDeclaration *DeclarationLexical) {
+func (vm *VM) forDeclarationBindingInstantiation(lexicalDeclaration *LexicalDeclaration) {
 	oldEnv := vm.envStack.Peek()
 	iterationEnv := NewDeclarativeEnvironment(oldEnv)
 
@@ -1472,7 +1472,7 @@ func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
 }
 
 // 13.15.3
-func applyStringOrNumericBinaryOperator(
+func ApplyStringOrNumericBinaryOperator(
 	agent *Agent,
 	lhs Value,
 	rhs Value,

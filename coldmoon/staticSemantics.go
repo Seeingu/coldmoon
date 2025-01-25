@@ -22,4 +22,8 @@ type StaticSemanticsExportEntries interface {
 	exportEntries() []ExportEntry
 }
 
+type StaticSemanticsIsAnonymousFunctionDefinition interface {
+	IsAnonymousFunctionDefinition() bool
+}
+
 // TODO: add missing semantics
