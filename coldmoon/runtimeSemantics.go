@@ -2,7 +2,7 @@ package coldmoon
 
 // 13.1.3
 type RuntimeSemanticsEvaluation interface {
-	Evaluation(i *IR, b *BytecodeContext)
+	Evaluation(vm *VM2) Value
 }
 
 // 8.4.5

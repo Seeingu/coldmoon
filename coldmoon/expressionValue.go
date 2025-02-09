@@ -5,8 +5,6 @@ type ExpressionValue struct {
 	Expression Expression
 }
 
-var _ StaticSemanticsIsAnonymousFunctionDefinition = (*ExpressionValue)(nil)
-
 func NewExpressionValue(e Expression) *ExpressionValue {
 	v := &ExpressionValue{
 		Expression: e,
@@ -20,6 +18,6 @@ func (v *ExpressionValue) String() string {
 }
 
 // TODO: implement this method
-func (v *ExpressionValue) IsAnonymousFunctionDefinition() bool {
+func IsAnonymousFunctionDefinition(expr Expression) bool {
 	return false
 }

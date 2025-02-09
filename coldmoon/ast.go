@@ -126,10 +126,13 @@ func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable, c *Byteco
 }
 
 // Evaluation 13.1.3
-func (p *PrimaryExpressionIdentifierReference) Evaluation(i *IR, c *BytecodeContext) {
-	i.StringValue(p.Identifier)
-	i.Let("id")
-	i.ResolveBinding("id", c.containedInStrictCode)
+func (p *PrimaryExpressionIdentifierReference) Evaluation(vm *VM2) Value {
+	return NewReferenceRecordValue(
+		vm.agent.ResolveBinding(
+			p.Identifier,
+			nil, vm.containedInStrictCode,
+		),
+	)
 }
 
 func (p *PrimaryExpressionIdentifierReference) String() string {
@@ -158,8 +161,8 @@ func (p *PrimaryExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // Evaluation Literal 13.2.3.1
-func (p *PrimaryExpressionLiteral) Evaluation(i *IR, c *BytecodeContext) {
-	i.BlockEvaluation(p.Literal, c)
+func (p *PrimaryExpressionLiteral) Evaluation(vm *VM2) Value {
+	return p.Literal.Evaluation(vm)
 }
 
 func (p *PrimaryExpressionLiteral) String() string {
@@ -746,34 +749,20 @@ func (m *MemberExpression) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // Evaluation 13.3.2.1
-func (m *MemberExpression) Evaluation(i *IR, b *BytecodeContext) {
-	m.Member.Evaluation(i, b)
-	i.Let("baseReference")
-
-	i.GetValue("baseReference")
-	i.Let("baseValue")
-
-	strict := b.containedInStrictCode
+func (m *MemberExpression) Evaluation(vm *VM2) Value {
+	baseReference := m.Member.Evaluation(vm)
+	baseValue := baseReference.GetValue(vm.agent)
+	strict := vm.containedInStrictCode
 
 	switch prop := m.Property.(type) {
 	case *ASTPropertyExpression:
-		i.BlockEvaluation(prop.Expression, b)
-		i.Let("Expression")
-
-		i.AddInstruction(&IEvaluatePropertyAccessWithExpressionKeyV2{
-			baseValue:  "baseValue",
-			expression: "Expression",
-			strict:     strict,
-		})
+		panic("unimplemented")
 	case *ASTPropertyIdentifier:
-		i.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKeyV2{
-			baseValue:      "baseValue",
-			identifierName: prop.Identifier,
-			strict:         strict,
-		})
-
+		return NewReferenceRecordValue(
+			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, prop.Identifier, strict),
+		)
 	}
-	i.GetLastValue()
+	panic("unimplemented")
 }
 
 func (m *MemberExpression) String() string {
@@ -810,9 +799,8 @@ func (l *LiteralNull) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: NullValue})
 }
 
-func (l *LiteralNull) Evaluation(i *IR, c *BytecodeContext) {
-	i.Value(NullValue)
-	i.GetLastValue()
+func (l *LiteralNull) Evaluation(vm *VM2) Value {
+	return NullValue
 }
 
 func (l *LiteralNull) String() string {
@@ -830,9 +818,8 @@ func (l *LiteralUndefined) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // 13.2.3.1
-func (l *LiteralUndefined) Evaluation(i *IR, c *BytecodeContext) {
-	i.Value(UndefinedValue)
-	i.GetLastValue()
+func (l *LiteralUndefined) Evaluation(vm *VM2) Value {
+	return UndefinedValue
 }
 
 func (l *LiteralUndefined) String() string {
@@ -850,13 +837,8 @@ func (l *LiteralBoolean) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: NewBooleanValue(l.Bool)})
 }
 
-func (l *LiteralBoolean) Evaluation(i *IR, c *BytecodeContext) {
-	if l.Bool {
-		i.Value(TrueValue)
-	} else {
-		i.Value(FalseValue)
-	}
-	i.GetLastValue()
+func (l *LiteralBoolean) Evaluation(vm *VM2) Value {
+	return NewBooleanValue(l.Bool)
 }
 
 func (l *LiteralBoolean) String() string {
@@ -922,13 +904,12 @@ func (l *LiteralNumeric) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: v})
 }
 
-func (l *LiteralNumeric) Evaluation(i *IR, c *BytecodeContext) {
+func (l *LiteralNumeric) Evaluation(vm *VM2) Value {
 	v, err := l.NumericValue()
 	if err != nil {
 		panic(err)
 	}
-	i.Value(v)
-	i.GetLastValue()
+	return v
 }
 
 func (l *LiteralNumeric) String() string {
@@ -937,6 +918,7 @@ func (l *LiteralNumeric) String() string {
 
 // MARK: - LiteralString
 
+// TODO(SM): rename to StringLiteral
 type LiteralString struct {
 	Literal
 	Value string
@@ -954,9 +936,8 @@ func (l *LiteralString) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // 13.2.3.1
-func (l *LiteralString) Evaluation(i *IR, c *BytecodeContext) {
-	i.Value(l.StringValue())
-	i.GetLastValue()
+func (l *LiteralString) Evaluation(vm *VM2) Value {
+	return l.StringValue()
 }
 
 func (l *LiteralString) String() string {
@@ -1834,27 +1815,17 @@ func (b *ExpressionBinaryExpression) Bytecode(e *Executable, c *BytecodeContext)
 }
 
 // 13.15.4
-func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(i *IR, c *BytecodeContext) {
-	i.BlockEvaluation(b.Left, c)
-	i.Let("lref")
-	i.GetValue("lref")
-	i.Let("lval")
+func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM2) Value {
+	lref := b.Left.Evaluation(vm)
+	lval := lref.GetValue(vm.agent)
 
-	i.BlockEvaluation(b.Right, c)
-	i.Let("rref")
-	i.GetValue("rref")
-	i.Let("rval")
-
-	i.AddInstruction(&IEvaluateStringOrNumericBinaryExpression{
-		left:     "lval",
-		right:    "rval",
-		operator: b.Operator,
-	})
+	rref := b.Right.Evaluation(vm)
+	rval := rref.GetValue(vm.agent)
+	return vm.ApplyStringOrNumericBinaryOperator(lval, rval, b.Operator)
 }
 
-func (b *ExpressionBinaryExpression) Evaluation(i *IR, c *BytecodeContext) {
-	b.EvaluateStringOrNumericBinaryExpression(i, c)
-	i.GetLastValue()
+func (b *ExpressionBinaryExpression) Evaluation(vm *VM2) Value {
+	return b.EvaluateStringOrNumericBinaryExpression(vm)
 }
 
 func (b *ExpressionBinaryExpression) String() string {
@@ -2106,33 +2077,24 @@ func (e *EqualityExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 }
 
 // 13.11.1
-func (e *EqualityExpression) Evaluation(i *IR, b *BytecodeContext) {
-	i.BlockEvaluation(e.Left, b)
-	i.Let("lref")
+func (e *EqualityExpression) Evaluation(vm *VM2) Value {
+	lref := e.Left.Evaluation(vm)
+	lval := lref.GetValue(vm.agent)
 
-	i.GetValue("lref")
-	i.Let("lval")
-
-	i.BlockEvaluation(e.Right, b)
-	i.Let("rref")
-
-	i.GetValue("rref")
-	i.Let("rval")
+	rref := e.Right.Evaluation(vm)
+	rval := rref.GetValue(vm.agent)
 
 	switch e.Operator {
 	case EqualityOperatorEqual:
-		i.IsLooselyEqual("rval", "lval")
+		return NewBooleanValue(IsLooselyEqual(vm.agent, lval, rval))
 	case EqualityOperatorNotEqual:
-		i.IsLooselyEqual("rval", "lval")
-		i.Let("temp")
-		i.LogicalNot("temp")
+		return NewBooleanValue(!IsLooselyEqual(vm.agent, lval, rval))
 	case EqualityOperatorStrictEqual:
-		i.IsStrictlyEqual("rval", "lval")
+		return NewBooleanValue(IsStrictlyEqual(lval, rval))
 	case EqualityOperatorStrictNotEqual:
-		i.IsStrictlyEqual("rval", "lval")
-		i.Let("temp")
-		i.LogicalNot("temp")
+		return NewBooleanValue(!IsStrictlyEqual(lval, rval))
 	}
+	panic("unreachable")
 }
 
 func (e *EqualityExpression) String() string {
@@ -2226,18 +2188,12 @@ func (e *RelationalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 }
 
 // 13.10.1
-func (e *RelationalExpression) Evaluation(i *IR, b *BytecodeContext) {
-	i.BlockEvaluation(e.Left, b)
-	i.Let("lref")
+func (e *RelationalExpression) Evaluation(vm *VM2) Value {
+	lref := e.Left.Evaluation(vm)
+	lval := lref.GetValue(vm.agent)
 
-	i.GetValue("lref")
-	i.Let("lval")
-
-	i.BlockEvaluation(e.Right, b)
-	i.Let("rref")
-
-	i.GetValue("rref")
-	i.Let("rval")
+	rref := e.Right.Evaluation(vm)
+	rval := rref.GetValue(vm.agent)
 
 	switch e.Operator {
 	case RelationalOperatorLessThan, RelationalOperatorGreaterThan:
@@ -2247,17 +2203,7 @@ func (e *RelationalExpression) Evaluation(i *IR, b *BytecodeContext) {
 		} else {
 			order = IsLessThanOrderRightFirst
 		}
-		i.IsLessThan("lval", "rval", order)
-		i.Let("r")
-		i.IsStrictlyEqual("r", "undefined")
-		i.Let("cond")
-		i.IfTrue("cond", func() {
-			i.GetValueFromName("false")
-			i.GetLastValue()
-		}, func() {
-			i.GetValueFromName("r")
-			i.GetLastValue()
-		})
+		return NewBooleanValue(IsLessThan(vm.agent, lval, rval, order))
 	case RelationalOperatorLessThanOrEqual, RelationalOperatorGreaterThanOrEqual:
 		var order isLessThanOrder
 		if e.Operator == RelationalOperatorLessThanOrEqual {
@@ -2265,27 +2211,13 @@ func (e *RelationalExpression) Evaluation(i *IR, b *BytecodeContext) {
 		} else {
 			order = IsLessThanOrderLeftFirst
 		}
-		i.IsLessThan("lval", "rval", order)
-		i.Let("r")
-		i.IsStrictlyEqual("r", "undefined")
-		i.Let("r_is_undefined")
-		// TODO: or short circuit
-		i.IsStrictlyEqual("r", "true")
-		i.Let("r_is_true")
-		i.Or("r_is_undefined", "r_is_true")
-		i.Let("cond")
-		i.IfTrue("cond", func() {
-			i.GetValueFromName("false")
-			i.GetLastValue()
-		}, func() {
-			i.GetValueFromName("true")
-			i.GetLastValue()
-		})
+		return NewBooleanValue(!IsLessThan(vm.agent, rval, lval, order))
 	case RelationalOperatorInstanceof:
 		panic("unimplemented")
 	case RelationalOperatorIn:
 		panic("unimplemented")
 	}
+	panic("unreachable")
 }
 
 func (e *RelationalExpression) String() string {
@@ -2432,31 +2364,21 @@ func (a Arguments) Bytecode(e *Executable, c *BytecodeContext) {
 // Evaluation 13.3.8.1
 // ArgumentListEvaluation
 // TODO(XXX): can we split it out based on different types of arguments?
-func (a Arguments) Evaluation(i *IR, b *BytecodeContext) {
+func (a Arguments) Evaluation(vm *VM2) Value {
 	// Assigment
 	if len(a) == 0 {
-		i.List("")
+		return NewListValue([]Value{})
 	} else if len(a) == 1 {
-		i.BlockEvaluation(a[0], b)
-		i.Let("ref")
-
-		i.GetValue("ref")
-		i.Let("arg")
-		i.List("arg")
+		ref := a[0].Evaluation(vm)
+		arg := ref.GetValue(vm.agent)
+		return NewListValue([]Value{arg})
 	} else if len(a) > 1 {
-		i.BlockEvaluation(a[:len(a)-1], b)
-		i.Let("precedingArgs")
-
-		i.BlockEvaluation(a[len(a)-1], b)
-		i.Let("ref")
-
-		i.GetValue("ref")
-		i.Let("arg")
-		i.List("arg")
-		i.Let("_argList")
-
-		i.AddInstruction(&IListConcatenation{"precedingArgs", "_argList"})
-		i.GetLastValue()
+		precedingArgs := a[:len(a)-1].Evaluation(vm)
+		ref := a[len(a)-1].Evaluation(vm)
+		arg := ref.GetValue(vm.agent)
+		return NewListValue(append(precedingArgs.(*ListValue).Values, arg))
+	} else {
+		panic("unimplemented")
 	}
 }
 
@@ -2505,12 +2427,9 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 
 // TODO(SM): WIP
 // Evaluation 13.3.6.1
-func (c *CallExpression) Evaluation(i *IR, b *BytecodeContext) {
-	i.BlockEvaluation(c.Callee, b)
-	i.Let("ref")
-
-	i.GetValue("ref")
-	i.Let("func")
+func (c *CallExpression) Evaluation(vm *VM2) Value {
+	ref := c.Callee.Evaluation(vm)
+	f := ref.GetValue(vm.agent)
 
 	// TODO: this ref
 	// i.This(c)
@@ -2520,15 +2439,8 @@ func (c *CallExpression) Evaluation(i *IR, b *BytecodeContext) {
 	// i.IsInTailPosition()
 	// i.Let("tailPosition")
 
-	i.BlockEvaluation(c.Arguments, b)
-	i.Let("Arguments")
-	i.AddInstruction(&IEvaluateCall{
-		fun:          "func",
-		ref:          "ref",
-		arguments:    "Arguments",
-		tailPosition: "tailPosition",
-	})
-	i.GetLastValue()
+	arguments := c.Arguments.Evaluation(vm)
+	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, false)
 }
 
 func (c *CallExpression) String() string {
@@ -2881,8 +2793,8 @@ func (s *StatementExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 }
 
-func (s *StatementExpression) Evaluation(i *IR, b *BytecodeContext) {
-	s.Expression.Evaluation(i, b)
+func (s *StatementExpression) Evaluation(vm *VM2) Value {
+	return s.Expression.Evaluation(vm)
 }
 
 func (s *StatementExpression) String() string {
@@ -2968,8 +2880,8 @@ func (f *FunctionBody) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // TODO(spec)
-func (f *FunctionBody) Evaluation(ir *IR, c *BytecodeContext) {
-	f.StatementList.Evaluation(ir, c)
+func (f *FunctionBody) Evaluation(vm *VM2) Value {
+	return f.StatementList.Evaluation(vm)
 }
 
 func (f *FunctionBody) String() string {
@@ -3590,7 +3502,7 @@ func (s *ForStatement) isVariableDeclarationList() bool {
 }
 
 // ForLoopEvaluation 14.7.4.2
-func (s *ForStatement) ForLoopEvaluation(i *IR, c *BytecodeContext) {
+func (s *ForStatement) ForLoopEvaluation(vm *VM2) Value {
 	panic("unimplemented")
 }
 
@@ -4029,16 +3941,14 @@ func (s *StatementReturn) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsReturn)
 }
 
-func (s *StatementReturn) Evaluation(i *IR, c *BytecodeContext) {
+func (s *StatementReturn) Evaluation(vm *VM2) Value {
 	if s.Expression == nil {
-		i.Return("undefined")
+		return UndefinedValue
 	} else {
-		i.BlockEvaluation(s.Expression, c)
-		i.Let("exprRef")
-		i.GetValue("exprRef")
-		i.Let("exprValue")
+		exprRef := s.Expression.Evaluation(vm)
+		exprValue := exprRef.GetValue(vm.agent)
 		// TODO: GetGeneratorKind
-		i.Return("exprValue")
+		return exprValue
 	}
 }
 
@@ -4104,8 +4014,8 @@ func (d *DeclarationHoistableFunction) Bytecode(e *Executable, c *BytecodeContex
 	d.FunctionDeclaration.Bytecode(e, c)
 }
 
-func (d *DeclarationHoistableFunction) Evaluation(i *IR, c *BytecodeContext) {
-	d.FunctionDeclaration.Evaluation(i, c)
+func (d *DeclarationHoistableFunction) Evaluation(vm *VM2) Value {
+	return d.FunctionDeclaration.Evaluation(vm)
 }
 
 func (d *DeclarationHoistableFunction) BoundNames() []IdentifierName {
@@ -4548,10 +4458,10 @@ func (d *LexicalDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // Evaluation 14.3.1.2
-func (d *LexicalDeclaration) Evaluation(i *IR, c *BytecodeContext) {
-	i.BlockEvaluation(d.BindingList, c)
+func (d *LexicalDeclaration) Evaluation(vm *VM2) Value {
+	d.BindingList.Evaluation(vm)
 	// return EMPTY
-	i.GetValueFromName("undefined")
+	return UndefinedValue
 }
 
 func (d *LexicalDeclaration) String() string {
@@ -4583,10 +4493,12 @@ func (b *BindingList) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 }
 
-func (b *BindingList) Evaluation(i *IR, c *BytecodeContext) {
+func (b *BindingList) Evaluation(vm *VM2) Value {
+	var list []Value
 	for _, item := range b.Items {
-		i.BlockEvaluation(item, c)
+		list = append(list, item.Evaluation(vm))
 	}
+	return NewListValue(list)
 }
 
 func (b *BindingList) String() string {
@@ -4640,40 +4552,26 @@ func (l *LexicalBinding) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // 14.3.1.2
-func (l *LexicalBinding) Evaluation(i *IR, c *BytecodeContext) {
+func (l *LexicalBinding) Evaluation(vm *VM2) Value {
 	switch {
 	case l.Identifier != "" && l.Initializer == nil:
-		i.StringValue(l.Identifier)
-		i.Let("bindingId")
-		i.ResolveBinding("bindingId", false)
-		i.Let("lhs")
-		i.InitializeReferencedBinding("lhs", "undefined")
-		i.GetValueFromName("undefined")
+		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
+		lhs.InitializeReferencedBinding(UndefinedValue)
 	case l.Identifier != "":
-		i.StringValue(l.Identifier)
-		i.Let("bindingId")
-		i.ResolveBinding("bindingId", false)
-		i.Let("lhs")
-
-		i.Value(NewExpressionValue(l.Initializer))
-		i.GetLastValue()
-		i.Let("expr")
-		i.IsAnonymousFunctionDefinition("expr")
-		i.Let("hasInitializer")
-		i.IfTrue("hasInitializer", func() {
-			i.NamedEvaluation("expr", "bindingId")
-			i.Let("value")
-		}, func() {
-			i.BlockEvaluation(l.Initializer, c)
-			i.Let("rhs")
-			i.GetValue("rhs")
-			i.Let("value")
-		})
-		i.InitializeReferencedBinding("lhs", "value")
-		i.GetValueFromName("undefined")
-	default:
-		panic("unimplemented")
+		// LexicalBinding : BindingIdentifier Initializer
+		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
+		if IsAnonymousFunctionDefinition(l.Initializer) {
+			// FIXME: handle named evaluation
+			panic("")
+		} else {
+			rhs := l.Initializer.Evaluation(vm)
+			value := rhs.GetValue(vm.agent)
+			lhs.InitializeReferencedBinding(value)
+		}
+		// return EMPTY
+		return UndefinedValue
 	}
+	panic("unimplemented")
 }
 
 func (l *LexicalBinding) String() string {
@@ -4751,14 +4649,14 @@ func (f *FunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // Evaluation 15.2.6
-func (f *FunctionDeclaration) Evaluation(i *IR, c *BytecodeContext) {
+func (f *FunctionDeclaration) Evaluation(vm *VM2) Value {
 	// TODO(SM): check spec
-	realm := c.agent.CurrentRealm()
+	realm := vm.agent.CurrentRealm()
 	env := realm.GlobalEnv
-	function := f.instantiateOrdinaryFunctionObject(c.agent, env, nil)
+	function := f.instantiateOrdinaryFunctionObject(vm.agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), function.ToValue(), setThrowTypeIgnore)
 	// return EMPTY
-	i.GetValueFromName("undefined")
+	return UndefinedValue
 }
 
 func (f *FunctionDeclaration) String() string {
@@ -4867,10 +4765,15 @@ func (s StatementList) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 }
 
-func (s StatementList) Evaluation(i *IR, b *BytecodeContext) {
+func (s StatementList) Evaluation(vm *VM2) Value {
+	var lastValue Value
 	for _, item := range s {
-		item.Evaluation(i, b)
+		lastValue = item.Evaluation(vm)
 	}
+	if lastValue == nil {
+		return UndefinedValue
+	}
+	return lastValue
 }
 
 func (s StatementList) String() string {
@@ -4934,8 +4837,8 @@ func (s *StatementListItemStatement) Bytecode(e *Executable, c *BytecodeContext)
 	s.Statement.Bytecode(e, c)
 }
 
-func (s *StatementListItemStatement) Evaluation(i *IR, b *BytecodeContext) {
-	s.Statement.Evaluation(i, b)
+func (s *StatementListItemStatement) Evaluation(vm *VM2) Value {
+	return s.Statement.Evaluation(vm)
 }
 
 func (s *StatementListItemStatement) String() string {
@@ -4975,8 +4878,8 @@ func (s *StatementListItemDeclaration) Bytecode(e *Executable, c *BytecodeContex
 	s.Declaration.Bytecode(e, c)
 }
 
-func (s *StatementListItemDeclaration) Evaluation(i *IR, b *BytecodeContext) {
-	s.Declaration.Evaluation(i, b)
+func (s *StatementListItemDeclaration) Evaluation(vm *VM2) Value {
+	return s.Declaration.Evaluation(vm)
 }
 
 func (s *StatementListItemDeclaration) String() string {
@@ -4992,8 +4895,8 @@ func (e *ExpressionStatement) Bytecode(ex *Executable, c *BytecodeContext) {
 	e.Expression.Bytecode(ex, c)
 }
 
-func (e *ExpressionStatement) Evaluation(i *IR, b *BytecodeContext) {
-	e.Expression.Evaluation(i, b)
+func (e *ExpressionStatement) Evaluation(vm *VM2) Value {
+	return e.Expression.Evaluation(vm)
 }
 
 func (e *ExpressionStatement) String() string {
@@ -5011,8 +4914,8 @@ func (s *Script) Bytecode(e *Executable, c *BytecodeContext) {
 	s.StatementList.Bytecode(e, c)
 }
 
-func (s *Script) Evaluation(i *IR, c *BytecodeContext) {
-	s.StatementList.Evaluation(i, c)
+func (s *Script) Evaluation(vm *VM2) Value {
+	return s.StatementList.Evaluation(vm)
 }
 
 func (s *Script) String() string {
@@ -5051,17 +4954,19 @@ func (m *Module) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 // TODO: spec reference
-func (m *Module) Evaluation(i *IR, b *BytecodeContext) {
+func (m *Module) Evaluation(vm *VM2) Value {
+	var list []Value
 	for _, moduleItem := range m.ModuleItemList {
 		switch stmt := moduleItem.(type) {
 		case *ModuleItemImportDeclaration:
 			panic("unimplemented")
 		case *ModuleItemStatementListItem:
-			stmt.Evaluation(i, b)
+			list = append(list, stmt.Evaluation(vm))
 		default:
 			panic("unimplemented")
 		}
 	}
+	return NewListValue(list)
 }
 
 func (m *Module) String() string {
@@ -5205,8 +5110,8 @@ func (m *ModuleItemStatementListItem) Bytecode(e *Executable, c *BytecodeContext
 	m.StatementListItem.Bytecode(e, c)
 }
 
-func (m *ModuleItemStatementListItem) Evaluation(i *IR, b *BytecodeContext) {
-	m.StatementListItem.Evaluation(i, b)
+func (m *ModuleItemStatementListItem) Evaluation(vm *VM2) Value {
+	return m.StatementListItem.Evaluation(vm)
 }
 
 func (m *ModuleItemStatementListItem) String() string {
@@ -5281,7 +5186,7 @@ func (m *ModuleItemExportDeclaration) Bytecode(e *Executable, c *BytecodeContext
 	}
 }
 
-func (m *ModuleItemExportDeclaration) Evaluation(i *IR, b *BytecodeContext) {
+func (m *ModuleItemExportDeclaration) Evaluation(vm *VM2) Value {
 	panic("unimplemented")
 }
 
