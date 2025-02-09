@@ -1203,7 +1203,7 @@ func (p *Parser) bindingPattern() *BindingPattern {
 	return b
 }
 
-func (p *Parser) forStatement() *StatementFor {
+func (p *Parser) forStatement() *ForStatement {
 	p.tokenizer.MustMatch(TFor)
 	p.tokenizer.MustMatch(TLeftParen)
 	var init ForStatementInitializer
@@ -1235,7 +1235,7 @@ func (p *Parser) forStatement() *StatementFor {
 	p.tokenizer.MustMatch(TRightParen)
 	body := p.statement()
 
-	return &StatementFor{
+	return &ForStatement{
 		Initializer: init,
 		Condition:   condition,
 		Increment:   increment,

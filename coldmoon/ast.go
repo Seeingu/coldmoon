@@ -2073,7 +2073,6 @@ type EqualityExpression struct {
 	// EqualityExpression
 	Left     Expression
 	Operator EqualityOperator
-	// TODO(SM): relational expression
 	// RelationalExpression
 	Right Expression
 }
@@ -3500,7 +3499,12 @@ func (f *ForStatementInitializerLexicalDeclaration) String() string {
 	return f.LexicalDeclaration.String()
 }
 
-type StatementFor struct {
+// ForStatement :
+// for ( LexicalDeclaration ; ) Statement
+// for ( LexicalDeclaration ; Expression ) Statement
+// for ( LexicalDeclaration Expression ; ) Statement
+// for ( LexicalDeclaration Expression ; Expression ) Statement
+type ForStatement struct {
 	IterationStatement
 	Initializer ForStatementInitializer
 	Condition   Expression
@@ -3508,7 +3512,7 @@ type StatementFor struct {
 	Body        Statement
 }
 
-func (s *StatementFor) VarScopedDeclarations() (l []*VariableDeclaration) {
+func (s *ForStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	if s.Initializer != nil {
 		if varStatement, ok := s.Initializer.(*ForStatementInitializerVariable); ok {
 			l = append(l, varStatement.VariableStatement.DeclarationList.VarScopedDeclarations()...)
@@ -3518,7 +3522,7 @@ func (s *StatementFor) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return
 }
 
-func (s *StatementFor) Bytecode(e *Executable, c *BytecodeContext) {
+func (s *ForStatement) Bytecode(e *Executable, c *BytecodeContext) {
 	if s.Initializer != nil {
 		switch initializer := s.Initializer.(type) {
 		case *ForStatementInitializerExpression:
@@ -3578,7 +3582,19 @@ func (s *StatementFor) Bytecode(e *Executable, c *BytecodeContext) {
 	c.breakJumpIndices.Clear()
 }
 
-func (s *StatementFor) String() string {
+// isVariableDeclarationList identifies
+// ForStatement : for ( var VariableDeclarationList ; Expression opt ; Expression opt ) Statement
+func (s *ForStatement) isVariableDeclarationList() bool {
+	_, ok := s.Initializer.(*ForStatementInitializerVariable)
+	return ok
+}
+
+// ForLoopEvaluation 14.7.4.2
+func (s *ForStatement) ForLoopEvaluation(i *IR, c *BytecodeContext) {
+	panic("unimplemented")
+}
+
+func (s *ForStatement) String() string {
 	sb := "For"
 	if s.Initializer != nil {
 		sb += " " + s.Initializer.String()
