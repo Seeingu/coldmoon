@@ -491,7 +491,7 @@ func IsIntegralNumber(value Value) bool {
 
 // 7.2.10
 func SameValue(x Value, y Value) bool {
-	if ValueType(x) != ValueType(y) {
+	if x.TypeString() != y.TypeString() {
 		return false
 	}
 	if number, ok := x.(*NumberValue); ok {
@@ -503,7 +503,7 @@ func SameValue(x Value, y Value) bool {
 
 // 7.2.11
 func SameValueZero(x Value, y Value) bool {
-	if ValueType(x) != ValueType(y) {
+	if x.TypeString() != y.TypeString() {
 		return false
 	}
 	if number, ok := x.(*NumberValue); ok {
@@ -515,7 +515,7 @@ func SameValueZero(x Value, y Value) bool {
 
 // 7.2.12
 func SameValueNonNumber(x Value, y Value) bool {
-	Assert(ValueType(x) == ValueType(y))
+	Assert(x.TypeString() == y.TypeString())
 	switch x.(type) {
 	case *undefinedValue, *nullValue:
 		return true
@@ -897,30 +897,6 @@ func ParsePattern(pattern string, unicode bool, unicodeSets bool) (r *regexp2.Re
 		return regexp2.Compile(pattern, regexp2.Unicode)
 	}
 	return regexp2.Compile(pattern, regexp2.None)
-}
-
-// Deprecated: use baseValue.TypeString
-func ValueType(value Value) string {
-	switch value.(type) {
-	case *undefinedValue:
-		return "undefined"
-	case *nullValue:
-		return "object"
-	case *BooleanValue:
-		return "boolean"
-	case *StringValue:
-		return "string"
-	case *NumberValue:
-		return "number"
-	case *BigIntValue:
-		return "bigint"
-	case *SymbolValue:
-		return "symbol"
-	case *ObjectValue:
-		return "object"
-	default:
-		panic("unreachable")
-	}
 }
 
 func MustGetObject(value Value) ObjectType {

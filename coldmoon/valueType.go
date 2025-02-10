@@ -12,6 +12,7 @@ type Value interface {
 	AOGetValue
 	// --- internal methods ---
 
+	// TypeString is aligned with spec's Type()
 	TypeString() string
 	String() string
 	ToCompletion() CompletionValue
