@@ -337,7 +337,7 @@ a.b;`,
 for (var i = 0; i < 3; i++) {
 	a += i;
 }
-a;`,
+assert(a === 4);`,
 		`var a = [];
 var a = [1,2,3];
 a[4294967295] = "not an array element";
@@ -385,6 +385,13 @@ true ? 2 : 1;
 
 func TestBaseline2(t *testing.T) {
 	sourceTexts := []string{
+		`
+let a = 1;
+for (var i = 0; i < 3; i++) {
+	a += i;
+}
+assert(a === 4);
+`,
 		`
 function toString(a) {
     return a;

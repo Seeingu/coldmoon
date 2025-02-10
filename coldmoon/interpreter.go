@@ -63,3 +63,48 @@ func (v *VM2) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool)
 	// TODO(SM): argumentsList
 	return evaluateCall(agent, fun, thisValue, arguments)
 }
+
+type LabelSet = []string
+
+// 14.7.4.3
+func (v *VM2) ForBodyEvaluation(test, increment Expression, stmt Statement, perIterationBindings []string, labelSet LabelSet) Value {
+	var V Value = UndefinedValue
+	CreatePerIterationEnvironment(perIterationBindings)
+	for {
+		if test != nil {
+			testRef := test.Evaluation(v)
+			testValue := testRef.GetValue(v.agent)
+			if !testValue.ToBoolean() {
+				return V
+			}
+			result := stmt.Evaluation(v)
+			if !LoopContinues(result, labelSet) {
+				return UpdateEmpty(result, V)
+			}
+			if !IsUndefinedOrNil(result) {
+				V = result
+				CreatePerIterationEnvironment(perIterationBindings)
+				if increment != nil {
+					incRef := increment.Evaluation(v)
+					incRef.GetValue(v.agent)
+				}
+			}
+		}
+	}
+}
+
+func CreatePerIterationEnvironment(perIterationBindings []string) {
+	// TODO
+}
+
+// 14.7.1.1
+func LoopContinues(result Value, labelSet LabelSet) bool {
+	// TODO
+	return true
+}
+
+// 6.2.4.3
+func UpdateEmpty(result, V Value) Value {
+	// TODO
+	return UndefinedValue
+}

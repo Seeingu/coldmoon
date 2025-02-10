@@ -1398,6 +1398,12 @@ func (u UpdateExpressionType) String() string {
 	return ""
 }
 
+// UpdateExpression [Yield, Await] :
+// LeftHandSideExpression[?Yield, ?Await]
+// LeftHandSideExpression[?Yield, ?Await] [no LineTerminator here] ++
+// LeftHandSideExpression[?Yield, ?Await] [no LineTerminator here]--
+// ++ UnaryExpression[?Yield, ?Await]
+// -- UnaryExpression[?Yield, ?Await]
 type ExpressionUpdate struct {
 	Expression
 	Type     UpdateExpressionType
@@ -1438,6 +1444,40 @@ func (e *ExpressionUpdate) Bytecode(ex *Executable, c *BytecodeContext) {
 	}
 }
 
+func (e *ExpressionUpdate) isPrefix() bool {
+	return e.Type == UpdateExpressionTypePrefix
+}
+
+// postfix: 13.4.2.1/13.4.3.1
+// prefix: 13.4.4.1/13.4.5.1
+func (e *ExpressionUpdate) Evaluation(vm *VM2) Value {
+	expr := e.Operand.Evaluation(vm)
+	oldValue := ToNumeric(vm.agent, expr.GetValue(vm.agent))
+	var newValue Value
+	if n, ok := oldValue.(*NumberValue); ok {
+		one := NewNumberValue(1)
+		if e.Operator == UpdateOperatorIncrement {
+			newValue = n.Add(one)
+		} else {
+			newValue = n.Subtract(one)
+		}
+	} else {
+		Assert(ValueIs[*BigIntValue](oldValue))
+		bi := oldValue.(*BigIntValue)
+		one := NewBigIntValue(big.NewInt(1))
+		if e.Operator == UpdateOperatorIncrement {
+			newValue = bi.Add(one)
+		} else {
+			newValue = bi.Subtract(one)
+		}
+	}
+	expr.(*ReferenceRecordValue).ReferenceRecord.PutValue(vm.agent, newValue)
+	if e.isPrefix() {
+		return newValue
+	}
+	return oldValue
+}
+
 func (e *ExpressionUpdate) String() string {
 	if e.Type == UpdateExpressionTypePrefix {
 		return e.Operator.String() + e.Operand.String()
@@ -1447,7 +1487,40 @@ func (e *ExpressionUpdate) String() string {
 
 // MARK: - AssignmentExpression
 
+// TODO: standardlize
+// AssignmentOperator : one of
+// *= /= %= += -= <<= >>= >>>= &= ^= |= **=
 type AssignmentOperator int
+
+func (a AssignmentOperator) ToBinaryOperator() BinaryOperator {
+	switch a {
+	case AssignmentOperatorAddition:
+		return BinaryOperatorAddition
+	case AssignmentOperatorSubtraction:
+		return BinaryOperatorSubtraction
+	case AssignmentOperatorMultiplication:
+		return BinaryOperatorMultiplication
+	case AssignmentOperatorDivision:
+		return BinaryOperatorDivision
+	case AssignmentOperatorRemainder:
+		return BinaryOperatorRemainder
+	case AssignmentOperatorLeftShift:
+		return BinaryOperatorLeftShift
+	case AssignmentOperatorRightShift:
+		return BinaryOperatorRightShift
+	case AssignmentOperatorUnsignedRightShift:
+		return BinaryOperatorUnsignedRightShift
+	case AssignmentOperatorBitwiseAnd:
+		return BinaryOperatorBitwiseAnd
+	case AssignmentOperatorBitwiseXor:
+		return BinaryOperatorBitwiseXor
+	case AssignmentOperatorBitwiseOr:
+		return BinaryOperatorBitwiseOr
+	case AssignmentOperatorExponentiation:
+		return BinaryOperatorExponentiation
+	}
+	panic("unreachable")
+}
 
 func (a AssignmentOperator) String() string {
 	switch a {
@@ -1525,6 +1598,20 @@ var operatorAssignmentMap = map[TokenType]AssignmentOperator{
 	TQuestionQuestionEquals:   AssignmentOperatorNullishCoalescing,
 }
 
+// AssignmentExpression [In, Yield, Await] :
+// ConditionalExpression[?In, ?Yield, ?Await]
+// [+Yield] YieldExpression[?In, ?Await]
+// ArrowFunction[?In, ?Yield, ?Await]
+// AsyncArrowFunction[?In, ?Yield, ?Await]
+// LeftHandSideExpression[?Yield, ?Await] = AssignmentExpression[?In, ?Yield, ?Await]
+// LeftHandSideExpression[?Yield, ?Await] AssignmentOperator
+// AssignmentExpression[?In, ?Yield, ?Await]
+// LeftHandSideExpression[?Yield, ?Await] &&=
+// AssignmentExpression[?In, ?Yield, ?Await]
+// LeftHandSideExpression[?Yield, ?Await] ||=
+// AssignmentExpression[?In, ?Yield, ?Await]
+// LeftHandSideExpression[?Yield, ?Await] ??=
+// AssignmentExpression[?In, ?Yield, ?Await]
 type AssignmentExpression struct {
 	Expression
 	Left     Expression
@@ -1673,6 +1760,26 @@ func (e *AssignmentExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 
 		endJump.Target = len(ex.Instructions) - 1
 		ex.AddInstruction(InsPopReference)
+	}
+}
+
+func (e *AssignmentExpression) astIsAssign() bool {
+	return e.Operator == AssignmentOperatorAssign
+}
+
+// 13.15.2
+func (e *AssignmentExpression) Evaluation(vm *VM2) Value {
+	if e.astIsAssign() {
+		panic("unimplemented")
+	} else {
+		// TODO: handle &&= ||=, ??=
+		lref := e.Left.Evaluation(vm)
+		lval := lref.GetValue(vm.agent)
+		rref := e.Right.Evaluation(vm)
+		rval := rref.GetValue(vm.agent)
+		r := ApplyStringOrNumericBinaryOperator(vm.agent, lval, rval, e.Operator.ToBinaryOperator())
+		lref.(*ReferenceRecordValue).ReferenceRecord.PutValue(vm.agent, r)
+		return r
 	}
 }
 
@@ -2504,6 +2611,7 @@ func StatementAnalyze(s Statement, a AnalyzeQuery) bool {
 
 // MARK: - VariableStatement
 
+// TODO(SM): remove
 type StatementVariable struct {
 	Statement
 	DeclarationList *VariableDeclarationList
@@ -2520,10 +2628,17 @@ func (s *StatementVariable) Bytecode(e *Executable, c *BytecodeContext) {
 	s.DeclarationList.Bytecode(e, c)
 }
 
+func (s *StatementVariable) Evaluation(vm *VM2) Value {
+	return s.DeclarationList.Evaluation(vm)
+}
+
 func (s *StatementVariable) String() string {
 	return "var " + s.DeclarationList.String()
 }
 
+// VariableDeclarationList [In, Yield, Await] :
+// VariableDeclaration[?In, ?Yield, ?Await]
+// VariableDeclarationList[?In, ?Yield, ?Await] , VariableDeclaration[?In, ?Yield, ?Await]
 type VariableDeclarationList struct {
 	ASTNode
 	Items []*VariableDeclaration
@@ -2537,6 +2652,17 @@ func (v *VariableDeclarationList) Bytecode(e *Executable, c *BytecodeContext) {
 	for _, item := range v.Items {
 		item.Bytecode(e, c)
 	}
+}
+
+func (v *VariableDeclarationList) Evaluation(vm *VM2) Value {
+	var lastValue Value
+	for _, item := range v.Items {
+		lastValue = item.Evaluation(vm)
+	}
+	if lastValue == nil {
+		return UndefinedValue
+	}
+	return lastValue
 }
 
 func (v *VariableDeclarationList) String() string {
@@ -2579,6 +2705,32 @@ func (v *VariableDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsPopReference)
 
 	e.AddInstruction(InsStore)
+}
+
+// VariableDeclaration : BindingIdentifier Initializer
+func (v *VariableDeclaration) astHasInitializer() bool {
+	return v.Initializer != nil
+}
+
+func (v *VariableDeclaration) Evaluation(vm *VM2) Value {
+	if !v.astHasInitializer() {
+		return UndefinedValue
+	} else {
+		bindingId := v.BindingIdentifier
+		lhs := vm.agent.ResolveBinding(bindingId, nil, false)
+		var value Value
+		if IsAnonymousFunctionDefinition(v.Initializer) {
+			// FIXME: handle named evaluation
+			panic("")
+		} else {
+			rhs := v.Initializer.Evaluation(vm)
+			value = rhs.GetValue(vm.agent)
+		}
+		lhs.PutValue(vm.agent, value)
+	}
+
+	// return EMPTY
+	return UndefinedValue
 }
 
 func (v *VariableDeclaration) String() string {
@@ -2815,6 +2967,10 @@ func (b *BreakableStatement) VarScopedDeclarations() (l []*VariableDeclaration) 
 
 func (b *BreakableStatement) Bytecode(e *Executable, c *BytecodeContext) {
 	b.IterationStatement.Bytecode(e, c)
+}
+
+func (b *BreakableStatement) Evaluation(vm *VM2) Value {
+	return b.IterationStatement.Evaluation(vm)
 }
 
 func (b *BreakableStatement) String() string {
@@ -3402,6 +3558,10 @@ func (f *ForStatementInitializerVariable) String() string {
 	return f.VariableStatement.String()
 }
 
+func (f *ForStatementInitializerVariable) Evaluation(vm *VM2) Value {
+	return f.VariableStatement.Evaluation(vm)
+}
+
 type ForStatementInitializerLexicalDeclaration struct {
 	ForStatementInitializer
 	LexicalDeclaration *LexicalDeclaration
@@ -3503,7 +3663,25 @@ func (s *ForStatement) isVariableDeclarationList() bool {
 
 // ForLoopEvaluation 14.7.4.2
 func (s *ForStatement) ForLoopEvaluation(vm *VM2) Value {
+	// TODO: label set
+	if s.isVariableDeclarationList() {
+		s.Initializer.Evaluation(vm)
+		var test Expression
+		if s.Condition != nil {
+			test = s.Condition
+		}
+		var increment Expression
+		if s.Increment != nil {
+			increment = s.Increment
+		}
+		var perIterationBindings []string
+		return vm.ForBodyEvaluation(test, increment, s.Body, perIterationBindings, nil)
+	}
 	panic("unimplemented")
+}
+
+func (s *ForStatement) Evaluation(vm *VM2) Value {
+	return s.ForLoopEvaluation(vm)
 }
 
 func (s *ForStatement) String() string {
@@ -4669,11 +4847,12 @@ type BlockStatement interface {
 	Statement
 }
 
+// TODO(SM): remove
 type BlockStatementBlock struct {
-	*StatementDefaultImpl
 	Block *Block
 }
 
+func (b *BlockStatementBlock) _statement() {}
 func (b *BlockStatementBlock) VarScopedDeclarations() []*VariableDeclaration {
 	return b.Block.StatementList.VarScopedDeclarations()
 }
@@ -4684,6 +4863,10 @@ func (b *BlockStatementBlock) VarDeclaredNames() []IdentifierName {
 
 func (b *BlockStatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
 	b.Block.Bytecode(e, c)
+}
+
+func (b *BlockStatementBlock) Evaluation(vm *VM2) Value {
+	return b.Block.Evaluation(vm)
 }
 
 func (b *BlockStatementBlock) String() string {
@@ -4697,6 +4880,11 @@ type Block struct {
 // 14.2.2
 func (b *Block) Bytecode(e *Executable, c *BytecodeContext) {
 	b.StatementList.Bytecode(e, c)
+}
+
+// 14.2.2
+func (b *Block) Evaluation(vm *VM2) Value {
+	return b.StatementList.Evaluation(vm)
 }
 
 func (b *Block) String() string {
