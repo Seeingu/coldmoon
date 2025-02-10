@@ -1470,7 +1470,7 @@ func (p *Parser) newTarget() (m *MetaPropertyNewTarget, ok bool) {
 	return &MetaPropertyNewTarget{}, true
 }
 
-func (p *Parser) updateExpression(primaryExpression Expression) (*ExpressionUpdate, bool) {
+func (p *Parser) updateExpression(primaryExpression Expression) (*UpdateExpression, bool) {
 	t := p.tokenizer.CurrentToken
 	var operator UpdateOperator
 	if op, ok := UpdateOperatorMap[t.Type]; ok {
@@ -1496,7 +1496,7 @@ func (p *Parser) updateExpression(primaryExpression Expression) (*ExpressionUpda
 		panic("updateExpression: invalid assignment target for postfix")
 	}
 
-	return &ExpressionUpdate{
+	return &UpdateExpression{
 		Operator: operator,
 		Type:     updateType,
 		Operand:  expr,

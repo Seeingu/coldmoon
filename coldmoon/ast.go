@@ -1404,18 +1404,18 @@ func (u UpdateExpressionType) String() string {
 // LeftHandSideExpression[?Yield, ?Await] [no LineTerminator here]--
 // ++ UnaryExpression[?Yield, ?Await]
 // -- UnaryExpression[?Yield, ?Await]
-type ExpressionUpdate struct {
+type UpdateExpression struct {
 	Expression
 	Type     UpdateExpressionType
 	Operator UpdateOperator
 	Operand  Expression
 }
 
-func (e *ExpressionUpdate) AssignmentTargetType() AssignmentTargetType {
+func (e *UpdateExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
 }
 
-func (e *ExpressionUpdate) Bytecode(ex *Executable, c *BytecodeContext) {
+func (e *UpdateExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 	e.Operand.Bytecode(ex, c)
 	ex.AddInstruction(InsPushReference)
 	if ExpressionAnalyze(e.Operand, AnalyzeQueryIsReference) {
@@ -1444,13 +1444,13 @@ func (e *ExpressionUpdate) Bytecode(ex *Executable, c *BytecodeContext) {
 	}
 }
 
-func (e *ExpressionUpdate) isPrefix() bool {
+func (e *UpdateExpression) isPrefix() bool {
 	return e.Type == UpdateExpressionTypePrefix
 }
 
 // postfix: 13.4.2.1/13.4.3.1
 // prefix: 13.4.4.1/13.4.5.1
-func (e *ExpressionUpdate) Evaluation(vm *VM2) Value {
+func (e *UpdateExpression) Evaluation(vm *VM2) Value {
 	expr := e.Operand.Evaluation(vm)
 	oldValue := ToNumeric(vm.agent, expr.GetValue(vm.agent))
 	var newValue Value
@@ -1478,7 +1478,7 @@ func (e *ExpressionUpdate) Evaluation(vm *VM2) Value {
 	return oldValue
 }
 
-func (e *ExpressionUpdate) String() string {
+func (e *UpdateExpression) String() string {
 	if e.Type == UpdateExpressionTypePrefix {
 		return e.Operator.String() + e.Operand.String()
 	}
