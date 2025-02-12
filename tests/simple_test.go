@@ -33,32 +33,9 @@ func testModule(t *testing.T, f string) {
 	Debug.Disable()
 }
 
-func TestBaseline(t *testing.T) {
+// Deprecated
+func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
-		`
-const target = {
-    message1: "hello",
-    message2: "everyone",
-};
-
-const handler1 = {};
-
-const proxy1 = new Proxy(target, handler1);
-assertEqual(proxy1.message1, "hello"); 
-assertEqual(proxy1.message2, "everyone"); 
-`,
-		`
-let a = ''
-const promiseA = new Promise((resolve, reject) => {
-    resolve(777);
-});
-promiseA.then((val) => {
-	a += val
-	assert(a === '1777');
-});
-a += '1'
-assert(a === '1');
-`,
 		`
 const duck = {
     name: "Maurice",
@@ -383,8 +360,20 @@ true ? 2 : 1;
 	}
 }
 
-func TestBaseline2(t *testing.T) {
+func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
+		`
+let a = ''
+const promiseA = new Promise((resolve, reject) => {
+    resolve(777);
+});
+promiseA.then((val) => {
+	a += val
+	assert(a === '1777');
+});
+a += '1'
+assert(a === '1');
+`,
 		`
 const target = {
     message1: "hello",
@@ -422,6 +411,17 @@ assert(2 >= 2);
 assert(2 < 31);
 `,
 	}
+	testNewSources(t, sourceTexts)
+	testDeprecatedSources(t, sourceTexts)
+}
+
+func testDeprecatedSources(t *testing.T, sourceTexts []string) {
+	for _, sourceText := range sourceTexts {
+		testSource(t, sourceText)
+	}
+}
+
+func testNewSources(t *testing.T, sourceTexts []string) {
 	DevFeatures.ToggleNewVM(true)
 	defer func() {
 		DevFeatures.ToggleNewVM(false)

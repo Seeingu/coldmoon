@@ -89,7 +89,7 @@ func (r *ReferenceRecord) IsUnresolvableReference() bool {
 
 // 6.2.5.3
 func (r *ReferenceRecord) IsSuperReference() bool {
-	return r.ThisValue != nil
+	return !IsUndefinedOrNil(r.ThisValue)
 }
 
 // 6.2.5.4

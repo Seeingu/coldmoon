@@ -730,12 +730,26 @@ func (p *PrimaryExpressionAsyncArrowFunction) String() string {
 
 // MARK: - ArrowFunction
 
+// TODO(SM): rename
+// ArrowFunction [In, Yield, Await] :
+// - ArrowParameters[?Yield, ?Await] [no LineTerminator here] => ConciseBody[?In]
 type PrimaryExpressionArrowFunction struct {
 	PrimaryExpression
+	// TODO: change to ArrowParameters
+	// ArrowParameters [Yield, Await] :
+	// - BindingIdentifier[?Yield, ?Await]
+	// - CoverParenthesizedExpressionAndArrowParameterList[?Yield, ?Await]
 	FormalParameters *FormalParameters
-	Body             *FunctionBody
-	SourceText       string
+	// ConciseBody[In] :
+	// - [lookahead ≠ {] ExpressionBody[?In, ~Await]
+	// - { FunctionBody[~Yield, ~Await] }
+	// ExpressionBody[In, Await] :
+	// - AssignmentExpression[?In, ~Yield, ?Await]
+	Body       *FunctionBody
+	SourceText string
 }
+
+var _ RuntimeSemanticsInstantiateArrowFunctionExpression = (*PrimaryExpressionArrowFunction)(nil)
 
 func (p *PrimaryExpressionArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
@@ -745,6 +759,30 @@ func (p *PrimaryExpressionArrowFunction) Bytecode(e *Executable, c *BytecodeCont
 	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
 	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateArrowFunctionExpression{FunctionExpression: p})
+}
+
+func (p *PrimaryExpressionArrowFunction) Evaluation(vm *VM2) Value {
+	return p.InstantiateArrowFunctionExpression(vm, "")
+}
+
+func (p *PrimaryExpressionArrowFunction) InstantiateArrowFunctionExpression(vm *VM2, name string) Value {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	sourceText := p.SourceText
+	closure := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		p.FormalParameters,
+		p.Body,
+		functionCreateThisModeLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(closure, CMString(name).ToPropertyKey(), "")
+	return closure.ToValue()
 }
 
 func (p *PrimaryExpressionArrowFunction) String() string {
@@ -2624,14 +2662,16 @@ func (a Arguments) Evaluation(vm *VM2) Value {
 }
 
 // CallExpression [Yield, Await] :
-// CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await]
-// SuperCall[?Yield, ?Await]
-// ImportCall[?Yield, ?Await]
-// CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
-// CallExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
-// CallExpression[?Yield, ?Await]. IdentifierName
-// CallExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
-// CallExpression[?Yield, ?Await]. PrivateIdentifier
+// - CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await]
+// - SuperCall[?Yield, ?Await]
+// - ImportCall[?Yield, ?Await]
+// - CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+// - CallExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
+// - CallExpression[?Yield, ?Await]. IdentifierName
+// - CallExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+// - CallExpression[?Yield, ?Await]. PrivateIdentifier
+// CoverCallExpressionAndAsyncArrowHead[Yield, Await] :
+// - MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
 type CallExpression struct {
 	Expression
 	Callee    Expression
@@ -2639,6 +2679,17 @@ type CallExpression struct {
 }
 
 var _ Expression = (*CallExpression)(nil)
+
+// astIsCover matches CoverCallExpressionAndAsyncArrowHead
+func (c *CallExpression) astIsCover() bool {
+	_, ok := c.Callee.(*MemberExpression)
+	return ok
+}
+
+// astIsFunctionCall matches CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+func (c *CallExpression) astIsFunctionCall() bool {
+	return true
+}
 
 // 13.3.6.1
 func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
@@ -2669,7 +2720,14 @@ func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
 // TODO(SM): WIP
 // Evaluation 13.3.6.1
 func (c *CallExpression) Evaluation(vm *VM2) Value {
+	if c.astIsCover() {
+		return c.coverCallExpressionAndAsyncArrowHead(vm)
+	}
+	if !c.astIsFunctionCall() {
+		panic("unimplemented")
+	}
 	ref := c.Callee.Evaluation(vm)
+	// rename from func
 	f := ref.GetValue(vm.agent)
 
 	// TODO: this ref
@@ -2682,6 +2740,29 @@ func (c *CallExpression) Evaluation(vm *VM2) Value {
 
 	arguments := c.Arguments.Evaluation(vm)
 	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, false)
+}
+
+// coverCallExpressionAndAsyncArrowHead matches CallExpression : CoverCallExpressionAndAsyncArrowHead
+// spec: 13.3.6.1
+func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM2) Value {
+	callee := c.Callee.(*MemberExpression)
+	expr := callee
+	memberExpr := expr
+	// TODO(XXX): is pass Arguments to evaluate directly?
+	arguments := c.Arguments.Evaluation(vm)
+	ref := memberExpr.Evaluation(vm)
+	f := ref.GetValue(vm.agent)
+	if ref, ok := ref.(*ReferenceRecordValue); ok {
+		r := ref.ReferenceRecord
+		if !r.IsPropertyReference() && r.ReferencedName.String == "eval" {
+			panic("unimplemented")
+		}
+	}
+
+	// TODO: check is tailPosition
+	tailCall := false
+
+	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, tailCall)
 }
 
 func (c *CallExpression) String() string {

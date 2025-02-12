@@ -20,3 +20,8 @@ type RuntimeSemanticsPropertyDefinitionEvaluation interface {
 type RuntimeSemanticsArgumentListEvaluation interface {
 	ArgumentListEvaluation(vm *VM2) []Value
 }
+
+// 15.3.4
+type RuntimeSemanticsInstantiateArrowFunctionExpression interface {
+	InstantiateArrowFunctionExpression(vm *VM2, name string) Value
+}
