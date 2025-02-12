@@ -6,6 +6,7 @@ type ObjectType interface {
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	DefineField(field *ClassFieldDefinition)
+	SetPrototype(p ObjectType)
 	InitializeInstanceElements(constructor ObjectType)
 	CreateDataProperty(key PropertyKey, value Value) bool
 	DeletePropertyOrThrow(key PropertyKey) bool
@@ -40,6 +41,7 @@ type ObjectType interface {
 
 	String() string
 	Ref() ObjectType
+	IsOrdinary() bool
 	// defineBuiltinProperty is an alias of DefinePropertyOrThrow
 	// used to define internal property
 	defineBuiltinProperty(name PropertyConvertable, desc *PropertyDescriptor)

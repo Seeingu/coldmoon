@@ -26,4 +26,16 @@ type StaticSemanticsIsAnonymousFunctionDefinition interface {
 	IsAnonymousFunctionDefinition() bool
 }
 
+// 13.2.5.2
+type StaticSemanticsIsComputedPropertyKey interface {
+	IsComputedPropertyKey() bool
+}
+
+func IsComputedPropertyKeyDefault(expr PropertyName) bool {
+	if _, ok := expr.(*PropertyNameComputed); ok {
+		return true
+	}
+	return false
+}
+
 // TODO: add missing semantics

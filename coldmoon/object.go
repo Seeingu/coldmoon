@@ -91,6 +91,11 @@ func (o *Object) PropertyStorage() *PropertyStorage {
 	return &o.data.propertyStorage
 }
 
+// TODO: check is ordinary
+func (o *Object) IsOrdinary() bool {
+	return o.Prototype() != nil
+}
+
 // 7.1.1.1
 func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 	var methodNames []string
@@ -475,9 +480,9 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		value := argumentsList[0]
 		if newTarget != nil && newTarget != agent.ActiveFunctionObject() {
-			return (OrdinaryCreateFromConstructor(
+			return OrdinaryCreateFromConstructor(
 				agent, newTarget, "%Object.prototype%", []string{},
-			)).ToValue()
+			).ToValue()
 		}
 
 		if value == nil {

@@ -363,6 +363,10 @@ func (p *PrimaryExpressionArrayLiteral) String() string {
 
 // MARK: - ObjectLiteral
 
+// ObjectLiteral [Yield, Await] :
+// - { }
+// - { PropertyDefinitionList[?Yield, ?Await] }
+// - { PropertyDefinitionList[?Yield, ?Await] , }
 type PrimaryExpressionObjectLiteral struct {
 	PrimaryExpression
 	PropertyList *PropertyDefinitionList
@@ -383,6 +387,21 @@ func (p *PrimaryExpressionObjectLiteral) Bytecode(e *Executable, c *BytecodeCont
 	p.PropertyList.Bytecode(e, c)
 }
 
+func (p *PrimaryExpressionObjectLiteral) astIsEmpty() bool {
+	return len(p.PropertyList.Items) == 0
+}
+
+// 13.2.5.4
+func (p *PrimaryExpressionObjectLiteral) Evaluation(vm *VM2) Value {
+	if p.astIsEmpty() {
+		return OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil).ToValue()
+	}
+
+	obj := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
+	p.PropertyList.PropertyDefinitionEvaluation(vm, obj)
+	return obj.ToValue()
+}
+
 func (p *PrimaryExpressionObjectLiteral) String() string {
 	sb := "{"
 	sb += p.PropertyList.String()
@@ -390,9 +409,21 @@ func (p *PrimaryExpressionObjectLiteral) String() string {
 	return sb
 }
 
+// PropertyDefinitionList [Yield, Await] :
+// PropertyDefinition[?Yield, ?Await]
+// PropertyDefinitionList[?Yield, ?Await] , PropertyDefinition[?Yield, ?Await]
 type PropertyDefinitionList struct {
 	ASTNode
 	Items []PropertyDefinition
+}
+
+var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionList)(nil)
+
+// 13.2.5.4
+func (p *PropertyDefinitionList) PropertyDefinitionEvaluation(vm *VM2, obj ObjectType) {
+	for _, item := range p.Items {
+		item.PropertyDefinitionEvaluation(vm, obj)
+	}
 }
 
 func (p *PropertyDefinitionList) Bytecode(e *Executable, c *BytecodeContext) {
@@ -415,8 +446,16 @@ func (p *PropertyDefinitionList) String() string {
 
 // MARK: - PropertyDefinition
 
+// TODO(SM): remove
+// PropertyDefinition [Yield, Await] :
+// - IdentifierReference[?Yield, ?Await]
+// - CoverInitializedName[?Yield, ?Await]
+// - PropertyName[?Yield, ?Await] : AssignmentExpression[+In, ?Yield, ?Await]
+// - MethodDefinition[?Yield, ?Await]
+// - ... AssignmentExpression[+In, ?Yield, ?Await]
 type PropertyDefinition interface {
 	ASTNode
+	RuntimeSemanticsPropertyDefinitionEvaluation
 }
 
 type PropertyDefinitionIdentifierReference struct {
@@ -427,7 +466,7 @@ type PropertyDefinitionIdentifierReference struct {
 func (p *PropertyDefinitionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
 	propName := p.IdentifierReference.Identifier
 	e.AddInstruction(&ILoadConstant{
-		Value: NewStringValue(string(propName)),
+		Value: NewStringValue(propName),
 	})
 
 	e.AddInstruction(InsGetValue)
@@ -458,6 +497,36 @@ func (p *PropertyDefinitionNameAndExpression) Bytecode(e *Executable, c *Bytecod
 	}
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IObjectSetProperty{})
+}
+
+func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *VM2, object ObjectType) {
+	propKey := p.Name.Evaluation(vm)
+	var isProtoSetter bool
+	if vm.IsJSONParse {
+		isProtoSetter = false
+	} else if propKey.String() == "__proto__" && !IsComputedPropertyKeyDefault(p.Name) {
+		isProtoSetter = true
+	} else {
+		isProtoSetter = false
+	}
+
+	var propValue Value
+	if IsAnonymousFunctionDefinition(p.Expression) {
+		panic("unimplemented")
+	} else {
+		exprValueRef := p.Expression.Evaluation(vm)
+		propValue = exprValueRef.GetValue(vm.agent)
+	}
+	if isProtoSetter {
+		if ValueIsObject(propValue) || propValue == NullValue {
+			object.SetPrototype(propValue.ToObject(vm.agent))
+		}
+		return
+	}
+	// TODO: assert no non-configurable properties
+	Assert(object.IsOrdinary() && object.IsExtensible())
+	object.CreateDataPropertyOrThrow(
+		ToPropertyKey(vm.agent, propKey), propValue)
 }
 
 func (p *PropertyDefinitionNameAndExpression) String() string {
@@ -558,6 +627,10 @@ func (p *PropertyNameLiteralIdentifier) String() string {
 
 func (p *PropertyNameLiteralIdentifier) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IStoreConstant{Value: NewStringValue(string(p.Identifier))})
+}
+
+func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM2) Value {
+	return NewStringValue(p.Identifier)
 }
 
 type PropertyNameLiteralString struct {
@@ -1448,6 +1521,7 @@ func (e *UpdateExpression) isPrefix() bool {
 	return e.Type == UpdateExpressionTypePrefix
 }
 
+// Evaluation
 // postfix: 13.4.2.1/13.4.3.1
 // prefix: 13.4.4.1/13.4.5.1
 func (e *UpdateExpression) Evaluation(vm *VM2) Value {
@@ -1789,6 +1863,9 @@ func (e *AssignmentExpression) String() string {
 
 // MARK: - NewExpression
 
+// NewExpression [Yield, Await] :
+// MemberExpression[?Yield, ?Await]
+// new NewExpression[?Yield, ?Await]
 type NewExpression struct {
 	Expression
 	Callee    Expression
@@ -1814,6 +1891,28 @@ func (e *NewExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 		ex.AddInstruction(InsLoad)
 	}
 	ex.AddInstruction(&INew{ArgumentCount: len(e.Arguments)})
+}
+
+// 13.3.5.1
+func (e *NewExpression) Evaluation(vm *VM2) Value {
+	return e.EvaluateNew(vm)
+}
+
+// 13.3.5.1.1
+func (e *NewExpression) EvaluateNew(vm *VM2) Value {
+	ref := e.Callee.Evaluation(vm)
+	constructor := ref.GetValue(vm.agent)
+	var argList []Value
+	if len(e.Arguments) == 0 {
+		argList = []Value{}
+	} else {
+		argList = e.Arguments.ArgumentListEvaluation(vm)
+	}
+	if !IsConstructor(constructor) {
+		return vm.agent.ThrowTypeError("constructor is not a constructor")
+	}
+	o := MustGetObject(constructor)
+	return o.Construct(argList, nil).ToValue()
 }
 
 func (e *NewExpression) String() string {
@@ -2437,12 +2536,47 @@ func (u *UnaryExpression) String() string {
 
 // MARK: - CallExpression
 
+// TODO: handle spread expression
 // ArgumentList[Yield, Await] :
 // AssignmentExpression[+In, ?Yield, ?Await]
 // ... AssignmentExpression[+In, ?Yield, ?Await]
 // ArgumentList[?Yield, ?Await] , AssignmentExpression[+In, ?Yield, ?Await]
 // ArgumentList[?Yield, ?Await] , ... AssignmentExpression[+In, ?Yield, ?Await]
 type Arguments []Expression
+
+var _ RuntimeSemanticsArgumentListEvaluation = Arguments{}
+
+func (a Arguments) astIsAssignmentExpression() bool {
+	return len(a) == 1
+}
+
+// TODO
+func (a Arguments) astIsSpreadElement() bool {
+	return false
+}
+
+func (a Arguments) isEmpty() bool {
+	return len(a) == 0
+}
+
+func (a Arguments) ArgumentListEvaluation(vm *VM2) []Value {
+	if a.isEmpty() {
+		return []Value{}
+	}
+	if a.astIsAssignmentExpression() {
+		// TODO: handle spread
+		if a.astIsSpreadElement() {
+			panic("unimplemented")
+		}
+		ref := a[0].Evaluation(vm)
+		arg := ref.GetValue(vm.agent)
+		return []Value{arg}
+	} else {
+		// TODO: handle spread
+		last := a[len(a)-1].Evaluation(vm)
+		return append(a[:len(a)-1].ArgumentListEvaluation(vm), last.GetValue(vm.agent))
+	}
+}
 
 func (a Arguments) String() string {
 	var sb string

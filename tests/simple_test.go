@@ -386,6 +386,18 @@ true ? 2 : 1;
 func TestBaseline2(t *testing.T) {
 	sourceTexts := []string{
 		`
+const target = {
+    message1: "hello",
+    message2: "everyone",
+};
+
+const handler1 = {};
+
+const proxy1 = new Proxy(target, handler1);
+assertEqual(proxy1.message1, "hello"); 
+assertEqual(proxy1.message2, "everyone"); 
+`,
+		`
 let a = 1;
 for (var i = 0; i < 3; i++) {
 	a += i;

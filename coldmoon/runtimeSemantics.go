@@ -9,3 +9,14 @@ type RuntimeSemanticsEvaluation interface {
 type RuntimeSemanticsNamedEvaluation interface {
 	NamedEvaluation(name string, expr Expression) ObjectType
 }
+
+// 13.2.5.5
+type RuntimeSemanticsPropertyDefinitionEvaluation interface {
+	// PropertyDefinitionEvaluation returns UNUSED
+	PropertyDefinitionEvaluation(vm *VM2, obj ObjectType)
+}
+
+// 13.3.8.1
+type RuntimeSemanticsArgumentListEvaluation interface {
+	ArgumentListEvaluation(vm *VM2) []Value
+}

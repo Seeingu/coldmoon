@@ -3,6 +3,9 @@ package coldmoon
 type VM2 struct {
 	agent                 *Agent
 	containedInStrictCode bool
+	// IsJSONParse handle is parsed from JSON.parse
+	// 25.5.1: Step 7
+	IsJSONParse bool
 }
 
 func NewVM2(agent *Agent) *VM2 {
