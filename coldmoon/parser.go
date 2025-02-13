@@ -2197,7 +2197,9 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		if method, ok := parserRecoverOk(p, func() *MethodDefinition {
 			return p.methodDefinition(MethodDefinitionTypeNil)
 		}); ok {
-			return method
+			return &PropertyDefinitionMethodDefinition{
+				method,
+			}
 		}
 	}
 	propertyName, ok := p.propertyName()

@@ -458,6 +458,16 @@ type PropertyDefinition interface {
 	RuntimeSemanticsPropertyDefinitionEvaluation
 }
 
+type PropertyDefinitionMethodDefinition struct {
+	*MethodDefinition
+}
+
+var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionMethodDefinition)(nil)
+
+func (p *PropertyDefinitionMethodDefinition) PropertyDefinitionEvaluation(vm *VM2, obj ObjectType) {
+	p.MethodDefinition.MethodDefinitionEvaluation(vm, obj, true)
+}
+
 type PropertyDefinitionIdentifierReference struct {
 	PropertyDefinition
 	IdentifierReference *PrimaryExpressionIdentifierReference
@@ -565,6 +575,15 @@ const (
 	MethodDefinitionTypeAsyncGenerator
 )
 
+// MethodDefinition [Yield, Await] :
+// - ClassElementName[?Yield, ?Await] ( UniqueFormalParameters[~Yield, ~Await] ) {
+// - FunctionBody[~Yield, ~Await] }
+// - GeneratorMethod[?Yield, ?Await]
+// - AsyncMethod[?Yield, ?Await]
+// - AsyncGeneratorMethod[?Yield, ?Await]
+// - get ClassElementName[?Yield, ?Await] ( ) { FunctionBody[~Yield, ~Await] }
+// - set ClassElementName[?Yield, ?Await] ( PropertySetParameterList ) {
+// - FunctionBody[~Yield, ~Await] }
 type MethodDefinition struct {
 	PropertyDefinition
 	Type                     MethodDefinitionType
@@ -573,6 +592,37 @@ type MethodDefinition struct {
 	GeneratorExpression      *PrimaryExpressionGeneratorExpression
 	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
 	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
+}
+
+var (
+	_ RuntimeSemanticsMethodDefinitionEvaluation = (*MethodDefinition)(nil)
+	_ RuntimeSemanticsDefineMethod               = (*MethodDefinition)(nil)
+)
+
+func (p *MethodDefinition) sourceText() string {
+	if p.FunctionExpression != nil {
+		return p.FunctionExpression.SourceText
+	} else if p.GeneratorExpression != nil {
+		return p.GeneratorExpression.SourceText
+	} else if p.AsyncFunctionExpression != nil {
+		return p.AsyncFunctionExpression.SourceText
+	} else if p.AsyncGeneratorExpression != nil {
+		return p.AsyncGeneratorExpression.SourceText
+	}
+	return ""
+}
+
+func (p *MethodDefinition) formalParameters() *FormalParameters {
+	if p.FunctionExpression != nil {
+		return p.FunctionExpression.FormalParameters
+	} else if p.GeneratorExpression != nil {
+		return p.GeneratorExpression.FormalParameters
+	} else if p.AsyncFunctionExpression != nil {
+		return p.AsyncFunctionExpression.FormalParameters
+	} else if p.AsyncGeneratorExpression != nil {
+		return p.AsyncGeneratorExpression.FormalParameters
+	}
+	return nil
 }
 
 func (p *MethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
@@ -590,6 +640,57 @@ func (p *MethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
 		AsyncFunctionExpression:  p.AsyncFunctionExpression,
 		AsyncGeneratorExpression: p.AsyncGeneratorExpression,
 	})
+}
+
+func (p *MethodDefinition) astIsClassElementName() bool {
+	return p.PropertyName != nil
+}
+
+// 15.4.4
+func (p *MethodDefinition) DefineMethod(vm *VM2, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	if p.astIsClassElementName() {
+		propKey := p.PropertyName.Evaluation(vm)
+		env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		var prototype ObjectType
+		if proto != nil {
+			prototype = proto
+		} else {
+			prototype = realm.Intrinsics.FunctionPrototype
+		}
+		sourceText := p.sourceText()
+		closure := OrdinaryFunctionCreate(
+			agent,
+			prototype,
+			sourceText,
+			p.FunctionExpression.FormalParameters,
+			p.FunctionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(closure, obj)
+		record.Key = ToPropertyKey(agent, propKey)
+		record.Closure = closure
+		return
+	} else {
+		panic("unreachable")
+	}
+}
+
+func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) Completion[*PrivateElement] {
+	if p.astIsClassElementName() {
+		methodDef, err := p.DefineMethod(vm, obj, nil)
+		if err != nil {
+			return newCompletionError[*PrivateElement](err)
+		}
+		SetFunctionName(methodDef.Closure, methodDef.Key, "")
+		return newCompletionNormalData(DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable))
+	} else {
+		panic("unimplemented")
+	}
 }
 
 func (p *MethodDefinition) String() string {

@@ -25,3 +25,20 @@ type RuntimeSemanticsArgumentListEvaluation interface {
 type RuntimeSemanticsInstantiateArrowFunctionExpression interface {
 	InstantiateArrowFunctionExpression(vm *VM2, name string) Value
 }
+
+// 15.4.5
+type RuntimeSemanticsMethodDefinitionEvaluation interface {
+	// MethodDefinitionEvaluation returns a normal Completion or an abrupt Completion
+	MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) Completion[*PrivateElement]
+}
+
+// MARK: - DefineMethod 15.4.4
+
+type DefineMethodRecord struct {
+	Key     PropertyKey
+	Closure ObjectType
+}
+type RuntimeSemanticsDefineMethod interface {
+	// proto is optional
+	DefineMethod(vm *VM2, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value)
+}

@@ -1659,13 +1659,15 @@ func InstantiateArrowFunctionExpression(agent *Agent, arrowFunction *PrimaryExpr
 	return closure
 }
 
+// Deprecated
 // 15.4.4
-type DefineMethodRecord struct {
-	Key     PropertyKey
-	Closure ObjectType
-}
-
-func DefineMethod(agent *Agent, functionExpression *PrimaryExpressionFunctionExpression, propertyName Value, object ObjectType, proto ObjectType) *DefineMethodRecord {
+func DefineMethod(
+	agent *Agent,
+	functionExpression *PrimaryExpressionFunctionExpression,
+	propertyName Value,
+	object ObjectType,
+	proto ObjectType,
+) *DefineMethodRecord {
 	realm := agent.CurrentRealm()
 	propKey := ToPropertyKey(agent, propertyName)
 	env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment

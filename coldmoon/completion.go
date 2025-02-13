@@ -71,6 +71,13 @@ func newCompletionNormal[T any](args completionNormalArgs[T]) completionDefaultI
 	return c
 }
 
+func newCompletionNormalData[T any](data T) completionDefaultImpl[T] {
+	c := newCompletionNormal(completionNormalArgs[T]{
+		data: data,
+	})
+	return c
+}
+
 func newCompletionError[T any](err Value) completionDefaultImpl[T] {
 	return completionDefaultImpl[T]{
 		Type: CompletionTypeThrow,
