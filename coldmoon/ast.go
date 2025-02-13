@@ -652,8 +652,8 @@ func (p *MethodDefinition) DefineMethod(vm *VM2, obj ObjectType, proto ObjectTyp
 	realm := agent.CurrentRealm()
 	if p.astIsClassElementName() {
 		propKey := p.PropertyName.Evaluation(vm)
-		env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
-		privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
 		var prototype ObjectType
 		if proto != nil {
 			prototype = proto
@@ -868,8 +868,8 @@ func (p *ArrowFunction) Evaluation(vm *VM2) Value {
 func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM2, name string) Value {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
-	env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
-	privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	env := vm.RunningLexicalEnvironment()
+	privateEnv := vm.RunningPrivateEnvironment()
 	sourceText := p.SourceText
 	closure := OrdinaryFunctionCreate(
 		agent,

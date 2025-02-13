@@ -14,6 +14,14 @@ func NewVM2(agent *Agent) *VM2 {
 	}
 }
 
+func (v *VM2) RunningLexicalEnvironment() EnvironmentRecord {
+	return v.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+}
+
+func (v *VM2) RunningPrivateEnvironment() *PrivateEnvironment {
+	return v.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+}
+
 // 13.3.4
 func (v *VM2) EvaluatePropertyAccessWithIdentifierKey(baseValue Value, identifierName IdentifierName, strict bool) *ReferenceRecord {
 	// TODO: use 13.1.2 Static Semantics: StringValue
