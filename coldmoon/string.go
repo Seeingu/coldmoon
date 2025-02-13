@@ -176,32 +176,32 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 	agent := realm.Agent
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := ThisStringValue(agent, thisArgument)
+		s := thisArgument.ThisStringValue()
 		return NewStringValue(s)
 	}
 	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		return NewStringValue(ThisStringValue(agent, thisArgument))
+		return NewStringValue(thisArgument.ThisStringValue())
 	}
 	toLowerCase := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := ThisStringValue(agent, this)
+		s := this.ThisStringValue()
 		return NewStringValue(strings.ToLower(s))
 	}
 	toUpperCase := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := ThisStringValue(agent, this)
+		s := this.ThisStringValue()
 		return NewStringValue(strings.ToUpper(s))
 	}
 	trim := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := ThisStringValue(agent, this)
+		s := this.ThisStringValue()
 		return NewStringValue(strings.TrimSpace(s))
 	}
 	trimEnd := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := ThisStringValue(agent, this)
+		s := this.ThisStringValue()
 		return NewStringValue(strings.TrimRightFunc(s, func(r rune) bool {
 			return strings.ContainsRune(" \t\n\v\f\r", r)
 		}))
 	}
 	trimStart := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
-		s := ThisStringValue(agent, this)
+		s := this.ThisStringValue()
 		return NewStringValue(strings.TrimLeftFunc(s, func(r rune) bool {
 			return strings.ContainsRune(" \t\n\v\f\r", r)
 		}))

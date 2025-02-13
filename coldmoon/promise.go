@@ -413,7 +413,7 @@ type ArgGetterSetterCaptures struct {
 	Env  EnvironmentRecord
 }
 
-// TODO(WM): maybe can be removed
+// TODO: maybe can be removed
 type AdditionalFields struct {
 	ClassConstructorFields *ClassConstructorFields
 }

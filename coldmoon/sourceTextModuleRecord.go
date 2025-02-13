@@ -91,7 +91,7 @@ func (s *SourceTextModule) ToReferrer() ImportedModuleReferrer {
 // 16.2.1.5.2
 func (s *SourceTextModule) Link() (err Value) {
 	module := s
-	// TODO(WM): bitset
+	// TODO(BM): bitset
 	Assert(module.Status == ModuleStatusUnlinked || module.Status == ModuleStatusLinked ||
 		module.Status == ModuleStatusEvaluated || module.Status == ModuleStatusEvaluatingAsync)
 	var stack pkg.Stack[ModuleRecord]
@@ -104,7 +104,7 @@ func (s *SourceTextModule) Link() (err Value) {
 		}
 		return
 	}
-	// TODO(WM): bitset
+	// TODO(BM): bitset
 	Assert(module.Status == ModuleStatusLinked || module.Status == ModuleStatusEvaluatingAsync ||
 		module.Status == ModuleStatusEvaluated)
 	Assert(stack.Len() == 0)
@@ -120,7 +120,7 @@ func (s *SourceTextModule) InnerModuleLinking(stack pkg.Stack[ModuleRecord], i i
 		return
 	}
 
-	// TODO(WM): bitset
+	// TODO(BM): bitset
 	if module.Status == ModuleStatusLinked ||
 		module.Status == ModuleStatusEvaluated ||
 		module.Status == ModuleStatusEvaluatingAsync ||
@@ -137,7 +137,7 @@ func (s *SourceTextModule) InnerModuleLinking(stack pkg.Stack[ModuleRecord], i i
 		requiredModule := GetImportedModule(module, required).(*SourceTextModule)
 		index, _ = requiredModule.InnerModuleLinking(stack, index)
 		if requiredModule.isCyclic() {
-			// TODO(WM): bitset
+			// TODO(BM): bitset
 			Assert(requiredModule.Status == ModuleStatusLinking ||
 				requiredModule.Status == ModuleStatusLinked ||
 				requiredModule.Status == ModuleStatusEvaluatingAsync ||
@@ -190,7 +190,7 @@ func (s *SourceTextModule) Evaluate() *PromiseObject {
 
 		capability.Reject.ToValue().Call(UndefinedValue, []Value{err})
 	} else {
-		// TODO(WM): bitset
+		// TODO(BM): bitset
 		Assert(module.Status == ModuleStatusEvaluated || module.Status == ModuleStatusEvaluatingAsync)
 		if !module.AsyncEvaluation {
 			Assert(module.Status == ModuleStatusEvaluated)

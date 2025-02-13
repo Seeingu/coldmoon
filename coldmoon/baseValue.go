@@ -26,6 +26,20 @@ func (b *BaseValue) GetValue(agent *Agent) Value {
 	return b.Value
 }
 
+// TODO(BM): return a string completion or abrupt completion
+func (b *BaseValue) ThisStringValue() string {
+	switch v := b.Value.(type) {
+	case *StringValue:
+		return v.Data
+	case *ObjectValue:
+		s, ok := v.Object.(*StringObject)
+		if ok {
+			return s.Data
+		}
+	}
+	panic("TypeError")
+}
+
 // TODO(I): this is a backdoor method, every value should implement this method
 func (b *BaseValue) ToString() CMString {
 	return CMString(b.String())

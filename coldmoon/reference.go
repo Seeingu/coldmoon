@@ -4,7 +4,7 @@ package coldmoon
 type ReferenceRecordBase struct {
 	value Value
 	env   EnvironmentRecord
-	// TODO(WM): use reference literal
+	// TODO(SM): use reference literal
 	unresolvable bool
 }
 
