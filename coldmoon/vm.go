@@ -1635,7 +1635,7 @@ func InstantiateOrdinaryFunctionExpression(
 }
 
 // 15.3.4
-func InstantiateArrowFunctionExpression(agent *Agent, arrowFunction *PrimaryExpressionArrowFunction, name string) ObjectType {
+func InstantiateArrowFunctionExpression(agent *Agent, arrowFunction *ArrowFunction, name string) ObjectType {
 	realm := agent.CurrentRealm()
 
 	env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment

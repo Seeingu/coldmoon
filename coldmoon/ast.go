@@ -831,10 +831,9 @@ func (p *PrimaryExpressionAsyncArrowFunction) String() string {
 
 // MARK: - ArrowFunction
 
-// TODO(SM): rename
 // ArrowFunction [In, Yield, Await] :
 // - ArrowParameters[?Yield, ?Await] [no LineTerminator here] => ConciseBody[?In]
-type PrimaryExpressionArrowFunction struct {
+type ArrowFunction struct {
 	PrimaryExpression
 	// TODO: change to ArrowParameters
 	// ArrowParameters [Yield, Await] :
@@ -850,23 +849,23 @@ type PrimaryExpressionArrowFunction struct {
 	SourceText string
 }
 
-var _ RuntimeSemanticsInstantiateArrowFunctionExpression = (*PrimaryExpressionArrowFunction)(nil)
+var _ RuntimeSemanticsInstantiateArrowFunctionExpression = (*ArrowFunction)(nil)
 
-func (p *PrimaryExpressionArrowFunction) AssignmentTargetType() AssignmentTargetType {
+func (p *ArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
+func (p *ArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
 	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateArrowFunctionExpression{FunctionExpression: p})
 }
 
-func (p *PrimaryExpressionArrowFunction) Evaluation(vm *VM2) Value {
+func (p *ArrowFunction) Evaluation(vm *VM2) Value {
 	return p.InstantiateArrowFunctionExpression(vm, "")
 }
 
-func (p *PrimaryExpressionArrowFunction) InstantiateArrowFunctionExpression(vm *VM2, name string) Value {
+func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM2, name string) Value {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
@@ -886,7 +885,7 @@ func (p *PrimaryExpressionArrowFunction) InstantiateArrowFunctionExpression(vm *
 	return closure.ToValue()
 }
 
-func (p *PrimaryExpressionArrowFunction) String() string {
+func (p *ArrowFunction) String() string {
 	return "ArrowFunction"
 }
 
@@ -2603,6 +2602,16 @@ func (u UnaryOperator) String() string {
 	return ""
 }
 
+// UnaryExpression [Yield, Await] :
+// - UpdateExpression[?Yield, ?Await]
+// - delete UnaryExpression[?Yield, ?Await]
+// - void UnaryExpression[?Yield, ?Await]
+// - typeof UnaryExpression[?Yield, ?Await]
+// - + UnaryExpression[?Yield, ?Await]
+// - - UnaryExpression[?Yield, ?Await]
+// - ~ UnaryExpression[?Yield, ?Await]
+// - ! UnaryExpression[?Yield, ?Await]
+// - [+Await] AwaitExpression[?Yield]
 type UnaryExpression struct {
 	Expression
 	Operator UnaryOperator
@@ -2667,6 +2676,93 @@ func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
 		}
 		e.AddInstruction(&IBitwiseNot{})
 	}
+}
+
+func (u *UnaryExpression) astIsAdd() bool {
+	return u.Operator == UnaryOperatorAddition
+}
+
+func (u *UnaryExpression) astIsSubtract() bool {
+	return u.Operator == UnaryOperatorSubtraction
+}
+
+func (u *UnaryExpression) astIsLogicalNot() bool {
+	return u.Operator == UnaryOperatorLogicalNot
+}
+
+func (u *UnaryExpression) astIsBitwiseNot() bool {
+	return u.Operator == UnaryOperatorBitwiseNot
+}
+
+func (u *UnaryExpression) astIsTypeof() bool {
+	return u.Operator == UnaryOperatorTypeof
+}
+
+func (u *UnaryExpression) astIsDelete() bool {
+	return u.Operator == UnaryOperatorDelete
+}
+
+func (u *UnaryExpression) astIsVoid() bool {
+	return u.Operator == UnaryOperatorVoid
+}
+
+// TODO: use Number::[op], BigInt::[op]
+// spec: 13.5.3.1, 13.5.4.1, 13.5.5.1, 13.5.6.1, 13.5.7.1
+func (u *UnaryExpression) Evaluation(vm *VM2) Value {
+	agent := vm.agent
+	switch {
+	case u.astIsTypeof():
+		// 13.5.3.1
+		val := u.Operand.Evaluation(vm)
+		if r, ok := val.(*ReferenceRecordValue); ok {
+			if r.ReferenceRecord.IsUnresolvableReference() {
+				return NewStringValue("undefined")
+			}
+		}
+		val = val.GetValue(agent)
+		// TODO: B.3.6.3 isHTMLDDA
+		return NewStringValue(val.TypeString())
+	case u.astIsAdd():
+		// 13.5.4.1
+		expr := u.Operand.Evaluation(vm)
+		return ToNumber(agent, expr.GetValue(agent))
+	case u.astIsSubtract():
+		// 13.5.5.1
+		expr := u.Operand.Evaluation(vm)
+		oldValue := ToNumeric(agent, expr.GetValue(agent))
+		if n, ok := oldValue.(*NumberValue); ok {
+			return NewNumberValue(-n.Data)
+		} else {
+			if b, ok := oldValue.(*BigIntValue); ok {
+				return NewBigIntValue(b.Data.Neg(nil))
+			} else {
+				Assert(false)
+			}
+		}
+	case u.astIsBitwiseNot():
+		// 13.5.6.1
+		expr := u.Operand.Evaluation(vm)
+		oldValue := ToNumeric(agent, expr.GetValue(agent))
+		if n, ok := oldValue.(*NumberValue); ok {
+			return NewNumberValue(JSNumber(^int64(n.Data)))
+		} else {
+			if b, ok := oldValue.(*BigIntValue); ok {
+				return NewBigIntValue(b.Data.Not(nil))
+			} else {
+				Assert(false)
+			}
+		}
+	case u.astIsLogicalNot():
+		// 13.5.7.1
+		expr := u.Operand.Evaluation(vm)
+		oldValue := expr.GetValue(agent).ToBoolean()
+		if oldValue {
+			return FalseValue
+		} else {
+			return TrueValue
+		}
+	}
+	panic("unimplemented")
 }
 
 func (u *UnaryExpression) String() string {

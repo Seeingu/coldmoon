@@ -36,25 +36,6 @@ func testModule(t *testing.T, f string) {
 // Deprecated
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
-		`
-const previouslyMaxSafeInteger = 9007199254740991n;
-const alsoHuge = BigInt(9007199254740991);
-const hugeString = BigInt("9007199254740991");
-const hugeHex = BigInt("0x1fffffffffffff");
-const hugeOctal = BigInt("0o377777777777777777");
-const hugeBin = BigInt(
-    "0b11111111111111111111111111111111111111111111111111111",
-);
-
-assertEqual(previouslyMaxSafeInteger.toString(), "9007199254740991n");
-assertEqual(alsoHuge.toString(), "9007199254740991n");
-assertEqual(hugeString.toString(), "9007199254740991n");
-assertEqual(hugeHex.toString(), "9007199254740991n");
-assertEqual(hugeOctal.toString(), "9007199254740991n");
-assertEqual(hugeBin.toString(), "9007199254740991n");
-assert(typeof 1n === "bigint");
-assert(typeof BigInt("1") === "bigint")
-`,
 		fmt.Sprintf(`
 class Animal {
     constructor(name) {
@@ -347,6 +328,25 @@ true ? 2 : 1;
 
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
+		`
+const previouslyMaxSafeInteger = 9007199254740991n;
+const alsoHuge = BigInt(9007199254740991);
+const hugeString = BigInt("9007199254740991");
+const hugeHex = BigInt("0x1fffffffffffff");
+const hugeOctal = BigInt("0o377777777777777777");
+const hugeBin = BigInt(
+    "0b11111111111111111111111111111111111111111111111111111",
+);
+
+assertEqual(previouslyMaxSafeInteger.toString(), "9007199254740991n");
+assertEqual(alsoHuge.toString(), "9007199254740991n");
+assertEqual(hugeString.toString(), "9007199254740991n");
+assertEqual(hugeHex.toString(), "9007199254740991n");
+assertEqual(hugeOctal.toString(), "9007199254740991n");
+assertEqual(hugeBin.toString(), "9007199254740991n");
+assert(typeof 1n === "bigint");
+assert(typeof BigInt("1") === "bigint")
+`,
 		`
 const duck = {
     name: "Maurice",

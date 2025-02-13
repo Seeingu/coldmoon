@@ -16,6 +16,7 @@ type Value interface {
 	// --- internal methods ---
 
 	// TypeString is aligned with spec's Type()
+	// also 13.5.3.1 typeof
 	TypeString() string
 	String() string
 	ToCompletion() CompletionValue

@@ -1834,7 +1834,7 @@ func (p *Parser) arguments() Arguments {
 	return list
 }
 
-func (p *Parser) arrowFunction() *PrimaryExpressionArrowFunction {
+func (p *Parser) arrowFunction() *ArrowFunction {
 	startOffset := p.tokenizer.Index
 	p.tokenizer.Match(TLeftParen)
 	params := p.formalParameters()
@@ -1857,7 +1857,7 @@ func (p *Parser) arrowFunction() *PrimaryExpressionArrowFunction {
 			},
 		}
 	}
-	return &PrimaryExpressionArrowFunction{
+	return &ArrowFunction{
 		FormalParameters: params,
 		Body:             body,
 		SourceText:       p.SourceText[startOffset:p.tokenizer.Index],

@@ -287,7 +287,7 @@ func (i *IInstantiateOrdinaryFunctionExpression) String() string {
 
 type IInstantiateArrowFunctionExpression struct {
 	Instruction
-	FunctionExpression *PrimaryExpressionArrowFunction
+	FunctionExpression *ArrowFunction
 }
 
 func (i *IInstantiateArrowFunctionExpression) String() string {
