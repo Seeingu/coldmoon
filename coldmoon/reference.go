@@ -52,12 +52,12 @@ type ReferenceRecord struct {
 
 type ReferenceRecordValue struct {
 	Value
-	ReferenceRecord *ReferenceRecord
+	record *ReferenceRecord
 }
 
 func NewReferenceRecordValue(referenceRecord *ReferenceRecord) *ReferenceRecordValue {
 	r := &ReferenceRecordValue{
-		ReferenceRecord: referenceRecord,
+		record: referenceRecord,
 	}
 	r.Value = NewBaseValue(r)
 	return r

@@ -20,8 +20,8 @@ func (b *BaseValue) Hash() string {
 }
 
 func (b *BaseValue) GetValue(agent *Agent) Value {
-	if r, ok := b.Value.(*ReferenceRecordValue); ok {
-		return r.ReferenceRecord.GetValue(agent)
+	if r, ok := b.Value.ReferenceRecord(); ok {
+		return r.GetValue(agent)
 	}
 	return b.Value
 }
@@ -170,6 +170,13 @@ func (b *BaseValue) NumberOrBigInt() (num *NumberValue, bigInt *BigIntValue, ok 
 	default:
 		return
 	}
+}
+
+func (b *BaseValue) ReferenceRecord() (*ReferenceRecord, bool) {
+	if r, ok := b.Value.(*ReferenceRecordValue); ok {
+		return r.record, true
+	}
+	return nil, false
 }
 
 func (b *BaseValue) String() string {

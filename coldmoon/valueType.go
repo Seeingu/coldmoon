@@ -24,4 +24,5 @@ type Value interface {
 	Hash() string
 
 	NumberOrBigInt() (*NumberValue, *BigIntValue, bool)
+	ReferenceRecord() (*ReferenceRecord, bool)
 }

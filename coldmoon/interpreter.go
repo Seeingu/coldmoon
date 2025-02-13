@@ -39,8 +39,7 @@ func (v *VM2) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOpe
 func (v *VM2) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) Value {
 	agent := v.agent
 	var thisValue Value
-	if r, ok := ref.(*ReferenceRecordValue); ok {
-		rr := r.ReferenceRecord
+	if rr, ok := ref.ReferenceRecord(); ok {
 		if rr.IsPropertyReference() {
 			thisValue = rr.GetThisValue()
 		} else {

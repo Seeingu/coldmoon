@@ -1685,7 +1685,11 @@ func (e *UpdateExpression) Evaluation(vm *VM2) Value {
 	} else {
 		Assert(false)
 	}
-	expr.(*ReferenceRecordValue).ReferenceRecord.PutValue(vm.agent, newValue)
+	if r, ok := expr.ReferenceRecord(); ok {
+		r.PutValue(vm.agent, newValue)
+	} else {
+		panic("unreachable")
+	}
 	if e.isPrefix() {
 		return newValue
 	}
@@ -1992,7 +1996,12 @@ func (e *AssignmentExpression) Evaluation(vm *VM2) Value {
 		rref := e.Right.Evaluation(vm)
 		rval := rref.GetValue(vm.agent)
 		r := ApplyStringOrNumericBinaryOperator(vm.agent, lval, rval, e.Operator.ToBinaryOperator())
-		lref.(*ReferenceRecordValue).ReferenceRecord.PutValue(vm.agent, r)
+
+		if ref, ok := lref.ReferenceRecord(); ok {
+			ref.PutValue(vm.agent, r)
+		} else {
+			panic("unreachable")
+		}
 		return r
 	}
 }
@@ -2716,8 +2725,8 @@ func (u *UnaryExpression) Evaluation(vm *VM2) Value {
 	case u.astIsTypeof():
 		// 13.5.3.1
 		val := u.Operand.Evaluation(vm)
-		if r, ok := val.(*ReferenceRecordValue); ok {
-			if r.ReferenceRecord.IsUnresolvableReference() {
+		if r, ok := val.ReferenceRecord(); ok {
+			if r.IsUnresolvableReference() {
 				return NewStringValue("undefined")
 			}
 		}
@@ -2951,8 +2960,7 @@ func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM2) Value {
 	arguments := c.Arguments.Evaluation(vm)
 	ref := memberExpr.Evaluation(vm)
 	f := ref.GetValue(vm.agent)
-	if ref, ok := ref.(*ReferenceRecordValue); ok {
-		r := ref.ReferenceRecord
+	if r, ok := ref.ReferenceRecord(); ok {
 		if !r.IsPropertyReference() && r.ReferencedName.String == "eval" {
 			panic("unimplemented")
 		}
