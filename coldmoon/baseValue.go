@@ -157,6 +157,21 @@ func (b *BaseValue) ToBoolean() bool {
 	}
 }
 
+func (b *BaseValue) NumberOrBigInt() (num *NumberValue, bigInt *BigIntValue, ok bool) {
+	switch v := b.Value.(type) {
+	case *NumberValue:
+		num = v
+		ok = true
+		return
+	case *BigIntValue:
+		bigInt = v
+		ok = true
+		return
+	default:
+		return
+	}
+}
+
 func (b *BaseValue) String() string {
 	return b.Value.String()
 }

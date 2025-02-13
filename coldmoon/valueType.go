@@ -22,4 +22,6 @@ type Value interface {
 	ToCompletion() CompletionValue
 	ToPropertyDescriptor() *PropertyDescriptor
 	Hash() string
+
+	NumberOrBigInt() (*NumberValue, *BigIntValue, bool)
 }

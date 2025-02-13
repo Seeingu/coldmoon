@@ -494,7 +494,7 @@ func SameValue(x Value, y Value) bool {
 	if x.TypeString() != y.TypeString() {
 		return false
 	}
-	if number, ok := x.(*NumberValue); ok {
+	if number, _, ok := x.NumberOrBigInt(); ok {
 		return number.SameValue(y.(*NumberValue))
 	}
 
@@ -506,7 +506,7 @@ func SameValueZero(x Value, y Value) bool {
 	if x.TypeString() != y.TypeString() {
 		return false
 	}
-	if number, ok := x.(*NumberValue); ok {
+	if number, _, ok := x.NumberOrBigInt(); ok {
 		return number.SameValueZero(y.(*NumberValue))
 	}
 
@@ -652,9 +652,8 @@ func IsStrictlyEqual(x Value, y Value) bool {
 		return false
 	}
 
-	_, xIsNumber := x.(*NumberValue)
-	if xIsNumber {
-		return x.(*NumberValue).SameValue(y.(*NumberValue))
+	if xNumber, xIsNumber := x.(*NumberValue); xIsNumber {
+		return xNumber.SameValue(y.(*NumberValue))
 	}
 
 	return SameValueNonNumber(x, y)

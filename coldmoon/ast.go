@@ -1666,22 +1666,24 @@ func (e *UpdateExpression) Evaluation(vm *VM2) Value {
 	expr := e.Operand.Evaluation(vm)
 	oldValue := ToNumeric(vm.agent, expr.GetValue(vm.agent))
 	var newValue Value
-	if n, ok := oldValue.(*NumberValue); ok {
-		one := NewNumberValue(1)
-		if e.Operator == UpdateOperatorIncrement {
-			newValue = n.Add(one)
+	if n, bi, ok := oldValue.NumberOrBigInt(); ok {
+		if n != nil {
+			one := NewNumberValue(1)
+			if e.Operator == UpdateOperatorIncrement {
+				newValue = n.Add(one)
+			} else {
+				newValue = n.Subtract(one)
+			}
 		} else {
-			newValue = n.Subtract(one)
+			one := NewBigIntValue(big.NewInt(1))
+			if e.Operator == UpdateOperatorIncrement {
+				newValue = bi.Add(one)
+			} else {
+				newValue = bi.Subtract(one)
+			}
 		}
 	} else {
-		Assert(ValueIs[*BigIntValue](oldValue))
-		bi := oldValue.(*BigIntValue)
-		one := NewBigIntValue(big.NewInt(1))
-		if e.Operator == UpdateOperatorIncrement {
-			newValue = bi.Add(one)
-		} else {
-			newValue = bi.Subtract(one)
-		}
+		Assert(false)
 	}
 	expr.(*ReferenceRecordValue).ReferenceRecord.PutValue(vm.agent, newValue)
 	if e.isPrefix() {
@@ -2730,27 +2732,27 @@ func (u *UnaryExpression) Evaluation(vm *VM2) Value {
 		// 13.5.5.1
 		expr := u.Operand.Evaluation(vm)
 		oldValue := ToNumeric(agent, expr.GetValue(agent))
-		if n, ok := oldValue.(*NumberValue); ok {
-			return NewNumberValue(-n.Data)
-		} else {
-			if b, ok := oldValue.(*BigIntValue); ok {
-				return NewBigIntValue(b.Data.Neg(nil))
+		if n, b, ok := oldValue.NumberOrBigInt(); ok {
+			if n != nil {
+				return NewNumberValue(-n.Data)
 			} else {
-				Assert(false)
+				return NewBigIntValue(b.Data.Neg(nil))
 			}
+		} else {
+			Assert(false)
 		}
 	case u.astIsBitwiseNot():
 		// 13.5.6.1
 		expr := u.Operand.Evaluation(vm)
 		oldValue := ToNumeric(agent, expr.GetValue(agent))
-		if n, ok := oldValue.(*NumberValue); ok {
-			return NewNumberValue(JSNumber(^int64(n.Data)))
-		} else {
-			if b, ok := oldValue.(*BigIntValue); ok {
-				return NewBigIntValue(b.Data.Not(nil))
+		if n, b, ok := oldValue.NumberOrBigInt(); ok {
+			if n != nil {
+				return NewNumberValue(JSNumber(^int64(n.Data)))
 			} else {
-				Assert(false)
+				return NewBigIntValue(b.Data.Not(nil))
 			}
+		} else {
+			Assert(false)
 		}
 	case u.astIsLogicalNot():
 		// 13.5.7.1
