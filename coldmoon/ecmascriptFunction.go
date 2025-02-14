@@ -27,7 +27,7 @@ type ECMAScriptFunction struct {
 	InternalSlotPrivateMethods
 	InternalSlotFields
 	InternalSlotClassFieldInitializerName
-	privateMethods            []*PrivateMethodDefinition
+	privateMethods            []*PrivateElement
 	fields                    []*ClassFieldDefinition
 	classFieldInitializerName ClassFieldInitializerName
 	Realm                     *Realm
@@ -50,7 +50,7 @@ var (
 	_ InternalSlotClassFieldInitializerName = (*ECMAScriptFunction)(nil)
 )
 
-func (e *ECMAScriptFunction) PrivateMethods() []*PrivateMethodDefinition {
+func (e *ECMAScriptFunction) PrivateMethods() []*PrivateElement {
 	return e.privateMethods
 }
 
@@ -569,7 +569,9 @@ func MakeMethod(F *ECMAScriptFunction, homeObject ObjectType) {
 }
 
 type (
-	PropertyKeyOrPrivateName     any
+	PropertyKeyOrPrivateName interface {
+		_propertyKeyOrPrivateName()
+	}
 	PropertyKeyOrPrivateNameName struct {
 		PropertyKeyOrPrivateName
 		PrivateName PrivateName

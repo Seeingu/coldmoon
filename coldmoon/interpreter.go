@@ -22,6 +22,17 @@ func (v *VM2) RunningPrivateEnvironment() *PrivateEnvironment {
 	return v.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 }
 
+// InitializeBoundName
+// spec: 8.6.2.1
+func (v *VM2) InitializeBoundName(name string, value Value, env EnvironmentRecord) {
+	if env == nil {
+		lhs := v.agent.ResolveBinding(name, nil, true)
+		lhs.PutValue(v.agent, value)
+	} else {
+		env.InitializeBinding(name, value)
+	}
+}
+
 // 13.3.4
 func (v *VM2) EvaluatePropertyAccessWithIdentifierKey(baseValue Value, identifierName IdentifierName, strict bool) *ReferenceRecord {
 	// TODO: use 13.1.2 Static Semantics: StringValue

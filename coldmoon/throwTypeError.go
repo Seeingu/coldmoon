@@ -18,7 +18,7 @@ func NewThrowTypeError(realm *Realm) ObjectType {
 			realm: realm,
 		},
 	)
-	object.(*BuiltinFunction).SetExtensible(false)
+	object.SetExtensible(false)
 
 	object.defineBuiltinProperty(CMString("length"), &PropertyDescriptor{
 		Value:        NewNumberValue(0),

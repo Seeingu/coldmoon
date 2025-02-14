@@ -112,12 +112,23 @@ func (a *Agent) ResolveThisBinding() Value {
 	return envRec.GetThisBinding()
 }
 
-// 9.4.5
+// GetNewTarget
+// spec: 9.4.5
 func (a *Agent) GetNewTarget() ObjectType {
 	envRec := a.GetThisEnvironment()
 	fun, ok := envRec.(*FunctionEnvironment)
 	Assert(ok)
 	return fun.NewTarget
+}
+
+// GetSuperConstructor
+// spec: 13.3.7.2
+func (a *Agent) GetSuperConstructor() Value {
+	envRec := a.GetThisEnvironment()
+	funEnv := envRec.(*FunctionEnvironment)
+	activeFunction := funEnv.FunctionObject
+	superConstructor := activeFunction.InternalMethods().GetPrototypeOf(activeFunction)
+	return superConstructor.ToValue()
 }
 
 // 9.4.6

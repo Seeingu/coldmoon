@@ -587,7 +587,7 @@ func (i *IRegExpCreate) String() string {
 
 type IBindingClassDeclarationEvaluation struct {
 	Instruction
-	ClassDeclaration *DeclarationClass
+	ClassDeclaration *ClassDeclaration
 }
 
 func (i *IBindingClassDeclarationEvaluation) String() string {

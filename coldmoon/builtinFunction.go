@@ -20,7 +20,7 @@ var (
 	_ InternalSlotFields         = (*BuiltinFunction)(nil)
 )
 
-func (b *BuiltinFunction) PrivateMethods() []*PrivateMethodDefinition {
+func (b *BuiltinFunction) PrivateMethods() []*PrivateElement {
 	return b.AdditionalFields.ClassConstructorFields.PrivateMethods
 }
 
@@ -99,7 +99,7 @@ func CreateBuiltinFunction(
 	length JSInt,
 	name PropertyConvertable,
 	args builtinFunctionArgs,
-) ObjectType {
+) *BuiltinFunction {
 	realm := args.realm
 	if realm == nil {
 		realm = agent.CurrentRealm()
@@ -145,6 +145,6 @@ func CreateBuiltinFunction(
 type ClassConstructorFields struct {
 	ConstructorKind ConstructorKind
 	SourceText      string
-	PrivateMethods  []*PrivateMethodDefinition
+	PrivateMethods  []*PrivateElement
 	Fields          []*ClassFieldDefinition
 }

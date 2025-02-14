@@ -2,7 +2,7 @@ package coldmoon
 
 // [[PrivateMethods]]
 type InternalSlotPrivateMethods interface {
-	PrivateMethods() []*PrivateMethodDefinition
+	PrivateMethods() []*PrivateElement
 }
 
 // [[Fields]]

@@ -4,6 +4,9 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/Seeingu/coldmoon/pkg"
+	"github.com/samber/lo"
 )
 
 // Deprecated
@@ -246,6 +249,8 @@ func (p *PrimaryExpressionAsyncGeneratorExpression) String() string {
 
 // MARK: - ThisExpression
 
+// This keyword
+// spec: 13.2.1
 type PrimaryExpressionThis struct {
 	PrimaryExpression
 }
@@ -257,6 +262,12 @@ func (p *PrimaryExpressionThis) AssignmentTargetType() AssignmentTargetType {
 
 func (p *PrimaryExpressionThis) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IResolveThisBinding{})
+}
+
+// Evaluation
+// spec: 13.2.1.1
+func (p *PrimaryExpressionThis) Evaluation(vm *VM2) Value {
+	return vm.agent.ResolveThisBinding()
 }
 
 func (p *PrimaryExpressionThis) String() string {
@@ -1424,6 +1435,8 @@ func (s *SuperPropertyIdentifier) String() string {
 
 // MARK: - SuperCall
 
+// SuperCall [Yield, Await] :
+// - super Arguments[?Yield, ?Await]
 type ExpressionSuperCall struct {
 	Expression
 	Arguments Arguments
@@ -1431,6 +1444,25 @@ type ExpressionSuperCall struct {
 
 func (e *ExpressionSuperCall) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
+}
+
+// Evaluation
+// spec: 13.3.7.1
+func (e *ExpressionSuperCall) Evaluation(vm *VM2) Value {
+	agent := vm.agent
+	newTarget := agent.GetNewTarget()
+	// alias of func
+	f := agent.GetSuperConstructor()
+	argList := e.Arguments.ArgumentListEvaluation(vm)
+	if !IsConstructor(f) {
+		return agent.ThrowTypeError("SuperCall: not a constructor")
+	}
+	result := MustGetObject(f).Construct(argList, newTarget)
+	thisER := agent.GetThisEnvironment().(*FunctionEnvironment)
+	thisER.BindThisValue(result.ToValue())
+	F := thisER.FunctionObject
+	result.InitializeInstanceElements(F)
+	return result.ToValue()
 }
 
 func (e *ExpressionSuperCall) Bytecode(ex *Executable, c *BytecodeContext) {
@@ -1532,6 +1564,21 @@ func (t *PrimaryExpressionTemplateLiteral) Bytecode(e *Executable, c *BytecodeCo
 			e.AddInstruction(InsLoad)
 		}
 	}
+}
+
+func (t *PrimaryExpressionTemplateLiteral) astNoSubstitution() bool {
+	return t.TemplateLiteral.TemplateHead == nil
+}
+
+// Evaluation
+// spec: 13.2.8.6
+func (t *PrimaryExpressionTemplateLiteral) Evaluation(vm *VM2) Value {
+	if t.astNoSubstitution() {
+		// NoSubstitutionTemplate
+		span := t.TemplateLiteral.Spans[0]
+		return span.TV().ToValue()
+	}
+	panic("unimplemented")
 }
 
 func (t *PrimaryExpressionTemplateLiteral) String() string {
@@ -1985,10 +2032,35 @@ func (e *AssignmentExpression) astIsAssign() bool {
 	return e.Operator == AssignmentOperatorAssign
 }
 
-// 13.15.2
+// Evaluation
+// spec: 13.15.2
 func (e *AssignmentExpression) Evaluation(vm *VM2) Value {
 	if e.astIsAssign() {
-		panic("unimplemented")
+		_, isObjectLiteral := e.Left.(*PrimaryExpressionObjectLiteral)
+		_, isArrayLiteral := e.Left.(*PrimaryExpressionArrayLiteral)
+		if !isObjectLiteral && !isArrayLiteral {
+			lref := e.Left.Evaluation(vm)
+			var rval Value
+			if IsAnonymousFunctionDefinition(e.Right) {
+				// FIXME: handle named evaluation
+				panic("")
+			} else {
+				rref := e.Right.Evaluation(vm)
+				rval = rref.GetValue(vm.agent)
+			}
+			if ref, ok := lref.ReferenceRecord(); ok {
+				ref.PutValue(vm.agent, rval)
+			} else {
+				panic("unreachable")
+			}
+			return rval
+		} else {
+			// TODO(BM): DestructuringAssignmentEvaluation
+			// assignmentPattern := e.Left
+			// rref := e.Right.Evaluation(vm)
+			// rval := rref.GetValue(vm.agent)
+			panic("unimplemented")
+		}
 	} else {
 		// TODO: handle &&= ||=, ??=
 		lref := e.Left.Evaluation(vm)
@@ -2542,7 +2614,8 @@ func (e *RelationalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 	}
 }
 
-// 13.10.1
+// Evaluation
+// spec: 13.10.1
 func (e *RelationalExpression) Evaluation(vm *VM2) Value {
 	lref := e.Left.Evaluation(vm)
 	lval := lref.GetValue(vm.agent)
@@ -2568,7 +2641,7 @@ func (e *RelationalExpression) Evaluation(vm *VM2) Value {
 		}
 		return NewBooleanValue(!IsLessThan(vm.agent, rval, lval, order))
 	case RelationalOperatorInstanceof:
-		panic("unimplemented")
+		return NewBooleanValue(InstanceOfOperator(vm.agent, lval, rval))
 	case RelationalOperatorIn:
 		panic("unimplemented")
 	}
@@ -4577,7 +4650,7 @@ func DeclarationBoundNames(d Declaration) (l []IdentifierName) {
 	switch decl := d.(type) {
 	case *DeclarationHoistableFunction, *DeclarationHoistableAsyncFunction:
 		return
-	case *DeclarationClass:
+	case *ClassDeclaration:
 		return decl.BoundNames()
 	case *LexicalDeclaration:
 		return decl.BoundNames()
@@ -4803,18 +4876,26 @@ func (d *GeneratorDeclaration) String() string {
 
 // MARK: - ClassDeclaration
 
-type DeclarationClass struct {
+// ClassDeclaration [Yield, Await, Default] :
+// - class BindingIdentifier[?Yield, ?Await] ClassTail[?Yield, ?Await]
+// - [+Default] class ClassTail[?Yield, ?Await]
+type ClassDeclaration struct {
 	Declaration
 	IdentifierName IdentifierName
 	ClassTail      *ClassTail
 	SourceText     string
 }
 
-func (d *DeclarationClass) LexicallyDeclaredNames() (l []IdentifierName) {
+var (
+	_ RuntimeSemanticsEvaluation                        = (*ClassDeclaration)(nil)
+	_ RuntimeSemanticsBindingClassDeclarationEvaluation = (*ClassDeclaration)(nil)
+)
+
+func (d *ClassDeclaration) LexicallyDeclaredNames() (l []IdentifierName) {
 	return d.BoundNames()
 }
 
-func (d *DeclarationClass) BoundNames() (l []IdentifierName) {
+func (d *ClassDeclaration) BoundNames() (l []IdentifierName) {
 	if d.IdentifierName != "" {
 		l = append(l, d.IdentifierName)
 	} else {
@@ -4823,7 +4904,7 @@ func (d *DeclarationClass) BoundNames() (l []IdentifierName) {
 	return
 }
 
-func (d *DeclarationClass) Bytecode(e *Executable, c *BytecodeContext) {
+func (d *ClassDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsLoad)
 	e.AddInstruction(&IBindingClassDeclarationEvaluation{
 		ClassDeclaration: d,
@@ -4831,13 +4912,271 @@ func (d *DeclarationClass) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(InsStore)
 }
 
-func (d *DeclarationClass) String() string {
+func (d *ClassDeclaration) astHasIdentifier() bool {
+	return d.IdentifierName != ""
+}
+
+// 15.7.16
+func (d *ClassDeclaration) Evaluation(vm *VM2) Value {
+	d.BindingClassDeclarationEvaluation(vm)
+	// return EMPTY
+	return UndefinedValue
+}
+
+// BindingClassDeclarationEvaluation
+// spec: 15.7.15
+func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM2) (obj ObjectType, err Value) {
+	if d.astHasIdentifier() {
+		className := d.IdentifierName
+		value, err := d.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className))
+		if err != nil {
+			return nil, err
+		}
+		// TODO: set [[SourceText]]
+		env := vm.RunningLexicalEnvironment()
+		vm.InitializeBoundName(className, value.ToValue(), env)
+		return value, nil
+	} else {
+		value, err := d.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("default"))
+		if err != nil {
+			return nil, err
+		}
+		// TODO: set [[SourceText]]
+		return value, nil
+	}
+}
+
+func (d *ClassDeclaration) String() string {
 	return "ClassDeclaration " + string(d.IdentifierName)
 }
 
 type ClassTail struct {
 	ClassHeritage Expression
 	ClassBody     *ClassBody
+}
+
+var _ RuntimeSemanticsClassDefinitionEvaluation = (*ClassTail)(nil)
+
+// ClassDefinitionEvaluation
+// spec: 15.7.14
+func (c *ClassTail) ClassDefinitionEvaluation(vm *VM2, classBinding string, className PropertyKeyOrPrivateName) (obj ObjectType, err Value) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	// outer env of class
+	env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	// the class env
+	classEnv := NewDeclarativeEnvironment(env)
+	if classBinding != "" {
+		classEnv.CreateImmutableBinding(classBinding, true)
+	}
+
+	outerPrivateEnvironment := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	classPrivateEnvironment := NewPrivateEnvironment(outerPrivateEnvironment)
+
+	if len(c.ClassBody.ClassElementList.Items) > 0 {
+		privateBoundIdentifiers := c.ClassBody.PrivateBoundIdentifiers()
+		for _, privateBoundIdentifier := range privateBoundIdentifiers {
+			names := lo.Map(classPrivateEnvironment.Names, func(item PrivateName, index int) string {
+				return item.Symbol.Description
+			})
+			if lo.Contains(names, string(privateBoundIdentifier)) {
+			} else {
+				classPrivateEnvironment.Names = append(classPrivateEnvironment.Names, PrivateName{
+					Symbol: agent.CreateSymbol(string(privateBoundIdentifier)),
+				})
+			}
+		}
+	}
+
+	var protoParent ObjectType
+	var constructorParent ObjectType
+	if c.ClassHeritage == nil {
+		protoParent = realm.Intrinsics.ObjectPrototype
+		constructorParent = realm.Intrinsics.FunctionPrototype
+	} else {
+		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
+		superclassRef := GenerateAndRunBytecode(agent,
+			&StatementExpression{
+				Expression: c.ClassHeritage,
+			},
+		)
+		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+		superclass := superclassRef.Data().GetValue(agent)
+		if superclass == nil {
+			protoParent = nil
+			constructorParent = realm.Intrinsics.FunctionPrototype
+		} else if !IsConstructor(superclass) {
+			panic("TypeError: superclass is not a constructor")
+		} else {
+			protoParentValue := MustGetObject(superclass).Get(NewStringPropertyKey("prototype"))
+			if !ValueIsObject(protoParentValue) {
+				panic("TypeError: prototype is not an object")
+			}
+			protoParent = MustGetObject(protoParentValue)
+			constructorParent = MustGetObject(superclass)
+		}
+	}
+
+	proto := OrdinaryObjectCreate(agent, protoParent, nil)
+	constructor := c.ClassBody.ConstructorMethod()
+	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
+	agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = classPrivateEnvironment
+
+	var function ObjectType
+	if constructor == nil {
+		var defaultConstructor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+			args := arguments
+			if newTarget == nil {
+				return agent.ThrowTypeError("class must be invoked with 'new'")
+			}
+
+			F := agent.ActiveFunctionObject()
+			classConstructorFields := ObjectAs[*BuiltinFunction](F).AdditionalFields.ClassConstructorFields
+			var result ObjectType
+			if classConstructorFields.ConstructorKind == ConstructorKindDerived {
+				fun := function.InternalMethods().GetPrototypeOf(function)
+				if !IsConstructor((fun).ToValue()) {
+					panic("TypeError: prototype is not a constructor")
+				}
+				result = fun.Construct(args, newTarget)
+			} else {
+				result = OrdinaryCreateFromConstructor(agent, newTarget, "%Object.prototype", nil)
+			}
+			return result.ToValue()
+		}
+
+		function = CreateBuiltinFunction(
+			agent,
+			defaultConstructor,
+			0,
+			CMString("constructor"),
+			builtinFunctionArgs{
+				prototype:     constructorParent,
+				realm:         realm,
+				isConstructor: true,
+				additionalFields: &AdditionalFields{
+					ClassConstructorFields: &ClassConstructorFields{},
+				},
+			})
+	} else {
+		constructorInfo := DefineMethod(agent, constructor.FunctionExpression, NewStringValue("constructor"), proto, constructorParent)
+		F := constructorInfo.Closure
+		MakeClassConstructor(F.(*ECMAScriptFunction))
+		SetFunctionName(F, className.(PropertyKey), "")
+		function = F
+	}
+
+	MakeConstructor(function, false, proto)
+	if c.ClassHeritage != nil {
+		if f, ok := function.(*ECMAScriptFunction); ok {
+			f.ConstructorKind = ConstructorKindDerived
+		} else if b, ok := function.(*BuiltinFunction); ok {
+			b.AdditionalFields.ClassConstructorFields.ConstructorKind = ConstructorKindDerived
+		} else {
+			panic("unreachable")
+		}
+	}
+
+	DefineMethodProperty(proto, NewStringPropertyKey("constructor"), function, false)
+
+	elements := c.ClassBody.NonConstructorElements()
+
+	instancePrivateMethods := &pkg.Stack[*PrivateElement]{}
+	staticPrivateMethods := &pkg.Stack[*PrivateElement]{}
+
+	instanceFields := make([]*ClassFieldDefinition, 0)
+
+	staticClassFields := make([]*ClassFieldDefinition, 0)
+	staticStaticBlocks := make([]*ClassStaticBlockDefinition, 0)
+
+	for _, classElement := range elements {
+		var err Value
+		var result classEvaluationResult
+		if !ClassElementIsStatic(classElement) {
+			result, err = classElement.ClassElementEvaluation(vm, proto)
+		} else {
+			result, err = classElement.ClassElementEvaluation(vm, function)
+		}
+		if err != nil {
+			agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+			agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+			panic(err)
+		}
+		if result.classFieldDefinition != nil {
+			if !ClassElementIsStatic(classElement) {
+				instanceFields = append(instanceFields, result.classFieldDefinition)
+			} else {
+				staticClassFields = append(staticClassFields, result.classFieldDefinition)
+			}
+		} else if result.staticBlockDefinition != nil {
+			staticStaticBlocks = append(staticStaticBlocks, result.staticBlockDefinition)
+		} else if result.privateElement != nil {
+			pme := result.privateElement
+			Assert(pme.Kind == PrivateElementKindMethod || pme.Kind == PrivateElementKindAccessor)
+			var container *pkg.Stack[*PrivateElement]
+			if !ClassElementIsStatic(classElement) {
+				container = instancePrivateMethods
+			} else {
+				container = staticPrivateMethods
+			}
+
+			element := pme
+			var found bool
+			for i, pe := range container.Data() {
+				if pe.Key.Equal(element.Key) {
+					found = true
+					Assert(
+						pe.Kind == PrivateElementKindAccessor &&
+							pe.Kind == element.Kind)
+					var combined *PrivateElement
+					if element.Get == nil {
+						combined = &PrivateElement{
+							Key:  element.Key,
+							Kind: PrivateElementKindAccessor,
+							Set:  element.Set,
+							Get:  pe.Get,
+						}
+					} else {
+						combined = &PrivateElement{
+							Key:  element.Key,
+							Kind: PrivateElementKindAccessor,
+							Set:  pe.Set,
+							Get:  element.Get,
+						}
+					}
+					container.Data()[i] = combined
+				}
+			}
+			if !found {
+				container.Push(pme)
+			}
+		}
+	}
+
+	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+	if classBinding != "" {
+		classEnv.InitializeBinding(classBinding, function.ToValue())
+	}
+
+	if ObjectIs[*ECMAScriptFunction](function) {
+		e := ObjectAs[*ECMAScriptFunction](function)
+		e.privateMethods = instancePrivateMethods.Data()
+		function.(InternalSlotFields).SetFields(instanceFields)
+	}
+
+	for _, method := range staticPrivateMethods.Data() {
+		function.PrivateMethodOrAccessorAdd(method)
+	}
+	for _, element := range staticClassFields {
+		function.DefineField(element)
+	}
+	for _, block := range staticStaticBlocks {
+		block.BodyFunction.ToValue().Call(function.ToValue(), nil)
+	}
+
+	agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+
+	return function, nil
 }
 
 type ClassBody struct {
@@ -4936,8 +5275,17 @@ const (
 	ClassElementKindEmpty
 )
 
+// TODO(BM): use struct
+// ClassElement [Yield, Await] :
+// - MethodDefinition[?Yield, ?Await]
+// - static MethodDefinition[?Yield, ?Await]
+// - FieldDefinition[?Yield, ?Await] ;
+// - static FieldDefinition[?Yield, ?Await] ;
+// - ClassStaticBlock
+// - ;
 type ClassElement interface {
 	ASTNode
+	RuntimeSemanticsClassElementEvaluation
 	ClassElementKind() ClassElementKind
 }
 
@@ -4967,12 +5315,74 @@ func (c *ClassElementStaticBlock) ClassElementKind() ClassElementKind {
 type ClassElementFieldDefinition struct {
 	ClassElement
 	FieldDefinition *FieldDefinition
+	IsStatic        bool
+}
+
+var (
+	_ RuntimeSemanticsClassElementEvaluation         = (*ClassElementFieldDefinition)(nil)
+	_ RuntimeSemanticsClassFieldDefinitionEvaluation = (*ClassElementFieldDefinition)(nil)
+)
+
+func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM2, obj ObjectType) (result classEvaluationResult, err Value) {
+	field, err := c.ClassFieldDefinitionEvaluation(vm, obj)
+	result.classFieldDefinition = field
+	return
+}
+
+func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM2, homeObject ObjectType) (field *ClassFieldDefinition, err Value) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	var name PropertyKeyOrPrivateName
+	value := GenerateAndRunBytecode(agent, c.FieldDefinition.PropertyName)
+	if value.Data() != nil {
+		name = ToPropertyKey(agent, value.Data())
+	}
+	var initializer ObjectType
+	if c.FieldDefinition.Initializer != nil {
+		formalParameterList := &FormalParameters{}
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := ""
+		functionBody := &FunctionBody{
+			StatementList: StatementList{
+				&StatementListItemStatement{
+					Statement: &StatementReturn{
+						Expression: c.FieldDefinition.Initializer,
+					},
+				},
+			},
+			Strict: true,
+			Type:   FunctionTypeNormal,
+		}
+		initializer = OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			formalParameterList,
+			functionBody,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(initializer.(*ECMAScriptFunction), homeObject)
+		initializer.(InternalSlotClassFieldInitializerName).SetClassFieldInitializerName(name)
+	} else {
+		return &ClassFieldDefinition{
+			Name: name,
+		}, nil
+	}
+
+	return &ClassFieldDefinition{
+		Name:        name,
+		Initializer: initializer.(*ECMAScriptFunction),
+	}, nil
 }
 
 func (c *ClassElementFieldDefinition) ClassElementKind() ClassElementKind {
 	return ClassElementKindNonConstructorMethod
 }
 
+// TODO(BM): use ClassElementFieldDefinition
 type ClassElementStaticFieldDefinition struct {
 	ClassElement
 	FieldDefinition *FieldDefinition
@@ -4992,6 +5402,11 @@ func (c *ClassElementEmpty) ClassElementKind() ClassElementKind {
 	return ClassElementKindEmpty
 }
 
+func (c *ClassElementEmpty) ClassElementEvaluation(vm *VM2, function ObjectType) (result classEvaluationResult, err Value) {
+	// return UNUSED
+	return
+}
+
 // MARK: - ClassElement: StaticMethodDefinition
 
 type ClassElementStaticMethodDefinition struct {
@@ -5008,6 +5423,16 @@ func (c *ClassElementStaticMethodDefinition) ClassElementKind() ClassElementKind
 type ClassElementMethodDefinition struct {
 	ClassElement
 	MethodDefinition *MethodDefinition
+}
+
+func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM2, obj ObjectType) (result classEvaluationResult, err Value) {
+	completion := c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false)
+	if completion.IsError() {
+		err = completion.Error()
+		return
+	}
+	result.privateElement = completion.Data()
+	return
 }
 
 func (c *ClassElementMethodDefinition) ClassElementKind() ClassElementKind {
@@ -5767,7 +6192,7 @@ type ModuleItemExportDeclaration struct {
 	Declaration                 Declaration
 	VariableStatement           *StatementVariable
 	DefaultHoistableDeclaration DeclarationHoistable
-	DefaultClassDeclaration     *DeclarationClass
+	DefaultClassDeclaration     *ClassDeclaration
 	DefaultExpression           Expression
 }
 

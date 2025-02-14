@@ -412,8 +412,8 @@ func (o *Object) DefineField(field *ClassFieldDefinition) {
 	switch name := fieldName.(type) {
 	case PropertyKey:
 		o.CreateDataPropertyOrThrow(name, initializer)
-	case PrivateName:
-		o.PrivateFieldAdd(name, initializer)
+	case PropertyKeyOrPrivateNameName:
+		o.PrivateFieldAdd(name.PrivateName, initializer)
 	default:
 		panic("unreachable")
 	}
@@ -425,9 +425,9 @@ func (o *Object) PrivateElementFind(privateName PrivateName) *PrivateElement {
 
 // 7.3.26
 func (o *Object) PrivateMethodOrAccessorAdd(
-	privateName PrivateName,
 	method *PrivateElement,
 ) {
+	privateName := method.Key
 	Assert(method.Kind == PrivateElementKindMethod || method.Kind == PrivateElementKindAccessor)
 	o.Agent().HostHooks.HostEnsureCanAddPrivateElement()
 	entry := o.PrivateElementFind(privateName)
@@ -463,7 +463,7 @@ func (o *Object) PrivateGet(privateName PrivateName) Value {
 func (o *Object) InitializeInstanceElements(constructor ObjectType) {
 	methods := constructor.(InternalSlotPrivateMethods).PrivateMethods()
 	for _, method := range methods {
-		o.PrivateMethodOrAccessorAdd(method.PrivateName, method.PrivateElement)
+		o.PrivateMethodOrAccessorAdd(method)
 	}
 
 	fields := constructor.(InternalSlotFields).Fields()

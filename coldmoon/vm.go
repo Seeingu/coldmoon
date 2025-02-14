@@ -621,6 +621,7 @@ func (vm *VM) forDeclarationBindingInstantiation(lexicalDeclaration *LexicalDecl
 	vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = iterationEnv
 }
 
+// Deprecated
 func (vm *VM) getSuperConstructor() Value {
 	agent := vm.agent
 	envRec := agent.GetThisEnvironment()
@@ -630,15 +631,15 @@ func (vm *VM) getSuperConstructor() Value {
 	return superConstructor.ToValue()
 }
 
-// classEvaluationResult enum
-type classEvaluationResult struct {
+// Deprecated
+type classEvaluationResultDeprecated struct {
 	classFieldDefinition    *ClassFieldDefinition
 	staticBlockDefinition   *ClassStaticBlockDefinition
 	privateMethodDefinition *PrivateMethodDefinition
 }
 
 // 15.7.13
-func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) (result classEvaluationResult, err error) {
+func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectType) (result classEvaluationResultDeprecated, err error) {
 	switch ce := classElement.(type) {
 	case *ClassElementStaticBlock:
 		result.staticBlockDefinition = vm.ClassStaticBlockDefinitionEvaluation(ce, object)
@@ -673,6 +674,7 @@ func (vm *VM) ClassElementEvaluation(classElement ClassElement, object ObjectTyp
 	panic("unreachable")
 }
 
+// Deprecated
 // 15.7.14
 func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding string, className string) ObjectType {
 	agent := vm.agent
@@ -806,7 +808,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 
 	for _, classElement := range elements {
 		var err error
-		var result classEvaluationResult
+		var result classEvaluationResultDeprecated
 		if !ClassElementIsStatic(classElement) {
 			result, err = vm.ClassElementEvaluation(classElement, proto)
 		} else {
@@ -877,13 +879,14 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 
 	if ObjectIs[*ECMAScriptFunction](function) {
 		e := ObjectAs[*ECMAScriptFunction](function)
-		e.privateMethods = instancePrivateMethods.Data()
+		e.privateMethods = lo.Map(instancePrivateMethods.Data(), func(item *PrivateMethodDefinition, index int) *PrivateElement {
+			return item.PrivateElement
+		})
 		function.(InternalSlotFields).SetFields(instanceFields)
 	}
 
 	for _, method := range staticPrivateMethods.Data() {
-		function.PrivateMethodOrAccessorAdd(
-			method.PrivateName, method.PrivateElement)
+		function.PrivateMethodOrAccessorAdd(method.PrivateElement)
 	}
 	for _, element := range staticClassFields {
 		function.DefineField(element)
@@ -898,7 +901,7 @@ func (vm *VM) ClassDefinitionEvaluation(classTail *ClassTail, classBinding strin
 }
 
 // 15.7.15
-func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *DeclarationClass) ObjectType {
+func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *ClassDeclaration) ObjectType {
 	agent := vm.agent
 	if classDeclaration.IdentifierName != "" {
 		className := string(classDeclaration.IdentifierName)
@@ -927,6 +930,7 @@ func (vm *VM) BindingClassDeclarationEvaluation(classDeclaration *DeclarationCla
 	}
 }
 
+// Deprecated
 // 8.6.2.1
 func (vm *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord) {
 	if env == nil {
@@ -1084,6 +1088,7 @@ func (vm *VM) ClassStaticBlockDefinitionEvaluation(classStaticBlock *ClassElemen
 	}
 }
 
+// Deprecated
 func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, homeObject ObjectType) *ClassFieldDefinition {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
@@ -1449,7 +1454,7 @@ func evaluateNew(agent *Agent, constructor Value, arguments []Value) Value {
 	return o.Construct(arguments, nil).ToValue()
 }
 
-// 13.10.2
+// InstanceOfOperator 13.10.2
 func InstanceOfOperator(agent *Agent, value Value, target Value) bool {
 	if _, ok := target.(*ObjectValue); !ok {
 		agent.ThrowTypeError("target is not an object")

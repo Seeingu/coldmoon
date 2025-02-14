@@ -42,3 +42,34 @@ type RuntimeSemanticsDefineMethod interface {
 	// proto is optional
 	DefineMethod(vm *VM2, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value)
 }
+
+// MARK: - Class Related
+
+// 15.7.15
+type RuntimeSemanticsBindingClassDeclarationEvaluation interface {
+	// BindingClassDeclarationEvaluation returns a function object or an abrupt Completion
+	BindingClassDeclarationEvaluation(vm *VM2) (obj ObjectType, err Value)
+}
+
+// 15.7.14
+type RuntimeSemanticsClassDefinitionEvaluation interface {
+	// classBinding is optional
+	ClassDefinitionEvaluation(vm *VM2, classBinding string, className PropertyKeyOrPrivateName) (obj ObjectType, err Value)
+}
+
+// classEvaluationResult enum
+type classEvaluationResult struct {
+	classFieldDefinition  *ClassFieldDefinition
+	staticBlockDefinition *ClassStaticBlockDefinition
+	privateElement        *PrivateElement
+}
+
+// 15.7.13
+type RuntimeSemanticsClassElementEvaluation interface {
+	ClassElementEvaluation(vm *VM2, obj ObjectType) (result classEvaluationResult, err Value)
+}
+
+// 15.7.10
+type RuntimeSemanticsClassFieldDefinitionEvaluation interface {
+	ClassFieldDefinitionEvaluation(vm *VM2, homeObject ObjectType) (field *ClassFieldDefinition, err Value)
+}

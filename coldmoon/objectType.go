@@ -7,6 +7,7 @@ type ObjectType interface {
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	DefineField(field *ClassFieldDefinition)
 	SetPrototype(p ObjectType)
+	// TODO: assert constructor is a function
 	InitializeInstanceElements(constructor ObjectType)
 	CreateDataProperty(key PropertyKey, value Value) bool
 	DeletePropertyOrThrow(key PropertyKey) bool
@@ -33,7 +34,8 @@ type ObjectType interface {
 	Prototype() ObjectType
 	Extensible() bool
 	SpeciesConstructor(defaultConstructor ObjectType) CompletionObject
-	PrivateMethodOrAccessorAdd(privateName PrivateName, method *PrivateElement)
+	// PrivateMethodOrAccessorAdd 7.3.28
+	PrivateMethodOrAccessorAdd(method *PrivateElement)
 	PrivateGet(privateName PrivateName) Value
 	ToCompletion() CompletionValue
 	ToValue() Value

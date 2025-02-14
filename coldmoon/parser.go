@@ -848,13 +848,13 @@ func (p *Parser) noLineTerminatorHere() {
 	// TODO
 }
 
-func (p *Parser) classDeclaration() *DeclarationClass {
+func (p *Parser) classDeclaration() *ClassDeclaration {
 	startIndex := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TClass)
 	identifier := p.bindingIdentifier()
 	classTail := p.classTail()
 	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
-	return &DeclarationClass{
+	return &ClassDeclaration{
 		IdentifierName: identifier,
 		ClassTail:      classTail,
 		SourceText:     sourceText,

@@ -36,34 +36,6 @@ func testModule(t *testing.T, f string) {
 // Deprecated
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
-		fmt.Sprintf(`
-class Animal {
-    constructor(name) {
-        this.name = name;
-    }
-
-    speak() {
-        return this.name + ' makes a noise.';
-    }
-}
-
-class Dog extends Animal {
-    constructor(name) {
-        super(name); // call the super class constructor and pass in the name parameter
-    }
-
-    speak() {
-        return this.name + ' barks.';
-    }
-}
-
-const d = new Dog("Mitzie");
-assertEqual(d.name, "Mitzie");
-assert(d instanceof Dog);
-assert(d instanceof Animal);
-assertEqual(d.speak(), "Mitzie barks.");
-assertEqual(%[1]sstring text line 1\nstring text line 2%[1]s, 'string text line 1\nstring text line 2');
-`, "`"),
 		fmt.Sprintf(
 			`
 const a = 5;
@@ -328,6 +300,34 @@ true ? 2 : 1;
 
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
+		fmt.Sprintf(`
+class Animal {
+    constructor(name) {
+        this.name = name;
+    }
+
+    speak() {
+        return this.name + ' makes a noise.';
+    }
+}
+
+class Dog extends Animal {
+    constructor(name) {
+        super(name); // call the super class constructor and pass in the name parameter
+    }
+
+    speak() {
+        return this.name + ' barks.';
+    }
+}
+
+const d = new Dog("Mitzie");
+assertEqual(d.name, "Mitzie");
+assert(d instanceof Dog);
+assert(d instanceof Animal);
+assertEqual(d.speak(), "Mitzie barks.");
+assertEqual(%[1]sstring text line 1\nstring text line 2%[1]s, 'string text line 1\nstring text line 2');
+`, "`"),
 		`
 const previouslyMaxSafeInteger = 9007199254740991n;
 const alsoHuge = BigInt(9007199254740991);
