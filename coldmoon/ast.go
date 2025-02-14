@@ -1521,6 +1521,7 @@ func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
 
 // MARK: - TemplateLiteral
 
+// TODO(BM): rename
 type PrimaryExpressionTemplateLiteral struct {
 	PrimaryExpression
 	TemplateLiteral *TemplateLiteral
@@ -1577,6 +1578,8 @@ func (t *PrimaryExpressionTemplateLiteral) Evaluation(vm *VM2) Value {
 		// NoSubstitutionTemplate
 		span := t.TemplateLiteral.Spans[0]
 		return span.TV().ToValue()
+	} else {
+		// TODO(BM): after remove old vm
 	}
 	panic("unimplemented")
 }
