@@ -33,7 +33,19 @@ func (v *VM2) InitializeBoundName(name string, value Value, env EnvironmentRecor
 	}
 }
 
-// 13.3.4
+// EvaluatePropertyAccessWithExpressionKey
+// spec: 13.3.3
+func (v *VM2) EvaluatePropertyAccessWithExpressionKey(
+	baseValue Value, expression Expression, strict bool,
+) *ReferenceRecord {
+	propertyNameReference := expression.Evaluation(v)
+	propertyNameValue := propertyNameReference.GetValue(v.agent)
+	propertyKey := ToPropertyKey(v.agent, propertyNameValue)
+	return NewReferenceRecord(NewReferenceRecordBaseValue(baseValue), propertyKey.ToReference(), strict, UndefinedValue)
+}
+
+// EvaluatePropertyAccessWithIdentifierKey
+// spec: 13.3.4
 func (v *VM2) EvaluatePropertyAccessWithIdentifierKey(baseValue Value, identifierName IdentifierName, strict bool) *ReferenceRecord {
 	// TODO: use 13.1.2 Static Semantics: StringValue
 	propertyNameString := identifierName

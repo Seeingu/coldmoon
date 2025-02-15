@@ -924,15 +924,16 @@ func (a *ASTPropertyExpression) String() string {
 	return a.Expression.String()
 }
 
+// TODO(BM): refactor: match spec
 // MemberExpression [Yield, Await] :
-// PrimaryExpression[?Yield, ?Await]
-// MemberExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
-// MemberExpression[?Yield, ?Await]. IdentifierName
-// MemberExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
-// SuperProperty[?Yield, ?Await]
-// MetaProperty
-// new MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
-// MemberExpression[?Yield, ?Await]. PrivateIdentifier
+// - PrimaryExpression[?Yield, ?Await]
+// - MemberExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
+// - MemberExpression[?Yield, ?Await]. IdentifierName
+// - MemberExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+// - SuperProperty[?Yield, ?Await]
+// - MetaProperty
+// - new MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+// - MemberExpression[?Yield, ?Await]. PrivateIdentifier
 type MemberExpression struct {
 	Expression
 	Member   Expression
@@ -970,7 +971,14 @@ func (m *MemberExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	}
 }
 
-// Evaluation 13.3.2.1
+// astIsMemberExpression check if Member is MemberExpression
+func (m *MemberExpression) astIsPropertyExpression() bool {
+	_, ok := m.Property.(*ASTPropertyExpression)
+	return ok
+}
+
+// Evaluation
+// spec: 13.3.2.1
 func (m *MemberExpression) Evaluation(vm *VM2) Value {
 	baseReference := m.Member.Evaluation(vm)
 	baseValue := baseReference.GetValue(vm.agent)
@@ -978,7 +986,10 @@ func (m *MemberExpression) Evaluation(vm *VM2) Value {
 
 	switch prop := m.Property.(type) {
 	case *ASTPropertyExpression:
-		panic("unimplemented")
+		// TODO: check source text is strict
+		return NewReferenceRecordValue(
+			vm.EvaluatePropertyAccessWithExpressionKey(baseValue, prop.Expression, strict),
+		)
 	case *ASTPropertyIdentifier:
 		return NewReferenceRecordValue(
 			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, prop.Identifier, strict),

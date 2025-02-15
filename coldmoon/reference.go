@@ -1,5 +1,6 @@
 package coldmoon
 
+// TODO(BM): use convertable
 // ReferenceRecordBase Enum
 type ReferenceRecordBase struct {
 	value Value
