@@ -37,72 +37,6 @@ func testModule(t *testing.T, f string) {
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
 		`
-const num1 = 42;
-const num2 = 3.14;
-const num3 = Number('123');
-const num4 = parseInt('123', 10);
-const num5 = parseFloat('3.14');
-const num6 = 0b1010; // binary
-const num7 = 0o52; // octal
-const num8 = 0x2A; // hexadecimal
-const num9 = 8.64e15;
-
-assert(num1 === 42);
-assert(num2 === 3.14);
-assert(num3 === 123);
-assert(num4 === 123);
-assert(num5 === 3.14);
-assert(num6 === 10);
-assert(num7 === 42);
-assert(num8 === 42);
-assert(num9 === 8640000000000000);
-`, `
-const set1 = new Set();
-
-set1.add(42);
-set1.add('forty two');
-
-const iterator1 = set1[Symbol.iterator]();
-
-assertEqual(iterator1.next().value, 42);
-assertEqual(iterator1.next().value, 'forty two');
-`,
-		`
-const map1 = new Map();
-
-map1.set('0', 'foo');
-map1.set(1, 'bar');
-
-const iterator1 = map1[Symbol.iterator]();
-
-assertEqual(iterator1.next().value[0], 0);
-assertEqual(iterator1.next().value[1], 'bar');
-`,
-		`
-const map1 = new Map();
-map1.set('a', 1);
-map1.set('b', 2);
-map1.set('c', 3);
-assert(map1.get('a') === 1);
-map1.set('a', 97);
-assert(map1.get('a') === 97);
-assert(map1.size === 3);
-map1.delete('b');
-assert(map1.size === 2);
-`,
-		`
-const object1 = {
-    [Symbol.toPrimitive](hint) {
-        if (hint === 'number') {
-            return 42;
-        }
-        return null;
-    },
-};
-
-assert(+object1 === 42);
-`,
-		`
 const a = [1,2,3]
 for (const i in a) {
 	assert(i === '0' || i === '1' || i === '2');
@@ -278,6 +212,73 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`
+const object1 = {
+    [Symbol.toPrimitive](hint) {
+        if (hint === 'number') {
+            return 42;
+        }
+        return null;
+    },
+};
+
+assert(+object1 === 42);
+`,
+		`
+const map1 = new Map();
+map1.set('a', 1);
+map1.set('b', 2);
+map1.set('c', 3);
+assert(map1.get('a') === 1);
+map1.set('a', 97);
+assert(map1.get('a') === 97);
+assert(map1.size === 3);
+map1.delete('b');
+assert(map1.size === 2);
+`,
+		`
+const map1 = new Map();
+
+map1.set('0', 'foo');
+map1.set(1, 'bar');
+
+const iterator1 = map1[Symbol.iterator]();
+
+assertEqual(iterator1.next().value[0], 0);
+assertEqual(iterator1.next().value[1], 'bar');
+`,
+		`
+const set1 = new Set();
+
+set1.add(42);
+set1.add('forty two');
+
+const iterator1 = set1[Symbol.iterator]();
+
+assertEqual(iterator1.next().value, 42);
+assertEqual(iterator1.next().value, 'forty two');
+`,
+		`
+const num1 = 42;
+const num2 = 3.14;
+const num3 = Number('123');
+const num4 = parseInt('123', 10);
+const num5 = parseFloat('3.14');
+const num6 = 0b1010; // binary
+const num7 = 0o52; // octal
+const num8 = 0x2A; // hexadecimal
+const num9 = 8.64e15;
+
+assert(num1 === 42);
+assert(num2 === 3.14);
+assert(num3 === 123);
+assert(num4 === 123);
+assert(num5 === 3.14);
+assert(num6 === 10);
+assert(num7 === 42);
+assert(num8 === 42);
+assert(num9 === 8640000000000000);
+`,
 		`
 const utcDate1 = new Date(Date.UTC(96, 1, 2, 3, 4, 5));
 const utcDate2 = new Date(Date.UTC(0, 0, 0, 0, 0, 0));

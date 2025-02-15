@@ -6,6 +6,8 @@ type VM2 struct {
 	// IsJSONParse handle is parsed from JSON.parse
 	// 25.5.1: Step 7
 	IsJSONParse bool
+	// isReturn indicates the current execution context is a return statement
+	isReturn bool
 }
 
 func NewVM2(agent *Agent) *VM2 {
@@ -136,8 +138,12 @@ func LoopContinues(result Value, labelSet LabelSet) bool {
 	return true
 }
 
-// 6.2.4.3
+// TODO: return completion
+// UpdateEmpty
+// spec: 6.2.4.3
 func UpdateEmpty(result, V Value) Value {
-	// TODO
-	return UndefinedValue
+	if result != nil {
+		return result
+	}
+	return V
 }

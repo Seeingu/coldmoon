@@ -1294,7 +1294,7 @@ func (p *Parser) returnStatement() *StatementReturn {
 
 // MARK: - Condition
 
-func (p *Parser) ifStatement() *StatementIf {
+func (p *Parser) ifStatement() *IfStatement {
 	p.tokenizer.MustMatch(TIf)
 	p.tokenizer.MustMatch(TLeftParen)
 	condition := p.expression(p.acceptContextLowest())
@@ -1306,7 +1306,7 @@ func (p *Parser) ifStatement() *StatementIf {
 		alternate = p.statement()
 	}
 
-	return &StatementIf{
+	return &IfStatement{
 		Condition:  condition,
 		Consequent: consequent,
 		Alternate:  alternate,
@@ -2077,7 +2077,7 @@ func (p *Parser) propertyName() (PropertyName, bool) {
 	case TLeftBracket:
 		p.tokenizer.Next()
 		computedPropertyName := p.expression(p.acceptContextLowest())
-		propertyName = &PropertyNameComputed{
+		propertyName = &ComputedPropertyName{
 			Expression: computedPropertyName,
 		}
 		p.tokenizer.MustMatch(TRightBracket)
@@ -2104,7 +2104,7 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 	}
 	propertyName, ok := p.propertyName()
 	if methodType == MethodDefinitionTypeNil && ok {
-		literal, ok := propertyName.(PropertyNameLiteral)
+		literal, ok := propertyName.(LiteralPropertyName)
 		if ok {
 			isGet := literal.LiteralString() == "get"
 			isSet := literal.LiteralString() == "set"

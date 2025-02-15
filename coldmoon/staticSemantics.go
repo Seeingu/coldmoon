@@ -32,7 +32,7 @@ type StaticSemanticsIsComputedPropertyKey interface {
 }
 
 func IsComputedPropertyKeyDefault(expr PropertyName) bool {
-	if _, ok := expr.(*PropertyNameComputed); ok {
+	if _, ok := expr.(*ComputedPropertyName); ok {
 		return true
 	}
 	return false

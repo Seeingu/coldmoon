@@ -717,15 +717,18 @@ type FieldDefinition struct {
 
 // MARK: - PropertyName
 
+// PropertyName [Yield, Await] :
+// - LiteralPropertyName
+// - ComputedPropertyName[?Yield, ?Await]
 type PropertyName interface {
 	ASTNode
 }
-type PropertyNameLiteral interface {
+type LiteralPropertyName interface {
 	PropertyName
 	LiteralString() string
 }
 type PropertyNameLiteralIdentifier struct {
-	PropertyNameLiteral
+	LiteralPropertyName
 	Identifier IdentifierName
 }
 
@@ -746,7 +749,7 @@ func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM2) Value {
 }
 
 type PropertyNameLiteralString struct {
-	PropertyNameLiteral
+	LiteralPropertyName
 	StringLiteral *LiteralString
 }
 
@@ -763,7 +766,7 @@ func (p *PropertyNameLiteralString) String() string {
 }
 
 type PropertyNameLiteralNumeric struct {
-	PropertyNameLiteral
+	LiteralPropertyName
 	NumericLiteral *LiteralNumeric
 }
 
@@ -779,20 +782,30 @@ func (p *PropertyNameLiteralNumeric) LiteralString() string {
 	return p.NumericLiteral.Value
 }
 
-type PropertyNameComputed struct {
+// ComputedPropertyName [Yield, Await] :
+// - [ AssignmentExpression[+In, ?Yield, ?Await] ]
+type ComputedPropertyName struct {
 	PropertyName
 	Expression Expression
 }
 
-func (p *PropertyNameComputed) String() string {
+func (p *ComputedPropertyName) String() string {
 	return p.Expression.String()
 }
 
-func (p *PropertyNameComputed) Bytecode(e *Executable, c *BytecodeContext) {
+func (p *ComputedPropertyName) Bytecode(e *Executable, c *BytecodeContext) {
 	p.Expression.Bytecode(e, c)
 	if ExpressionAnalyze(p.Expression, AnalyzeQueryIsReference) {
 		e.AddInstruction(InsGetValue)
 	}
+}
+
+// Evaluation
+// spec: 13.2.5.4
+func (p *ComputedPropertyName) Evaluation(vm *VM2) Value {
+	exprValue := p.Expression.Evaluation(vm)
+	propName := exprValue.GetValue(vm.agent)
+	return ToPropertyKey(vm.agent, propName).ToValue()
 }
 
 // MARK: - FunctionExpression
@@ -3875,16 +3888,21 @@ func (b *BindingElement) String() string {
 
 // MARK: - IfStatement
 
-type StatementIf struct {
+// IfStatement [Yield, Await, Return] :
+//   - if ( Expression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return] else
+//     Statement[?Yield, ?Await, ?Return]
+//   - if ( Expression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//     [lookahead ≠ else]
+type IfStatement struct {
 	Statement
 	Condition  Expression
 	Consequent Statement
 	Alternate  Statement
 }
 
-var _ Statement = (*StatementIf)(nil)
+var _ Statement = (*IfStatement)(nil)
 
-func (s *StatementIf) VarScopedDeclarations() (l []*VariableDeclaration) {
+func (s *IfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	l = append(l, s.Consequent.VarScopedDeclarations()...)
 	if s.Alternate != nil {
 		l = append(l, s.Alternate.VarScopedDeclarations()...)
@@ -3894,7 +3912,7 @@ func (s *StatementIf) VarScopedDeclarations() (l []*VariableDeclaration) {
 }
 
 // 14.6.2
-func (s *StatementIf) Bytecode(e *Executable, c *BytecodeContext) {
+func (s *IfStatement) Bytecode(e *Executable, c *BytecodeContext) {
 	s.Condition.Bytecode(e, c)
 
 	if ExpressionAnalyze(s.Condition, AnalyzeQueryIsReference) {
@@ -3919,7 +3937,36 @@ func (s *StatementIf) Bytecode(e *Executable, c *BytecodeContext) {
 	endJump.Target = len(e.Instructions) - 1
 }
 
-func (s *StatementIf) String() string {
+func (s *IfStatement) astHasElse() bool {
+	return s.Alternate != nil
+}
+
+// Evaluation
+// spec: 14.6.2
+func (s *IfStatement) Evaluation(vm *VM2) Value {
+	if s.astHasElse() {
+		exprRef := s.Condition.Evaluation(vm)
+		exprValue := exprRef.GetValue(vm.agent)
+		var stmtCompletion Value
+		if exprValue.ToBoolean() {
+			stmtCompletion = s.Consequent.Evaluation(vm)
+		} else {
+			stmtCompletion = s.Alternate.Evaluation(vm)
+		}
+		return UpdateEmpty(stmtCompletion, UndefinedValue)
+	} else {
+		exprRef := s.Condition.Evaluation(vm)
+		exprValue := exprRef.GetValue(vm.agent)
+		if !exprValue.ToBoolean() {
+			return UndefinedValue
+		} else {
+			stmtCompletion := s.Consequent.Evaluation(vm)
+			return UpdateEmpty(stmtCompletion, UndefinedValue)
+		}
+	}
+}
+
+func (s *IfStatement) String() string {
 	sb := "If"
 	sb += " " + s.Condition.String() + " \n"
 	sb += s.Consequent.String()
@@ -4629,6 +4676,9 @@ func (s *StatementReturn) Bytecode(e *Executable, c *BytecodeContext) {
 }
 
 func (s *StatementReturn) Evaluation(vm *VM2) Value {
+	defer func() {
+		vm.isReturn = true
+	}()
 	if s.Expression == nil {
 		return UndefinedValue
 	} else {
@@ -5451,7 +5501,7 @@ func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM2, obj Objec
 
 func (c *ClassElementMethodDefinition) ClassElementKind() ClassElementKind {
 	switch pn := c.MethodDefinition.PropertyName.(type) {
-	case PropertyNameLiteral:
+	case LiteralPropertyName:
 		if l, ok := pn.(*PropertyNameLiteralIdentifier); ok {
 			if l.Identifier == "constructor" {
 				return ClassElementKindConstructorMethod
@@ -5818,6 +5868,9 @@ func (s StatementList) Evaluation(vm *VM2) Value {
 	var lastValue Value
 	for _, item := range s {
 		lastValue = item.Evaluation(vm)
+		if vm.isReturn {
+			return lastValue
+		}
 	}
 	if lastValue == nil {
 		return UndefinedValue
