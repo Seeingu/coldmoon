@@ -320,12 +320,69 @@ type ArrayElementSpread struct {
 	ArrayElement
 	Spread Expression
 }
-type PrimaryExpressionArrayLiteral struct {
-	PrimaryExpression
-	ElementList []ArrayElement
+
+// TODO: handle elision
+// ElementList [Yield, Await] :
+// Elisionopt AssignmentExpression[+In, ?Yield, ?Await]
+// Elisionopt SpreadElement[?Yield, ?Await]
+// ElementList[?Yield, ?Await] , Elisionopt AssignmentExpression[+In, ?Yield, ?Await]
+// ElementList[?Yield, ?Await] , Elisionopt SpreadElement[?Yield, ?Await]
+type ElementList []ArrayElement
+
+var _ RuntimeSemanticsArrayAccumulation = ElementList{}
+
+// ElementList : Elisionopt AssignmentExpression
+func (e ElementList) astIsOnlyHasAssigmentExpression() (expr *ArrayElementExpression, ok bool) {
+	if len(e) != 1 {
+		return
+	}
+	expr, ok = e[0].(*ArrayElementExpression)
+	return
 }
 
-func (p *PrimaryExpressionArrayLiteral) Bytecode(e *Executable, c *BytecodeContext) {
+func (e ElementList) astHasElementListAndAssignmentExpression() (list ElementList, expr *ArrayElementExpression, ok bool) {
+	if len(e) < 2 {
+		return
+	}
+	list = e[:len(e)-1]
+	expr, ok = e[len(e)-1].(*ArrayElementExpression)
+	return
+}
+
+// ArrayAccumulation
+// spec: 13.2.4.1
+func (e ElementList) ArrayAccumulation(vm *VM2, array *ArrayObject, nextIndex JSInt) (index JSInt, err Value) {
+	if list, expr, ok := e.astHasElementListAndAssignmentExpression(); ok {
+		nextIndex, err = list.ArrayAccumulation(vm, array, nextIndex)
+		if err != nil {
+			return
+		}
+		// TODO: check elision
+		initResult := expr.Expression.Evaluation(vm)
+		initValue := initResult.GetValue(vm.agent)
+		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
+		return nextIndex + 1, nil
+	} else if expr, ok = e.astIsOnlyHasAssigmentExpression(); ok {
+		// TODO: check elision
+		initResult := expr.Expression.Evaluation(vm)
+		initValue := initResult.GetValue(vm.agent)
+		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
+		return nextIndex + 1, nil
+	} else {
+		panic("unimplemented")
+	}
+}
+
+// ArrayLiteral [Yield, Await] :
+// - [ Elisionopt ]
+// - [ ElementList[?Yield, ?Await] ]
+// - [ ElementList[?Yield, ?Await] , Elisionopt ]
+type ArrayLiteral struct {
+	PrimaryExpression
+	ElementList ElementList
+}
+
+func (p *ArrayLiteral) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IArrayCreate{})
 	e.AddInstruction(InsLoad)
 	for i, element := range p.ElementList {
@@ -355,7 +412,23 @@ func (p *PrimaryExpressionArrayLiteral) Bytecode(e *Executable, c *BytecodeConte
 	e.AddInstruction(InsStore)
 }
 
-func (p *PrimaryExpressionArrayLiteral) String() string {
+// TODO: Elision
+func (p *ArrayLiteral) astHasElision() bool {
+	return false
+}
+
+// Evaluation
+// spec: 13.2.4.2
+func (p *ArrayLiteral) Evaluation(vm *VM2) Value {
+	array := ArrayCreate(vm.agent, 0, nil)
+	if p.astHasElision() {
+	} else {
+		p.ElementList.ArrayAccumulation(vm, array, 0)
+	}
+	return array.ToValue()
+}
+
+func (p *ArrayLiteral) String() string {
 	sb := "["
 	for i, element := range p.ElementList {
 		if i != 0 {
@@ -2064,7 +2137,7 @@ func (e *AssignmentExpression) astIsAssign() bool {
 func (e *AssignmentExpression) Evaluation(vm *VM2) Value {
 	if e.astIsAssign() {
 		_, isObjectLiteral := e.Left.(*PrimaryExpressionObjectLiteral)
-		_, isArrayLiteral := e.Left.(*PrimaryExpressionArrayLiteral)
+		_, isArrayLiteral := e.Left.(*ArrayLiteral)
 		if !isObjectLiteral && !isArrayLiteral {
 			lref := e.Left.Evaluation(vm)
 			var rval Value
@@ -2382,6 +2455,26 @@ var operatorLogicalMap = map[TokenType]LogicalOperator{
 	TQuestionQuestion:   LogicalOperatorNullishCoalescing,
 }
 
+// LogicalANDExpression[In, Yield, Await] :
+//   - BitwiseORExpression[?In, ?Yield, ?Await]
+//   - LogicalANDExpression[?In, ?Yield, ?Await] &&
+//     BitwiseORExpression[?In, ?Yield, ?Await]
+//
+// LogicalORExpression[In, Yield, Await] :
+//   - LogicalANDExpression[?In, ?Yield, ?Await]
+//   - LogicalORExpression[?In, ?Yield, ?Await] ||
+//     LogicalANDExpression[?In, ?Yield, ?Await]
+//
+// CoalesceExpression[In, Yield, Await] :
+//   - CoalesceExpressionHead[?In, ?Yield, ?Await] ??
+//     BitwiseORExpression[?In, ?Yield, ?Await]
+//
+// CoalesceExpressionHead[In, Yield, Await] :
+// - CoalesceExpression[?In, ?Yield, ?Await]
+// - BitwiseORExpression[?In, ?Yield, ?Await]
+// ShortCircuitExpression[In, Yield, Await] :
+// - LogicalORExpression[?In, ?Yield, ?Await]
+// - CoalesceExpression[?In, ?Yield, ?Await]
 type ExpressionLogicalExpression struct {
 	Expression
 	Left     Expression
@@ -2446,6 +2539,25 @@ func (e *ExpressionLogicalExpression) Bytecode(ex *Executable, c *BytecodeContex
 		ex.AddInstruction(InsStore)
 
 		jump.Target = len(ex.Instructions) - 1
+	}
+}
+
+func (e *ExpressionLogicalExpression) astIsOr() bool {
+	return e.Operator == LogicalOperatorOr
+}
+
+func (e *ExpressionLogicalExpression) Evaluation(vm *VM2) Value {
+	if e.astIsOr() {
+		lref := e.Left.Evaluation(vm)
+		lval := lref.GetValue(vm.agent)
+		lbool := lval.ToBoolean()
+		if lbool {
+			return lval
+		}
+		rref := e.Right.Evaluation(vm)
+		return rref.GetValue(vm.agent)
+	} else {
+		panic("unimplemented")
 	}
 }
 
@@ -4297,10 +4409,13 @@ type ForInOfStatement struct {
 	Type        ForInOfStatementType
 	IsAwait     bool
 	Body        Statement
+	isVar       bool
 	Initializer *ForInOfStatementInitializer
 	// Expression is Expression, LeftHandSideExpression or AssignmentExpression
 	Expression Expression
 }
+
+var _ RuntimeSemanticsForInOfLoopEvaluation = (*ForInOfStatement)(nil)
 
 func (f *ForInOfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	l = append(l, f.Body.VarScopedDeclarations()...)
@@ -4313,6 +4428,71 @@ func (f *ForInOfStatement) BoundNames() (l []IdentifierName) {
 		l = append(l, f.Body.VarDeclaredNames()...)
 	}
 	return
+}
+
+func (f *ForInOfStatement) Evaluation(vm *VM2) Value {
+	// TODO
+	var labelSet []string
+	result, err := f.ForInOfLoopEvaluation(vm, labelSet)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func (f *ForInOfStatement) astIsLeftHandSideExpression() bool {
+	return f.Initializer.LeftHandSideExpression != nil
+}
+
+func (f *ForInOfStatement) astIsIn() bool {
+	return f.Type == ForInOfStatementTypeIn
+}
+
+func (f *ForInOfStatement) astIsOf() bool {
+	return f.Type == ForInOfStatementTypeOf
+}
+
+func (f *ForInOfStatement) astIsForDeclaration() bool {
+	return f.Initializer.ForDeclaration != nil
+}
+
+// ForInOfLoopEvaluation
+// spec: 14.7.5.5
+func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value) {
+	if f.astIsForDeclaration() {
+		forDeclaration := f.Initializer.ForDeclaration
+		if f.astIsOf() {
+			keyResult, err := vm.ForInOfHeadEvaluation(forDeclaration.BoundNames(), f.Expression, ForInOfIterationKindIterate)
+			if err != nil {
+				return nil, err
+			}
+			return vm.ForInOfBodyEvaluation(
+				forDeclaration,
+				f.Body,
+				keyResult,
+				ForInOfIterationKindIterate,
+				ForInOfLhsKindLexicalBinding,
+				labelSet,
+				IteratorKindSync,
+			)
+		} else {
+			// for in
+			keyResult, err := vm.ForInOfHeadEvaluation(forDeclaration.BoundNames(), f.Expression, ForInOfIterationKindEnumerate)
+			if err != nil {
+				return nil, err
+			}
+			return vm.ForInOfBodyEvaluation(
+				forDeclaration,
+				f.Body,
+				keyResult,
+				ForInOfIterationKindEnumerate,
+				ForInOfLhsKindLexicalBinding,
+				labelSet,
+				IteratorKindSync,
+			)
+		}
+	}
+	panic("unimplemented")
 }
 
 type ForInOfIterationKind int
@@ -4568,6 +4748,8 @@ type ForBinding struct {
 	BindingPattern    *BindingPattern
 }
 
+var _ StaticSemanticsBoundNames = (*ForBinding)(nil)
+
 func (f *ForBinding) String() string {
 	if f.BindingPattern != nil {
 		return f.BindingPattern.String()
@@ -4585,8 +4767,30 @@ func (f *ForBinding) BoundNames() (l []IdentifierName) {
 // ForDeclaration [Yield, Await] :
 // - LetOrConst ForBinding[?Yield, ?Await]
 type ForDeclaration struct {
+	// TODO(BM): unused, remove
+	Expression
 	LetOrConst LetOrConst
 	ForBinding *ForBinding
+}
+
+var (
+	_ StaticSemanticsBoundNames                          = (*ForDeclaration)(nil)
+	_ RuntimeSemanticsForDeclarationBindingInstantiation = (*ForDeclaration)(nil)
+)
+
+func (f *ForDeclaration) ForDeclarationBindingInstantiation(vm *VM2, env EnvironmentRecord) {
+	for _, name := range f.ForBinding.BoundNames() {
+		if f.LetOrConst.IsConstantDeclaration() {
+			env.CreateImmutableBinding(name, true)
+		} else {
+			env.CreateMutableBinding(name, false)
+		}
+	}
+	// return UNUSED
+}
+
+func (f *ForDeclaration) BoundNames() (l []IdentifierName) {
+	return f.ForBinding.BoundNames()
 }
 
 func (f *ForDeclaration) String() string {
@@ -5529,6 +5733,12 @@ const (
 	LetOrConstLet LetOrConst = iota
 	LetOrConstConst
 )
+
+var _ StaticSemanticsIsConstantDeclaration = LetOrConst(0)
+
+func (l LetOrConst) IsConstantDeclaration() bool {
+	return l == LetOrConstConst
+}
 
 // LexicalDeclaration [In, Yield, Await] :
 // LetOrConst BindingList[?In, ?Yield, ?Await] ;

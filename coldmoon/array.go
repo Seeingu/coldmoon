@@ -18,8 +18,10 @@ func getArrayLength(array ObjectType) JSInt {
 	return lengthDesc.Value.(*NumberValue).Data.ToInt()
 }
 
-// 10.4.2.2
-func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) ObjectType {
+// ArrayCreate
+// spec: 10.4.2.2
+// proto is optional
+func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
 	realm := agent.CurrentRealm()
 	// 10.4.2.1
 	defineOwnProperty := func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {

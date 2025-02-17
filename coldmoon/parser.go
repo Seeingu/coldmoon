@@ -2222,7 +2222,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 	}
 }
 
-func (p *Parser) arrayLiteral() *PrimaryExpressionArrayLiteral {
+func (p *Parser) arrayLiteral() *ArrayLiteral {
 	p.tokenizer.MustMatch(TLeftBracket)
 	var list []ArrayElement
 	accept := p.acceptContext(TComma)
@@ -2248,7 +2248,7 @@ func (p *Parser) arrayLiteral() *PrimaryExpressionArrayLiteral {
 			p.tokenizer.Match(TComma)
 		}
 	}
-	return &PrimaryExpressionArrayLiteral{
+	return &ArrayLiteral{
 		ElementList: list,
 	}
 }

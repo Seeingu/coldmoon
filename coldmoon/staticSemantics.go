@@ -3,7 +3,6 @@ package coldmoon
 // 8.2.1
 // TODO: remove boundName interface
 type StaticSemanticsBoundNames interface {
-	// TODO: lower case should be more appropriate
 	BoundNames() (l []IdentifierName)
 }
 
@@ -38,4 +37,8 @@ func IsComputedPropertyKeyDefault(expr PropertyName) bool {
 	return false
 }
 
-// TODO: add missing semantics
+// StaticSemanticsIsConstantDeclaration
+// spec: 8.2.3
+type StaticSemanticsIsConstantDeclaration interface {
+	IsConstantDeclaration() bool
+}

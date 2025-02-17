@@ -7,6 +7,8 @@ type ObjectType interface {
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	DefineField(field *ClassFieldDefinition)
 	SetPrototype(p ObjectType)
+	// 14.7.5.9
+	EnumerateObjectProperties() ObjectType
 	// TODO: assert constructor is a function
 	InitializeInstanceElements(constructor ObjectType)
 	CreateDataProperty(key PropertyKey, value Value) bool

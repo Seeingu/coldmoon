@@ -73,3 +73,25 @@ type RuntimeSemanticsClassElementEvaluation interface {
 type RuntimeSemanticsClassFieldDefinitionEvaluation interface {
 	ClassFieldDefinitionEvaluation(vm *VM2, homeObject ObjectType) (field *ClassFieldDefinition, err Value)
 }
+
+// MARK: - Array
+
+// RuntimeSemanticsArrayAccumulation
+// spec: 13.2.4.1
+type RuntimeSemanticsArrayAccumulation interface {
+	ArrayAccumulation(vm *VM2, array *ArrayObject, nextIndex JSInt) (index JSInt, err Value)
+}
+
+// MARK: - Loop
+
+// RuntimeSemanticsForInOfLoopEvaluation
+// spec: 13.7.5.5
+type RuntimeSemanticsForInOfLoopEvaluation interface {
+	ForInOfLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value)
+}
+
+// RuntimeSemanticsForDeclarationBindingInstantiation
+// spec: 14.7.5.4
+type RuntimeSemanticsForDeclarationBindingInstantiation interface {
+	ForDeclarationBindingInstantiation(vm *VM2, env EnvironmentRecord)
+}

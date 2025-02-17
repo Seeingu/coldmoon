@@ -67,6 +67,12 @@ func (o *Object) Prototype() ObjectType {
 	return o.data.prototype
 }
 
+// TODO: implement spec
+// 14.7.5.9
+func (o *Object) EnumerateObjectProperties() ObjectType {
+	return CreateForInIterator(o.Agent(), o.Ref())
+}
+
 func (o *Object) SetPrototype(p ObjectType) {
 	o.data.prototype = p
 }

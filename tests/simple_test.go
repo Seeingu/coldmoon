@@ -37,19 +37,6 @@ func testModule(t *testing.T, f string) {
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
 		`
-const a = [1,2,3]
-for (const i in a) {
-	assert(i === '0' || i === '1' || i === '2');
-}
-
-const array1 = ['a', 'b', 'c'];
-const iterator1 = array1[Symbol.iterator]();
-
-for (const value of iterator1) {
-    assert(value === 'a' || value === 'b' || value === 'c');
-}
-`,
-		`
 const foo = function* () {
   yield 'a';
   yield 'b';
@@ -212,6 +199,19 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`
+const a = [1,2,3]
+for (const i in a) {
+	assert(i === '0' || i === '1' || i === '2');
+}
+
+const array1 = ['a', 'b', 'c'];
+const iterator1 = array1[Symbol.iterator]();
+
+for (const value of iterator1) {
+    assert(value === 'a' || value === 'b' || value === 'c');
+}
+`,
 		`
 const object1 = {
     [Symbol.toPrimitive](hint) {
