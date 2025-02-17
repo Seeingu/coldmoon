@@ -95,3 +95,12 @@ type RuntimeSemanticsForInOfLoopEvaluation interface {
 type RuntimeSemanticsForDeclarationBindingInstantiation interface {
 	ForDeclarationBindingInstantiation(vm *VM2, env EnvironmentRecord)
 }
+
+// MARK: - Generator
+
+// RuntimeSemanticsInstantiateGeneratorFunctionExpression
+// spec: 15.5.4
+// name is optional
+type RuntimeSemanticsInstantiateGeneratorFunctionExpression interface {
+	InstantiateGeneratorFunctionExpression(vm *VM2, name PropertyKeyOrPrivateName) (fun ObjectType)
+}

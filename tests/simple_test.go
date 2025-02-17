@@ -37,38 +37,6 @@ func testModule(t *testing.T, f string) {
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
 		`
-const foo = function* () {
-  yield 'a';
-  yield 'b';
-  yield 'c';
-};
-
-let str = '';
-for (const val of foo()) {
-  str = str + val;
-}
-assert(str === 'abc');
-
-const gen = foo();
-assert(gen.next().value === 'a');
-assert(gen.next().value === 'b');
-assert(gen.next().value === 'c');
-
-const infinite = function*() {
-  let index = 0;
-
-  while (true) {
-    yield index++;
-  }
-}
-
-const generator = infinite(); // "Generator { }"
-
-assert(generator.next().value === 0); // 0
-assert(generator.next().value === 1); // 1
-assert(generator.next().value === 2); // 2
-`,
-		`
 const string1 = "A string primitive";
 const string2 = 'Also a string primitive';
 const string4 = new String("A String object");
@@ -199,6 +167,38 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`
+const foo = function* () {
+  yield 'a';
+  yield 'b';
+  yield 'c';
+};
+
+let str = '';
+for (const val of foo()) {
+  str = str + val;
+}
+assert(str === 'abc');
+
+const gen = foo();
+assert(gen.next().value === 'a');
+assert(gen.next().value === 'b');
+assert(gen.next().value === 'c');
+
+const infinite = function*() {
+  let index = 0;
+
+  while (true) {
+    yield index++;
+  }
+}
+
+const generator = infinite(); // "Generator { }"
+
+assert(generator.next().value === 0); // 0
+assert(generator.next().value === 1); // 1
+assert(generator.next().value === 2); // 2
+`,
 		`
 const a = [1,2,3]
 for (const i in a) {

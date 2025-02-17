@@ -44,8 +44,8 @@ func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *Itera
 	return iteratorRecord
 }
 
-// 7.4.3
-
+// GetIterator
+// spec: 7.4.3
 func GetIterator(agent *Agent, obj Value, kind IteratorKind) Completion[*IteratorRecord] {
 	var method ObjectType
 	switch kind {

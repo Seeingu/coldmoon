@@ -57,12 +57,14 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 	return g
 }
 
-// 27.5.3.1
+// GeneratorStart
+// spec: 27.5.3.1
 func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody *ECMAScriptFunction) {
 	Assert(generator.GeneratorState == GeneratorStateSuspendedStart)
 	genContext := agent.RunningExecutionContext()
 	genContext.Generator = generator
 
+	// TODO(BM): use new vm arch
 	closure := func(bytecode *BytecodeContext) ObjectType {
 		a := bytecode.agent
 		acGenContext := a.RunningExecutionContext()

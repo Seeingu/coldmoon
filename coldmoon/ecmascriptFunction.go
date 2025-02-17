@@ -605,7 +605,7 @@ func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, c
 }
 
 // 10.2.9
-func SetFunctionName(function ObjectType, key PropertyKey, prefix string) {
+func SetFunctionName(function ObjectType, key PropertyKeyOrPrivateName, prefix string) {
 	Assert(function.IsExtensible())
 	Assert(!function.PropertyStorage().Has(NewStringPropertyKey("name")))
 

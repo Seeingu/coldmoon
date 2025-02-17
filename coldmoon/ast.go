@@ -199,6 +199,9 @@ func (p *PrimaryExpressionAsyncFunctionExpression) String() string {
 
 // MARK: - GeneratorExpression
 
+// GeneratorExpression :
+//   - function * BindingIdentifier[+Yield, ~Await] opt ( FormalParameters[+Yield, ~Await]
+//     ) { GeneratorBody }
 type GeneratorExpression struct {
 	PrimaryExpression
 	IdentifierName   IdentifierName
@@ -206,6 +209,8 @@ type GeneratorExpression struct {
 	Body             *FunctionBody
 	SourceText       string
 }
+
+var _ RuntimeSemanticsInstantiateGeneratorFunctionExpression = (*GeneratorExpression)(nil)
 
 func (p *GeneratorExpression) _primaryExpression() {}
 func (p *GeneratorExpression) AssignmentTargetType() AssignmentTargetType {
@@ -216,6 +221,75 @@ func (p *GeneratorExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
 	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateGeneratorFunctionExpression{FunctionExpression: p})
+}
+
+func (p *GeneratorExpression) astHasIdentifierName() bool {
+	return p.IdentifierName != ""
+}
+
+// InstantiateGeneratorFunctionExpression
+// spec: 15.5.4
+func (p *GeneratorExpression) InstantiateGeneratorFunctionExpression(
+	vm *VM2,
+	name PropertyKeyOrPrivateName,
+) (fun ObjectType) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	if p.astHasIdentifierName() {
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.GeneratorFunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		SetFunctionName(closure, name, "")
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        prototype.ToValue(),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+		return closure
+	} else {
+		outerEnv := vm.RunningLexicalEnvironment()
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(p.IdentifierName, false)
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.GeneratorFunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(p.IdentifierName), "")
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        prototype.ToValue(),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+		return closure
+	}
+}
+
+func (p *GeneratorExpression) Evaluation(vm *VM2) Value {
+	// TODO: name
+	name := NewStringPropertyKey("")
+	return p.InstantiateGeneratorFunctionExpression(vm, name).ToValue()
 }
 
 func (p *GeneratorExpression) String() string {
