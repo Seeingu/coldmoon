@@ -799,7 +799,7 @@ func (p *Parser) asyncGeneratorExpression() *PrimaryExpressionAsyncGeneratorExpr
 	}
 }
 
-func (p *Parser) generatorExpression() *PrimaryExpressionGeneratorExpression {
+func (p *Parser) generatorExpression() *GeneratorExpression {
 	startOffset := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TFunction)
 	p.tokenizer.MustMatch(TStar)
@@ -814,7 +814,7 @@ func (p *Parser) generatorExpression() *PrimaryExpressionGeneratorExpression {
 	body := p.functionBody(FunctionTypeGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
 	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
-	return &PrimaryExpressionGeneratorExpression{
+	return &GeneratorExpression{
 		IdentifierName:   identifier,
 		FormalParameters: params,
 		SourceText:       sourceText,
@@ -2143,9 +2143,9 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 			Body:             body,
 		}
 	}
-	var genExpression *PrimaryExpressionGeneratorExpression
+	var genExpression *GeneratorExpression
 	if m == MethodDefinitionTypeGenerator {
-		genExpression = &PrimaryExpressionGeneratorExpression{
+		genExpression = &GeneratorExpression{
 			IdentifierName:   "",
 			FormalParameters: formalParameters,
 			SourceText:       sourceText,

@@ -1138,7 +1138,7 @@ func (vm *VM) ClassFieldDefinitionEvaluation(fieldDefinition *FieldDefinition, h
 	}
 }
 
-func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *PrimaryExpressionGeneratorExpression) ObjectType {
+func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *GeneratorExpression) ObjectType {
 	realm := vm.agent.CurrentRealm()
 	if functionExpression.IdentifierName != "" {
 		name := string(functionExpression.IdentifierName)
@@ -1200,7 +1200,7 @@ type methodDefinitionArgs struct {
 	PropertyName             Value
 	MethodType               MethodDefinitionType
 	FunctionExpression       *PrimaryExpressionFunctionExpression
-	GeneratorExpression      *PrimaryExpressionGeneratorExpression
+	GeneratorExpression      *GeneratorExpression
 	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
 	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
 }

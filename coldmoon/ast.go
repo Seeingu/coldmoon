@@ -199,7 +199,7 @@ func (p *PrimaryExpressionAsyncFunctionExpression) String() string {
 
 // MARK: - GeneratorExpression
 
-type PrimaryExpressionGeneratorExpression struct {
+type GeneratorExpression struct {
 	PrimaryExpression
 	IdentifierName   IdentifierName
 	FormalParameters *FormalParameters
@@ -207,18 +207,18 @@ type PrimaryExpressionGeneratorExpression struct {
 	SourceText       string
 }
 
-func (p *PrimaryExpressionGeneratorExpression) _primaryExpression() {}
-func (p *PrimaryExpressionGeneratorExpression) AssignmentTargetType() AssignmentTargetType {
+func (p *GeneratorExpression) _primaryExpression() {}
+func (p *GeneratorExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionGeneratorExpression) Bytecode(e *Executable, c *BytecodeContext) {
+func (p *GeneratorExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
 	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateGeneratorFunctionExpression{FunctionExpression: p})
 }
 
-func (p *PrimaryExpressionGeneratorExpression) String() string {
+func (p *GeneratorExpression) String() string {
 	return "GeneratorExpression"
 }
 
@@ -673,7 +673,7 @@ type MethodDefinition struct {
 	Type                     MethodDefinitionType
 	PropertyName             PropertyName
 	FunctionExpression       *PrimaryExpressionFunctionExpression
-	GeneratorExpression      *PrimaryExpressionGeneratorExpression
+	GeneratorExpression      *GeneratorExpression
 	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
 	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
 }

@@ -361,7 +361,7 @@ type IObjectDefineMethod struct {
 	Instruction
 	MethodType               MethodDefinitionType
 	FunctionExpression       *PrimaryExpressionFunctionExpression
-	GeneratorExpression      *PrimaryExpressionGeneratorExpression
+	GeneratorExpression      *GeneratorExpression
 	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
 	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
 }
@@ -521,7 +521,7 @@ func (i *IDelete) String() string {
 
 type IInstantiateGeneratorFunctionExpression struct {
 	Instruction
-	FunctionExpression *PrimaryExpressionGeneratorExpression
+	FunctionExpression *GeneratorExpression
 }
 
 func (i *IInstantiateGeneratorFunctionExpression) String() string {
