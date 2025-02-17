@@ -1407,10 +1407,28 @@ func (i *ExpressionImportCall) String() string {
 
 // MARK: - OptionalExpression
 
+// OptionalExpression [Yield, Await] :
+// - MemberExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+// - CallExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+// - OptionalExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+//
+// OptionalChain[Yield, Await] :
+// - ?. Arguments[?Yield, ?Await]
+// - ?. [ Expression[+In, ?Yield, ?Await] ]
+// - ?. IdentifierName
+// - ?. TemplateLiteral[?Yield, ?Await, +Tagged]
+// - ?. PrivateIdentifier
+// - OptionalChain[?Yield, ?Await] Arguments[?Yield, ?Await]
+// - OptionalChain[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
+// - OptionalChain[?Yield, ?Await]. IdentifierName
+// - OptionalChain[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+// - OptionalChain[?Yield, ?Await]. PrivateIdentifier
 type OptionalExpression struct {
 	Expression
+	// Property is OptionalChain
 	Property *OptionalExpressionProperty
-	Expr     Expression
+	// Expr is MemberExpression, CallExpression, or OptionalExpression
+	Expr Expression
 }
 
 func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
@@ -1484,15 +1502,72 @@ func (o *OptionalExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	endJump.Target = len(e.Instructions) - 1
 }
 
+func (o *OptionalExpression) Evaluation(vm *VM2) Value {
+	baseReference := o.Expr.Evaluation(vm)
+	baseValue := baseReference.GetValue(vm.agent)
+	if IsUndefinedOrNull(baseValue) {
+		return UndefinedValue
+	}
+	result, err := o.Property.ChainEvaluation(vm, baseValue, baseReference)
+	if err != nil {
+		vm.panic(err)
+	}
+	return result
+}
+
 func (o *OptionalExpression) String() string {
 	return o.Expr.String() + "?." + o.Property.String()
 }
 
-// Enum
+// OptionalExpressionProperty Enum
+// TODO(BM): rename to OptionalChain
+// TODO: handle chaining
+// TODO: handle private identifier
 type OptionalExpressionProperty struct {
 	Arguments  Arguments
 	Expression Expression
 	Identifier IdentifierName
+}
+
+var _ RuntimeSemanticsChainEvaluation = (*OptionalExpressionProperty)(nil)
+
+func (o *OptionalExpressionProperty) astIsArguments() bool {
+	return o.Arguments != nil
+}
+
+func (o *OptionalExpressionProperty) astIsExpression() bool {
+	return o.Expression != nil
+}
+
+func (o *OptionalExpressionProperty) astIsIdentifier() bool {
+	return o.Identifier != ""
+}
+
+func (o *OptionalExpressionProperty) isStrict() bool {
+	// TODO: check strict
+	return true
+}
+
+func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM2, baseValue Value, baseReference Value) (value Value, err Value) {
+	if o.astIsArguments() {
+		thisChain := o
+		// TODO
+		tailCall := false
+		arguments := thisChain.Arguments.Evaluation(vm)
+		return vm.EvaluateCall(baseValue, baseReference, arguments.(*ListValue).Values, tailCall), nil
+	} else if o.astIsExpression() {
+		strict := o.isStrict()
+		return NewReferenceRecordValue(
+			vm.EvaluatePropertyAccessWithExpressionKey(baseValue, o.Expression, strict),
+		), nil
+	} else if o.astIsIdentifier() {
+		strict := o.isStrict()
+		return NewReferenceRecordValue(
+			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, o.Identifier, strict),
+		), nil
+	} else {
+		panic("unimplemented")
+	}
 }
 
 func (o *OptionalExpressionProperty) String() string {
@@ -2620,6 +2695,12 @@ func (e *ExpressionLogicalExpression) astIsOr() bool {
 	return e.Operator == LogicalOperatorOr
 }
 
+func (e *ExpressionLogicalExpression) astNullishCoalescing() bool {
+	return e.Operator == LogicalOperatorNullishCoalescing
+}
+
+// Evaluation
+// spec: 13.13.1
 func (e *ExpressionLogicalExpression) Evaluation(vm *VM2) Value {
 	if e.astIsOr() {
 		lref := e.Left.Evaluation(vm)
@@ -2630,6 +2711,15 @@ func (e *ExpressionLogicalExpression) Evaluation(vm *VM2) Value {
 		}
 		rref := e.Right.Evaluation(vm)
 		return rref.GetValue(vm.agent)
+	} else if e.astNullishCoalescing() {
+		lref := e.Left.Evaluation(vm)
+		lval := lref.GetValue(vm.agent)
+		if IsUndefinedOrNil(lval) || lval == NullValue {
+			rref := e.Right.Evaluation(vm)
+			return rref.GetValue(vm.agent)
+		} else {
+			return lval
+		}
 	} else {
 		panic("unimplemented")
 	}

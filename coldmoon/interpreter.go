@@ -24,6 +24,11 @@ func (v *VM2) RunningPrivateEnvironment() *PrivateEnvironment {
 	return v.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 }
 
+// TODO(BM): error handling
+func (v *VM2) panic(err Value) {
+	panic(err)
+}
+
 // InitializeBoundName
 // spec: 8.6.2.1
 func (v *VM2) InitializeBoundName(name string, value Value, env EnvironmentRecord) {

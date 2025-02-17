@@ -27,6 +27,10 @@ func IsUndefinedOrNil(v Value) bool {
 	return v == nil || v == UndefinedValue
 }
 
+func IsUndefinedOrNull(v Value) bool {
+	return IsUndefinedOrNil(v) || v == NullValue
+}
+
 // BindPrototypeAndConstructor set proto as the prototype of constructor
 // and constructor as the constructor of proto
 func BindPrototypeAndConstructor(proto ObjectType, constructor ObjectType) {

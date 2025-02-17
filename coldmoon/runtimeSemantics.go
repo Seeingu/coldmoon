@@ -32,6 +32,12 @@ type RuntimeSemanticsMethodDefinitionEvaluation interface {
 	MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) Completion[*PrivateElement]
 }
 
+// RuntimeSemanticsChainEvaluation
+// 13.3.9.2
+type RuntimeSemanticsChainEvaluation interface {
+	ChainEvaluation(vm *VM2, baseValue Value, baseReference Value) (value Value, err Value)
+}
+
 // MARK: - DefineMethod 15.4.4
 
 type DefineMethodRecord struct {
