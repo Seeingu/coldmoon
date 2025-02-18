@@ -33,14 +33,6 @@ func testModule(t *testing.T, f string) {
 	Debug.Disable()
 }
 
-// Deprecated
-func TestBaselineDeprecated(t *testing.T) {
-	sourceTexts := []string{}
-	for _, sourceText := range sourceTexts {
-		testSource(t, sourceText)
-	}
-}
-
 func TestBaselineNew(t *testing.T) {
 	skipped := []string{
 		// After refactor template literal
@@ -418,13 +410,6 @@ assert(2 < 31);
 `,
 	}
 	testNewSources(t, sourceTexts)
-	testDeprecatedSources(t, sourceTexts)
-}
-
-func testDeprecatedSources(t *testing.T, sourceTexts []string) {
-	for _, sourceText := range sourceTexts {
-		testSource(t, sourceText)
-	}
 }
 
 func testNewSources(t *testing.T, sourceTexts []string) {
