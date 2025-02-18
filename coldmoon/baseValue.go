@@ -26,6 +26,17 @@ func (b *BaseValue) GetValue(agent *Agent) Value {
 	return b.Value
 }
 
+func (b *BaseValue) ToPropertyKey() PropertyKey {
+	switch v := b.Value.(type) {
+	case *StringValue:
+		return NewStringPropertyKey(v.Data)
+	case *SymbolValue:
+		return NewSymbolPropertyKey(v)
+	default:
+		panic("unimplemented")
+	}
+}
+
 // TODO(BM): return a string completion or abrupt completion
 func (b *BaseValue) ThisStringValue() string {
 	switch v := b.Value.(type) {

@@ -587,11 +587,11 @@ func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, c
 		return &PrivateElement{
 			Key:   k.PrivateName,
 			Kind:  PrivateElementKindMethod,
-			Value: (closure).ToValue(),
+			Value: closure.ToValue(),
 		}
 	case PropertyKey:
 		desc := &PropertyDescriptor{
-			Value:        (closure).ToValue(),
+			Value:        closure.ToValue(),
 			Writable:     true,
 			Enumerable:   enumerable,
 			Configurable: true,

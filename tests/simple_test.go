@@ -36,36 +36,6 @@ func testModule(t *testing.T, f string) {
 // Deprecated
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
-		`
-const string1 = "A string primitive";
-const string2 = 'Also a string primitive';
-const string4 = new String("A String object");
-assert("cat".charAt(1) === 'a');
-assert("cat"[1] === 'a');
-const strPrim = "foo"; // A literal is a string primitive
-const strPrim2 = String(1); // Coerced into the string primitive "1"
-const strPrim3 = String(true); // Coerced into the string primitive "true"
-const strObj = new String(strPrim); // String with new returns a string wrapper object.
-
-assert(typeof strPrim === "string", "typeof: expected string");
-assert(typeof strPrim2 === "string", "typeof: expected string");
-assert(typeof strPrim3 === "string", "typeof: expected string");
-assert(typeof strObj === "object", "typeof: expected object"); 
-`,
-		// TODO: String locale compare
-		"const string3 = `Yet another string primitive`;",
-		`const a = {};
-const b = a?.b ?? 1;
-assert(b === 1, 'b should be 1')`,
-		`
-class ValidatorClass {
-  get [Symbol.toStringTag]() {
-    return 'Validator';
-  }
-}
-const v = new ValidatorClass();
-assert(Object.prototype.toString.call(v) === '[object Validator]', 'should be [object Validator]');
-`,
 		`const sab = new SharedArrayBuffer(1024);
 const ta = new Uint8Array(sab);
 ta[0] = 5; // 5
@@ -167,6 +137,36 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`const a = {};
+const b = a?.b ?? 1;
+assert(b === 1, 'b should be 1')`,
+		`
+class ValidatorClass {
+  get [Symbol.toStringTag]() {
+    return 'Validator';
+  }
+}
+const v = new ValidatorClass();
+assert(Object.prototype.toString.call(v) === '[object Validator]', 'should be [object Validator]');
+`,
+		// TODO: String locale compare
+		"const string3 = `Yet another string primitive`;",
+		`
+const string1 = "A string primitive";
+const string2 = 'Also a string primitive';
+const string4 = new String("A String object");
+assert("cat".charAt(1) === 'a');
+assert("cat"[1] === 'a');
+const strPrim = "foo"; // A literal is a string primitive
+const strPrim2 = String(1); // Coerced into the string primitive "1"
+const strPrim3 = String(true); // Coerced into the string primitive "true"
+const strObj = new String(strPrim); // String with new returns a string wrapper object.
+
+assert(typeof strPrim === "string", "typeof: expected string");
+assert(typeof strPrim2 === "string", "typeof: expected string");
+assert(typeof strPrim3 === "string", "typeof: expected string");
+assert(typeof strObj === "object", "typeof: expected object"); 
+`,
 		`
 const foo = function* () {
   yield 'a';

@@ -21,6 +21,7 @@ type Value interface {
 	String() string
 	ToCompletion() CompletionValue
 	ToPropertyDescriptor() *PropertyDescriptor
+	ToPropertyKey() PropertyKey
 	Hash() string
 
 	NumberOrBigInt() (*NumberValue, *BigIntValue, bool)

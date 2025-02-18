@@ -804,7 +804,12 @@ func (p *MethodDefinition) astIsClassElementName() bool {
 	return p.PropertyName != nil
 }
 
-// 15.4.4
+func (p *MethodDefinition) astIsGet() bool {
+	return p.Type == MethodDefinitionTypeGet
+}
+
+// DefineMethod
+// spec: 15.4.4
 func (p *MethodDefinition) DefineMethod(vm *VM2, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
@@ -839,7 +844,40 @@ func (p *MethodDefinition) DefineMethod(vm *VM2, obj ObjectType, proto ObjectTyp
 }
 
 func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) Completion[*PrivateElement] {
-	if p.astIsClassElementName() {
+	agent := vm.agent
+	if p.astIsGet() {
+		propKey := p.PropertyName.Evaluation(vm)
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.sourceText()
+		formalParameterList := p.formalParameters()
+		closure := OrdinaryFunctionCreate(
+			agent,
+			agent.CurrentRealm().Intrinsics.FunctionPrototype,
+			sourceText,
+			formalParameterList,
+			p.FunctionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(closure, obj)
+		// TODO: check propKey is private name
+		SetFunctionName(closure, propKey.ToPropertyKey(), "get")
+		// TODO: check propKey is private name
+		isPrivateName := false
+		if isPrivateName {
+			panic("unimplemented")
+		} else {
+			desc := &PropertyDescriptor{
+				Get:          closure,
+				Enumerable:   enumerable,
+				Configurable: true,
+			}
+			obj.DefinePropertyOrThrow(propKey.ToPropertyKey(), desc)
+			return newCompletionNormalData[*PrivateElement](nil)
+		}
+	} else if p.astIsClassElementName() {
 		methodDef, err := p.DefineMethod(vm, obj, nil)
 		if err != nil {
 			return newCompletionError[*PrivateElement](err)
@@ -5532,7 +5570,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM2, classBinding string, clas
 		if err != nil {
 			agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 			agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
-			panic(err)
+			vm.panic(err)
 		}
 		if result.classFieldDefinition != nil {
 			if !ClassElementIsStatic(classElement) {
