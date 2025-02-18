@@ -36,15 +36,6 @@ func testModule(t *testing.T, f string) {
 // Deprecated
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
-		`let a = 1;
-for (var i = 0; i < 3; i++) {
-	a += i;
-}
-assert(a === 4);`,
-		`var a = [];
-var a = [1,2,3];
-a[4294967295] = "not an array element";
-a[4294967295];`,
 		`function toString(a) {
 	return a;
 }
@@ -100,6 +91,15 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`let a = 1;
+for (var i = 0; i < 3; i++) {
+	a += i;
+}
+assert(a === 4);`,
+		`var a = [];
+var a = [1,2,3];
+a[4294967295] = "not an array element";
+a[4294967295];`,
 		`const a = {
   b: 8,
   writable: false,

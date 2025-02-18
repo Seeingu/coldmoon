@@ -491,10 +491,17 @@ func (p *ArrayLiteral) astHasElision() bool {
 	return false
 }
 
+func (p *ArrayLiteral) astElementListEmpty() bool {
+	return len(p.ElementList) == 0
+}
+
 // Evaluation
 // spec: 13.2.4.2
 func (p *ArrayLiteral) Evaluation(vm *VM2) Value {
 	array := ArrayCreate(vm.agent, 0, nil)
+	if p.astElementListEmpty() {
+		return array.ToValue()
+	}
 	if p.astHasElision() {
 	} else {
 		p.ElementList.ArrayAccumulation(vm, array, 0)
