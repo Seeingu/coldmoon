@@ -2897,6 +2897,10 @@ func (e *ExpressionLogicalExpression) astIsOr() bool {
 	return e.Operator == LogicalOperatorOr
 }
 
+func (e *ExpressionLogicalExpression) astIsAnd() bool {
+	return e.Operator == LogicalOperatorAnd
+}
+
 func (e *ExpressionLogicalExpression) astNullishCoalescing() bool {
 	return e.Operator == LogicalOperatorNullishCoalescing
 }
@@ -2904,7 +2908,8 @@ func (e *ExpressionLogicalExpression) astNullishCoalescing() bool {
 // Evaluation
 // spec: 13.13.1
 func (e *ExpressionLogicalExpression) Evaluation(vm *VM2) Value {
-	if e.astIsOr() {
+	switch {
+	case e.astIsOr():
 		lref := e.Left.Evaluation(vm)
 		lval := lref.GetValue(vm.agent)
 		lbool := lval.ToBoolean()
@@ -2913,7 +2918,16 @@ func (e *ExpressionLogicalExpression) Evaluation(vm *VM2) Value {
 		}
 		rref := e.Right.Evaluation(vm)
 		return rref.GetValue(vm.agent)
-	} else if e.astNullishCoalescing() {
+	case e.astIsAnd():
+		lref := e.Left.Evaluation(vm)
+		lval := lref.GetValue(vm.agent)
+		lbool := lval.ToBoolean()
+		if !lbool {
+			return lval
+		}
+		rref := e.Right.Evaluation(vm)
+		return rref.GetValue(vm.agent)
+	case e.astNullishCoalescing():
 		lref := e.Left.Evaluation(vm)
 		lval := lref.GetValue(vm.agent)
 		if IsUndefinedOrNil(lval) || lval == NullValue {
@@ -2922,9 +2936,8 @@ func (e *ExpressionLogicalExpression) Evaluation(vm *VM2) Value {
 		} else {
 			return lval
 		}
-	} else {
-		panic("unimplemented")
 	}
+	panic("unreachable")
 }
 
 func (e *ExpressionLogicalExpression) String() string {

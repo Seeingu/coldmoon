@@ -35,16 +35,7 @@ func testModule(t *testing.T, f string) {
 
 // Deprecated
 func TestBaselineDeprecated(t *testing.T) {
-	sourceTexts := []string{
-		`2 == 1;
-2 > 1;
-false || 1;
-true && 1;
-true ? 2 : 1;
-2 ** 3;
-() => 123;
-`,
-	}
+	sourceTexts := []string{}
 	for _, sourceText := range sourceTexts {
 		testSource(t, sourceText)
 	}
@@ -64,6 +55,14 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`2 == 1;
+2 > 1;
+false || 1;
+true && 1;
+true ? 2 : 1;
+2 ** 3;
+() => 123;
+`,
 		`class A {
 	static sa = 'a';
 }
