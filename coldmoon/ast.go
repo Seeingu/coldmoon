@@ -3272,9 +3272,46 @@ func (u *UnaryExpression) Evaluation(vm *VM2) Value {
 		val = val.GetValue(agent)
 		return NewStringValue(val.TypeString())
 	case u.astIsVoid():
+		// 13.5.2.1
 		expr := u.Operand.Evaluation(vm)
 		expr.GetValue(agent)
 		return UndefinedValue
+	case u.astIsDelete():
+		// 13.5.1.2
+		refValue := u.Operand.Evaluation(vm)
+		ref, ok := refValue.ReferenceRecord()
+		if !ok {
+			return TrueValue
+		}
+		if ref.IsUnresolvableReference() {
+			Assert(!ref.Strict)
+			return TrueValue
+		}
+		if ref.IsPropertyReference() {
+			Assert(!ref.IsPrivateReference())
+			if ref.IsSuperReference() {
+				vm.panic(agent.ThrowException(ReferenceError, "cannot delete super property"))
+			}
+			v, _ := ref.Base.Value()
+			baseObj := v.ToObject(agent)
+			var referencedName PropertyKey
+			if ref.ReferencedName.PrivateName != nil {
+				panic("unreachable")
+			} else if ref.ReferencedName.Symbol != nil {
+				referencedName = NewSymbolPropertyKey(ref.ReferencedName.Symbol)
+			} else {
+				referencedName = NewStringPropertyKey(ref.ReferencedName.String)
+			}
+			deleteStatus := baseObj.InternalMethods().Delete(baseObj, referencedName)
+			if !deleteStatus && ref.Strict {
+				vm.panic(agent.ThrowTypeError("cannot delete property"))
+			}
+			return NewBooleanValue(deleteStatus)
+		} else {
+			base, ok := ref.Base.Env()
+			Assert(ok)
+			return NewBooleanValue(base.DeleteBinding(ref.ReferencedName.String))
+		}
 	}
 	panic("unimplemented")
 }

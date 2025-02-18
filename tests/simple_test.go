@@ -36,22 +36,6 @@ func testModule(t *testing.T, f string) {
 // Deprecated
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
-		`const desc = Object.getOwnPropertyDescriptor(BigInt64Array, 'BYTES_PER_ELEMENT');
-let a = 0;
-if (Object.prototype.hasOwnProperty.call(desc, 'enumerable')) {
-	a = 1;
-}
-a;`,
-		`const a = {
-  b: 8,
-  writable: false,
-  enumerable: false,
-  configurable: false
-};
-delete a.b;
-let b = 2;
-a.b = b;
-a.b;`,
 		`let a = 1;
 for (var i = 0; i < 3; i++) {
 	a += i;
@@ -116,6 +100,22 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`const a = {
+  b: 8,
+  writable: false,
+  enumerable: false,
+  configurable: false
+};
+delete a.b;
+let b = 2;
+a.b = b;
+a.b;`,
+		`const desc = Object.getOwnPropertyDescriptor(BigInt64Array, 'BYTES_PER_ELEMENT');
+let a = 0;
+if (Object.prototype.hasOwnProperty.call(desc, 'enumerable')) {
+	a = 1;
+}
+a;`,
 		`
 assert(Boolean(function() {}()) === false);
 assert(typeof Boolean(void 0) === "boolean");
