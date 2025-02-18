@@ -712,7 +712,7 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	}
 }
 
-func (p *Parser) asyncArrowFunction() *PrimaryExpressionAsyncArrowFunction {
+func (p *Parser) asyncArrowFunction() *AsyncArrowFunction {
 	startOffset := p.tokenizer.Index
 	p.tokenizer.Match(TAsync)
 	var params *FormalParameters
@@ -751,7 +751,7 @@ func (p *Parser) asyncArrowFunction() *PrimaryExpressionAsyncArrowFunction {
 		}
 	}
 	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
-	return &PrimaryExpressionAsyncArrowFunction{
+	return &AsyncArrowFunction{
 		FormalParameters: params,
 		SourceText:       sourceText,
 		Body:             body,

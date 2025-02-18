@@ -118,3 +118,9 @@ type RuntimeSemanticsForDeclarationBindingInstantiation interface {
 type RuntimeSemanticsInstantiateGeneratorFunctionExpression interface {
 	InstantiateGeneratorFunctionExpression(vm *VM2, name PropertyKeyOrPrivateName) (fun ObjectType)
 }
+
+// MARK: - Async
+
+type RuntimeSemanticsInstantiateAsyncArrowFunctionExpression interface {
+	InstantiateAsyncArrowFunctionExpression(vm *VM2, name PropertyKeyOrPrivateName) (fun ObjectType)
+}

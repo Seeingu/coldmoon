@@ -36,21 +36,6 @@ func testModule(t *testing.T, f string) {
 // Deprecated
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
-		"``",
-		`class A {
-	static sa = 'a';
-}
-const B = class {}`,
-		`function a() {
-}
-function* b() {
-}
-async function* c() {
-}
-async function d() {
-}
-const a = async () => {
-}`,
 		`2 == 1;
 2 > 1;
 false || 1;
@@ -79,6 +64,21 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`class A {
+	static sa = 'a';
+}
+const B = class {}`,
+		`function a() {
+}
+function* b() {
+}
+async function* c() {
+}
+async function d() {
+}
+const e = async () => {
+}`,
+		"``",
 		`let a = 1;
 let b = a + 1;
 let c = a + b + b;

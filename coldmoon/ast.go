@@ -1126,24 +1126,59 @@ func (p *FunctionExpression) String() string {
 
 // MARK: - AsyncArrowFunction
 
-type PrimaryExpressionAsyncArrowFunction struct {
+// AsyncArrowFunction [In, Yield, Await] :
+//   - async [no LineTerminator here] AsyncArrowBindingIdentifier[?Yield] [no LineTerminator
+//     here] => AsyncConciseBody[?In]
+//   - CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await] [no LineTerminator here] =>
+//     AsyncConciseBody[?In]
+type AsyncArrowFunction struct {
 	PrimaryExpression
 	FormalParameters *FormalParameters
 	Body             *FunctionBody
 	SourceText       string
 }
 
-func (p *PrimaryExpressionAsyncArrowFunction) AssignmentTargetType() AssignmentTargetType {
+var _ RuntimeSemanticsInstantiateAsyncArrowFunctionExpression = (*AsyncArrowFunction)(nil)
+
+func (p *AsyncArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionAsyncArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
+func (p *AsyncArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
 	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
 	p.Body.Strict = strict
 	e.AddInstruction(&IInstantiateAsyncArrowFunctionExpression{FunctionExpression: p})
 }
 
-func (p *PrimaryExpressionAsyncArrowFunction) String() string {
+func (p *AsyncArrowFunction) Evaluation(vm *VM2) Value {
+	return p.InstantiateAsyncArrowFunctionExpression(vm, NewStringPropertyKey("")).ToValue()
+}
+
+func (p *AsyncArrowFunction) InstantiateAsyncArrowFunctionExpression(
+	vm *VM2,
+	name PropertyKeyOrPrivateName,
+) ObjectType {
+	functionExpression := p
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := vm.RunningLexicalEnvironment()
+	privateEnv := vm.RunningPrivateEnvironment()
+	sourceText := functionExpression.SourceText
+	closure := OrdinaryFunctionCreate(
+		vm.agent,
+		realm.Intrinsics.AsyncFunctionPrototype,
+		sourceText,
+		functionExpression.FormalParameters,
+		functionExpression.Body,
+		functionCreateThisModeLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(closure, name, "")
+	return closure
+}
+
+func (p *AsyncArrowFunction) String() string {
 	return "AsyncArrowFunction"
 }
 
@@ -5367,6 +5402,10 @@ func (d *DeclarationHoistableAsyncFunction) Bytecode(e *Executable, c *BytecodeC
 	d.AsyncFunctionDeclaration.Bytecode(e, c)
 }
 
+func (d *DeclarationHoistableAsyncFunction) Evaluation(vm *VM2) Value {
+	return d.AsyncFunctionDeclaration.Evaluation(vm)
+}
+
 func (d *DeclarationHoistableAsyncFunction) String() string {
 	return d.AsyncFunctionDeclaration.String()
 }
@@ -5384,6 +5423,16 @@ func (d *AsyncFunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	env := realm.GlobalEnv
 	function := d.instantiateAsyncFunctionObject(c.agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+}
+
+// TODO: not standard
+func (d *AsyncFunctionDeclaration) Evaluation(vm *VM2) Value {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateAsyncFunctionObject(agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+	return UndefinedValue
 }
 
 func (d *AsyncFunctionDeclaration) instantiateAsyncFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
@@ -5419,6 +5468,10 @@ func (d *DeclarationHoistableAsyncGenerator) Bytecode(e *Executable, c *Bytecode
 	d.AsyncGeneratorDeclaration.Bytecode(e, c)
 }
 
+func (d *DeclarationHoistableAsyncGenerator) Evaluation(vm *VM2) Value {
+	return d.AsyncGeneratorDeclaration.Evaluation(vm)
+}
+
 func (d *DeclarationHoistableAsyncGenerator) String() string {
 	return d.AsyncGeneratorDeclaration.String()
 }
@@ -5436,6 +5489,16 @@ func (d *AsyncGeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) 
 	env := realm.GlobalEnv
 	function := d.instantiateAsyncGeneratorFunctionObject(c.agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+}
+
+// TODO: not standard
+func (d *AsyncGeneratorDeclaration) Evaluation(vm *VM2) Value {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateAsyncGeneratorFunctionObject(agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+	return UndefinedValue
 }
 
 // 15.6.3
@@ -5479,6 +5542,10 @@ func (d *DeclarationHoistableGenerator) Bytecode(e *Executable, c *BytecodeConte
 	d.GeneratorDeclaration.Bytecode(e, c)
 }
 
+func (d *DeclarationHoistableGenerator) Evaluation(vm *VM2) Value {
+	return d.GeneratorDeclaration.Evaluation(vm)
+}
+
 func (d *DeclarationHoistableGenerator) String() string {
 	return d.GeneratorDeclaration.String()
 }
@@ -5496,6 +5563,16 @@ func (d *GeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
 	env := realm.GlobalEnv
 	function := d.instantiateGeneratorFunctionObject(c.agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(CMString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
+}
+
+// TODO: not standard
+func (d *GeneratorDeclaration) Evaluation(vm *VM2) Value {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateGeneratorFunctionObject(agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(CMString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
+	return UndefinedValue
 }
 
 // 15.5.3

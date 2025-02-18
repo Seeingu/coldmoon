@@ -539,7 +539,7 @@ func (i *IInstantiateAsyncGeneratorFunctionExpression) String() string {
 
 type IInstantiateAsyncArrowFunctionExpression struct {
 	Instruction
-	FunctionExpression *PrimaryExpressionAsyncArrowFunction
+	FunctionExpression *AsyncArrowFunction
 }
 
 func (i *IInstantiateAsyncArrowFunctionExpression) String() string {

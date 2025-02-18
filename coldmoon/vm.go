@@ -941,7 +941,8 @@ func (vm *VM) InitializeBoundName(name string, value Value, env EnvironmentRecor
 	}
 }
 
-func (vm *VM) InstantiateAsyncArrowFunctionExpression(functionExpression *PrimaryExpressionAsyncArrowFunction, name string) ObjectType {
+// Depreacated
+func (vm *VM) InstantiateAsyncArrowFunctionExpression(functionExpression *AsyncArrowFunction, name string) ObjectType {
 	realm := vm.agent.CurrentRealm()
 	env := vm.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 	privateEnv := vm.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
