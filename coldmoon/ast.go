@@ -54,23 +54,50 @@ type PrimaryExpression interface {
 
 // MARK: - ClassExpression
 
-type PrimaryExpressionClassExpression struct {
+// ClassExpression [Yield, Await] :
+// - class BindingIdentifier[?Yield, ?Await] opt ClassTail[?Yield, ?Await]
+type ClassExpression struct {
 	PrimaryExpression
 	IdentifierName IdentifierName
 	ClassTail      *ClassTail
 	SourceText     string
 }
 
-func (p *PrimaryExpressionClassExpression) _primaryExpression() {}
-func (p *PrimaryExpressionClassExpression) AssignmentTargetType() AssignmentTargetType {
+func (p *ClassExpression) _primaryExpression() {}
+func (p *ClassExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionClassExpression) Bytecode(e *Executable, c *BytecodeContext) {
+func (p *ClassExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IClassDefinitionEvaluation{ClassExpression: p})
 }
 
-func (p *PrimaryExpressionClassExpression) String() string {
+func (p *ClassExpression) astHasIdentifier() bool {
+	return p.IdentifierName != ""
+}
+
+// Evaluation
+// spec: 15.7.16
+func (p *ClassExpression) Evaluation(vm *VM2) Value {
+	if p.astHasIdentifier() {
+		className := p.IdentifierName
+		value, err := p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className))
+		if err != nil {
+			vm.panic(err)
+		}
+		// TODO: set sourceText
+		return value.ToValue()
+	} else {
+		value, err := p.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey(""))
+		if err != nil {
+			vm.panic(err)
+		}
+		// TODO: set sourceText
+		return value.ToValue()
+	}
+}
+
+func (p *ClassExpression) String() string {
 	return "ClassExpression"
 }
 
@@ -5917,11 +5944,16 @@ type ClassElement interface {
 	ClassElementKind() ClassElementKind
 }
 
-// 15.7.4
+// ClassElementIsStatic
+// spec: 15.7.4
 func ClassElementIsStatic(c ClassElement) bool {
-	switch c.(type) {
-	case *ClassElementStaticMethodDefinition:
+	switch ce := c.(type) {
+	case *ClassElementStaticMethodDefinition, *ClassElementStaticFieldDefinition:
 		return true
+	case *ClassElementFieldDefinition:
+		return ce.IsStatic
+	case *ClassElementMethodDefinition:
+		return ce.IsStatic
 	default:
 		return false
 	}
@@ -6010,6 +6042,7 @@ func (c *ClassElementFieldDefinition) ClassElementKind() ClassElementKind {
 	return ClassElementKindNonConstructorMethod
 }
 
+// Deprecated
 // TODO(BM): use ClassElementFieldDefinition
 type ClassElementStaticFieldDefinition struct {
 	ClassElement
@@ -6037,6 +6070,8 @@ func (c *ClassElementEmpty) ClassElementEvaluation(vm *VM2, function ObjectType)
 
 // MARK: - ClassElement: StaticMethodDefinition
 
+// Deprecated
+// TODO(BM): remove
 type ClassElementStaticMethodDefinition struct {
 	ClassElement
 	MethodDefinition *MethodDefinition
@@ -6051,6 +6086,7 @@ func (c *ClassElementStaticMethodDefinition) ClassElementKind() ClassElementKind
 type ClassElementMethodDefinition struct {
 	ClassElement
 	MethodDefinition *MethodDefinition
+	IsStatic         bool
 }
 
 func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM2, obj ObjectType) (result classEvaluationResult, err Value) {

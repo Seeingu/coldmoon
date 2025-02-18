@@ -596,7 +596,7 @@ func (i *IBindingClassDeclarationEvaluation) String() string {
 
 type IClassDefinitionEvaluation struct {
 	Instruction
-	ClassExpression *PrimaryExpressionClassExpression
+	ClassExpression *ClassExpression
 }
 
 func (i *IClassDefinitionEvaluation) String() string {

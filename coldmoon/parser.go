@@ -910,12 +910,14 @@ func (p *Parser) classElement() ClassElement {
 		if def, ok := parserRecoverOk(p, func() *MethodDefinition {
 			return p.methodDefinition(MethodDefinitionTypeNil)
 		}); ok {
-			return &ClassElementStaticMethodDefinition{
+			return &ClassElementMethodDefinition{
 				MethodDefinition: def,
+				IsStatic:         true,
 			}
 		} else {
 			field := p.fieldDefinition()
-			return &ClassElementStaticFieldDefinition{
+			return &ClassElementFieldDefinition{
+				IsStatic:        true,
 				FieldDefinition: field,
 			}
 		}
@@ -1994,7 +1996,7 @@ func (p *Parser) templateLiteral() *PrimaryExpressionTemplateLiteral {
 	}
 }
 
-func (p *Parser) classExpression() *PrimaryExpressionClassExpression {
+func (p *Parser) classExpression() *ClassExpression {
 	startIndex := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TClass)
 	var identifier IdentifierName
@@ -2003,7 +2005,7 @@ func (p *Parser) classExpression() *PrimaryExpressionClassExpression {
 	}
 	classTail := p.classTail()
 	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
-	return &PrimaryExpressionClassExpression{
+	return &ClassExpression{
 		IdentifierName: identifier,
 		ClassTail:      classTail,
 		SourceText:     sourceText,
