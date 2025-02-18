@@ -36,27 +36,6 @@ func testModule(t *testing.T, f string) {
 // Deprecated
 func TestBaselineDeprecated(t *testing.T) {
 	sourceTexts := []string{
-		`const sab = new SharedArrayBuffer(1024);
-const ta = new Uint8Array(sab);
-ta[0] = 5; // 5
-ta[123] = 12;
-Atomics.add(ta, 0, 12); // 5
-Atomics.and(ta, 0, 1); 
-Atomics.compareExchange(ta, 0, 5, 12); // 1
-Atomics.exchange(ta, 0, 12); // 1
-Atomics.isLockFree(1); // true
-Atomics.isLockFree(2); // true
-Atomics.isLockFree(3); // false
-Atomics.isLockFree(4); // true
-Atomics.or(ta, 0, 1); // 12
-Atomics.store(ta, 0, 12); // 12
-Atomics.sub(ta, 0, 2); // 12
-Atomics.xor(ta, 0, 1); // 10
-Atomics.load(ta, 0); 
-`,
-		"Boolean(function() {}())",
-		"typeof Boolean(void 0)",
-		"void 0",
 		`const desc = Object.getOwnPropertyDescriptor(BigInt64Array, 'BYTES_PER_ELEMENT');
 let a = 0;
 if (Object.prototype.hasOwnProperty.call(desc, 'enumerable')) {
@@ -137,6 +116,29 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`
+assert(Boolean(function() {}()) === false);
+assert(typeof Boolean(void 0) === "boolean");
+void 0;
+`,
+		`const sab = new SharedArrayBuffer(1024);
+const ta = new Uint8Array(sab);
+ta[0] = 5; // 5
+ta[123] = 12;
+Atomics.add(ta, 0, 12); // 5
+Atomics.and(ta, 0, 1); 
+Atomics.compareExchange(ta, 0, 5, 12); // 1
+Atomics.exchange(ta, 0, 12); // 1
+Atomics.isLockFree(1); // true
+Atomics.isLockFree(2); // true
+Atomics.isLockFree(3); // false
+Atomics.isLockFree(4); // true
+Atomics.or(ta, 0, 1); // 12
+Atomics.store(ta, 0, 12); // 12
+Atomics.sub(ta, 0, 2); // 12
+Atomics.xor(ta, 0, 1); // 10
+Atomics.load(ta, 0); 
+`,
 		`const a = {};
 const b = a?.b ?? 1;
 assert(b === 1, 'b should be 1')`,

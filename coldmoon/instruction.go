@@ -278,7 +278,7 @@ func (i *IBitwiseNot) String() string {
 
 type IInstantiateOrdinaryFunctionExpression struct {
 	Instruction
-	FunctionExpression *PrimaryExpressionFunctionExpression
+	FunctionExpression *FunctionExpression
 }
 
 func (i *IInstantiateOrdinaryFunctionExpression) String() string {
@@ -360,7 +360,7 @@ func (i *IObjectSetProperty) String() string {
 type IObjectDefineMethod struct {
 	Instruction
 	MethodType               MethodDefinitionType
-	FunctionExpression       *PrimaryExpressionFunctionExpression
+	FunctionExpression       *FunctionExpression
 	GeneratorExpression      *GeneratorExpression
 	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
 	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression

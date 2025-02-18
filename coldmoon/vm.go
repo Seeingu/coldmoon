@@ -1199,7 +1199,7 @@ func (vm *VM) InstantiateGeneratorFunctionExpression(functionExpression *Generat
 type methodDefinitionArgs struct {
 	PropertyName             Value
 	MethodType               MethodDefinitionType
-	FunctionExpression       *PrimaryExpressionFunctionExpression
+	FunctionExpression       *FunctionExpression
 	GeneratorExpression      *GeneratorExpression
 	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
 	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
@@ -1588,10 +1588,11 @@ func ApplyStringOrNumericBinaryOperator(
 	panic("unreachable")
 }
 
+// Deprecated
 // 15.2.5
 func InstantiateOrdinaryFunctionExpression(
 	agent *Agent,
-	functionExpression *PrimaryExpressionFunctionExpression,
+	functionExpression *FunctionExpression,
 	name string,
 ) ObjectType {
 	realm := agent.CurrentRealm()
@@ -1668,7 +1669,7 @@ func InstantiateArrowFunctionExpression(agent *Agent, arrowFunction *ArrowFuncti
 // 15.4.4
 func DefineMethod(
 	agent *Agent,
-	functionExpression *PrimaryExpressionFunctionExpression,
+	functionExpression *FunctionExpression,
 	propertyName Value,
 	object ObjectType,
 	proto ObjectType,

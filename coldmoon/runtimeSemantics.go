@@ -57,6 +57,14 @@ type RuntimeSemanticsBindingClassDeclarationEvaluation interface {
 	BindingClassDeclarationEvaluation(vm *VM2) (obj ObjectType, err Value)
 }
 
+// RuntimeSemanticsInstantiateOrdinaryFunctionExpression
+// spec: 15.2.5
+type RuntimeSemanticsInstantiateOrdinaryFunctionExpression interface {
+	// InstantiateOrdinaryFunctionExpression
+	// name is optional
+	InstantiateOrdinaryFunctionExpression(vm *VM2, name PropertyKeyOrPrivateName) (fun ObjectType)
+}
+
 // 15.7.14
 type RuntimeSemanticsClassDefinitionEvaluation interface {
 	// classBinding is optional

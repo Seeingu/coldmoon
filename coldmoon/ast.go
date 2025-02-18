@@ -746,7 +746,7 @@ type MethodDefinition struct {
 	PropertyDefinition
 	Type                     MethodDefinitionType
 	PropertyName             PropertyName
-	FunctionExpression       *PrimaryExpressionFunctionExpression
+	FunctionExpression       *FunctionExpression
 	GeneratorExpression      *GeneratorExpression
 	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
 	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
@@ -996,7 +996,10 @@ func (p *ComputedPropertyName) Evaluation(vm *VM2) Value {
 
 // MARK: - FunctionExpression
 
-type PrimaryExpressionFunctionExpression struct {
+// FunctionExpression :
+//   - function BindingIdentifier[~Yield, ~Await] opt ( FormalParameters[~Yield, ~Await] )
+//     { FunctionBody[~Yield, ~Await] }
+type FunctionExpression struct {
 	PrimaryExpression
 	Identifier       IdentifierName
 	FormalParameters *FormalParameters
@@ -1004,15 +1007,86 @@ type PrimaryExpressionFunctionExpression struct {
 	SourceText       string
 }
 
-func (p *PrimaryExpressionFunctionExpression) AssignmentTargetType() AssignmentTargetType {
+var _ RuntimeSemanticsInstantiateOrdinaryFunctionExpression = (*FunctionExpression)(nil)
+
+func (p *FunctionExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionFunctionExpression) Bytecode(e *Executable, c *BytecodeContext) {
+func (p *FunctionExpression) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&IInstantiateOrdinaryFunctionExpression{FunctionExpression: p})
 }
 
-func (p *PrimaryExpressionFunctionExpression) String() string {
+func (p *FunctionExpression) astHasIdentifier() bool {
+	return p.Identifier != ""
+}
+
+// InstantiateOrdinaryFunctionExpression
+// spec: 15.2.5
+func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM2, propertyKeyOrPrivateName PropertyKeyOrPrivateName) (fun ObjectType) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	if p.astHasIdentifier() {
+		Assert(propertyKeyOrPrivateName == nil)
+		name := p.Identifier
+		outerEnv := vm.RunningLexicalEnvironment()
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(name, false)
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		MakeConstructor(closure, false, nil)
+
+		funcEnv.InitializeBinding(name, closure.ToValue())
+		return closure
+	} else {
+		var name PropertyKeyOrPrivateName
+		if propertyKeyOrPrivateName == nil {
+			name = NewStringPropertyKey("")
+		} else {
+			name = propertyKeyOrPrivateName
+		}
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		SetFunctionName(closure, name, "")
+		MakeConstructor(closure, false, nil)
+		return closure
+	}
+}
+
+// NamedEvaluation
+// spec: 8.4.5
+func (p *FunctionExpression) NamedEvaluation(vm *VM2, name PropertyKeyOrPrivateName) Value {
+	return p.InstantiateOrdinaryFunctionExpression(vm, name).ToValue()
+}
+
+// TODO: non standard
+func (p *FunctionExpression) Evaluation(vm *VM2) Value {
+	return p.NamedEvaluation(vm, NewStringPropertyKey(""))
+}
+
+func (p *FunctionExpression) String() string {
 	return "FunctionExpression " + string(p.Identifier)
 }
 
@@ -3187,6 +3261,20 @@ func (u *UnaryExpression) Evaluation(vm *VM2) Value {
 		} else {
 			return TrueValue
 		}
+	case u.astIsTypeof():
+		// 13.5.3.1
+		val := u.Operand.Evaluation(vm)
+		if ref, ok := val.ReferenceRecord(); ok {
+			if ref.IsUnresolvableReference() {
+				return NewStringValue("undefined")
+			}
+		}
+		val = val.GetValue(agent)
+		return NewStringValue(val.TypeString())
+	case u.astIsVoid():
+		expr := u.Operand.Evaluation(vm)
+		expr.GetValue(agent)
+		return UndefinedValue
 	}
 	panic("unimplemented")
 }
@@ -3844,6 +3932,11 @@ const (
 	FunctionTypeAsyncGenerator
 )
 
+// FunctionBody [Yield, Await] :
+// - FunctionStatementList[?Yield, ?Await]
+//
+// FunctionStatementList[Yield, Await] :
+// - StatementList[?Yield, ?Await, +Return] opt
 type FunctionBody struct {
 	ASTNode
 	StatementList StatementList
@@ -6089,16 +6182,6 @@ func (l *LexicalBinding) String() string {
 // - FunctionBody[~Yield, ~Await] }
 // - [+Default] function ( FormalParameters[~Yield, ~Await] ) {
 // - FunctionBody[~Yield, ~Await] }
-//
-// - FunctionExpression :
-//   - function BindingIdentifier[~Yield, ~Await] opt ( FormalParameters[~Yield, ~Await] )
-//   - { FunctionBody[~Yield, ~Await] }
-//
-// - FunctionBody[Yield, Await] :
-//   - FunctionStatementList[?Yield, ?Await]
-//
-// - FunctionStatementList[Yield, Await] :
-//   - StatementList[?Yield, ?Await, +GetLastValue] opt
 type FunctionDeclaration struct {
 	ASTNode
 	Identifier       IdentifierName
