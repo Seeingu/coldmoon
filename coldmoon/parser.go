@@ -1679,13 +1679,13 @@ func (p *Parser) sequenceExpression(left Expression) *ExpressionSequenceExpressi
 	}
 }
 
-func (p *Parser) conditionalExpression(left Expression, accept *acceptContext) *ExpressionConditionalExpression {
+func (p *Parser) conditionalExpression(left Expression, accept *acceptContext) *ConditionalExpression {
 	p.tokenizer.MustMatch(TQuestion)
 	consequent := p.expression(accept)
 	p.tokenizer.MustMatch(TColon)
 	alternate := p.expression(accept)
 	p.automaticSemicolonInsertion()
-	return &ExpressionConditionalExpression{
+	return &ConditionalExpression{
 		Test:       left,
 		Consequent: consequent,
 		Alternate:  alternate,

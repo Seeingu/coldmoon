@@ -2657,14 +2657,19 @@ func (e *ExpressionSequenceExpression) String() string {
 
 // MARK: - ConditionalExpression
 
-type ExpressionConditionalExpression struct {
+// ConditionalExpression [In, Yield, Await] :
+//   - ShortCircuitExpression[?In, ?Yield, ?Await]
+//   - ShortCircuitExpression[?In, ?Yield, ?Await] ?
+//     AssignmentExpression[+In, ?Yield, ?Await] :
+//     AssignmentExpression[?In, ?Yield, ?Await]
+type ConditionalExpression struct {
 	Expression
 	Test       Expression
 	Consequent Expression
 	Alternate  Expression
 }
 
-func (e *ExpressionConditionalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
+func (e *ConditionalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
 	e.Test.Bytecode(ex, c)
 	if ExpressionAnalyze(e.Test, AnalyzeQueryIsReference) {
 		ex.AddInstruction(InsGetValue)
@@ -2692,7 +2697,22 @@ func (e *ExpressionConditionalExpression) Bytecode(ex *Executable, c *BytecodeCo
 	jump.Target = len(ex.Instructions) - 1
 }
 
-func (e *ExpressionConditionalExpression) String() string {
+// Evaluation
+// spec: 13.14.1
+func (e *ConditionalExpression) Evaluation(vm *VM2) Value {
+	agent := vm.agent
+	lref := e.Test.Evaluation(vm)
+	lval := lref.GetValue(agent)
+	if lval.ToBoolean() {
+		trueRef := e.Consequent.Evaluation(vm)
+		return trueRef.GetValue(agent)
+	} else {
+		falseRef := e.Alternate.Evaluation(vm)
+		return falseRef.GetValue(agent)
+	}
+}
+
+func (e *ConditionalExpression) String() string {
 	return e.Test.String() + " ? " + e.Consequent.String() + " : " + e.Alternate.String()
 }
 
