@@ -28,8 +28,8 @@ type RuntimeSemanticsInstantiateArrowFunctionExpression interface {
 
 // 15.4.5
 type RuntimeSemanticsMethodDefinitionEvaluation interface {
-	// MethodDefinitionEvaluation returns a normal Completion or an abrupt Completion
-	MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) Completion[*PrivateElement]
+	// MethodDefinitionEvaluation returns PrivateElement or an abrupt Completion
+	MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) (pe *PrivateElement, err Value)
 }
 
 // RuntimeSemanticsChainEvaluation

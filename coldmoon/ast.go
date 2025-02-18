@@ -843,7 +843,7 @@ func (p *MethodDefinition) DefineMethod(vm *VM2, obj ObjectType, proto ObjectTyp
 	}
 }
 
-func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) Completion[*PrivateElement] {
+func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) (pe *PrivateElement, err Value) {
 	agent := vm.agent
 	if p.astIsGet() {
 		propKey := p.PropertyName.Evaluation(vm)
@@ -875,15 +875,16 @@ func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM2, obj ObjectType, e
 				Configurable: true,
 			}
 			obj.DefinePropertyOrThrow(propKey.ToPropertyKey(), desc)
-			return newCompletionNormalData[*PrivateElement](nil)
+			// return UNUSED
+			return
 		}
 	} else if p.astIsClassElementName() {
 		methodDef, err := p.DefineMethod(vm, obj, nil)
 		if err != nil {
-			return newCompletionError[*PrivateElement](err)
+			return nil, err
 		}
 		SetFunctionName(methodDef.Closure, methodDef.Key, "")
-		return newCompletionNormalData(DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable))
+		return DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable), nil
 	} else {
 		panic("unimplemented")
 	}
@@ -5896,12 +5897,11 @@ type ClassElementMethodDefinition struct {
 }
 
 func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM2, obj ObjectType) (result classEvaluationResult, err Value) {
-	completion := c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false)
-	if completion.IsError() {
-		err = completion.Error()
-		return
+	privateElement, err := c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false)
+	if err != nil {
+		return result, err
 	}
-	result.privateElement = completion.Data()
+	result.privateElement = privateElement
 	return
 }
 
