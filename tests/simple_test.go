@@ -413,10 +413,6 @@ assert(2 < 31);
 }
 
 func testNewSources(t *testing.T, sourceTexts []string) {
-	DevFeatures.ToggleNewVM(true)
-	defer func() {
-		DevFeatures.ToggleNewVM(false)
-	}()
 	for _, sourceText := range sourceTexts {
 		testSource(t, sourceText)
 	}
@@ -428,10 +424,6 @@ func resolveTestdataPath(f string) string {
 }
 
 func TestModule(t *testing.T) {
-	DevFeatures.ToggleNewVM(true)
-	defer func() {
-		DevFeatures.ToggleNewVM(false)
-	}()
 	sourceFiles := []string{
 		"simple_import.js",
 	}

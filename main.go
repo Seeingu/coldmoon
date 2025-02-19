@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	DevFeatures.ToggleNewVM(true)
 	Debug.Enable()
 	InitializeConstants()
 	agent := NewAgent()

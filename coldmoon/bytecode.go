@@ -55,12 +55,8 @@ func GenerateBytecode(agent *Agent, node ASTNode) *BytecodeContext {
 }
 
 func GenerateAndRunBytecode(agent *Agent, node ASTNode) CompletionValue {
-	if DevFeatures.IsNewVMEnabled() {
-		vm2 := NewVM2(agent)
-		value := node.Evaluation(vm2)
-		// TODO: use completion return
-		return NewCompletionReturnValue(value)
-	}
-	bytecode := GenerateBytecode(agent, node)
-	return bytecode.Run()
+	vm2 := NewVM2(agent)
+	value := node.Evaluation(vm2)
+	// TODO: use completion return
+	return NewCompletionReturnValue(value)
 }
