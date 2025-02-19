@@ -6826,8 +6826,10 @@ func (m *Module) Evaluation(vm *VM2) Value {
 	for _, moduleItem := range m.ModuleItemList {
 		switch stmt := moduleItem.(type) {
 		case *ModuleItemImportDeclaration:
-			panic("unimplemented")
+			return UndefinedValue
 		case *ModuleItemStatementListItem:
+			list = append(list, stmt.Evaluation(vm))
+		case *ModuleItemExportDeclaration:
 			list = append(list, stmt.Evaluation(vm))
 		default:
 			panic("unimplemented")
@@ -7054,7 +7056,22 @@ func (m *ModuleItemExportDeclaration) Bytecode(e *Executable, c *BytecodeContext
 }
 
 func (m *ModuleItemExportDeclaration) Evaluation(vm *VM2) Value {
-	panic("unimplemented")
+	switch {
+	case m.ExportFrom != nil || m.NamedExports != nil:
+		return UndefinedValue
+	case m.Declaration != nil:
+		return m.Declaration.Evaluation(vm)
+	case m.VariableStatement != nil:
+		return m.VariableStatement.Evaluation(vm)
+	case m.DefaultHoistableDeclaration != nil:
+		return m.DefaultHoistableDeclaration.Evaluation(vm)
+	case m.DefaultClassDeclaration != nil:
+		return m.DefaultClassDeclaration.Evaluation(vm)
+	case m.DefaultExpression != nil:
+		return m.DefaultExpression.Evaluation(vm)
+	default:
+		panic("unreachable")
+	}
 }
 
 func (m *ModuleItemExportDeclaration) String() string {
