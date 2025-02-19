@@ -1260,14 +1260,14 @@ func (p *Parser) doWhileStatement() *StatementDoWhile {
 	}
 }
 
-func (p *Parser) whileStatement() *StatementWhile {
+func (p *Parser) whileStatement() *WhileStatement {
 	p.tokenizer.MustMatch(TWhile)
 	p.tokenizer.MustMatch(TLeftParen)
 	condition := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
 	body := p.statement()
 
-	return &StatementWhile{
+	return &WhileStatement{
 		Condition: condition,
 		Body:      body,
 	}

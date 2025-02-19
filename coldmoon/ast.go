@@ -4083,6 +4083,29 @@ type FunctionBody struct {
 	Type          FunctionType
 }
 
+var _ RuntimeSemanticsEvaluateBody = (*FunctionBody)(nil)
+
+// EvaluateBody
+// spec: 10.2.1.3
+func (f *FunctionBody) EvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentList []Value) (value Value, err Value) {
+	var completion CompletionValue
+	switch f.Type {
+	case FunctionTypeNormal:
+		completion = EvaluateFunctionBody(agent, function, argumentList)
+	case FunctionTypeGenerator:
+		completion = EvaluateGeneratorBody(agent, function, argumentList)
+	case FunctionTypeAsyncGenerator:
+		completion = EvaluateAsyncGeneratorBody(agent, function, argumentList)
+	case FunctionTypeAsync:
+		completion = EvaluateAsyncFunctionBody(agent, function, argumentList)
+	}
+
+	if completion.IsError() {
+		return nil, completion.Error()
+	}
+	return completion.Data(), nil
+}
+
 func (f *FunctionBody) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return f.StatementList.VarScopedDeclarations()
 }
@@ -4528,24 +4551,29 @@ func (s *IfStatement) String() string {
 
 type IterationStatement interface {
 	VarScopedDeclarations() []*VariableDeclaration
-	ASTNode
+	Statement
 }
 
 // MARK: - WhileStatement
 
-type StatementWhile struct {
+// WhileStatement :
+// - while ( Expression ) Statement
+type WhileStatement struct {
 	IterationStatement
 	Condition Expression
 	Body      Statement
 }
 
-var _ IterationStatement = (*StatementWhile)(nil)
+var (
+	_ IterationStatement                  = (*WhileStatement)(nil)
+	_ RuntimeSemanticsWhileLoopEvaluation = (*WhileStatement)(nil)
+)
 
-func (s *StatementWhile) VarScopedDeclarations() []*VariableDeclaration {
+func (s *WhileStatement) VarScopedDeclarations() []*VariableDeclaration {
 	return s.Body.VarScopedDeclarations()
 }
 
-func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
+func (s *WhileStatement) Bytecode(e *Executable, c *BytecodeContext) {
 	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
 
 	conditionIndex := len(e.Instructions) - 1
@@ -4578,7 +4606,40 @@ func (s *StatementWhile) Bytecode(e *Executable, c *BytecodeContext) {
 	c.breakJumpIndices.Clear()
 }
 
-func (s *StatementWhile) String() string {
+func (s *WhileStatement) Evaluation(vm *VM2) Value {
+	// TODO
+	var labelSet []string
+	vm.loopNodeStack.Push(s)
+	defer func() {
+		vm.loopNodeStack.Pop()
+	}()
+	return vm.GetValueOrPanic(s.WhileLoopEvaluation(vm, labelSet))
+}
+
+// WhileLoopEvaluation
+// spec: 14.7.3.2
+func (s *WhileStatement) WhileLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value) {
+	var V Value = UndefinedValue
+	for {
+		exprRef := s.Condition.Evaluation(vm)
+		exprValue := exprRef.GetValue(vm.agent)
+		if !exprValue.ToBoolean() {
+			return V, nil
+		}
+		stmtResult := s.Body.Evaluation(vm)
+		if vm.isYield {
+			return stmtResult, nil
+		}
+		if !LoopContinues(stmtResult, labelSet) {
+			return UpdateEmpty(stmtResult, V), nil
+		}
+		if !IsUndefinedOrNil(stmtResult) {
+			V = stmtResult
+		}
+	}
+}
+
+func (s *WhileStatement) String() string {
 	sb := "While"
 	sb += " " + s.Condition.String() + " \n"
 	sb += s.Body.String()
@@ -6551,9 +6612,28 @@ func (s StatementList) Bytecode(e *Executable, c *BytecodeContext) {
 
 func (s StatementList) Evaluation(vm *VM2) Value {
 	var lastValue Value
-	for _, item := range s {
+	for i, item := range s {
 		lastValue = item.Evaluation(vm)
 		if vm.isReturn {
+			return lastValue
+		}
+		if vm.isYield {
+			// TODO(XXX): simplify?
+			if len(s) == i+1 && !vm.loopNodeStack.IsEmpty() {
+				// let loop node handle execution flow
+				vm.suspendedGeneratorBody = StatementList{&StatementListItemStatement{
+					Statement: vm.loopNodeStack.Peek(),
+				}}
+				vm.isInLoop = true
+			} else {
+				// when in loop, and we are at the end of current block
+				// should continue from start of loop
+				if vm.isInLoop && len(s) == i+1 {
+					return lastValue
+				}
+				vm.isInLoop = false
+				vm.suspendedGeneratorBody = s[i+1:]
+			}
 			return lastValue
 		}
 	}
@@ -7188,8 +7268,9 @@ func (i *ImportSpecifier) String() string {
 // yield [no LineTerminator here] * AssignmentExpression[?In, +Yield, ?Await]
 type YieldExpression struct {
 	Expression
-	// TODO: Check AssignmentExpression type
+	// AssignmentExpression is optional
 	AssignmentExpression Expression
+	hasStar              bool
 }
 
 var _ Expression = (*YieldExpression)(nil)
@@ -7211,4 +7292,21 @@ func (y *YieldExpression) Bytecode(e *Executable, c *BytecodeContext) {
 		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
 	}
 	e.AddInstruction(InsYield)
+}
+
+func (y *YieldExpression) astHasAssignmentExpression() bool {
+	return y.AssignmentExpression != nil
+}
+
+func (y *YieldExpression) Evaluation(vm *VM2) Value {
+	if !y.astHasAssignmentExpression() {
+		return vm.GetCompletionValueOrPanic(Yield(vm.agent, UndefinedValue))
+	} else if y.hasStar {
+		panic("unimplemented")
+	} else {
+		exprRef := y.AssignmentExpression.Evaluation(vm)
+		value := exprRef.GetValue(vm.agent)
+		vm.isYield = true
+		return vm.GetCompletionValueOrPanic(Yield(vm.agent, value))
+	}
 }

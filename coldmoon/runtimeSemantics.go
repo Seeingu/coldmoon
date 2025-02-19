@@ -104,6 +104,12 @@ type RuntimeSemanticsForInOfLoopEvaluation interface {
 	ForInOfLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value)
 }
 
+// RuntimeSemanticsWhileLoopEvaluation
+// spec: 14.7.3.2
+type RuntimeSemanticsWhileLoopEvaluation interface {
+	WhileLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value)
+}
+
 // RuntimeSemanticsForDeclarationBindingInstantiation
 // spec: 14.7.5.4
 type RuntimeSemanticsForDeclarationBindingInstantiation interface {
@@ -123,4 +129,12 @@ type RuntimeSemanticsInstantiateGeneratorFunctionExpression interface {
 
 type RuntimeSemanticsInstantiateAsyncArrowFunctionExpression interface {
 	InstantiateAsyncArrowFunctionExpression(vm *VM2, name PropertyKeyOrPrivateName) (fun ObjectType)
+}
+
+// MARK: - Function
+
+// RuntimeSemanticsEvaluateBody
+// spec: 10.2.1.3
+type RuntimeSemanticsEvaluateBody interface {
+	EvaluateBody(agent *Agent, functionObject *ECMAScriptFunction, argumentList []Value) (value Value, err Value)
 }

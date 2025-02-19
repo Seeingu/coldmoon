@@ -19,8 +19,7 @@ type GeneratorObject struct {
 	GeneratorContext *ExecutionContext
 	// [[GeneratorBrand]]
 	GeneratorBrand string
-	closure        func(bytecode *BytecodeContext) ObjectType
-	bytecode       *BytecodeContext
+	closure        func() Value
 	result         Value
 }
 
@@ -34,13 +33,13 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 
 	var next BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		value := pkg.SliceSafeGet(argumentsList, 0)
-		return GeneratorResume(agent, this, value).ToValue()
+		return GeneratorResume(agent, this, value)
 	}
 	var iteratorReturn BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		value := pkg.SliceSafeGet(argumentsList, 0)
 		generator := this
 		C := NewCompletionReturnValue(value)
-		return GeneratorResumeAbrupt(agent, generator, C).ToValue()
+		return GeneratorResumeAbrupt(agent, generator, C)
 	}
 
 	DefineBuiltinFunction(realm, CMString("next"), g, next, 1)
@@ -57,32 +56,42 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 	return g
 }
 
+type AbstractClosure func() Value
+
+// GeneratorBody is Expression or Abstract closure
+type GeneratorBody interface{}
+
 // GeneratorStart
 // spec: 27.5.3.1
-func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody *ECMAScriptFunction) {
+func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody GeneratorBody) {
 	Assert(generator.GeneratorState == GeneratorStateSuspendedStart)
 	genContext := agent.RunningExecutionContext()
 	genContext.Generator = generator
 
-	// TODO(BM): use new vm arch
-	closure := func(bytecode *BytecodeContext) ObjectType {
-		a := bytecode.agent
+	genVM := NewVM2(agent)
+	genVM.suspendedGeneratorBody = generatorBody
+	closure := func() Value {
+		a := agent
 		acGenContext := a.RunningExecutionContext()
 		acGenerator := acGenContext.Generator
-		if bytecode.IsFinished() {
-			a.ExecutionContextStack.Pop()
-			acGenerator.GeneratorState = GeneratorStateCompleted
-			return CreateIterResultObject(a, UndefinedValue, true)
+		// TODO: result should be a completion
+		var result Value
+		if body, ok := genVM.suspendedGeneratorBody.(RuntimeSemanticsEvaluation); ok {
+			result = body.Evaluation(genVM)
+		} else {
+			result = generatorBody.(AbstractClosure)()
 		}
-		result := bytecode.Run()
-		if result.IsError() {
-			return MustGetObject(result.Error())
+		// TODO: not standard
+		if acGenerator.GeneratorState == GeneratorStateSuspendedYield {
+			return CreateIterResultObject(a, result, false).ToValue()
 		}
-		acGenerator.GeneratorState = GeneratorStateSuspendedYield
-		return CreateIterResultObject(a, result.Data(), false)
+		// TODO: Assert generator status
+		a.ExecutionContextStack.Pop()
+		acGenerator.GeneratorState = GeneratorStateCompleted
+		var resultValue Value = result
+		return CreateIterResultObject(a, resultValue, true).ToValue()
 	}
 	generator.closure = closure
-	generator.bytecode = GenerateBytecode(agent, generatorBody.ECMAScriptCode)
 	generator.GeneratorContext = genContext
 }
 
@@ -96,24 +105,25 @@ func GeneratorValidate(agent *Agent, generator Value) GeneratorState {
 	return g.GeneratorState
 }
 
-// 27.5.3.3
-func GeneratorResume(agent *Agent, generator Value, value Value) ObjectType {
+// GeneratorResume
+// spec: 27.5.3.3
+func GeneratorResume(agent *Agent, generator Value, value Value) Value {
 	state := GeneratorValidate(agent, generator)
 	if state == GeneratorStateCompleted {
-		return CreateIterResultObject(agent, UndefinedValue, true)
+		return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
 	}
 	Assert(state == GeneratorStateSuspendedStart || state == GeneratorStateSuspendedYield)
 	g := RequireInternalSlot[*GeneratorObject](generator)
 	genContext := g.GeneratorContext
-	// methodContext := agent.RunningExecutionContext()
+	methodContext := agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
 	agent.ExecutionContextStack.Push(genContext)
-	result := g.closure(g.bytecode)
-	// Assert(methodContext == agent.RunningExecutionContext())
+	result := g.closure()
+	Assert(methodContext == agent.RunningExecutionContext())
 	return result
 }
 
-func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion CompletionValue) ObjectType {
+func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion CompletionValue) Value {
 	state := GeneratorValidate(agent, generator)
 	g := RequireInternalSlot[*GeneratorObject](generator)
 	if state == GeneratorStateSuspendedStart {
@@ -122,17 +132,17 @@ func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion Compl
 	}
 	if state == GeneratorStateCompleted {
 		if abruptCompletion.Type == CompletionTypeReturn {
-			return CreateIterResultObject(agent, UndefinedValue, true)
+			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
 		}
 		agent.exception = abruptCompletion.Error()
-		return MustGetObject(abruptCompletion.Error())
+		return abruptCompletion.Error()
 	}
 
 	genContext := g.GeneratorContext
 	// methodContext:= agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
 	agent.ExecutionContextStack.Push(genContext)
-	result := g.closure(g.bytecode)
+	result := g.closure()
 	return result
 }
 
@@ -154,19 +164,21 @@ func GetGeneratorKind(agent *Agent) GeneratorKind {
 	return GeneratorKindSync
 }
 
-// 27.5.3.6
-func GeneratorYield(agent *Agent, iteratorResult ObjectType) CompletionValue {
+// GeneratorYield
+// spec: 27.5.3.6
+func GeneratorYield(agent *Agent, iterNextObj ObjectType) CompletionValue {
 	genContext := agent.RunningExecutionContext()
 	Assert(genContext.Generator != nil)
 	generator := genContext.Generator
 	Assert(GetGeneratorKind(agent) == GeneratorKindSync)
 	generator.GeneratorState = GeneratorStateSuspendedYield
 	agent.ExecutionContextStack.Pop()
-	generator.result = iteratorResult.ToValue()
-	return NewCompletionValue(iteratorResult.Get(CMString("value").ToPropertyKey()))
+	generator.result = iterNextObj.ToValue()
+	return NewCompletionValue(iterNextObj.Get(CMString("value").ToPropertyKey()))
 }
 
-// 27.5.3.7
+// Yield
+// spec: 27.5.3.7
 func Yield(agent *Agent, value Value) CompletionValue {
 	generatorKind := GetGeneratorKind(agent)
 	switch generatorKind {

@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/Seeingu/coldmoon/pkg"
+
 type VM2 struct {
 	agent                 *Agent
 	containedInStrictCode bool
@@ -8,6 +10,12 @@ type VM2 struct {
 	IsJSONParse bool
 	// isReturn indicates the current execution context is a return statement
 	isReturn bool
+	// isYield indicates the current execution context is a yield statement
+	isYield bool
+	// visitedNodesMap is used to store visited nodes
+	suspendedGeneratorBody GeneratorBody
+	loopNodeStack          pkg.Stack[IterationStatement]
+	isInLoop               bool
 }
 
 func NewVM2(agent *Agent) *VM2 {
@@ -265,7 +273,8 @@ func CreatePerIterationEnvironment(perIterationBindings []string) {
 	// TODO
 }
 
-// 14.7.1.1
+// LoopContinues
+// spec: 14.7.1.1
 func LoopContinues(result Value, labelSet LabelSet) bool {
 	// TODO
 	return true
@@ -279,4 +288,18 @@ func UpdateEmpty(result, V Value) Value {
 		return result
 	}
 	return V
+}
+
+func (v *VM2) GetValueOrPanic(result Value, err Value) Value {
+	if result == nil {
+		v.panic(err)
+	}
+	return result
+}
+
+func (v *VM2) GetCompletionValueOrPanic(c CompletionValue) Value {
+	if c.IsError() {
+		v.panic(c.Error())
+	}
+	return c.Data()
 }

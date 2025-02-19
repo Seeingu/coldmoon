@@ -94,14 +94,18 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Val
 
 	OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
 
-	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
+	result, err := OrdinaryCallEvaluateBody(agent, function, argumentsList)
+	if err != nil {
+		panic(err)
+	}
 
 	agent.ExecutionContextStack.Pop()
 
-	if result.Type == CompletionTypeReturn {
-		return result.Data()
-	}
-	return UndefinedValue
+	// TODO(BM): check is return from e
+	//if result.Type == CompletionTypeReturn {
+	//	return result.Data()
+	//}
+	return result
 }
 
 // 10.2.1.1
@@ -154,20 +158,10 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 	return
 }
 
-// 10.2.1.4
-func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
-	functionBody := function.ECMAScriptCode
-	switch functionBody.Type {
-	case FunctionTypeNormal:
-		return EvaluateFunctionBody(agent, function, argumentsList)
-	case FunctionTypeGenerator:
-		return EvaluateGeneratorBody(agent, function, argumentsList)
-	case FunctionTypeAsyncGenerator:
-		return EvaluateAsyncGeneratorBody(agent, function, argumentsList)
-	case FunctionTypeAsync:
-		return EvaluateAsyncFunctionBody(agent, function, argumentsList)
-	}
-	panic("unreachable")
+// OrdinaryCallEvaluateBody
+// spec: 10.2.1.4
+func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (value Value, err Value) {
+	return function.ECMAScriptCode.EvaluateBody(agent, function, argumentsList)
 }
 
 func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
@@ -199,6 +193,8 @@ func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argu
 	return NewCompletionReturnValue((G).ToValue())
 }
 
+// EvaluateGeneratorBody
+// spec: 15.5.2
 func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	o := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
@@ -207,7 +203,7 @@ func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, arguments
 	}
 	G.ref = G
 
-	GeneratorStart(agent, G, function)
+	GeneratorStart(agent, G, function.ECMAScriptCode)
 	return NewCompletionReturnValue(G.ToValue())
 }
 
@@ -413,18 +409,18 @@ func (e *ECMAScriptFunction) Construct(
 
 	constructorEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
 
-	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
+	result, err := OrdinaryCallEvaluateBody(agent, function, argumentsList)
 
 	agent.ExecutionContextStack.Pop()
 
-	if !result.IsError() {
-		if o, ok := result.Data().(*ObjectValue); ok {
+	if err == nil {
+		if o, ok := result.(*ObjectValue); ok {
 			return o.Object
 		}
 		if kind == ConstructorKindBase {
 			return MustGetObject(thisArgument)
 		}
-		if result.Data() != UndefinedValue {
+		if result != UndefinedValue {
 			panic("TypeError")
 		}
 	} else {
