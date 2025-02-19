@@ -71,8 +71,7 @@ func (e *ECMAScriptFunction) SetClassFieldInitializerName(n ClassFieldInitialize
 }
 
 func (e *ECMAScriptFunction) EvaluateBody() CompletionValue {
-	vm := NewVM(e.Agent())
-	return GenerateAndRunBytecode(vm.agent, e.ECMAScriptCode)
+	return RunNode(e.Agent(), e.ECMAScriptCode)
 }
 
 // 7.3.24
@@ -184,7 +183,7 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	functionBody := function.ECMAScriptCode
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
-	return GenerateAndRunBytecode(agent, functionBody)
+	return RunNode(agent, functionBody)
 }
 
 func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
@@ -298,7 +297,7 @@ loop:
 			}
 			ref := agent.ResolveBinding(string(name), e, strict)
 			if initializer != nil {
-				value = GenerateAndRunBytecode(agent, &ExpressionStatement{
+				value = RunNode(agent, &ExpressionStatement{
 					Expression: initializer,
 				}).Data()
 			}

@@ -1,6 +1,10 @@
 package coldmoon
 
-import "github.com/Seeingu/coldmoon/pkg"
+import (
+	"reflect"
+
+	"github.com/Seeingu/coldmoon/pkg"
+)
 
 type VM2 struct {
 	agent                 *Agent
@@ -73,15 +77,177 @@ func (v *VM2) EvaluatePropertyAccessWithIdentifierKey(baseValue Value, identifie
 	)
 }
 
-// 13.15.3
+// InstanceOfOperator
+// spec: 13.10.2
+func (v *VM2) InstanceOfOperator(value Value, target Value) bool {
+	agent := v.agent
+	if _, ok := target.(*ObjectValue); !ok {
+		agent.ThrowTypeError("target is not an object")
+		return false
+	}
+	symbol := WellKnownSymbols[WellKnownSymbolsHasInstance]
+	instOfHandler := GetMethod(
+		agent,
+		target,
+		NewSymbolPropertyKey(symbol))
+	if instOfHandler != nil {
+		return instOfHandler.ToValue().Call(target, []Value{value}).ToBoolean()
+	}
+
+	if !IsCallable(target) {
+		agent.ThrowTypeError("target is not callable")
+		return false
+	}
+	return v.OrdinaryHasInstance(target, value).Data()
+}
+
+// 7.3.21
+func (v *VM2) OrdinaryHasInstance(c Value, value Value) Completion[bool] {
+	agent := v.agent
+	if !IsCallable(c) {
+		return NewNormalCompletion(false)
+	}
+	o := MustGetObject(c)
+	if b, ok := o.(*BoundFunctionObject); ok {
+		bc := b.BoundTargetFunction
+		return NewNormalCompletion(v.InstanceOfOperator(value, bc.ToValue()))
+	}
+
+	objectValue, ok := value.(*ObjectValue)
+	if !ok {
+		return NewNormalCompletion(false)
+	}
+
+	proto := o.Get(NewStringPropertyKey("prototype"))
+	protoObject, ok := proto.(*ObjectValue)
+	if !ok {
+		return NewThrowCompletion[bool](agent.ThrowException(TypeError, "prototype is not an object"))
+	}
+
+	object := objectValue.Object
+	for {
+		object = object.InternalMethods().GetPrototypeOf(object)
+		if object == nil {
+			return NewNormalCompletion(false)
+		}
+		if protoObject.Object == object {
+			return NewNormalCompletion(true)
+		}
+	}
+}
+
+// spec: 13.15.3
 func (v *VM2) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOperator) Value {
-	return ApplyStringOrNumericBinaryOperator(
-		v.agent, left, right, op,
-	)
+	agent := v.agent
+	lhs := left
+	rhs := right
+	finalLval := lhs
+	finalRval := rhs
+	if op == BinaryOperatorAddition {
+		lprim := ToPrimitive(agent, lhs, PreferredTypeDefault)
+		rprim := ToPrimitive(agent, rhs, PreferredTypeDefault)
+		_, lprimIsString := lprim.(*StringValue)
+		_, rprimIsString := rprim.(*StringValue)
+		if lprimIsString || rprimIsString {
+			lstr := lprim.String()
+			rstr := rprim.String()
+			return NewStringValue(lstr + rstr)
+		}
+
+		finalLval = lprim
+		finalRval = rprim
+	}
+
+	lnum := ToNumeric(agent, finalLval)
+	rnum := ToNumeric(agent, finalRval)
+	if reflect.TypeOf(lnum) != reflect.TypeOf(rnum) {
+		panic("TypeError: lnum and rnum are not the same type")
+	}
+
+	lNumber, isNumber := lnum.(*NumberValue)
+	lBigInt, _ := lnum.(*BigIntValue)
+	rNumber, _ := rnum.(*NumberValue)
+	rBigInt, _ := rnum.(*BigIntValue)
+
+	switch op {
+	case BinaryOperatorExponentiation:
+		if isNumber {
+			return lNumber.Exponentiate(rNumber)
+		} else {
+			return lBigInt.Exponentiate(rBigInt)
+		}
+	case BinaryOperatorMultiplication:
+		if isNumber {
+			return lNumber.Multiply(rNumber)
+		} else {
+			return lBigInt.Multiply(rBigInt)
+		}
+	case BinaryOperatorAddition:
+		if isNumber {
+			return lNumber.Add(rNumber)
+		} else {
+			return lBigInt.Add(rBigInt)
+		}
+	case BinaryOperatorSubtraction:
+		if isNumber {
+			return lNumber.Subtract(rNumber)
+		} else {
+			return lBigInt.Subtract(rBigInt)
+		}
+	case BinaryOperatorDivision:
+		if isNumber {
+			return lNumber.Divide(rNumber)
+		} else {
+			return lBigInt.Divide(rBigInt)
+		}
+	case BinaryOperatorRemainder:
+		if isNumber {
+			return lNumber.Remainder(rNumber)
+		} else {
+			return lBigInt.Remainder(rBigInt)
+		}
+	case BinaryOperatorLeftShift:
+		if isNumber {
+			return lNumber.LeftShift(rNumber)
+		} else {
+			return lBigInt.LeftShift(rBigInt)
+		}
+	case BinaryOperatorRightShift:
+		if isNumber {
+			return lNumber.SignedRightShift(rNumber)
+		} else {
+			return lBigInt.SignedRightShift(rBigInt)
+		}
+	case BinaryOperatorUnsignedRightShift:
+		if isNumber {
+			return lNumber.UnsignedRightShift(rNumber)
+		} else {
+			return lBigInt.UnsignedRightShift(rBigInt)
+		}
+	case BinaryOperatorBitwiseAnd:
+		if isNumber {
+			return lNumber.BitwiseAnd(rNumber)
+		} else {
+			return lBigInt.BitwiseAnd(rBigInt)
+		}
+	case BinaryOperatorBitwiseOr:
+		if isNumber {
+			return lNumber.BitwiseOr(rNumber)
+		} else {
+			return lBigInt.BitwiseOr(rBigInt)
+		}
+	case BinaryOperatorBitwiseXor:
+		if isNumber {
+			return lNumber.BitwiseXor(rNumber)
+		} else {
+			return lBigInt.BitwiseXor(rBigInt)
+		}
+	}
+	panic("unreachable")
 }
 
 // EvaluateCall ( func, ref, arguments, tailPosition )
-// 13.3.6.2
+// spec: 13.3.6.2
 func (v *VM2) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) Value {
 	agent := v.agent
 	var thisValue Value
@@ -109,7 +275,7 @@ func (v *VM2) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool)
 	}
 	// TODO: WIP: tailPosition
 	// TODO(SM): argumentsList
-	return evaluateCall(agent, fun, thisValue, arguments)
+	return fun.Call(thisValue, arguments)
 }
 
 type LabelSet = []string
@@ -302,4 +468,11 @@ func (v *VM2) GetCompletionValueOrPanic(c CompletionValue) Value {
 		v.panic(c.Error())
 	}
 	return c.Data()
+}
+
+func RunNode(agent *Agent, node ASTNode) CompletionValue {
+	vm2 := NewVM2(agent)
+	value := node.Evaluation(vm2)
+	// TODO: use completion return
+	return NewCompletionReturnValue(value)
 }

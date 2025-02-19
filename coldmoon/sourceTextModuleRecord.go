@@ -578,7 +578,7 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 	if !s.HasTLA {
 		Assert(capability == nil)
 		agent.ExecutionContextStack.Push(moduleContext)
-		GenerateAndRunBytecode(agent, s.ECMAScriptCode)
+		RunNode(agent, s.ECMAScriptCode)
 		agent.ExecutionContextStack.Pop()
 	} else {
 	}

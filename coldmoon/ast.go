@@ -16,7 +16,6 @@ type boundName interface {
 
 type ASTNode interface {
 	String() string
-	Bytecode(e *Executable, c *BytecodeContext)
 	RuntimeSemanticsEvaluation
 }
 
@@ -68,10 +67,6 @@ func (p *ClassExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *ClassExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IClassDefinitionEvaluation{ClassExpression: p})
-}
-
 func (p *ClassExpression) astHasIdentifier() bool {
 	return p.IdentifierName != ""
 }
@@ -114,12 +109,6 @@ func (p *PrimaryExpressionRegularExpressionLiteral) AssignmentTargetType() Assig
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionRegularExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&ILoadConstant{Value: NewStringValue(p.Pattern)})
-	e.AddInstruction(&ILoadConstant{Value: NewStringValue(p.Flags)})
-	e.AddInstruction(&IRegExpCreate{})
-}
-
 func (p *PrimaryExpressionRegularExpressionLiteral) String() string {
 	return "/" + p.Pattern + "/" + p.Flags
 }
@@ -148,11 +137,6 @@ type PrimaryExpressionIdentifierReference struct {
 
 func (p *PrimaryExpressionIdentifierReference) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
-}
-
-// 13.1.3
-func (p *PrimaryExpressionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IResolveBinding{Name: p.Identifier, Strict: c.containedInStrictCode})
 }
 
 // Evaluation 13.1.3
@@ -186,10 +170,6 @@ func (p *PrimaryExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionLiteral) Bytecode(e *Executable, c *BytecodeContext) {
-	p.Literal.Bytecode(e, c)
-}
-
 // Evaluation Literal 13.2.3.1
 func (p *PrimaryExpressionLiteral) Evaluation(vm *VM2) Value {
 	return p.Literal.Evaluation(vm)
@@ -214,12 +194,6 @@ func (p *PrimaryExpressionAsyncFunctionExpression) AssignmentTargetType() Assign
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionAsyncFunctionExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
-	p.Body.Strict = strict
-	e.AddInstruction(&IInstantiateAsyncFunctionExpression{FunctionExpression: p})
-}
-
 func (p *PrimaryExpressionAsyncFunctionExpression) String() string {
 	return "AsyncFunctionExpression"
 }
@@ -242,12 +216,6 @@ var _ RuntimeSemanticsInstantiateGeneratorFunctionExpression = (*GeneratorExpres
 func (p *GeneratorExpression) _primaryExpression() {}
 func (p *GeneratorExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
-}
-
-func (p *GeneratorExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
-	p.Body.Strict = strict
-	e.AddInstruction(&IInstantiateGeneratorFunctionExpression{FunctionExpression: p})
 }
 
 func (p *GeneratorExpression) astHasIdentifierName() bool {
@@ -338,12 +306,6 @@ func (p *PrimaryExpressionAsyncGeneratorExpression) AssignmentTargetType() Assig
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionAsyncGeneratorExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
-	p.Body.Strict = strict
-	e.AddInstruction(&IInstantiateAsyncGeneratorFunctionExpression{FunctionExpression: p})
-}
-
 func (p *PrimaryExpressionAsyncGeneratorExpression) String() string {
 	return "AsyncGeneratorExpression"
 }
@@ -359,10 +321,6 @@ type PrimaryExpressionThis struct {
 func (p *PrimaryExpressionThis) _primaryExpression() {}
 func (p *PrimaryExpressionThis) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
-}
-
-func (p *PrimaryExpressionThis) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IResolveThisBinding{})
 }
 
 // Evaluation
@@ -394,10 +352,6 @@ func ParenthesizedExpressionAnalyze(p *PrimaryExpressionParenthesizedExpression,
 
 func (p *PrimaryExpressionParenthesizedExpression) AssignmentTargetType() AssignmentTargetType {
 	return p.Expression.AssignmentTargetType()
-}
-
-func (p *PrimaryExpressionParenthesizedExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	p.Expression.Bytecode(e, c)
 }
 
 func (p *PrimaryExpressionParenthesizedExpression) String() string {
@@ -483,36 +437,6 @@ type ArrayLiteral struct {
 	ElementList ElementList
 }
 
-func (p *ArrayLiteral) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IArrayCreate{})
-	e.AddInstruction(InsLoad)
-	for i, element := range p.ElementList {
-		switch element := element.(type) {
-		case *ArrayElementExpression:
-			element.Expression.Bytecode(e, c)
-			if ExpressionAnalyze(element.Expression, AnalyzeQueryIsReference) {
-				e.AddInstruction(InsGetValue)
-			}
-			e.AddInstruction(InsLoad)
-			e.AddInstruction(&IArraySetValue{Index: i})
-			e.AddInstruction(InsLoad)
-		case *ArrayElementElision:
-			e.AddInstruction(InsStore)
-			e.AddInstruction(&IArrayPushValue{})
-			e.AddInstruction(InsLoad)
-		case *ArrayElementSpread:
-			element.Spread.Bytecode(e, c)
-			if ExpressionAnalyze(element.Spread, AnalyzeQueryIsReference) {
-				e.AddInstruction(InsGetValue)
-			}
-			e.AddInstruction(InsLoad)
-			e.AddInstruction(&IArraySpread{})
-			e.AddInstruction(InsLoad)
-		}
-	}
-	e.AddInstruction(InsStore)
-}
-
 // TODO: Elision
 func (p *ArrayLiteral) astHasElision() bool {
 	return false
@@ -568,17 +492,6 @@ func (p *PrimaryExpressionObjectLiteral) AssignmentTargetType() AssignmentTarget
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionObjectLiteral) Bytecode(e *Executable, c *BytecodeContext) {
-	if len(p.PropertyList.Items) == 0 {
-		e.AddInstruction(&IObjectCreate{})
-		return
-	}
-
-	e.AddInstruction(&IObjectCreate{})
-
-	p.PropertyList.Bytecode(e, c)
-}
-
 func (p *PrimaryExpressionObjectLiteral) astIsEmpty() bool {
 	return len(p.PropertyList.Items) == 0
 }
@@ -615,13 +528,6 @@ var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionList)(n
 func (p *PropertyDefinitionList) PropertyDefinitionEvaluation(vm *VM2, obj ObjectType) {
 	for _, item := range p.Items {
 		item.PropertyDefinitionEvaluation(vm, obj)
-	}
-}
-
-func (p *PropertyDefinitionList) Bytecode(e *Executable, c *BytecodeContext) {
-	for _, item := range p.Items {
-		e.AddInstruction(InsLoad)
-		item.Bytecode(e, c)
 	}
 }
 
@@ -665,19 +571,6 @@ type PropertyDefinitionIdentifierReference struct {
 	IdentifierReference *PrimaryExpressionIdentifierReference
 }
 
-func (p *PropertyDefinitionIdentifierReference) Bytecode(e *Executable, c *BytecodeContext) {
-	propName := p.IdentifierReference.Identifier
-	e.AddInstruction(&ILoadConstant{
-		Value: NewStringValue(propName),
-	})
-
-	e.AddInstruction(InsGetValue)
-	e.AddInstruction(InsLoad)
-
-	e.AddInstruction(&IObjectSetProperty{})
-	e.AddInstruction(InsLoad)
-}
-
 func (p *PropertyDefinitionIdentifierReference) String() string {
 	return p.IdentifierReference.String()
 }
@@ -686,19 +579,6 @@ type PropertyDefinitionNameAndExpression struct {
 	PropertyDefinition
 	Name       PropertyName
 	Expression Expression
-}
-
-func (p *PropertyDefinitionNameAndExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	p.Name.Bytecode(e, c)
-	e.AddInstruction(InsLoad)
-
-	p.Expression.Bytecode(e, c)
-
-	if ExpressionAnalyze(p.Expression, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(&IObjectSetProperty{})
 }
 
 func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *VM2, object ObjectType) {
@@ -738,15 +618,6 @@ func (p *PropertyDefinitionNameAndExpression) String() string {
 type PropertyDefinitionSpread struct {
 	PropertyDefinition
 	Spread Expression
-}
-
-func (p *PropertyDefinitionSpread) Bytecode(e *Executable, c *BytecodeContext) {
-	p.Spread.Bytecode(e, c)
-	if ExpressionAnalyze(p.Spread, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(&IObjectSpreadValue{})
 }
 
 func (p *PropertyDefinitionSpread) String() string {
@@ -815,23 +686,6 @@ func (p *MethodDefinition) formalParameters() *FormalParameters {
 		return p.AsyncGeneratorExpression.FormalParameters
 	}
 	return nil
-}
-
-func (p *MethodDefinition) Bytecode(e *Executable, c *BytecodeContext) {
-	strict := c.containedInStrictCode
-	if p.FunctionExpression != nil {
-		strict = strict || p.FunctionExpression.Body.FunctionBodyContainsUseStrict()
-		p.FunctionExpression.Body.Strict = strict
-	}
-	p.PropertyName.Bytecode(e, c)
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(&IObjectDefineMethod{
-		FunctionExpression:       p.FunctionExpression,
-		MethodType:               p.Type,
-		GeneratorExpression:      p.GeneratorExpression,
-		AsyncFunctionExpression:  p.AsyncFunctionExpression,
-		AsyncGeneratorExpression: p.AsyncGeneratorExpression,
-	})
 }
 
 func (p *MethodDefinition) astIsClassElementName() bool {
@@ -960,10 +814,6 @@ func (p *PropertyNameLiteralIdentifier) String() string {
 	return string(p.Identifier)
 }
 
-func (p *PropertyNameLiteralIdentifier) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IStoreConstant{Value: NewStringValue(string(p.Identifier))})
-}
-
 func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM2) Value {
 	return NewStringValue(p.Identifier)
 }
@@ -977,10 +827,6 @@ func (p *PropertyNameLiteralString) LiteralString() string {
 	return p.StringLiteral.Value
 }
 
-func (p *PropertyNameLiteralString) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&ILoadConstant{Value: p.StringLiteral.StringValue()})
-}
-
 func (p *PropertyNameLiteralString) String() string {
 	return p.StringLiteral.String()
 }
@@ -988,10 +834,6 @@ func (p *PropertyNameLiteralString) String() string {
 type PropertyNameLiteralNumeric struct {
 	LiteralPropertyName
 	NumericLiteral *LiteralNumeric
-}
-
-func (p *PropertyNameLiteralNumeric) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&ILoadConstant{Value: NewStringValue(p.NumericLiteral.Value)})
 }
 
 func (p *PropertyNameLiteralNumeric) String() string {
@@ -1011,13 +853,6 @@ type ComputedPropertyName struct {
 
 func (p *ComputedPropertyName) String() string {
 	return p.Expression.String()
-}
-
-func (p *ComputedPropertyName) Bytecode(e *Executable, c *BytecodeContext) {
-	p.Expression.Bytecode(e, c)
-	if ExpressionAnalyze(p.Expression, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
 }
 
 // Evaluation
@@ -1045,10 +880,6 @@ var _ RuntimeSemanticsInstantiateOrdinaryFunctionExpression = (*FunctionExpressi
 
 func (p *FunctionExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
-}
-
-func (p *FunctionExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IInstantiateOrdinaryFunctionExpression{FunctionExpression: p})
 }
 
 func (p *FunctionExpression) astHasIdentifier() bool {
@@ -1144,12 +975,6 @@ func (p *AsyncArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *AsyncArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
-	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
-	p.Body.Strict = strict
-	e.AddInstruction(&IInstantiateAsyncArrowFunctionExpression{FunctionExpression: p})
-}
-
 func (p *AsyncArrowFunction) Evaluation(vm *VM2) Value {
 	return p.InstantiateAsyncArrowFunctionExpression(vm, NewStringPropertyKey("")).ToValue()
 }
@@ -1206,12 +1031,6 @@ var _ RuntimeSemanticsInstantiateArrowFunctionExpression = (*ArrowFunction)(nil)
 
 func (p *ArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
-}
-
-func (p *ArrowFunction) Bytecode(e *Executable, c *BytecodeContext) {
-	strict := c.containedInStrictCode || p.Body.FunctionBodyContainsUseStrict()
-	p.Body.Strict = strict
-	e.AddInstruction(&IInstantiateArrowFunctionExpression{FunctionExpression: p})
 }
 
 func (p *ArrowFunction) Evaluation(vm *VM2) Value {
@@ -1286,33 +1105,6 @@ func (m *MemberExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
 }
 
-func (m *MemberExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddDebug("MemberExpression: " + m.String())
-	m.Member.Bytecode(e, c)
-	if ExpressionAnalyze(m.Member, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsLoad)
-	strict := c.containedInStrictCode
-
-	switch prop := m.Property.(type) {
-	case *ASTPropertyExpression:
-		prop.Expression.Bytecode(e, c)
-		if ExpressionAnalyze(prop.Expression, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(InsLoad)
-		e.AddInstruction(&IEvaluatePropertyAccessWithExpressionKey{
-			Strict: strict,
-		})
-	case *ASTPropertyIdentifier:
-		e.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKey{
-			Strict: strict,
-			Name:   prop.Identifier,
-		})
-	}
-}
-
 // astIsMemberExpression check if Member is MemberExpression
 func (m *MemberExpression) astIsPropertyExpression() bool {
 	_, ok := m.Property.(*ASTPropertyExpression)
@@ -1350,7 +1142,6 @@ type Literal interface {
 	ASTNode
 	Analyze(a AnalyzeQuery) bool
 	// 13.2.3.1
-	// Bytecode
 }
 
 func LiteralAnalyze(l Literal, a AnalyzeQuery) bool {
@@ -1370,10 +1161,6 @@ type LiteralNull struct {
 
 var _ Literal = (*LiteralNull)(nil)
 
-func (l *LiteralNull) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IStoreConstant{Value: NullValue})
-}
-
 func (l *LiteralNull) Evaluation(vm *VM2) Value {
 	return NullValue
 }
@@ -1387,10 +1174,6 @@ type LiteralUndefined struct {
 }
 
 var _ Literal = (*LiteralUndefined)(nil)
-
-func (l *LiteralUndefined) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
-}
 
 // 13.2.3.1
 func (l *LiteralUndefined) Evaluation(vm *VM2) Value {
@@ -1407,10 +1190,6 @@ type LiteralBoolean struct {
 }
 
 var _ Literal = (*LiteralBoolean)(nil)
-
-func (l *LiteralBoolean) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IStoreConstant{Value: NewBooleanValue(l.Bool)})
-}
 
 func (l *LiteralBoolean) Evaluation(vm *VM2) Value {
 	return NewBooleanValue(l.Bool)
@@ -1471,14 +1250,6 @@ func (l *LiteralNumeric) NumericValue() (Value, error) {
 	return NewNumberValue(JSNumber(num)), nil
 }
 
-func (l *LiteralNumeric) Bytecode(e *Executable, c *BytecodeContext) {
-	v, err := l.NumericValue()
-	if err != nil {
-		panic(err)
-	}
-	e.AddInstruction(&IStoreConstant{Value: v})
-}
-
 func (l *LiteralNumeric) Evaluation(vm *VM2) Value {
 	v, err := l.NumericValue()
 	if err != nil {
@@ -1504,10 +1275,6 @@ var _ Literal = (*LiteralString)(nil)
 // 12.9.4.2: SV
 func (l *LiteralString) StringValue() Value {
 	return NewStringValue(l.Value)
-}
-
-func (l *LiteralString) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IStoreConstant{Value: l.StringValue()})
 }
 
 // 13.2.3.1
@@ -1574,15 +1341,6 @@ type ExpressionImportCall struct {
 	Expression Expression
 }
 
-func (i *ExpressionImportCall) Bytecode(e *Executable, c *BytecodeContext) {
-	i.Expression.Bytecode(e, c)
-	if ExpressionAnalyze(i.Expression, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(&IImportCall{})
-}
-
 func (i *ExpressionImportCall) String() string {
 	return "import(" + i.Expression.String() + ")"
 }
@@ -1615,73 +1373,6 @@ type OptionalExpression struct {
 
 func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
-}
-
-func (o *OptionalExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	o.Expr.Bytecode(e, c)
-	if o.Property.Arguments != nil {
-		e.AddInstruction(InsPushReference)
-	}
-	if ExpressionAnalyze(o.Expr, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsLoad)
-
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(&ILoadConstant{
-		Value: UndefinedValue,
-	})
-	e.AddInstruction(InsLooselyEqual)
-
-	jumpIfTrue := &IJumpIfTrue{}
-	e.AddInstruction(jumpIfTrue)
-
-	jumpIfTrue.Target = len(e.Instructions) - 1
-	e.AddInstruction(InsStore)
-	e.AddInstruction(&IStoreConstant{
-		Value: UndefinedValue,
-	})
-	endJump := &IJump{}
-
-	jumpIfTrue.TargetElse = len(e.Instructions) - 1
-	strict := c.containedInStrictCode
-
-	if o.Property.Arguments != nil {
-		e.AddInstruction(InsLoadThisValue)
-		for _, arg := range o.Property.Arguments {
-			arg.Bytecode(e, c)
-			if ExpressionAnalyze(arg, AnalyzeQueryIsReference) {
-				e.AddInstruction(InsGetValue)
-			}
-			e.AddInstruction(InsLoad)
-		}
-
-		e.AddInstructionDebug(&ICall{
-			ArgumentCount: len(o.Property.Arguments),
-			Strict:        strict,
-		}, "OptionalExpression "+o.String())
-	} else if o.Property.Expression != nil {
-		expr := o.Property.Expression
-		expr.Bytecode(e, c)
-		if ExpressionAnalyze(expr, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(InsLoad)
-		e.AddInstruction(&IEvaluatePropertyAccessWithExpressionKey{
-			Strict: strict,
-		})
-	} else if o.Property.Identifier != "" {
-		e.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKey{
-			Strict: strict,
-			Name:   o.Property.Identifier,
-		})
-	}
-
-	if o.Property.Arguments == nil {
-		e.AddInstruction(InsGetValue)
-	}
-
-	endJump.Target = len(e.Instructions) - 1
 }
 
 func (o *OptionalExpression) Evaluation(vm *VM2) Value {
@@ -1776,10 +1467,6 @@ func (m *MetaPropertyNewTarget) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (m *MetaPropertyNewTarget) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(InsGetNewTarget)
-}
-
 func (m *MetaPropertyNewTarget) String() string {
 	return "new.target"
 }
@@ -1790,10 +1477,6 @@ type MetaPropertyImportMeta struct {
 
 func (m *MetaPropertyImportMeta) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
-}
-
-func (m *MetaPropertyImportMeta) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&IGetOrCreateImportMeta{})
 }
 
 func (m *MetaPropertyImportMeta) String() string {
@@ -1818,20 +1501,6 @@ func (s *SuperPropertyExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
 }
 
-func (s *SuperPropertyExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(InsLoadThisValueSuper)
-	s.Expression.Bytecode(e, c)
-	if ExpressionAnalyze(s.Expression, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsLoad)
-
-	strict := c.containedInStrictCode
-	e.AddInstruction(&IMakeSuperPropertyReference{
-		Strict: strict,
-	})
-}
-
 func (s *SuperPropertyExpression) String() string {
 	return "super." + s.Expression.String()
 }
@@ -1844,17 +1513,6 @@ type SuperPropertyIdentifier struct {
 func (s *SuperPropertyIdentifier) _superProperty() {}
 func (s *SuperPropertyIdentifier) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
-}
-
-func (s *SuperPropertyIdentifier) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(InsLoadThisValueSuper)
-	e.AddInstruction(&ILoadConstant{
-		Value: NewStringValue(string(s.IdentifierName)),
-	})
-	strict := c.containedInStrictCode
-	e.AddInstruction(&IMakeSuperPropertyReference{
-		Strict: strict,
-	})
 }
 
 func (s *SuperPropertyIdentifier) String() string {
@@ -1893,13 +1551,6 @@ func (e *ExpressionSuperCall) Evaluation(vm *VM2) Value {
 	return result.ToValue()
 }
 
-func (e *ExpressionSuperCall) Bytecode(ex *Executable, c *BytecodeContext) {
-	e.Arguments.Bytecode(ex, c)
-	ex.AddInstruction(&IEvaluateSuperCall{
-		ArgumentCount: len(e.Arguments),
-	})
-}
-
 func (e *ExpressionSuperCall) String() string {
 	return "super(" + e.Arguments.String() + ")"
 }
@@ -1913,10 +1564,6 @@ type ExpressionPrimary struct {
 
 func (e *ExpressionPrimary) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
-}
-
-func (e *ExpressionPrimary) Bytecode(ex *Executable, c *BytecodeContext) {
-	e.PrimaryExpression.Bytecode(ex, c)
 }
 
 func (e *ExpressionPrimary) String() string {
@@ -1954,45 +1601,6 @@ type PrimaryExpressionTemplateLiteral struct {
 	PrimaryExpression
 	TemplateLiteral *TemplateLiteral
 	SourceText      string
-}
-
-// 13.2.8.6
-func (t *PrimaryExpressionTemplateLiteral) Bytecode(e *Executable, c *BytecodeContext) {
-	hasHead := t.TemplateLiteral.TemplateHead != nil
-	if hasHead {
-		e.AddInstruction(&ILoadConstant{
-			Value: t.TemplateLiteral.TemplateHead.TV().ToValue(),
-		})
-	} else {
-		// NoSubstitutionTemplate
-		span := t.TemplateLiteral.Spans[0]
-		e.AddInstruction(&IStoreConstant{
-			Value: span.TV().ToValue(),
-		})
-		return
-	}
-	for i, span := range t.TemplateLiteral.Spans {
-		// --- Expression
-		if span.Expression != nil {
-			span.Expression.Bytecode(e, c)
-			if ExpressionAnalyze(span.Expression, AnalyzeQueryIsReference) {
-				e.AddInstruction(InsGetValue)
-			}
-			// TODO: to string
-			e.AddInstruction(InsLoad)
-			e.AddInstruction(&IApplyStringOrNumericBinaryOperator{Operator: BinaryOperatorAddition})
-			e.AddInstruction(InsLoad)
-		}
-
-		// --- Text
-		e.AddInstruction(&ILoadConstant{
-			Value: span.TV().ToValue(),
-		})
-		e.AddInstruction(&IApplyStringOrNumericBinaryOperator{Operator: BinaryOperatorAddition})
-		if i < len(t.TemplateLiteral.Spans)-1 {
-			e.AddInstruction(InsLoad)
-		}
-	}
 }
 
 func (t *PrimaryExpressionTemplateLiteral) astNoSubstitution() bool {
@@ -2102,35 +1710,6 @@ type UpdateExpression struct {
 
 func (e *UpdateExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
-}
-
-func (e *UpdateExpression) Bytecode(ex *Executable, c *BytecodeContext) {
-	e.Operand.Bytecode(ex, c)
-	ex.AddInstruction(InsPushReference)
-	if ExpressionAnalyze(e.Operand, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-	ex.AddInstruction(InsToNumber)
-	if e.Type == UpdateExpressionTypePrefix {
-		if e.Operator == UpdateOperatorIncrement {
-			ex.AddInstruction(&IIncrement{})
-		} else {
-			ex.AddInstruction(&IDecrement{})
-		}
-
-		ex.AddInstruction(InsPutValue)
-		ex.AddInstruction(InsPopReference)
-	} else {
-		ex.AddInstruction(InsLoad)
-		if e.Operator == UpdateOperatorIncrement {
-			ex.AddInstruction(&IIncrement{})
-		} else {
-			ex.AddInstruction(&IDecrement{})
-		}
-		ex.AddInstruction(InsPutValue)
-		ex.AddInstruction(InsPopReference)
-		ex.AddInstruction(InsStore)
-	}
 }
 
 func (e *UpdateExpression) isPrefix() bool {
@@ -2319,146 +1898,6 @@ func (e *AssignmentExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (e *AssignmentExpression) Bytecode(ex *Executable, c *BytecodeContext) {
-	if e.Operator == AssignmentOperatorAssign {
-		e.Left.Bytecode(ex, c)
-		ex.AddInstruction(&IPushReference{})
-
-		e.Right.Bytecode(ex, c)
-		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-
-		ex.AddInstruction(&IPutValue{})
-		ex.AddInstruction(&IPopReference{})
-	} else if e.Operator != AssignmentOperatorAnd &&
-		e.Operator != AssignmentOperatorOr &&
-		e.Operator != AssignmentOperatorNullishCoalescing {
-		e.Left.Bytecode(ex, c)
-		ex.AddInstruction(&IPushReference{})
-
-		if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-		ex.AddInstruction(InsLoad)
-
-		e.Right.Bytecode(ex, c)
-
-		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-		ex.AddInstruction(InsLoad)
-
-		operatorMap := map[AssignmentOperator]BinaryOperator{
-			AssignmentOperatorAddition:           BinaryOperatorAddition,
-			AssignmentOperatorSubtraction:        BinaryOperatorSubtraction,
-			AssignmentOperatorMultiplication:     BinaryOperatorMultiplication,
-			AssignmentOperatorDivision:           BinaryOperatorDivision,
-			AssignmentOperatorRemainder:          BinaryOperatorRemainder,
-			AssignmentOperatorLeftShift:          BinaryOperatorLeftShift,
-			AssignmentOperatorRightShift:         BinaryOperatorRightShift,
-			AssignmentOperatorUnsignedRightShift: BinaryOperatorUnsignedRightShift,
-			AssignmentOperatorBitwiseAnd:         BinaryOperatorBitwiseAnd,
-			AssignmentOperatorBitwiseXor:         BinaryOperatorBitwiseXor,
-			AssignmentOperatorBitwiseOr:          BinaryOperatorBitwiseOr,
-			AssignmentOperatorExponentiation:     BinaryOperatorExponentiation,
-		}
-		op := operatorMap[e.Operator]
-		ex.AddInstruction(&IApplyStringOrNumericBinaryOperator{
-			Operator: op,
-		})
-
-		ex.AddInstruction(InsPutValue)
-		ex.AddInstruction(InsPopReference)
-	} else if e.Operator == AssignmentOperatorAnd {
-		e.Left.Bytecode(ex, c)
-		ex.AddInstruction(InsPushReference)
-
-		if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-		ex.AddInstruction(InsLoad)
-
-		jumpIfTrue := &IJumpIfTrue{}
-		ex.AddInstruction(jumpIfTrue)
-
-		jumpIfTrue.Target = len(ex.Instructions) - 1
-
-		e.Right.Bytecode(ex, c)
-		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-
-		ex.AddInstruction(InsPutValue)
-
-		endJump := &IJump{}
-		ex.AddInstruction(endJump)
-
-		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
-		ex.AddInstruction(InsStore)
-
-		endJump.Target = len(ex.Instructions) - 1
-		ex.AddInstruction(InsPopReference)
-	} else if e.Operator == AssignmentOperatorOr {
-		e.Left.Bytecode(ex, c)
-		ex.AddInstruction(InsPushReference)
-
-		if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-
-		jumpIfTrue := &IJumpIfTrue{}
-		ex.AddInstruction(jumpIfTrue)
-
-		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
-
-		e.Right.Bytecode(ex, c)
-		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-
-		ex.AddInstruction(InsPutValue)
-
-		jumpIfTrue.Target = len(ex.Instructions) - 1
-
-		ex.AddInstruction(InsPopReference)
-	} else if e.Operator == AssignmentOperatorNullishCoalescing {
-		e.Left.Bytecode(ex, c)
-		ex.AddInstruction(InsPushReference)
-
-		if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-		ex.AddInstruction(InsLoad)
-
-		ex.AddInstruction(InsLoad)
-		ex.AddInstruction(&ILoadConstant{
-			Value: UndefinedValue,
-		})
-		ex.AddInstruction(InsLooselyEqual)
-
-		jumpIfTrue := &IJumpIfTrue{}
-		ex.AddInstruction(jumpIfTrue)
-
-		jumpIfTrue.Target = len(ex.Instructions) - 1
-
-		e.Right.Bytecode(ex, c)
-		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-
-		ex.AddInstruction(InsPutValue)
-		endJump := &IJump{}
-		ex.AddInstruction(endJump)
-
-		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
-		ex.AddInstruction(InsStore)
-
-		endJump.Target = len(ex.Instructions) - 1
-		ex.AddInstruction(InsPopReference)
-	}
-}
-
 func (e *AssignmentExpression) astIsAssign() bool {
 	return e.Operator == AssignmentOperatorAssign
 }
@@ -2498,7 +1937,7 @@ func (e *AssignmentExpression) Evaluation(vm *VM2) Value {
 		lval := lref.GetValue(vm.agent)
 		rref := e.Right.Evaluation(vm)
 		rval := rref.GetValue(vm.agent)
-		r := ApplyStringOrNumericBinaryOperator(vm.agent, lval, rval, e.Operator.ToBinaryOperator())
+		r := vm.ApplyStringOrNumericBinaryOperator(lval, rval, e.Operator.ToBinaryOperator())
 
 		if ref, ok := lref.ReferenceRecord(); ok {
 			ref.PutValue(vm.agent, r)
@@ -2526,23 +1965,6 @@ type NewExpression struct {
 
 func (e *NewExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
-}
-
-func (e *NewExpression) Bytecode(ex *Executable, c *BytecodeContext) {
-	e.Callee.Bytecode(ex, c)
-	if ExpressionAnalyze(e.Callee, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-	ex.AddInstruction(InsLoad)
-
-	for _, arg := range e.Arguments {
-		arg.Bytecode(ex, c)
-		if ExpressionAnalyze(arg, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-		ex.AddInstruction(InsLoad)
-	}
-	ex.AddInstruction(&INew{ArgumentCount: len(e.Arguments)})
 }
 
 // 13.3.5.1
@@ -2654,24 +2076,6 @@ func (b *ExpressionBinaryExpression) AssignmentTargetType() AssignmentTargetType
 	return AssignmentTargetTypeInvalid
 }
 
-func (b *ExpressionBinaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	b.Left.Bytecode(e, c)
-	if ExpressionAnalyze(b.Left, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsLoad)
-
-	b.Right.Bytecode(e, c)
-	if ExpressionAnalyze(b.Right, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsLoad)
-
-	e.AddInstruction(&IApplyStringOrNumericBinaryOperator{
-		Operator: b.Operator,
-	})
-}
-
 // 13.15.4
 func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM2) Value {
 	lref := b.Left.Evaluation(vm)
@@ -2697,15 +2101,6 @@ type ExpressionSequenceExpression struct {
 	Expressions []Expression
 }
 
-func (e *ExpressionSequenceExpression) Bytecode(ex *Executable, c *BytecodeContext) {
-	for _, expr := range e.Expressions {
-		expr.Bytecode(ex, c)
-		if ExpressionAnalyze(expr, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-	}
-}
-
 func (e *ExpressionSequenceExpression) String() string {
 	var sb string
 	for i, expr := range e.Expressions {
@@ -2729,34 +2124,6 @@ type ConditionalExpression struct {
 	Test       Expression
 	Consequent Expression
 	Alternate  Expression
-}
-
-func (e *ConditionalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
-	e.Test.Bytecode(ex, c)
-	if ExpressionAnalyze(e.Test, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
-	ex.AddInstruction(jumpIfTrue)
-
-	jumpIfTrue.Target = len(ex.Instructions) - 1
-	e.Consequent.Bytecode(ex, c)
-
-	if ExpressionAnalyze(e.Consequent, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-
-	jump := &IJump{Target: 0}
-	ex.AddInstruction(jump)
-
-	jumpIfTrue.TargetElse = len(ex.Instructions) - 1
-	e.Alternate.Bytecode(ex, c)
-
-	if ExpressionAnalyze(e.Alternate, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-
-	jump.Target = len(ex.Instructions) - 1
 }
 
 // Evaluation
@@ -2831,66 +2198,6 @@ type ExpressionLogicalExpression struct {
 	Left     Expression
 	Operator LogicalOperator
 	Right    Expression
-}
-
-func (e *ExpressionLogicalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
-	e.Left.Bytecode(ex, c)
-	if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-
-	switch e.Operator {
-	case LogicalOperatorAnd:
-		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
-		ex.AddInstruction(jumpIfTrue)
-
-		jumpIfTrue.Target = len(ex.Instructions) - 1
-		e.Right.Bytecode(ex, c)
-
-		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-
-		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
-	case LogicalOperatorOr:
-		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
-		ex.AddInstruction(jumpIfTrue)
-
-		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
-		e.Right.Bytecode(ex, c)
-		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-
-		jumpIfTrue.Target = len(ex.Instructions) - 1
-	case LogicalOperatorNullishCoalescing:
-		ex.AddInstruction(InsLoad)
-
-		ex.AddInstruction(InsLoad)
-		ex.AddInstruction(&ILoadConstant{
-			Value: UndefinedValue,
-		})
-		ex.AddInstruction(InsLooselyEqual)
-
-		jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
-		ex.AddInstruction(jumpIfTrue)
-
-		jumpIfTrue.Target = len(ex.Instructions) - 1
-		ex.AddInstruction(InsStore)
-
-		e.Right.Bytecode(ex, c)
-		if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-			ex.AddInstruction(InsGetValue)
-		}
-
-		jump := &IJump{Target: 0}
-		ex.AddInstruction(jump)
-
-		jumpIfTrue.TargetElse = len(ex.Instructions) - 1
-		ex.AddInstruction(InsStore)
-
-		jump.Target = len(ex.Instructions) - 1
-	}
 }
 
 func (e *ExpressionLogicalExpression) astIsOr() bool {
@@ -2993,34 +2300,6 @@ type EqualityExpression struct {
 	Right Expression
 }
 
-func (e *EqualityExpression) Bytecode(ex *Executable, c *BytecodeContext) {
-	ex.AddDebug("Equality: " + e.String())
-	e.Left.Bytecode(ex, c)
-	if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-	ex.AddInstruction(InsLoad)
-
-	e.Right.Bytecode(ex, c)
-	if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-	ex.AddInstruction(InsLoad)
-
-	switch e.Operator {
-	case EqualityOperatorEqual:
-		ex.AddInstruction(InsLooselyEqual)
-	case EqualityOperatorNotEqual:
-		ex.AddInstruction(InsLooselyEqual)
-		ex.AddInstruction(InsLogicalNot)
-	case EqualityOperatorStrictEqual:
-		ex.AddInstruction(InsStrictlyEqual)
-	case EqualityOperatorStrictNotEqual:
-		ex.AddInstruction(InsStrictlyEqual)
-		ex.AddInstruction(InsLogicalNot)
-	}
-}
-
 // 13.11.1
 func (e *EqualityExpression) Evaluation(vm *VM2) Value {
 	lref := e.Left.Evaluation(vm)
@@ -3103,35 +2382,6 @@ type RelationalExpression struct {
 	Right    Expression
 }
 
-func (e *RelationalExpression) Bytecode(ex *Executable, c *BytecodeContext) {
-	e.Left.Bytecode(ex, c)
-	if ExpressionAnalyze(e.Left, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-	ex.AddInstruction(InsLoad)
-
-	e.Right.Bytecode(ex, c)
-	if ExpressionAnalyze(e.Right, AnalyzeQueryIsReference) {
-		ex.AddInstruction(InsGetValue)
-	}
-	ex.AddInstruction(InsLoad)
-
-	switch e.Operator {
-	case RelationalOperatorLessThan:
-		ex.AddInstruction(InsLessThan)
-	case RelationalOperatorGreaterThan:
-		ex.AddInstruction(InsGreaterThan)
-	case RelationalOperatorLessThanOrEqual:
-		ex.AddInstruction(InsLessThanEquals)
-	case RelationalOperatorGreaterThanOrEqual:
-		ex.AddInstruction(InsGreaterThanEquals)
-	case RelationalOperatorInstanceof:
-		ex.AddInstruction(InsInstanceOf)
-	case RelationalOperatorIn:
-		ex.AddInstruction(InsHasProperty)
-	}
-}
-
 // Evaluation
 // spec: 13.10.1
 func (e *RelationalExpression) Evaluation(vm *VM2) Value {
@@ -3159,7 +2409,7 @@ func (e *RelationalExpression) Evaluation(vm *VM2) Value {
 		}
 		return NewBooleanValue(!IsLessThan(vm.agent, rval, lval, order))
 	case RelationalOperatorInstanceof:
-		return NewBooleanValue(InstanceOfOperator(vm.agent, lval, rval))
+		return NewBooleanValue(vm.InstanceOfOperator(lval, rval))
 	case RelationalOperatorIn:
 		panic("unimplemented")
 	}
@@ -3218,66 +2468,6 @@ type UnaryExpression struct {
 	Expression
 	Operator UnaryOperator
 	Operand  Expression
-}
-
-func (u *UnaryExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	switch u.Operator {
-	case UnaryOperatorDelete:
-		u.Operand.Bytecode(e, c)
-		if !ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
-			e.AddInstruction(&IStoreConstant{
-				Value: TrueValue,
-			})
-		} else {
-			e.AddInstruction(&IDelete{})
-		}
-	case UnaryOperatorVoid:
-		u.Operand.Bytecode(e, c)
-		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(&IStoreConstant{
-			Value: UndefinedValue,
-		})
-	case UnaryOperatorTypeof:
-		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsIdentifierReference) {
-			identifier := u.Operand.(*PrimaryExpressionIdentifierReference).Identifier
-			e.AddInstruction(&ITypeOfIdentifier{
-				IdentifierName: string(identifier),
-			})
-		} else {
-			u.Operand.Bytecode(e, c)
-			if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
-				e.AddInstruction(InsGetValue)
-			}
-			e.AddInstruction(InsTypeof)
-		}
-	case UnaryOperatorAddition:
-		u.Operand.Bytecode(e, c)
-		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(InsToNumber)
-	case UnaryOperatorSubtraction:
-		u.Operand.Bytecode(e, c)
-		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(InsToNumeric)
-		e.AddInstruction(InsUnaryMinus)
-	case UnaryOperatorLogicalNot:
-		u.Operand.Bytecode(e, c)
-		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(&ILogicalNot{})
-	case UnaryOperatorBitwiseNot:
-		u.Operand.Bytecode(e, c)
-		if ExpressionAnalyze(u.Operand, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(&IBitwiseNot{})
-	}
 }
 
 func (u *UnaryExpression) astIsAdd() bool {
@@ -3477,18 +2667,6 @@ func (a Arguments) String() string {
 	return sb
 }
 
-// 13.3.8.1 ArgumentListEvaluation
-func (a Arguments) Bytecode(e *Executable, c *BytecodeContext) {
-	for _, arg := range a {
-		arg.Bytecode(e, c)
-		if ExpressionAnalyze(arg, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(InsLoad)
-		// TODO: Spread
-	}
-}
-
 // TODO(WIP): Spread, Template
 // Evaluation 13.3.8.1
 // ArgumentListEvaluation
@@ -3539,32 +2717,6 @@ func (c *CallExpression) astIsCover() bool {
 // astIsFunctionCall matches CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
 func (c *CallExpression) astIsFunctionCall() bool {
 	return true
-}
-
-// 13.3.6.1
-func (c *CallExpression) Bytecode(e *Executable, bc *BytecodeContext) {
-	c.Callee.Bytecode(e, bc)
-
-	e.AddInstruction(&IPushReference{})
-	if ExpressionAnalyze(c.Callee, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(InsLoadThisValue)
-	c.Arguments.Bytecode(e, bc)
-
-	strict := bc.containedInStrictCode
-
-	e.AddInstructionDebug(
-		&ICall{
-			ArgumentCount: len(c.Arguments),
-			Strict:        strict,
-		},
-		"CallExpression: "+c.String(),
-	)
-
-	e.AddInstruction(&IPopReference{})
 }
 
 // TODO(SM): WIP
@@ -3649,10 +2801,6 @@ func (s *StatementDefaultImpl) VarDeclaredNames() (l []IdentifierName) {
 	return
 }
 
-func (s *StatementDefaultImpl) Bytecode(e *Executable, c *BytecodeContext) {
-	panic("should implement")
-}
-
 func (s *StatementDefaultImpl) String() string {
 	panic("should implement")
 }
@@ -3688,10 +2836,6 @@ func (s *StatementVariable) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return s.DeclarationList.VarScopedDeclarations()
 }
 
-func (s *StatementVariable) Bytecode(e *Executable, c *BytecodeContext) {
-	s.DeclarationList.Bytecode(e, c)
-}
-
 func (s *StatementVariable) Evaluation(vm *VM2) Value {
 	return s.DeclarationList.Evaluation(vm)
 }
@@ -3710,12 +2854,6 @@ type VariableDeclarationList struct {
 
 func (v *VariableDeclarationList) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return v.Items
-}
-
-func (v *VariableDeclarationList) Bytecode(e *Executable, c *BytecodeContext) {
-	for _, item := range v.Items {
-		item.Bytecode(e, c)
-	}
 }
 
 func (v *VariableDeclarationList) Evaluation(vm *VM2) Value {
@@ -3746,29 +2884,6 @@ type VariableDeclaration struct {
 	ASTNode
 	BindingIdentifier IdentifierName
 	Initializer       Expression
-}
-
-func (v *VariableDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	if v.Initializer == nil {
-		return
-	}
-
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(&IResolveBinding{
-		Name: v.BindingIdentifier,
-	})
-	_ = c.containedInStrictCode
-	e.AddInstruction(InsPushReference)
-
-	v.Initializer.Bytecode(e, c)
-
-	if ExpressionAnalyze(v.Initializer, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsPutValue)
-	e.AddInstruction(InsPopReference)
-
-	e.AddInstruction(InsStore)
 }
 
 // VariableDeclaration : BindingIdentifier Initializer
@@ -3821,9 +2936,6 @@ func (s *StatementBlock) VarDeclaredNames() (l []IdentifierName) {
 	return s.BlockStatement.VarDeclaredNames()
 }
 func (s *StatementBlock) _statement() {}
-func (s *StatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
-	s.BlockStatement.Bytecode(e, c)
-}
 
 func (s *StatementBlock) String() string {
 	return s.BlockStatement.String()
@@ -3841,10 +2953,6 @@ var _ Statement = (*StatementEmpty)(nil)
 
 func (s *StatementEmpty) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return l
-}
-
-func (s *StatementEmpty) Bytecode(e *Executable, c *BytecodeContext) {
-	// empty
 }
 
 func (s *StatementEmpty) String() string {
@@ -3882,86 +2990,6 @@ func (t *StatementTry) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return
 }
 
-func (t *StatementTry) Bytecode(e *Executable, c *BytecodeContext) {
-	if t.FinallyBlock == nil {
-		e.AddDebug("Try Catch Start: " + t.String())
-		exceptionJumpToCatch := &IPushExceptionJumpTarget{}
-		e.AddInstruction(exceptionJumpToCatch)
-
-		e.AddInstruction(&IStoreConstant{
-			Value: UndefinedValue,
-		})
-		t.TryBlock.Bytecode(e, c)
-		exceptionJumpToEnd := &IJump{}
-		e.AddInstruction(exceptionJumpToEnd)
-
-		exceptionJumpToCatch.Target = len(e.Instructions) - 1
-		e.AddInstruction(&IPopExceptionJumpTarget{})
-		if t.CatchParameter != "" {
-			e.AddInstruction(&ICreateCatchBinding{
-				IdentifierName: t.CatchParameter.ToIdentifier(),
-			})
-		}
-		e.AddInstruction(&IStoreConstant{
-			Value: UndefinedValue,
-		})
-		e.AddDebug("Catch block start")
-		t.CatchBlock.Bytecode(e, c)
-
-		exceptionJumpToEnd.Target = len(e.Instructions) - 1
-		e.AddDebug("Try Catch end")
-	} else if t.CatchBlock == nil {
-		exceptionJumpToFinally := &IPushExceptionJumpTarget{}
-		e.AddInstruction(exceptionJumpToFinally)
-
-		e.AddInstruction(&IStoreConstant{
-			Value: UndefinedValue,
-		})
-		t.TryBlock.Bytecode(e, c)
-
-		exceptionJumpToFinally.Target = len(e.Instructions) - 1
-		e.AddInstruction(&IPopExceptionJumpTarget{})
-		e.AddInstruction(&IStoreConstant{
-			Value: UndefinedValue,
-		})
-		t.FinallyBlock.Bytecode(e, c)
-		e.AddInstruction(&IRethrowExceptionIfAny{})
-	} else {
-		exceptionJumpToCatch := &IPushExceptionJumpTarget{}
-		e.AddInstruction(exceptionJumpToCatch)
-
-		e.AddInstruction(&IStoreConstant{
-			Value: UndefinedValue,
-		})
-		t.TryBlock.Bytecode(e, c)
-		jumpToFinally := &IJump{}
-		e.AddInstruction(jumpToFinally)
-
-		exceptionJumpToCatch.Target = len(e.Instructions) - 1
-		e.AddInstruction(&IPopExceptionJumpTarget{})
-		exceptionJumpToFinally := &IPushExceptionJumpTarget{}
-		e.AddInstruction(exceptionJumpToFinally)
-		if t.CatchParameter != "" {
-			e.AddInstruction(&ICreateCatchBinding{
-				IdentifierName: t.CatchParameter.ToIdentifier(),
-			})
-		}
-		e.AddInstruction(&IStoreConstant{
-			Value: UndefinedValue,
-		})
-		t.CatchBlock.Bytecode(e, c)
-
-		jumpToFinally.Target = len(e.Instructions) - 1
-		exceptionJumpToFinally.Target = len(e.Instructions) - 1
-		e.AddInstruction(&IPopExceptionJumpTarget{})
-		e.AddInstruction(&IStoreConstant{
-			Value: UndefinedValue,
-		})
-		t.FinallyBlock.Bytecode(e, c)
-		e.AddInstruction(&IRethrowExceptionIfAny{})
-	}
-}
-
 func (t *StatementTry) String() string {
 	sb := "try " + t.TryBlock.String()
 	if t.CatchBlock != nil {
@@ -3981,10 +3009,6 @@ type StatementDebugger struct {
 
 var _ Statement = (*StatementDebugger)(nil)
 
-func (s *StatementDebugger) Bytecode(e *Executable, c *BytecodeContext) {
-	// TODO: implement
-}
-
 func (s *StatementDebugger) String() string {
 	return "debugger"
 }
@@ -4000,13 +3024,6 @@ var _ Statement = (*StatementExpression)(nil)
 
 func (s *StatementExpression) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return
-}
-
-func (s *StatementExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	s.Expression.Bytecode(e, c)
-	if ExpressionAnalyze(s.Expression, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
 }
 
 func (s *StatementExpression) Evaluation(vm *VM2) Value {
@@ -4029,10 +3046,6 @@ func (b *BreakableStatement) VarScopedDeclarations() (l []*VariableDeclaration) 
 	return b.IterationStatement.VarScopedDeclarations()
 }
 
-func (b *BreakableStatement) Bytecode(e *Executable, c *BytecodeContext) {
-	b.IterationStatement.Bytecode(e, c)
-}
-
 func (b *BreakableStatement) Evaluation(vm *VM2) Value {
 	return b.IterationStatement.Evaluation(vm)
 }
@@ -4046,14 +3059,6 @@ func (b *BreakableStatement) String() string {
 type StatementThrow struct {
 	*StatementDefaultImpl
 	Expression Expression
-}
-
-func (s *StatementThrow) Bytecode(e *Executable, c *BytecodeContext) {
-	s.Expression.Bytecode(e, c)
-	if ExpressionAnalyze(s.Expression, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	e.AddInstruction(InsThrow)
 }
 
 func (s *StatementThrow) String() string {
@@ -4116,15 +3121,6 @@ func (f *FunctionBody) VarDeclaredNames() (l []IdentifierName) {
 
 func (f *FunctionBody) LexicallyDeclaredNames() (l []IdentifierName) {
 	return f.StatementList.TopLevelLexicallyDeclaredNames()
-}
-
-func (f *FunctionBody) Bytecode(e *Executable, c *BytecodeContext) {
-	strictBefore := c.containedInStrictCode
-	c.containedInStrictCode = c.containedInStrictCode || f.FunctionBodyContainsUseStrict()
-	defer func() {
-		c.containedInStrictCode = strictBefore
-	}()
-	f.StatementList.Bytecode(e, c)
 }
 
 // TODO(spec)
@@ -4481,32 +3477,6 @@ func (s *IfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return
 }
 
-// 14.6.2
-func (s *IfStatement) Bytecode(e *Executable, c *BytecodeContext) {
-	s.Condition.Bytecode(e, c)
-
-	if ExpressionAnalyze(s.Condition, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
-	e.AddInstruction(jumpIfTrue)
-
-	jumpIfTrue.Target = len(e.Instructions) - 1
-	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
-	s.Consequent.Bytecode(e, c)
-	endJump := &IJump{Target: 0}
-	e.AddInstruction(endJump)
-
-	// else
-	jumpIfTrue.TargetElse = len(e.Instructions) - 1
-	e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
-
-	if s.Alternate != nil {
-		s.Alternate.Bytecode(e, c)
-	}
-	endJump.Target = len(e.Instructions) - 1
-}
-
 func (s *IfStatement) astHasElse() bool {
 	return s.Alternate != nil
 }
@@ -4573,39 +3543,6 @@ func (s *WhileStatement) VarScopedDeclarations() []*VariableDeclaration {
 	return s.Body.VarScopedDeclarations()
 }
 
-func (s *WhileStatement) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
-
-	conditionIndex := len(e.Instructions) - 1
-	s.Condition.Bytecode(e, c)
-	if ExpressionAnalyze(s.Condition, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-
-	jumpIfTrue := &IJumpIfTrue{Target: 0, TargetElse: 0}
-	e.AddInstruction(jumpIfTrue)
-
-	jumpIfTrue.Target = len(e.Instructions) - 1
-	e.AddInstruction(InsStore)
-	s.Body.Bytecode(e, c)
-	bodyEndIndex := len(e.Instructions) - 1
-	e.AddInstruction(InsLoad)
-
-	e.AddInstruction(&IJump{Target: conditionIndex})
-
-	jumpIfTrue.TargetElse = len(e.Instructions) - 1
-	e.AddInstruction(InsStore)
-
-	for _, index := range c.continueJumpIndices.Data() {
-		index.Target = bodyEndIndex
-	}
-	c.continueJumpIndices.Clear()
-	for _, index := range c.breakJumpIndices.Data() {
-		index.Target = len(e.Instructions) - 1
-	}
-	c.breakJumpIndices.Clear()
-}
-
 func (s *WhileStatement) Evaluation(vm *VM2) Value {
 	// TODO
 	var labelSet []string
@@ -4656,40 +3593,6 @@ type StatementDoWhile struct {
 
 func (s *StatementDoWhile) VarScopedDeclarations() []*VariableDeclaration {
 	return s.Body.VarScopedDeclarations()
-}
-
-func (s *StatementDoWhile) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
-
-	bodyStartIndex := len(e.Instructions) - 1
-
-	e.AddInstruction(InsStore)
-	s.Body.Bytecode(e, c)
-	bodyEndIndex := len(e.Instructions) - 1
-	e.AddInstruction(InsLoad)
-
-	s.Condition.Bytecode(e, c)
-	if ExpressionAnalyze(s.Condition, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-
-	e.AddInstruction(InsLoad)
-	jumpIfTrue := &IJumpIfTrue{Target: bodyStartIndex, TargetElse: 0}
-	jumpIfTrue.TargetElse = len(e.Instructions) - 1
-
-	e.AddInstruction(InsStore)
-
-	for _, index := range c.continueJumpIndices.Data() {
-		index.Target = bodyEndIndex
-	}
-	c.continueJumpIndices.Clear()
-	if c.Label != "" {
-		// TODO: Label Jump
-	}
-	for _, index := range c.breakJumpIndices.Data() {
-		index.Target = len(e.Instructions) - 1
-	}
-	c.breakJumpIndices.Clear()
 }
 
 func (s *StatementDoWhile) String() string {
@@ -4756,66 +3659,6 @@ func (s *ForStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	}
 	l = append(l, s.Body.VarScopedDeclarations()...)
 	return
-}
-
-func (s *ForStatement) Bytecode(e *Executable, c *BytecodeContext) {
-	if s.Initializer != nil {
-		switch initializer := s.Initializer.(type) {
-		case *ForStatementInitializerExpression:
-			initializer.Expression.Bytecode(e, c)
-			if ExpressionAnalyze(initializer.Expression, AnalyzeQueryIsReference) {
-				e.AddInstruction(InsGetValue)
-			}
-		case *ForStatementInitializerVariable:
-			initializer.VariableStatement.Bytecode(e, c)
-		case *ForStatementInitializerLexicalDeclaration:
-			initializer.LexicalDeclaration.Bytecode(e, c)
-		}
-	}
-
-	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
-
-	conditionIndex := len(e.Instructions) - 1
-	var endJump *IJumpIfTrue
-	if s.Condition != nil {
-		s.Condition.Bytecode(e, c)
-		if ExpressionAnalyze(s.Condition, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-
-		jumpIfTrue := &IJumpIfTrue{}
-		e.AddInstruction(jumpIfTrue)
-		jumpIfTrue.Target = len(e.Instructions) - 1
-		jumpIfTrue.TargetElse = len(e.Instructions) - 1
-		endJump = jumpIfTrue
-	}
-
-	e.AddInstruction(InsStore)
-	s.Body.Bytecode(e, c)
-	bodyEndIndex := len(e.Instructions) - 1
-	e.AddInstruction(&ILoad{})
-
-	if s.Increment != nil {
-		s.Increment.Bytecode(e, c)
-		if ExpressionAnalyze(s.Increment, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-	}
-
-	e.AddInstruction(&IJump{Target: conditionIndex})
-	if endJump != nil {
-		endJump.TargetElse = len(e.Instructions) - 1
-	}
-	e.AddInstruction(InsStore)
-
-	for _, index := range c.continueJumpIndices.Data() {
-		index.Target = bodyEndIndex
-	}
-	c.continueJumpIndices.Clear()
-	for _, index := range c.breakJumpIndices.Data() {
-		index.Target = len(e.Instructions) - 1
-	}
-	c.breakJumpIndices.Clear()
 }
 
 // isVariableDeclarationList identifies
@@ -5007,197 +3850,9 @@ const (
 	ForInOfLhsKindLexicalBinding
 )
 
-func (f *ForInOfStatement) Bytecode(e *Executable, c *BytecodeContext) {
-	var iterationKind ForInOfIterationKind
-	if f.Type == ForInOfStatementTypeIn {
-		iterationKind = ForInOfIterationKindEnumerate
-	} else {
-		if f.IsAwait {
-			iterationKind = ForInOfIterationKindAsyncIterate
-		} else {
-			iterationKind = ForInOfIterationKindIterate
-		}
-	}
-	var lhsKind ForInOfLhsKind
-	if f.Initializer.ForBinding != nil {
-		lhsKind = ForInOfLhsKindVarBinding
-	} else if f.Initializer.ForDeclaration != nil {
-		lhsKind = ForInOfLhsKindLexicalBinding
-	} else {
-		lhsKind = ForInOfLhsKindAssignment
-	}
-	var iteratorKind IteratorKind
-	if iterationKind == ForInOfIterationKindAsyncIterate {
-		iteratorKind = IteratorKindAsync
-	} else {
-		iteratorKind = IteratorKindSync
-	}
-
-	index := f.forInOfHeadEvaluation(e, c, f.Expression, iterationKind, iteratorKind)
-	f.forInOfBodyEvaluation(e, c, index, lhsKind, iteratorKind)
-}
-
-// ForIn/OfHeadEvaluation
-func (f *ForInOfStatement) forInOfHeadEvaluation(e *Executable, c *BytecodeContext, expr Expression, iterationKind ForInOfIterationKind, iteratorKind IteratorKind) *IJumpIfTrue {
-	// TODO: BoundNames of expr
-
-	expr.Bytecode(e, c)
-	if ExpressionAnalyze(expr, AnalyzeQueryIsReference) {
-		e.AddInstruction(InsGetValue)
-	}
-	if iterationKind == ForInOfIterationKindEnumerate {
-		e.AddInstruction(InsLoad)
-		// a. If exprValue is either undefined or null, then
-		//     i. GetLastValue Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
-		e.AddInstruction(InsLoad)
-		e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
-		e.AddInstruction(InsLooselyEqual)
-		jumpIfTrue := &IJumpIfTrue{}
-		e.AddInstruction(jumpIfTrue)
-		jumpIfTrue.TargetElse = len(e.Instructions) - 1
-
-		e.AddInstruction(InsStore)
-		e.AddInstruction(&IForInIterator{})
-		return jumpIfTrue
-	} else {
-		e.AddInstruction(&IGetIterator{
-			IteratorKind: iteratorKind,
-		})
-		return nil
-	}
-}
-
 func (f *ForInOfStatement) IsDestructuring() bool {
 	// TODO:
 	return f.Initializer.ForBinding != nil && f.Initializer.ForBinding.BindingPattern != nil
-}
-
-// ForIn/OfBodyEvaluation
-func (f *ForInOfStatement) forInOfBodyEvaluation(
-	e *Executable,
-	c *BytecodeContext,
-	jumpIndex *IJumpIfTrue,
-	lhsKind ForInOfLhsKind,
-	iteratorKind IteratorKind,
-) {
-	body := f.Body
-	e.AddInstruction(InsPushLexicalEnvironment)
-	e.AddInstruction(&ILoadConstant{Value: UndefinedValue})
-
-	destructuring := f.IsDestructuring()
-	lhs := f.Initializer
-
-	if destructuring && lhsKind == ForInOfLhsKindAssignment {
-		// TODO
-	}
-
-	startIndex := len(e.Instructions) - 1
-	e.AddInstruction(&ILoadIterator{})
-	e.AddInstruction(&ICall{})
-
-	if iteratorKind == IteratorKindAsync {
-		// e.AddInstruction(InsAwait)
-	}
-
-	e.AddInstruction(InsLoad)
-
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKey{
-		Name:   "done",
-		Strict: false,
-	})
-	e.AddInstruction(InsGetValue)
-
-	jumpIfTrue := &IJumpIfTrue{}
-	e.AddInstruction(jumpIfTrue)
-
-	jumpIfTrue.TargetElse = len(e.Instructions) - 1
-
-	e.AddInstruction(&IEvaluatePropertyAccessWithIdentifierKey{
-		Name:   "value",
-		Strict: false,
-	})
-	e.AddInstruction(InsGetValue)
-
-	if lhsKind == ForInOfLhsKindAssignment || lhsKind == ForInOfLhsKindVarBinding {
-		if destructuring {
-			if lhsKind == ForInOfLhsKindAssignment {
-				// TODO
-			} else {
-				// TODO
-			}
-		} else {
-			if lhs.LeftHandSideExpression != nil {
-				lhs.LeftHandSideExpression.Bytecode(e, c)
-			} else if lhs.ForBinding != nil {
-				e.AddInstruction(&IResolveBinding{
-					Name: lhs.ForBinding.BindingIdentifier,
-				})
-			} else {
-				panic("unreachable")
-			}
-			e.AddInstruction(InsPushReference)
-			e.AddInstruction(InsPutValue)
-			e.AddInstruction(InsPopReference)
-		}
-	} else {
-		lexicalDeclaration := &LexicalDeclaration{
-			BindingList: &BindingList{
-				Items: make([]*LexicalBinding, 0),
-			},
-		}
-		lexicalBinding := &LexicalBinding{}
-		if lhs.ForDeclaration.ForBinding.BindingIdentifier != "" {
-			lexicalBinding.Identifier = lhs.ForDeclaration.ForBinding.BindingIdentifier
-		} else {
-			lexicalBinding.BindingPattern = lhs.ForDeclaration.ForBinding.BindingPattern
-		}
-		lexicalDeclaration.BindingList.Items = append(lexicalDeclaration.BindingList.Items, lexicalBinding)
-		e.AddInstruction(&IForDeclarationBindingInstantiation{
-			LexicalDeclaration: lexicalDeclaration,
-		})
-
-		if destructuring {
-			// TODO
-			panic("unimplemented")
-		} else {
-			lhsName := lhs.ForDeclaration.ForBinding.BindingIdentifier
-			e.AddInstruction(&IResolveBinding{
-				Name:   lhsName,
-				Strict: c.containedInStrictCode,
-			})
-			e.AddInstruction(&IInitializeReferencedBinding{})
-		}
-	}
-
-	e.AddInstruction(InsStore)
-	body.Bytecode(e, c)
-	continueIndex := len(e.Instructions) - 1
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(InsRestoreLexicalEnvironment)
-
-	e.AddInstruction(&IJump{Target: startIndex})
-	jumpIfTrue.Target = len(e.Instructions) - 1
-	e.AddInstruction(InsStore)
-	e.AddInstruction(InsStore)
-	for _, index := range c.continueJumpIndices.Data() {
-		index.Target = continueIndex
-	}
-	c.continueJumpIndices.Clear()
-	for _, index := range c.breakJumpIndices.Data() {
-		index.Target = len(e.Instructions) - 1
-	}
-	c.breakJumpIndices.Clear()
-
-	if jumpIndex != nil {
-		skipJump := &IJump{}
-		e.AddInstruction(skipJump)
-		jumpIndex.Target = len(e.Instructions) - 1
-
-		e.AddInstruction(InsStore)
-		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
-		skipJump.Target = len(e.Instructions) - 1
-	}
 }
 
 func (f *ForInOfStatement) String() string {
@@ -5306,19 +3961,6 @@ type StatementBreak struct {
 	Label IdentifierName
 }
 
-func (s *StatementBreak) Bytecode(e *Executable, c *BytecodeContext) {
-	jump := &IJump{}
-	if s.Label != "" {
-		e.AddInstruction(jump)
-		if list, ok := c.labelBreakJumpIndexMap[string(s.Label)]; ok {
-			list.Push(jump)
-		}
-	} else {
-		e.AddInstruction(jump)
-		c.breakJumpIndices.Push(jump)
-	}
-}
-
 func (s *StatementBreak) String() string {
 	if s.Label != "" {
 		return "Break " + string(s.Label)
@@ -5331,19 +3973,6 @@ func (s *StatementBreak) String() string {
 type StatementContinue struct {
 	Statement
 	Label IdentifierName
-}
-
-func (s *StatementContinue) Bytecode(e *Executable, c *BytecodeContext) {
-	jump := &IJump{}
-	if s.Label != "" {
-		e.AddInstruction(jump)
-		if list, ok := c.labelContinueJumpIndexMap[string(s.Label)]; ok {
-			list.Push(jump)
-		}
-	} else {
-		e.AddInstruction(jump)
-		c.continueJumpIndices.Push(jump)
-	}
 }
 
 func (s *StatementContinue) String() string {
@@ -5361,18 +3990,6 @@ func (s *StatementContinue) String() string {
 type StatementReturn struct {
 	*StatementDefaultImpl
 	Expression Expression
-}
-
-func (s *StatementReturn) Bytecode(e *Executable, c *BytecodeContext) {
-	if s.Expression != nil {
-		s.Expression.Bytecode(e, c)
-		if ExpressionAnalyze(s.Expression, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-	} else {
-		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
-	}
-	e.AddInstruction(InsReturn)
 }
 
 func (s *StatementReturn) Evaluation(vm *VM2) Value {
@@ -5447,10 +4064,6 @@ type DeclarationHoistableFunction struct {
 	FunctionDeclaration *FunctionDeclaration
 }
 
-func (d *DeclarationHoistableFunction) Bytecode(e *Executable, c *BytecodeContext) {
-	d.FunctionDeclaration.Bytecode(e, c)
-}
-
 func (d *DeclarationHoistableFunction) Evaluation(vm *VM2) Value {
 	return d.FunctionDeclaration.Evaluation(vm)
 }
@@ -5472,9 +4085,6 @@ type DeclarationHoistableAsyncFunction struct {
 }
 
 func (d *DeclarationHoistableAsyncFunction) _declaration() {}
-func (d *DeclarationHoistableAsyncFunction) Bytecode(e *Executable, c *BytecodeContext) {
-	d.AsyncFunctionDeclaration.Bytecode(e, c)
-}
 
 func (d *DeclarationHoistableAsyncFunction) Evaluation(vm *VM2) Value {
 	return d.AsyncFunctionDeclaration.Evaluation(vm)
@@ -5490,13 +4100,6 @@ type AsyncFunctionDeclaration struct {
 	FormalParameters *FormalParameters
 	Body             *FunctionBody
 	SourceText       string
-}
-
-func (d *AsyncFunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	realm := c.agent.CurrentRealm()
-	env := realm.GlobalEnv
-	function := d.instantiateAsyncFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
 }
 
 // TODO: not standard
@@ -5538,10 +4141,6 @@ type DeclarationHoistableAsyncGenerator struct {
 	AsyncGeneratorDeclaration *AsyncGeneratorDeclaration
 }
 
-func (d *DeclarationHoistableAsyncGenerator) Bytecode(e *Executable, c *BytecodeContext) {
-	d.AsyncGeneratorDeclaration.Bytecode(e, c)
-}
-
 func (d *DeclarationHoistableAsyncGenerator) Evaluation(vm *VM2) Value {
 	return d.AsyncGeneratorDeclaration.Evaluation(vm)
 }
@@ -5556,13 +4155,6 @@ type AsyncGeneratorDeclaration struct {
 	FormalParameters *FormalParameters
 	Body             *FunctionBody
 	SourceText       string
-}
-
-func (d *AsyncGeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	realm := c.agent.CurrentRealm()
-	env := realm.GlobalEnv
-	function := d.instantiateAsyncGeneratorFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
 }
 
 // TODO: not standard
@@ -5612,10 +4204,6 @@ type DeclarationHoistableGenerator struct {
 	GeneratorDeclaration *GeneratorDeclaration
 }
 
-func (d *DeclarationHoistableGenerator) Bytecode(e *Executable, c *BytecodeContext) {
-	d.GeneratorDeclaration.Bytecode(e, c)
-}
-
 func (d *DeclarationHoistableGenerator) Evaluation(vm *VM2) Value {
 	return d.GeneratorDeclaration.Evaluation(vm)
 }
@@ -5630,13 +4218,6 @@ type GeneratorDeclaration struct {
 	FormalParameters *FormalParameters
 	Body             *FunctionBody
 	SourceText       string
-}
-
-func (d *GeneratorDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	realm := c.agent.CurrentRealm()
-	env := realm.GlobalEnv
-	function := d.instantiateGeneratorFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(CMString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
 }
 
 // TODO: not standard
@@ -5708,14 +4289,6 @@ func (d *ClassDeclaration) BoundNames() (l []IdentifierName) {
 		l = append(l, "default")
 	}
 	return
-}
-
-func (d *ClassDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	e.AddInstruction(InsLoad)
-	e.AddInstruction(&IBindingClassDeclarationEvaluation{
-		ClassDeclaration: d,
-	})
-	e.AddInstruction(InsStore)
 }
 
 func (d *ClassDeclaration) astHasIdentifier() bool {
@@ -5801,7 +4374,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM2, classBinding string, clas
 		constructorParent = realm.Intrinsics.FunctionPrototype
 	} else {
 		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
-		superclassRef := GenerateAndRunBytecode(agent,
+		superclassRef := RunNode(agent,
 			&StatementExpression{
 				Expression: c.ClassHeritage,
 			},
@@ -5865,7 +4438,10 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM2, classBinding string, clas
 				},
 			})
 	} else {
-		constructorInfo := DefineMethod(agent, constructor.FunctionExpression, NewStringValue("constructor"), proto, constructorParent)
+		constructorInfo, err := constructor.DefineMethod(vm, proto, constructorParent)
+		if err != nil {
+			vm.panic(err)
+		}
 		F := constructorInfo.Closure
 		MakeClassConstructor(F.(*ECMAScriptFunction))
 		SetFunctionName(F, className.(PropertyKey), "")
@@ -6034,15 +4610,6 @@ func (c *ClassBody) NonConstructorElements() (l []ClassElement) {
 	return l
 }
 
-func (c *ClassBody) Bytecode(e *Executable, cx *BytecodeContext) {
-	containedInStrictCode := cx.containedInStrictCode
-	cx.containedInStrictCode = true
-	defer func() {
-		cx.containedInStrictCode = containedInStrictCode
-	}()
-	c.ClassElementList.Bytecode(e, cx)
-}
-
 func (c *ClassBody) String() string {
 	return c.ClassElementList.String()
 }
@@ -6052,12 +4619,6 @@ func (c *ClassBody) String() string {
 type ClassElementList struct {
 	ASTNode
 	Items []ClassElement
-}
-
-func (c *ClassElementList) Bytecode(e *Executable, cx *BytecodeContext) {
-	for _, item := range c.Items {
-		item.Bytecode(e, cx)
-	}
 }
 
 func (c *ClassElementList) String() string {
@@ -6144,7 +4705,7 @@ func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM2, ho
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	var name PropertyKeyOrPrivateName
-	value := GenerateAndRunBytecode(agent, c.FieldDefinition.PropertyName)
+	value := RunNode(agent, c.FieldDefinition.PropertyName)
 	if value.Data() != nil {
 		name = ToPropertyKey(agent, value.Data())
 	}
@@ -6261,10 +4822,6 @@ func (c *ClassElementMethodDefinition) ClassElementKind() ClassElementKind {
 	return ClassElementKindNonConstructorMethod
 }
 
-func (c *ClassElementMethodDefinition) Bytecode(e *Executable, cx *BytecodeContext) {
-	c.MethodDefinition.Bytecode(e, cx)
-}
-
 func (c *ClassElementMethodDefinition) String() string {
 	return c.MethodDefinition.String()
 }
@@ -6298,10 +4855,6 @@ func (d *LexicalDeclaration) IsConstantDeclaration() bool {
 	return d.Type == LetOrConstConst
 }
 
-func (d *LexicalDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	d.BindingList.Bytecode(e, c)
-}
-
 // Evaluation 14.3.1.2
 func (d *LexicalDeclaration) Evaluation(vm *VM2) Value {
 	d.BindingList.Evaluation(vm)
@@ -6330,12 +4883,6 @@ func (b *BindingList) BoundNames() (l []IdentifierName) {
 		l = append(l, item.BoundNames()...)
 	}
 	return
-}
-
-func (b *BindingList) Bytecode(e *Executable, c *BytecodeContext) {
-	for _, item := range b.Items {
-		item.Bytecode(e, c)
-	}
 }
 
 func (b *BindingList) Evaluation(vm *VM2) Value {
@@ -6375,25 +4922,6 @@ func (l *LexicalBinding) BoundNames() (list []IdentifierName) {
 		list = append(list, l.BindingPattern.BoundNames()...)
 	}
 	return
-}
-
-func (l *LexicalBinding) Bytecode(e *Executable, c *BytecodeContext) {
-	if l.Initializer == nil {
-		panic("unimplemented: bindingidentifier")
-	} else {
-		e.AddInstruction(InsLoad)
-		e.AddInstruction(&IResolveBinding{
-			Name:   l.Identifier,
-			Strict: c.containedInStrictCode,
-		})
-
-		l.Initializer.Bytecode(e, c)
-		if ExpressionAnalyze(l.Initializer, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-		e.AddInstruction(&IInitializeReferencedBinding{})
-		e.AddInstruction(InsStore)
-	}
 }
 
 // 14.3.1.2
@@ -6476,13 +5004,6 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 	return function
 }
 
-func (f *FunctionDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	realm := c.agent.CurrentRealm()
-	env := realm.GlobalEnv
-	function := f.instantiateOrdinaryFunctionObject(c.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), function.ToValue(), setThrowTypeIgnore)
-}
-
 // Evaluation 15.2.6
 func (f *FunctionDeclaration) Evaluation(vm *VM2) Value {
 	// TODO(SM): check spec
@@ -6518,10 +5039,6 @@ func (b *BlockStatementBlock) VarDeclaredNames() []IdentifierName {
 	return b.Block.StatementList.VarDeclaredNames()
 }
 
-func (b *BlockStatementBlock) Bytecode(e *Executable, c *BytecodeContext) {
-	b.Block.Bytecode(e, c)
-}
-
 func (b *BlockStatementBlock) Evaluation(vm *VM2) Value {
 	return b.Block.Evaluation(vm)
 }
@@ -6532,11 +5049,6 @@ func (b *BlockStatementBlock) String() string {
 
 type Block struct {
 	StatementList StatementList
-}
-
-// 14.2.2
-func (b *Block) Bytecode(e *Executable, c *BytecodeContext) {
-	b.StatementList.Bytecode(e, c)
 }
 
 // 14.2.2
@@ -6602,12 +5114,6 @@ func (s StatementList) ContainsDirective(directive string) bool {
 		}
 	}
 	return false
-}
-
-func (s StatementList) Bytecode(e *Executable, c *BytecodeContext) {
-	for _, item := range s {
-		item.Bytecode(e, c)
-	}
 }
 
 func (s StatementList) Evaluation(vm *VM2) Value {
@@ -6700,10 +5206,6 @@ func (s *StatementListItemStatement) VarScopedDeclarations() (l []*VariableDecla
 	return vars
 }
 
-func (s *StatementListItemStatement) Bytecode(e *Executable, c *BytecodeContext) {
-	s.Statement.Bytecode(e, c)
-}
-
 func (s *StatementListItemStatement) Evaluation(vm *VM2) Value {
 	return s.Statement.Evaluation(vm)
 }
@@ -6741,10 +5243,6 @@ func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDec
 	return
 }
 
-func (s *StatementListItemDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	s.Declaration.Bytecode(e, c)
-}
-
 func (s *StatementListItemDeclaration) Evaluation(vm *VM2) Value {
 	return s.Declaration.Evaluation(vm)
 }
@@ -6755,11 +5253,6 @@ func (s *StatementListItemDeclaration) String() string {
 
 type ExpressionStatement struct {
 	Expression Expression
-}
-
-// 14.5.1
-func (e *ExpressionStatement) Bytecode(ex *Executable, c *BytecodeContext) {
-	e.Expression.Bytecode(ex, c)
 }
 
 func (e *ExpressionStatement) Evaluation(vm *VM2) Value {
@@ -6775,10 +5268,6 @@ func (e *ExpressionStatement) String() string {
 type Script struct {
 	ASTNode
 	StatementList StatementList
-}
-
-func (s *Script) Bytecode(e *Executable, c *BytecodeContext) {
-	s.StatementList.Bytecode(e, c)
 }
 
 func (s *Script) Evaluation(vm *VM2) Value {
@@ -6807,18 +5296,6 @@ var (
 	_ StaticSemanticsImportEntries  = (*Module)(nil)
 	_ StaticSemanticsExportEntries  = (*Module)(nil)
 )
-
-func (m *Module) Bytecode(e *Executable, c *BytecodeContext) {
-	for _, moduleItem := range m.ModuleItemList {
-		if stmt, ok := moduleItem.(*ModuleItemStatementListItem); ok {
-			stmt.Bytecode(e, c)
-		}
-		if stmt, ok := moduleItem.(*ModuleItemExportDeclaration); ok {
-			stmt.Bytecode(e, c)
-		}
-
-	}
-}
 
 // TODO: spec reference
 func (m *Module) Evaluation(vm *VM2) Value {
@@ -6975,10 +5452,6 @@ func (m *ModuleItemStatementListItem) moduleRequests() (l []string) {
 	return
 }
 
-func (m *ModuleItemStatementListItem) Bytecode(e *Executable, c *BytecodeContext) {
-	m.StatementListItem.Bytecode(e, c)
-}
-
 func (m *ModuleItemStatementListItem) Evaluation(vm *VM2) Value {
 	return m.StatementListItem.Evaluation(vm)
 }
@@ -6998,10 +5471,6 @@ var _ ModuleItem = (*ModuleItemImportDeclaration)(nil)
 func (m *ModuleItemImportDeclaration) moduleRequests() (l []string) {
 	l = append(l, m.ImportDeclaration.ModuleSpecifier.StringValue().String())
 	return
-}
-
-func (m *ModuleItemImportDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	panic("unimplemented")
 }
 
 func (m *ModuleItemImportDeclaration) String() string {
@@ -7035,25 +5504,6 @@ var (
 	_ StaticSemanticsExportEntries = (*ModuleItemExportDeclaration)(nil)
 	_ ASTNode                      = (*ModuleItemExportDeclaration)(nil)
 )
-
-func (m *ModuleItemExportDeclaration) Bytecode(e *Executable, c *BytecodeContext) {
-	switch {
-	case m.ExportFrom != nil || m.NamedExports != nil:
-		return
-	case m.Declaration != nil:
-		m.Declaration.Bytecode(e, c)
-	case m.VariableStatement != nil:
-		m.VariableStatement.Bytecode(e, c)
-	case m.DefaultHoistableDeclaration != nil:
-		m.DefaultHoistableDeclaration.Bytecode(e, c)
-	case m.DefaultClassDeclaration != nil:
-		m.DefaultClassDeclaration.Bytecode(e, c)
-	case m.DefaultExpression != nil:
-		m.DefaultExpression.Bytecode(e, c)
-	default:
-		panic("unreachable")
-	}
-}
 
 func (m *ModuleItemExportDeclaration) Evaluation(vm *VM2) Value {
 	switch {
@@ -7297,18 +5747,6 @@ func (y *YieldExpression) String() string {
 		return "YieldExpression " + y.AssignmentExpression.String()
 	}
 	return "YieldExpression"
-}
-
-func (y *YieldExpression) Bytecode(e *Executable, c *BytecodeContext) {
-	if y.AssignmentExpression != nil {
-		y.AssignmentExpression.Bytecode(e, c)
-		if ExpressionAnalyze(y.AssignmentExpression, AnalyzeQueryIsReference) {
-			e.AddInstruction(InsGetValue)
-		}
-	} else {
-		e.AddInstruction(&IStoreConstant{Value: UndefinedValue})
-	}
-	e.AddInstruction(InsYield)
 }
 
 func (y *YieldExpression) astHasAssignmentExpression() bool {

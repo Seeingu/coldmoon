@@ -66,7 +66,7 @@ func (s *ScriptRecord) Evaluate() Value {
 		}
 	}
 
-	result := GenerateAndRunBytecode(agent, s.ECMAScriptCode)
+	result := RunNode(agent, s.ECMAScriptCode)
 	if result.IsError() {
 		return result.Error()
 	}
