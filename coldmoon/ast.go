@@ -2796,24 +2796,25 @@ func StatementAnalyze(s Statement, a AnalyzeQuery) bool {
 
 // MARK: - VariableStatement
 
-// TODO(SM): remove
-type StatementVariable struct {
+// VariableStatement [Yield, Await] :
+// - var VariableDeclarationList[+In, ?Yield, ?Await] ;
+type VariableStatement struct {
 	Statement
 	DeclarationList *VariableDeclarationList
 }
 
-var _ Statement = (*StatementVariable)(nil)
+var _ Statement = (*VariableStatement)(nil)
 
-func (s *StatementVariable) _statement() {}
-func (s *StatementVariable) VarScopedDeclarations() (l []*VariableDeclaration) {
+func (s *VariableStatement) _statement() {}
+func (s *VariableStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return s.DeclarationList.VarScopedDeclarations()
 }
 
-func (s *StatementVariable) Evaluation(vm *VM) Value {
+func (s *VariableStatement) Evaluation(vm *VM) Value {
 	return s.DeclarationList.Evaluation(vm)
 }
 
-func (s *StatementVariable) String() string {
+func (s *VariableStatement) String() string {
 	return "var " + s.DeclarationList.String()
 }
 
@@ -3589,7 +3590,7 @@ func (f *ForStatementInitializerExpression) String() string {
 
 type ForStatementInitializerVariable struct {
 	ForStatementInitializer
-	VariableStatement *StatementVariable
+	VariableStatement *VariableStatement
 }
 
 func (f *ForStatementInitializerVariable) String() string {
@@ -5464,7 +5465,7 @@ type ModuleItemExportDeclaration struct {
 	ExportFrom                  *ExportFrom
 	NamedExports                *NamedExports
 	Declaration                 Declaration
-	VariableStatement           *StatementVariable
+	VariableStatement           *VariableStatement
 	DefaultHoistableDeclaration DeclarationHoistable
 	DefaultClassDeclaration     *ClassDeclaration
 	DefaultExpression           Expression

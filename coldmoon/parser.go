@@ -2300,10 +2300,10 @@ func (p *Parser) stringLiteral() *StringLiteral {
 	}
 }
 
-func (p *Parser) variableStatement() *StatementVariable {
+func (p *Parser) variableStatement() *VariableStatement {
 	p.tokenizer.MustMatch(TVar)
 	list := p.variableDeclarationList()
-	return &StatementVariable{
+	return &VariableStatement{
 		DeclarationList: list,
 	}
 }
