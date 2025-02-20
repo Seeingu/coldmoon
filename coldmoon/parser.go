@@ -2290,12 +2290,12 @@ func (p *Parser) numericLiteral() *LiteralNumeric {
 	}
 }
 
-func (p *Parser) stringLiteral() *LiteralString {
+func (p *Parser) stringLiteral() *StringLiteral {
 	t := p.tokenizer.CurrentToken
 	if t.Type != TString {
 		panic("stringLiteral: expected string")
 	}
-	return &LiteralString{
+	return &StringLiteral{
 		Value: t.Value,
 	}
 }

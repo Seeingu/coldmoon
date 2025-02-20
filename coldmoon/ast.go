@@ -789,7 +789,7 @@ func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM) Value {
 
 type PropertyNameLiteralString struct {
 	LiteralPropertyName
-	StringLiteral *LiteralString
+	StringLiteral *StringLiteral
 }
 
 func (p *PropertyNameLiteralString) LiteralString() string {
@@ -1123,7 +1123,7 @@ func LiteralAnalyze(l Literal, a AnalyzeQuery) bool {
 	case AnalyzeQueryIsReference:
 		return false
 	case AnalyzeQueryIsStringLiteral:
-		_, ok := l.(*LiteralString)
+		_, ok := l.(*StringLiteral)
 		return ok
 	}
 	panic("unreachable")
@@ -1236,27 +1236,26 @@ func (l *LiteralNumeric) String() string {
 	return l.Value
 }
 
-// MARK: - LiteralString
+// MARK: - StringLiteral
 
-// TODO(SM): rename to StringLiteral
-type LiteralString struct {
+type StringLiteral struct {
 	Literal
 	Value string
 }
 
-var _ Literal = (*LiteralString)(nil)
+var _ Literal = (*StringLiteral)(nil)
 
 // 12.9.4.2: SV
-func (l *LiteralString) StringValue() Value {
+func (l *StringLiteral) StringValue() Value {
 	return NewStringValue(l.Value)
 }
 
 // 13.2.3.1
-func (l *LiteralString) Evaluation(vm *VM) Value {
+func (l *StringLiteral) Evaluation(vm *VM) Value {
 	return l.StringValue()
 }
 
-func (l *LiteralString) String() string {
+func (l *StringLiteral) String() string {
 	return "StringLiteral: " + l.Value
 }
 
@@ -5080,7 +5079,7 @@ func (s StatementList) ContainsDirective(directive string) bool {
 		statementItem := item.(*StatementListItemStatement).Statement
 		statementExpression := statementItem.(*StatementExpression).Expression
 		primary := statementExpression.(*ExpressionPrimary).PrimaryExpression
-		literal := primary.(Literal).(*LiteralString)
+		literal := primary.(Literal).(*StringLiteral)
 		if literal.Value == directive {
 			return true
 		}
@@ -5550,7 +5549,7 @@ func (m *ModuleItemExportDeclaration) exportEntries() (l []ExportEntry) {
 
 type ExportFrom struct {
 	ExportFromClause *ExportFromClause
-	ModuleSpecifier  *LiteralString
+	ModuleSpecifier  *StringLiteral
 }
 
 // Enum
@@ -5576,7 +5575,7 @@ type ExportSpecifier struct {
 // - StringLiteral
 type ModuleExportName struct {
 	IdentifierName IdentifierName
-	StringLiteral  *LiteralString
+	StringLiteral  *StringLiteral
 }
 
 func (m *ModuleExportName) String() string {
@@ -5599,7 +5598,7 @@ type ImportDeclaration struct {
 	// optional
 	ImportClause *ImportClause
 	// Not null
-	ModuleSpecifier *LiteralString
+	ModuleSpecifier *StringLiteral
 }
 
 func (i *ImportDeclaration) BoundNames() (l []IdentifierName) {
