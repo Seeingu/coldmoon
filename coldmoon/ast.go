@@ -42,8 +42,6 @@ type LexicallyScopedDeclaration struct {
 
 type PrimaryExpression interface {
 	Expression
-	AssignmentTargetType() AssignmentTargetType
-	_primaryExpression()
 }
 
 // MARK: - ClassExpression
