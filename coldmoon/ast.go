@@ -514,7 +514,6 @@ func (p *PropertyDefinitionList) String() string {
 
 // MARK: - PropertyDefinition
 
-// TODO(SM): remove
 // PropertyDefinition [Yield, Await] :
 // - IdentifierReference[?Yield, ?Await]
 // - CoverInitializedName[?Yield, ?Await]
@@ -570,7 +569,7 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 		propValue = exprValueRef.GetValue(vm.agent)
 	}
 	if isProtoSetter {
-		if ValueIsObject(propValue) || propValue == NullValue {
+		if propValue.IsObject() || propValue == NullValue {
 			object.SetPrototype(propValue.ToObject(vm.agent))
 		}
 		return
@@ -4361,7 +4360,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 			panic("TypeError: superclass is not a constructor")
 		} else {
 			protoParentValue := MustGetObject(superclass).Get(NewStringPropertyKey("prototype"))
-			if !ValueIsObject(protoParentValue) {
+			if !protoParentValue.IsObject() {
 				panic("TypeError: prototype is not an object")
 			}
 			protoParent = MustGetObject(protoParentValue)

@@ -372,7 +372,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	typedArray.defineBuiltinProperty(CMString("toString"), realm.Intrinsics.ArrayPrototype.ToValue().ToBuiltinPropertyDescriptor())
 
 	toStringTag := func(this Value, arguments []Value, newTarget ObjectType) Value {
-		if !ValueIsObject(this) {
+		if !this.IsObject() {
 			return UndefinedValue
 		}
 		o := MustGetObject(this)
@@ -731,7 +731,7 @@ func typedArrayBehavior(agent *Agent, name TypedArrayName, thisArgument Value, a
 		return (AllocateTypedArray(agent, constructorName, newTarget, proto, 0)).ToValue()
 	} else {
 		firstArgument := argumentsList[0]
-		if ValueIsObject(firstArgument) {
+		if firstArgument.IsObject() {
 			O := AllocateTypedArray(agent, constructorName, newTarget, proto, 0)
 			firstArgumentObj := MustGetObject(firstArgument)
 			switch fao := firstArgumentObj.(type) {
@@ -1611,7 +1611,7 @@ func typedArraySet(agent *Agent, this Value, source, offset Value) Value {
 		return agent.ThrowException(RangeError, "negative offset")
 	}
 	var sourceIsTypedArray bool
-	if s, ok := ValueGetObject(source); ok {
+	if s, ok := source.GetObject(); ok {
 		if ta, ok := s.(*TypedArrayObject); ok {
 			SetTypedArrayFromTypedArray(agent, target, targetOffset, ta)
 			sourceIsTypedArray = true

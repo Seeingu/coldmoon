@@ -31,7 +31,7 @@ func NewIteratorPrototype(realm *Realm) ObjectType {
 // 7.4.2
 func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *IteratorRecord {
 	iterator := method.ToValue().Call(object, nil)
-	if !ValueIsObject(iterator) {
+	if !iterator.IsObject() {
 		panic("TypeError")
 	}
 	nextMethod := GetV(agent, iterator, NewStringPropertyKey("next"))

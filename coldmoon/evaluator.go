@@ -7,7 +7,7 @@ import (
 )
 
 func fatalOnError(result Value) {
-	if o, ok := ValueGetObject(result); ok {
+	if o, ok := result.GetObject(); ok {
 		if e, ok := o.(*ErrorObject); ok {
 			println("Return Error: ", e.Message)
 			panic(e)
@@ -57,7 +57,7 @@ func EvaluateModule(filePath string, realm *Realm) {
 func Evaluate(source string, realm *Realm) {
 	agent := realm.Agent
 	result := ParseScript(source, realm, nil).Evaluate()
-	if o, ok := ValueGetObject(result); ok {
+	if o, ok := result.GetObject(); ok {
 		if e, ok := o.(*ErrorObject); ok {
 			println("Return Error: ", e.Message)
 			panic(e)

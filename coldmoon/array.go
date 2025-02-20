@@ -1397,7 +1397,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 // 23.1.3.2.1
 func IsConcatSpreadable(agent *Agent, value Value) bool {
-	if !ValueIsObject(value) {
+	if !value.IsObject() {
 		return false
 	}
 	spreadable := MustGetObject(value).Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable]))

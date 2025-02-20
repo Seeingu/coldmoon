@@ -14,7 +14,8 @@ type Value interface {
 	// TODO(BM): throw completion handling
 	ToPrimitive(agent *Agent, hint PreferredType) Value
 	CallNoArgs(this Value) Value
-	// 7.1.18
+	// ToObject
+	// spec: 7.1.18
 	ToObject(agent *Agent) ObjectType
 	// ThisStringValue implemented in BaseValue
 	// 22.1.3.35.1
@@ -31,6 +32,9 @@ type Value interface {
 	ToPropertyKey() PropertyKey
 	Hash() string
 
+	IsObject() bool
+	IsPromise() bool
+	GetObject() (object ObjectType, ok bool)
 	NumberOrBigInt() (*NumberValue, *BigIntValue, bool)
 	ReferenceRecord() (*ReferenceRecord, bool)
 }

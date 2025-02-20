@@ -87,7 +87,7 @@ func CloneArrayBuffer(agent *Agent, srcBuffer *ArrayBufferLike, srcByteOffset JS
 
 // 25.1.3.7
 func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (l JSInt) {
-	if !ValueIsObject(options) {
+	if !options.IsObject() {
 		return
 	}
 	maxByteLength := MustGetObject(options).Get(NewStringPropertyKey("maxByteLength"))
@@ -286,7 +286,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 
 	var isView BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		arg := arguments[0]
-		if !ValueIsObject(arg) {
+		if !arg.IsObject() {
 			return FalseValue
 		}
 		o := MustGetObject(arg)

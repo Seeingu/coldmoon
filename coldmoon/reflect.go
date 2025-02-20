@@ -47,7 +47,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		propertyKey := arguments[1]
 		attributes := arguments[2]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.defineProperty called on non-object")
 		}
 
@@ -66,7 +66,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		target := arguments[0]
 		propertyKey := arguments[1]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.deleteProperty called on non-object")
 		}
 
@@ -82,7 +82,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		propertyKey := arguments[1]
 		receiver := pkg.SliceSafeGet(arguments, 2)
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.get called on non-object")
 		}
 
@@ -96,7 +96,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		target := arguments[0]
 		propertyKey := arguments[1]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.getOwnPropertyDescriptor called on non-object")
 		}
 
@@ -114,7 +114,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 	var getPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.getPrototypeOf called on non-object")
 		}
 
@@ -126,7 +126,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		target := arguments[0]
 		propertyKey := arguments[1]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.has called on non-object")
 		}
 
@@ -139,7 +139,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 	var isExtensible BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.isExtensible called on non-object")
 		}
 
@@ -150,7 +150,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 	var ownKeys BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.ownKeys called on non-object")
 		}
 
@@ -166,7 +166,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 	var preventExtensions BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.preventExtensions called on non-object")
 		}
 
@@ -182,7 +182,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		value := arguments[2]
 		receiver := pkg.SliceSafeGet(arguments, 3)
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.set called on non-object")
 		}
 
@@ -201,13 +201,13 @@ func NewReflectObject(realm *Realm) ObjectType {
 		target := arguments[0]
 		proto := arguments[1]
 
-		if !ValueIsObject(target) {
+		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.setPrototypeOf called on non-object")
 		}
 
 		targetObject := MustGetObject(target)
 
-		if proto != nil && !ValueIsObject(proto) {
+		if proto != nil && !proto.IsObject() {
 			return agent.ThrowTypeError("Reflect.setPrototypeOf called with non-object prototype")
 		}
 

@@ -143,7 +143,7 @@ func promiseThen(agent *Agent, this Value, arguments []Value, newTarget ObjectTy
 		onRejected = UndefinedValue
 	}
 	promise := this
-	if !ValueIsPromise(promise) {
+	if !promise.IsPromise() {
 		return agent.ThrowTypeError("Promise.prototype.then called on incompatible receiver")
 	}
 	promiseObject := MustGetObject(promise)
@@ -156,7 +156,7 @@ func promiseFinally(agent *Agent, this Value, arguments []Value, newTarget Objec
 	promise := this
 	realm := agent.CurrentRealm()
 	onFinally := arguments[0]
-	if !ValueIsObject(promise) {
+	if !promise.IsObject() {
 		return agent.ThrowTypeError("Promise.prototype.finally called on incompatible receiver")
 	}
 	C := MustGetObject(promise).SpeciesConstructor(realm.Intrinsics.Promise)
@@ -269,7 +269,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 	var resolve BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		resolution := arguments[0]
 		C := this
-		if !ValueIsObject(C) {
+		if !C.IsObject() {
 			return agent.ThrowTypeError("TypeError")
 		}
 		return PromiseResolve(agent, MustGetObject(C), resolution).ToValue()
@@ -460,7 +460,7 @@ func stepsResolve(agent *Agent, this Value, arguments []Value, newTarget ObjectT
 		RejectPromise(agent, promise, agent.exception)
 		return UndefinedValue
 	}
-	if !ValueIsObject(resolution) {
+	if !resolution.IsObject() {
 		FulfillPromise(agent, promise, resolution)
 		return UndefinedValue
 	}
@@ -639,7 +639,7 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 
 // 27.2.4.7.1
 func PromiseResolve(agent *Agent, constructor ObjectType, x Value) ObjectType {
-	if ValueIsPromise(x) {
+	if x.IsPromise() {
 		xConstructor := MustGetObject(x).Get(NewStringPropertyKey("constructor"))
 		if SameValue(xConstructor, (constructor).ToValue()) {
 			return MustGetObject(x)

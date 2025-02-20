@@ -55,7 +55,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		return RegExpHasFlag(agent, this, "v").Data()
 	}
 	flags := func(this Value, arguments []Value, _ ObjectType) Value {
-		if !ValueIsObject(this) {
+		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.flags: 'this' is not an object")
 		}
 		r, ok := MustGetObject(this).(*RegExpObject)
@@ -90,7 +90,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		return NewStringValue(f)
 	}
 	source := func(this Value, arguments []Value, _ ObjectType) Value {
-		if !ValueIsObject(this) {
+		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.source: 'this' is not an object")
 		}
 		r, ok := MustGetObject(this).(*RegExpObject)
@@ -102,7 +102,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		return NewStringValue(EscapeRegExpPattern(src, _flags))
 	}
 	toString := func(this Value, arguments []Value, _ ObjectType) Value {
-		if !ValueIsObject(this) {
+		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.toString: 'this' is not an object")
 		}
 		r, ok := MustGetObject(this).(*RegExpObject)
@@ -114,7 +114,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		return NewStringValue("/" + EscapeRegExpPattern(src.String(), _flags.String()) + "/")
 	}
 	exec := func(this Value, arguments []Value, _ ObjectType) Value {
-		if !ValueIsObject(this) {
+		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.exec: 'this' is not an object")
 		}
 		r, ok := MustGetObject(this).(*RegExpObject)
@@ -132,7 +132,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 	}
 	test := func(this Value, arguments []Value, _ ObjectType) Value {
-		if !ValueIsObject(this) {
+		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.test: 'this' is not an object")
 		}
 		r, ok := MustGetObject(this).(*RegExpObject)
@@ -148,7 +148,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 	}
 	search := func(this Value, arguments []Value, _ ObjectType) Value {
 		rx := this
-		if !ValueIsObject(rx) {
+		if !rx.IsObject() {
 			panic("TypeError")
 		}
 		rxObject := MustGetObject(rx)
@@ -168,7 +168,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		return result.Data().Get(NewStringPropertyKey("index"))
 	}
 	matchAll := func(this Value, arguments []Value, _ ObjectType) Value {
-		if !ValueIsObject(this) {
+		if !this.IsObject() {
 			panic("TypeError")
 		}
 		rx, ok := this.(*ObjectValue)
@@ -246,7 +246,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 		}
 		var p Value
 		var f Value
-		if ValueIsObject(pattern) {
+		if pattern.IsObject() {
 			if regexp, ok := MustGetObject(pattern).(*RegExpObject); ok {
 				p = NewStringValue(regexp.OriginalSource)
 				if flags == UndefinedValue {
@@ -295,7 +295,7 @@ func RegExpCreate(agent *Agent, pattern Value, flags Value) CompletionObject {
 
 // 22.2.6.4.1
 func RegExpHasFlag(agent *Agent, R Value, flag string) CompletionValue {
-	if !ValueIsObject(R) {
+	if !R.IsObject() {
 		return agent.ThrowException(TypeError, "RegExpHasFlag: R is not an object").ToCompletion()
 	}
 	r, ok := MustGetObject(R).(*RegExpObject)
@@ -343,7 +343,7 @@ func RegExpExec(agent *Agent, regExp *RegExpObject, s string) CompletionObject {
 	exec := regExp.Get(NewStringPropertyKey("exec"))
 	if IsCallable(exec) {
 		result := exec.Call(regExp.ToValue(), []Value{NewStringValue(s)})
-		if !ValueIsObject(result) && result != NullValue {
+		if !result.IsObject() && result != NullValue {
 			return NewCompletionObjectError(agent.ThrowException(TypeError, "RegExpExec: exec is not an object"))
 		}
 		if result == NullValue {

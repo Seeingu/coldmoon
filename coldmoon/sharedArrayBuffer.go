@@ -58,6 +58,9 @@ func NewSharedArrayBufferConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
 		length := argumentsList[0]
 		options := pkg.SliceSafeGet(argumentsList, 1)
+		if options == nil {
+			options = UndefinedValue
+		}
 		if newTarget == nil {
 			return agent.ThrowTypeError("newTarget is nil in SharedArrayBuffer")
 		}

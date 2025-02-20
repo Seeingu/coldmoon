@@ -310,7 +310,7 @@ func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) CompletionObj
 	if c == UndefinedValue {
 		return NewCompletionObject(defaultConstructor)
 	}
-	if !ValueIsObject(c) {
+	if !c.IsObject() {
 		return NewCompletionObjectError(objectRef.Agent().ThrowException(TypeError, c.String()+" is not an object"))
 	}
 	cObject := MustGetObject(c)
@@ -512,7 +512,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var create BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		o := arguments[0]
 		properties := arguments[1]
-		if !ValueIsObject(o) {
+		if !o.IsObject() {
 			return agent.ThrowTypeError("is not an object")
 		}
 
@@ -528,7 +528,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var defineProperties BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		o := arguments[0]
 		properties := arguments[1]
-		if !ValueIsObject(o) {
+		if !o.IsObject() {
 			return agent.ThrowTypeError("is not an object")
 		}
 		return (objectDefineProperties(agent, MustGetObject(o), properties)).ToValue()
@@ -538,7 +538,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		o := arguments[0]
 		property := arguments[1]
 		attributes := arguments[2]
-		if !ValueIsObject(o) {
+		if !o.IsObject() {
 			return agent.ThrowTypeError("is not an object")
 		}
 
@@ -888,7 +888,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	}
 	isPrototypeOf := func(this Value, args []Value, newTarget ObjectType) Value {
 		v := args[0]
-		if !ValueIsObject(v) {
+		if !v.IsObject() {
 			return NewBooleanValue(false)
 		}
 		o := this.ToObject(agent)

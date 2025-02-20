@@ -23,7 +23,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	// 21.4.4.45
 	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		hintValue := args[0]
-		if !ValueIsObject(this) {
+		if !this.IsObject() {
 			return agent.ThrowTypeError("is not an object")
 		}
 		o := MustGetObject(this)
@@ -811,7 +811,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			value := args[0]
 			var tv JSNumber
 
-			if o, ok := ValueGetObject(value); ok {
+			if o, ok := value.GetObject(); ok {
 				if date, ok := o.(*DateObject); ok {
 					tv = date.Data
 				} else {

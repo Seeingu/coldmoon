@@ -107,7 +107,7 @@ func NewJSON(realm *Realm) *JSON {
 		var propertyList []PropertyKey
 
 		var replacerFunction ObjectType
-		if obj, ok := ValueGetObject(replacer); ok {
+		if obj, ok := replacer.GetObject(); ok {
 			if IsCallable(replacer) {
 				replacerFunction = obj
 			} else {
@@ -136,7 +136,7 @@ func NewJSON(realm *Realm) *JSON {
 			}
 		}
 
-		if obj, ok := ValueGetObject(space); ok {
+		if obj, ok := space.GetObject(); ok {
 			if ObjectIs[*NumberObject](obj) {
 				space = space.ToNumber(agent)
 			} else if ObjectIs[*StringObject](obj) {
@@ -187,7 +187,7 @@ func NewJSON(realm *Realm) *JSON {
 // InternalizeJSONProperty
 func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, reviver Value) Value {
 	value := holder.Get(name)
-	if ValueIsObject(value) {
+	if value.IsObject() {
 		obj := MustGetObject(value)
 		isArray := IsArray(value)
 		if isArray {
@@ -219,7 +219,7 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 
 func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key PropertyKey, holder ObjectType) string {
 	value := holder.Get(key)
-	if ValueIsObject(value) || ValueIs[*BigIntValue](value) {
+	if value.IsObject() || ValueIs[*BigIntValue](value) {
 		toJSON := GetV(agent, value, NewStringPropertyKey("toJSON"))
 		if IsCallable(toJSON) {
 			value = toJSON.Call(value, []Value{key.ToValue()})
@@ -230,7 +230,7 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 		value = state.ReplacerFunction.ToValue().Call(holder.ToValue(), []Value{key.ToValue(), value})
 	}
 
-	if obj, ok := ValueGetObject(value); ok {
+	if obj, ok := value.GetObject(); ok {
 		if ObjectIs[*NumberObject](obj) {
 			value = value.ToNumber(agent)
 		} else if ObjectIs[*StringObject](obj) {

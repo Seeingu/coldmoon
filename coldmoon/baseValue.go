@@ -152,6 +152,7 @@ func (b *BaseValue) ToString() CMString {
 	return CMString(b.String())
 }
 
+// spec: 7.1.18
 // TODO: type error handling
 func (b *BaseValue) ToObject(agent *Agent) ObjectType {
 	realm := agent.CurrentRealm()
@@ -184,6 +185,28 @@ func (b *BaseValue) ToBuiltinPropertyDescriptor() *PropertyDescriptor {
 		Enumerable:   false,
 		Configurable: true,
 	}
+}
+
+func (b *BaseValue) IsObject() bool {
+	_, ok := b.GetObject()
+	return ok
+}
+
+func (b *BaseValue) IsPromise() bool {
+	objectValue, ok := b.GetObject()
+	if !ok {
+		return false
+	}
+	_, ok = objectValue.(*PromiseObject)
+	return ok
+}
+
+func (b *BaseValue) GetObject() (object ObjectType, ok bool) {
+	v, ok := ValueGet[*ObjectValue](b.Value)
+	if ok {
+		return v.Object, true
+	}
+	return nil, false
 }
 
 func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {

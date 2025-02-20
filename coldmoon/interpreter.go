@@ -265,14 +265,13 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 	} else {
 		thisValue = UndefinedValue
 	}
-	if !ValueIsObject(fun) {
+	if !fun.IsObject() {
 		return agent.ThrowTypeError("function is not an object")
 	}
 	if !IsCallable(fun) {
 		return agent.ThrowTypeError("function is not callable")
 	}
 	// TODO: WIP: tailPosition
-	// TODO(SM): argumentsList
 	return fun.Call(thisValue, arguments)
 }
 
@@ -376,7 +375,7 @@ func (v *VM) ForInOfBodyEvaluation(
 		if iteratorKind == IteratorKindAsync {
 			// TODO: Await
 		}
-		nextResult, ok := ValueGetObject(nextResultValue)
+		nextResult, ok := nextResultValue.GetObject()
 		if !ok {
 			return nil, v.agent.ThrowTypeError("Iterator result is not an object")
 		}

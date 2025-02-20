@@ -11,10 +11,10 @@ type ProxyObject struct {
 }
 
 func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
-	if !ValueIsObject(target) {
+	if !target.IsObject() {
 		panic("TypeError")
 	}
-	if !ValueIsObject(handler) {
+	if !handler.IsObject() {
 		panic("TypeError")
 	}
 	p := &ProxyObject{
@@ -438,7 +438,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			(h).ToValue(),
 			[]Value{(t).ToValue(), (argArray).ToValue(), (newTarget).ToValue()},
 		)
-		if !ValueIsObject(newObj) {
+		if !newObj.IsObject() {
 			panic("TypeError")
 		}
 		return MustGetObject(newObj)

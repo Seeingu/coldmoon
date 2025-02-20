@@ -611,7 +611,7 @@ func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsLis
 
 // 7.2.8
 func IsRegExp(value Value) bool {
-	object, ok := ValueGetObject(value)
+	object, ok := value.GetObject()
 	if !ok {
 		return false
 	}
@@ -627,7 +627,7 @@ func IsRegExp(value Value) bool {
 
 // 10.1.15
 func RequireInternalSlot[O ObjectType](value Value) O {
-	if !ValueIsObject(value) {
+	if !value.IsObject() {
 		panic("TypeError")
 	}
 	o := MustGetObject(value)
@@ -753,31 +753,6 @@ func MustGetObject(value Value) ObjectType {
 	return value.(*ObjectValue).Object
 }
 
-// TODO(SM): make this a method on BaseValue
-func ValueIsObject(value Value) bool {
-	_, ok := value.(*ObjectValue)
-	return ok
-}
-
-// TODO(SM): make this a method on BaseValue
-func ValueIsPromise(value Value) bool {
-	objectValue, ok := value.(*ObjectValue)
-	if !ok {
-		return false
-	}
-	_, ok = objectValue.Object.(*PromiseObject)
-	return ok
-}
-
-// TODO(SM): make this a method on BaseValue
-func ValueGetObject(value Value) (object ObjectType, ok bool) {
-	v, ok := ValueGet[*ObjectValue](value)
-	if ok {
-		return v.Object, true
-	}
-	return nil, false
-}
-
 func ValueIs[Type Value](value Value) bool {
 	_, ok := value.(Type)
 	return ok
@@ -789,7 +764,7 @@ func ValueGet[Type Value](value Value) (Type, bool) {
 }
 
 func ValueGetLength(v Value) (l JSInt, ok bool) {
-	if !ValueIsObject(v) {
+	if !v.IsObject() {
 		return
 	}
 	o := MustGetObject(v)
