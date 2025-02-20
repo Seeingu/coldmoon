@@ -143,7 +143,7 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 			return agent.ThrowTypeError("BigInt is not a constructor.")
 		}
 
-		prim := ToPrimitive(agent, value, PreferredTypeNumber)
+		prim := value.ToPrimitive(agent, PreferredTypeNumber)
 
 		if num, ok := prim.(*NumberValue); ok {
 			return NumberToBigInt(agent, num)

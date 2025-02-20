@@ -42,34 +42,6 @@ func NewValueFromObject(object ObjectType) Value {
 	return ov
 }
 
-// TODO(SM): make this a method on BaseValue
-// 7.1.1
-func ToPrimitive(agent *Agent, value Value, hint PreferredType) Value {
-	if objectValue, isObject := value.(*ObjectValue); isObject {
-		symbol := WellKnownSymbols[WellKnownSymbolsToPrimitive]
-		exoticToPrim := GetMethod(agent, value, NewSymbolPropertyKey(symbol))
-		if exoticToPrim != nil {
-			hintString := hint.String()
-
-			result := exoticToPrim.ToValue().Call(value, []Value{
-				NewStringValue(hintString),
-			})
-			if _, isObject = result.(*ObjectValue); !isObject {
-				return result
-			}
-
-			return agent.ThrowTypeError("could not convert object to primitive")
-		}
-		preferredType := hint
-		if preferredType == PreferredTypeDefault {
-			preferredType = PreferredTypeNumber
-		}
-		return objectValue.Object.OrdinaryToPrimitive(preferredType)
-	}
-
-	return value
-}
-
 // TODO(C): replace with value.ToNumber
 func ToNumber(agent *Agent, value Value) *NumberValue {
 	switch value := value.(type) {
@@ -87,7 +59,7 @@ func ToNumber(agent *Agent, value Value) *NumberValue {
 	case *StringValue:
 		return StringToNumber(value)
 	case *ObjectValue:
-		primValue := ToPrimitive(agent, value, PreferredTypeNumber)
+		primValue := value.ToPrimitive(agent, PreferredTypeNumber)
 		return ToNumber(agent, primValue)
 	}
 	panic("TypeError")
@@ -95,7 +67,7 @@ func ToNumber(agent *Agent, value Value) *NumberValue {
 
 // 7.1.3
 func ToNumeric(agent *Agent, value Value) Value {
-	primValue := ToPrimitive(agent, value, PreferredTypeNumber)
+	primValue := value.ToPrimitive(agent, PreferredTypeNumber)
 	if bigInt, ok := primValue.(*BigIntValue); ok {
 		return bigInt
 	}
@@ -235,7 +207,7 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 }
 
 func ToBigInt(agent *Agent, value Value) *BigIntValue {
-	prim := ToPrimitive(agent, value, PreferredTypeNumber)
+	prim := value.ToPrimitive(agent, PreferredTypeNumber)
 	switch p := prim.(type) {
 	case *undefinedValue, *nullValue, *NumberValue, *SymbolValue:
 		panic("TypeError")
@@ -323,7 +295,7 @@ func GetPrivateName(agent *Agent, value Value) (*PrivateName, bool) {
 
 // 7.1.19
 func ToPropertyKey(agent *Agent, value Value) PropertyKey {
-	key := ToPrimitive(agent, value, PreferredTypeString)
+	key := value.ToPrimitive(agent, PreferredTypeString)
 	if symbolKey, ok := key.(*SymbolValue); ok {
 		return NewSymbolPropertyKey(symbolKey)
 	}
@@ -482,11 +454,11 @@ const (
 func IsLessThanV2(agent *Agent, x, y Value, order isLessThanOrder) Value {
 	var px, py Value
 	if order == IsLessThanOrderLeftFirst {
-		px = ToPrimitive(agent, x, PreferredTypeNumber)
-		py = ToPrimitive(agent, y, PreferredTypeNumber)
+		px = x.ToPrimitive(agent, PreferredTypeNumber)
+		py = y.ToPrimitive(agent, PreferredTypeNumber)
 	} else {
-		px = ToPrimitive(agent, y, PreferredTypeNumber)
-		py = ToPrimitive(agent, x, PreferredTypeNumber)
+		px = y.ToPrimitive(agent, PreferredTypeNumber)
+		py = x.ToPrimitive(agent, PreferredTypeNumber)
 	}
 	pxString, isPxString := px.(*StringValue)
 	pyString, isPyString := px.(*StringValue)
@@ -569,11 +541,11 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
 	}
 
 	if (xIsString || xIsNumber || xIsBigInt || xIsSymbol) && yIsObject {
-		return IsLooselyEqual(agent, x, ToPrimitive(agent, y, PreferredTypeDefault))
+		return IsLooselyEqual(agent, x, y.ToPrimitive(agent, PreferredTypeDefault))
 	}
 
 	if xIsObject && (yIsString || yIsNumber || yIsBigInt || yIsSymbol) {
-		return IsLooselyEqual(agent, ToPrimitive(agent, x, PreferredTypeDefault), y)
+		return IsLooselyEqual(agent, x.ToPrimitive(agent, PreferredTypeDefault), y)
 	}
 
 	if (xIsBigInt && yIsNumber) || (xIsNumber && yIsBigInt) {

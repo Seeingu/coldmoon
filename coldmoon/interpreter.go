@@ -143,8 +143,8 @@ func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOper
 	finalLval := lhs
 	finalRval := rhs
 	if op == BinaryOperatorAddition {
-		lprim := ToPrimitive(agent, lhs, PreferredTypeDefault)
-		rprim := ToPrimitive(agent, rhs, PreferredTypeDefault)
+		lprim := lhs.ToPrimitive(agent, PreferredTypeDefault)
+		rprim := rhs.ToPrimitive(agent, PreferredTypeDefault)
 		_, lprimIsString := lprim.(*StringValue)
 		_, rprimIsString := rprim.(*StringValue)
 		if lprimIsString || rprimIsString {

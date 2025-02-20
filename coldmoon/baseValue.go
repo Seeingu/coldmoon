@@ -104,6 +104,35 @@ func (b *BaseValue) ToPropertyDescriptor(agent *Agent) *PropertyDescriptor {
 	return desc
 }
 
+// ToPrimitive
+// spec: 7.1.1
+func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) Value {
+	value := b.Value
+	if objectValue, isObject := value.(*ObjectValue); isObject {
+		symbol := WellKnownSymbols[WellKnownSymbolsToPrimitive]
+		exoticToPrim := GetMethod(agent, value, NewSymbolPropertyKey(symbol))
+		if exoticToPrim != nil {
+			hintString := hint.String()
+
+			result := exoticToPrim.ToValue().Call(value, []Value{
+				NewStringValue(hintString),
+			})
+			if _, isObject = result.(*ObjectValue); !isObject {
+				return result
+			}
+
+			return agent.ThrowTypeError("could not convert object to primitive")
+		}
+		preferredType := hint
+		if preferredType == PreferredTypeDefault {
+			preferredType = PreferredTypeNumber
+		}
+		return objectValue.Object.OrdinaryToPrimitive(preferredType)
+	}
+
+	return value
+}
+
 // TODO(BM): return a string completion or abrupt completion
 func (b *BaseValue) ThisStringValue() string {
 	switch v := b.Value.(type) {
@@ -173,7 +202,7 @@ func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
 	case *StringValue:
 		return StringToNumber(value)
 	case *ObjectValue:
-		primValue := ToPrimitive(agent, value, PreferredTypeNumber)
+		primValue := value.ToPrimitive(agent, PreferredTypeNumber)
 
 		if _, ok := primValue.(*ObjectValue); !ok {
 			Assert(false)
