@@ -169,7 +169,7 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
 	if completion.IsError() {
 		ex := agent.exception
-		promiseCapability.Reject.ToValue().Call(
+		promiseCapability.Reject.Call(
 			UndefinedValue,
 			[]Value{ex},
 		)

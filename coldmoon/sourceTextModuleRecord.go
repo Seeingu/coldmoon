@@ -188,13 +188,13 @@ func (s *SourceTextModule) Evaluate() *PromiseObject {
 
 		Assert(module.Status == ModuleStatusEvaluating)
 
-		capability.Reject.ToValue().Call(UndefinedValue, []Value{err})
+		capability.Reject.Call(UndefinedValue, []Value{err})
 	} else {
 		// TODO(BM): bitset
 		Assert(module.Status == ModuleStatusEvaluated || module.Status == ModuleStatusEvaluatingAsync)
 		if !module.AsyncEvaluation {
 			Assert(module.Status == ModuleStatusEvaluated)
-			capability.Resolve.ToValue().Call(UndefinedValue, []Value{UndefinedValue})
+			capability.Resolve.Call(UndefinedValue, []Value{UndefinedValue})
 		}
 		Assert(stack.Len() == 0)
 	}
@@ -477,7 +477,7 @@ func ContinueModuleLoading(agent *Agent, state *GraphLoadingState, moduleComplet
 		module.InnerModuleLoading(state)
 	} else {
 		state.IsLoading = false
-		state.PromiseCapability.Reject.ToValue().Call(UndefinedValue, []Value{moduleCompletion.Error()})
+		state.PromiseCapability.Reject.Call(UndefinedValue, []Value{moduleCompletion.Error()})
 	}
 }
 
@@ -615,7 +615,7 @@ func (s *SourceTextModule) InnerModuleLoading(state *GraphLoadingState) {
 			if loaded.Status == ModuleStatusNew {
 				loaded.Status = ModuleStatusUnlinked
 			}
-			state.PromiseCapability.Resolve.ToValue().Call(UndefinedValue, []Value{UndefinedValue})
+			state.PromiseCapability.Resolve.Call(UndefinedValue, []Value{UndefinedValue})
 		}
 	}
 }

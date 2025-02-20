@@ -1511,7 +1511,7 @@ func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen JSInt, 
 		if exists {
 			element := source.Get(p)
 			if mapperFunction != nil {
-				element = (mapperFunction).ToValue().Call(
+				element = mapperFunction.Call(
 					thisArg,
 					[]Value{element, NewNumberValue(sourceIndex.ToNumber()), (source).ToValue()},
 				)

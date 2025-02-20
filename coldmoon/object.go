@@ -125,6 +125,22 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 	return o.Agent().ThrowException(TypeError, message)
 }
 
+func (o *Object) IsCallable() bool {
+	if o.Ref().InternalMethods().Call != nil {
+		return true
+	}
+
+	return false
+}
+
+func (o *Object) Call(this Value, argumentsList ArgumentsList) Value {
+	if !o.IsCallable() {
+		panic("TypeError")
+	}
+	object := o.Ref()
+	return object.InternalMethods().Call(object, this, argumentsList)
+}
+
 // 7.2.5
 func (o *Object) IsExtensible() bool {
 	return o.InternalMethods().IsExtensible(o)
@@ -458,7 +474,7 @@ func (o *Object) PrivateGet(privateName PrivateName) Value {
 		if getter == nil {
 			return o.Agent().ThrowTypeError("PrivateGet failed: getter is nil")
 		}
-		return getter.ToValue().Call(o.ToValue(), []Value{})
+		return getter.Call(o.ToValue(), []Value{})
 	}
 	panic("unreachable")
 }

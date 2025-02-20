@@ -33,7 +33,7 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 		}
 		k := MustGetObject(nextItem).Get(NewStringPropertyKey("0"))
 		v := MustGetObject(nextItem).Get(NewStringPropertyKey("1"))
-		adder.ToValue().Call(target.ToValue(), []Value{k, v})
+		adder.Call(target.ToValue(), []Value{k, v})
 	}
 	return target
 }

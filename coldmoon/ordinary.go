@@ -388,7 +388,7 @@ func OrdinarySetWithOwnDescriptor(
 	if setter == nil {
 		return false
 	}
-	_ = setter.ToValue().Call(receiver, []Value{value})
+	_ = setter.Call(receiver, []Value{value})
 	return true
 }
 

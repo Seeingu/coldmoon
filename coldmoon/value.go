@@ -34,7 +34,7 @@ func (hint PreferredType) String() string {
 	}
 }
 
-type ArgumentsList []Value
+type ArgumentsList = []Value
 
 func NewValueFromObject(object ObjectType) Value {
 	ov := &ObjectValue{Object: object}

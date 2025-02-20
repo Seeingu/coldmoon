@@ -4504,7 +4504,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 		function.DefineField(element)
 	}
 	for _, block := range staticStaticBlocks {
-		block.BodyFunction.ToValue().Call(function.ToValue(), nil)
+		block.BodyFunction.Call(function.ToValue(), nil)
 	}
 
 	agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment

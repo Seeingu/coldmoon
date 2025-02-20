@@ -620,7 +620,7 @@ func CompareTypedArrayElements(agent *Agent, x, y Value, comparator ObjectType) 
 	yBigInt, yIsBigInt := y.(*BigIntValue)
 	Assert((xIsNumber && yIsNumber) || (xIsBigInt && yIsBigInt))
 	if comparator != nil {
-		v := comparator.ToValue().Call(UndefinedValue, []Value{x, y}).ToNumber(agent)
+		v := comparator.Call(UndefinedValue, []Value{x, y}).ToNumber(agent)
 		if v.IsNaN() {
 			return 0
 		}

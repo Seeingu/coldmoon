@@ -50,7 +50,7 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 		agent.ExecutionContextStack.Pop()
 
 		if result.Type == CompletionTypeNormal {
-			promiseCapability.Resolve.ToValue().Call(
+			promiseCapability.Resolve.Call(
 				UndefinedValue, []Value{result.Data()})
 		} else {
 			panic("AsyncBlockStart: completion type not normal")

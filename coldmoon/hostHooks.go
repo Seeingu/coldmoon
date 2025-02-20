@@ -43,8 +43,8 @@ func HostPromiseRejectionTracker(promise *PromiseObject, operation PromiseReject
 }
 
 func HostCallJobCallback(callback *JobCallback, this Value, arguments []Value) Value {
-	Assert(IsCallable((callback.Callback).ToValue()))
-	return (callback.Callback).ToValue().Call(this, arguments)
+	Assert(IsCallable(callback.Callback.ToValue()))
+	return callback.Callback.Call(this, arguments)
 }
 
 // MARK: - HostResizeArrayBuffer 25.1.3.8

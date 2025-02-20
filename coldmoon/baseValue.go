@@ -114,7 +114,7 @@ func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) Value {
 		if exoticToPrim != nil {
 			hintString := hint.String()
 
-			result := exoticToPrim.ToValue().Call(value, []Value{
+			result := exoticToPrim.Call(value, []Value{
 				NewStringValue(hintString),
 			})
 			if _, isObject = result.(*ObjectValue); !isObject {

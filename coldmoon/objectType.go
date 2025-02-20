@@ -46,6 +46,7 @@ type ObjectType interface {
 	String() string
 	Ref() ObjectType
 	IsOrdinary() bool
+	Call(this Value, argumentsList ArgumentsList) Value
 	// defineBuiltinProperty is an alias of DefinePropertyOrThrow
 	// used to define internal property
 	defineBuiltinProperty(name PropertyConvertable, desc *PropertyDescriptor)

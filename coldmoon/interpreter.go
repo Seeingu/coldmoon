@@ -90,7 +90,7 @@ func (v *VM) InstanceOfOperator(value Value, target Value) bool {
 		target,
 		NewSymbolPropertyKey(symbol))
 	if instOfHandler != nil {
-		return instOfHandler.ToValue().Call(target, []Value{value}).ToBoolean()
+		return instOfHandler.Call(target, []Value{value}).ToBoolean()
 	}
 
 	if !IsCallable(target) {
