@@ -1866,11 +1866,11 @@ func (p *Parser) arrowFunction() *ArrowFunction {
 	}
 }
 
-func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpression {
+func (p *Parser) parenthesizedExpression() *ParenthesizedExpression {
 	p.tokenizer.MustMatch(TLeftParen)
 	expr := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
-	return &PrimaryExpressionParenthesizedExpression{
+	return &ParenthesizedExpression{
 		Expression: expr,
 	}
 }

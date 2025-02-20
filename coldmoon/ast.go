@@ -303,13 +303,15 @@ func (p *PrimaryExpressionThis) String() string {
 
 // MARK: - ParenthesizedExpression
 
-type PrimaryExpressionParenthesizedExpression struct {
+// ParenthesizedExpression [Yield, Await] :
+// - ( Expression[+In, ?Yield, ?Await] )
+type ParenthesizedExpression struct {
 	PrimaryExpression
 	Expression Expression
 }
 
-func (p *PrimaryExpressionParenthesizedExpression) _primaryExpression() {}
-func ParenthesizedExpressionAnalyze(p *PrimaryExpressionParenthesizedExpression, query AnalyzeQuery) bool {
+func (p *ParenthesizedExpression) _primaryExpression() {}
+func ParenthesizedExpressionAnalyze(p *ParenthesizedExpression, query AnalyzeQuery) bool {
 	switch query {
 	case AnalyzeQueryIsReference:
 		return ExpressionAnalyze(p.Expression, query)
@@ -318,11 +320,17 @@ func ParenthesizedExpressionAnalyze(p *PrimaryExpressionParenthesizedExpression,
 	}
 }
 
-func (p *PrimaryExpressionParenthesizedExpression) AssignmentTargetType() AssignmentTargetType {
+func (p *ParenthesizedExpression) AssignmentTargetType() AssignmentTargetType {
 	return p.Expression.AssignmentTargetType()
 }
 
-func (p *PrimaryExpressionParenthesizedExpression) String() string {
+// Evaluation
+// spec: 13.2.9.2
+func (p *ParenthesizedExpression) Evaluation(vm *VM) Value {
+	return p.Expression.Evaluation(vm)
+}
+
+func (p *ParenthesizedExpression) String() string {
 	return "(" + p.Expression.String() + ")"
 }
 
@@ -1547,7 +1555,7 @@ func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
 		switch pe := e.(type) {
 		case *IdentifierReference:
 			return true
-		case *PrimaryExpressionParenthesizedExpression:
+		case *ParenthesizedExpression:
 			return ParenthesizedExpressionAnalyze(pe, a)
 		default:
 			return false
