@@ -256,7 +256,6 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 		} else {
 			refEnv, ok := rr.Base.Env()
 			Assert(ok)
-			// TODO(SM): we should provide undefined object
 			if o := refEnv.WithBaseObject(); o != nil {
 				thisValue = o.ToValue()
 			} else {

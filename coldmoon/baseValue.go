@@ -179,7 +179,7 @@ func (b *BaseValue) ToObject(agent *Agent) ObjectType {
 func (b *BaseValue) ToBuiltinPropertyDescriptor() *PropertyDescriptor {
 	return &PropertyDescriptor{
 		Value: b.Value,
-		// TODO(C): check writable
+		// TODO: check writable
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,

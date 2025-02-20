@@ -16,7 +16,7 @@ func jsPrint(this coldmoon.Value, arguments []coldmoon.Value, newTarget coldmoon
 }
 
 // https://console.spec.whatwg.org/#console-namespace
-// TODO(C): fill up
+// TODO(BM): fill up
 func CreateConsole(realm *coldmoon.Realm) coldmoon.ObjectType {
 	agent := realm.Agent
 	proto := coldmoon.OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, nil)

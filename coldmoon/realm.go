@@ -42,7 +42,7 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.ObjectPrototype = NewObjectPrototypeSkeleton(r)
 	NewFunctionPrototypeWithIntrinsicsBinding(r)
 	r.Intrinsics.ObjectPrototype = NewObjectPrototypeWithObject(r, r.Intrinsics.ObjectPrototype)
-	// TODO(C): Register without restricted dependency order
+	// TODO: Register without restricted dependency order
 	r.Intrinsics.BooleanPrototype = NewBooleanPrototype(r)
 	r.Intrinsics.BooleanConstructor = NewBooleanConstructor(r)
 	r.Intrinsics.ThrowTypeError = NewThrowTypeError(r)
