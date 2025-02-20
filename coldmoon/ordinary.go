@@ -1,8 +1,6 @@
 package coldmoon
 
 import (
-	"fmt"
-
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
@@ -310,7 +308,6 @@ func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) Value {
 
 	getter := desc.Get
 	if getter == nil {
-		fmt.Println("DEBUG: getter is nil")
 		return UndefinedValue
 	}
 

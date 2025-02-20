@@ -4535,11 +4535,7 @@ func (c *ClassBody) PrivateBoundIdentifiers() (l []PrivateIdentifierName) {
 			// ignore
 		case *ClassElementMethodDefinition:
 			propertyName = i.MethodDefinition.PropertyName
-		case *ClassElementStaticMethodDefinition:
-			propertyName = i.MethodDefinition.PropertyName
 		case *ClassElementFieldDefinition:
-			propertyName = i.FieldDefinition.PropertyName
-		case *ClassElementStaticFieldDefinition:
 			propertyName = i.FieldDefinition.PropertyName
 		}
 	}
@@ -4611,8 +4607,6 @@ type ClassElement interface {
 // spec: 15.7.4
 func ClassElementIsStatic(c ClassElement) bool {
 	switch ce := c.(type) {
-	case *ClassElementStaticMethodDefinition, *ClassElementStaticFieldDefinition:
-		return true
 	case *ClassElementFieldDefinition:
 		return ce.IsStatic
 	case *ClassElementMethodDefinition:
@@ -4705,17 +4699,6 @@ func (c *ClassElementFieldDefinition) ClassElementKind() ClassElementKind {
 	return ClassElementKindNonConstructorMethod
 }
 
-// Deprecated
-// TODO(BM): use ClassElementFieldDefinition
-type ClassElementStaticFieldDefinition struct {
-	ClassElement
-	FieldDefinition *FieldDefinition
-}
-
-func (c *ClassElementStaticFieldDefinition) ClassElementKind() ClassElementKind {
-	return ClassElementKindNonConstructorMethod
-}
-
 // MARK: - ClassElement: EmptyStatement
 
 type ClassElementEmpty struct {
@@ -4729,19 +4712,6 @@ func (c *ClassElementEmpty) ClassElementKind() ClassElementKind {
 func (c *ClassElementEmpty) ClassElementEvaluation(vm *VM, function ObjectType) (result classEvaluationResult, err Value) {
 	// return UNUSED
 	return
-}
-
-// MARK: - ClassElement: StaticMethodDefinition
-
-// Deprecated
-// TODO(BM): remove
-type ClassElementStaticMethodDefinition struct {
-	ClassElement
-	MethodDefinition *MethodDefinition
-}
-
-func (c *ClassElementStaticMethodDefinition) ClassElementKind() ClassElementKind {
-	return ClassElementKindNonConstructorMethod
 }
 
 // MARK: - ClassElement: MethodDefinition

@@ -1,7 +1,6 @@
 package coldmoon
 
 // 8.2.1
-// TODO: remove boundName interface
 type StaticSemanticsBoundNames interface {
 	BoundNames() (l []IdentifierName)
 }
