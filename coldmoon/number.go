@@ -7,6 +7,7 @@ import (
 )
 
 // MARK: - JSNumber
+
 type JSNumber float64
 
 func (n JSNumber) ToValue() Value {

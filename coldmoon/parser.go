@@ -1275,7 +1275,7 @@ func (p *Parser) whileStatement() *WhileStatement {
 
 // MARK: - CompletionTypeReturn
 
-func (p *Parser) returnStatement() *StatementReturn {
+func (p *Parser) returnStatement() *ReturnStatement {
 	p.tokenizer.MustMatch(TReturn)
 	t := p.tokenizer.CurrentToken
 
@@ -1285,11 +1285,11 @@ func (p *Parser) returnStatement() *StatementReturn {
 
 	if t.Type == TSemicolon {
 		p.tokenizer.Next()
-		return &StatementReturn{}
+		return &ReturnStatement{}
 	}
 	expr := p.expression(p.acceptContextLowest())
 	p.automaticSemicolonInsertion()
-	return &StatementReturn{
+	return &ReturnStatement{
 		Expression: expr,
 	}
 }
@@ -1342,7 +1342,7 @@ func (p *Parser) importCall() (*ExpressionImportCall, bool) {
 	}, true
 }
 
-func (p *Parser) superCall() (*ExpressionSuperCall, bool) {
+func (p *Parser) superCall() (*SuperCall, bool) {
 	t := p.tokenizer.CurrentToken
 	if t.Type != TSuper {
 		return nil, false
@@ -1352,7 +1352,7 @@ func (p *Parser) superCall() (*ExpressionSuperCall, bool) {
 	if !p.inClassConstructor {
 		panic("superCall: not in class constructor")
 	}
-	return &ExpressionSuperCall{
+	return &SuperCall{
 		Arguments: args,
 	}, true
 }
@@ -1852,7 +1852,7 @@ func (p *Parser) arrowFunction() *ArrowFunction {
 		body = &FunctionBody{
 			StatementList: StatementList{
 				&StatementListItemStatement{
-					Statement: &StatementReturn{
+					Statement: &ReturnStatement{
 						Expression: expression,
 					},
 				},

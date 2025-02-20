@@ -573,7 +573,8 @@ type (
 	}
 )
 
-// 10.2.8
+// DefineMethodProperty
+// spec: 10.2.8
 // return PrivateElement or nil(UNUSED)
 func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, closure ObjectType, enumerable bool) *PrivateElement {
 	Assert(homeObject.IsExtensible())

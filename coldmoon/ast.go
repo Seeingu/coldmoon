@@ -9,11 +9,6 @@ import (
 	"github.com/samber/lo"
 )
 
-// Deprecated
-type boundName interface {
-	BoundNames() (l []IdentifierName)
-}
-
 type ASTNode interface {
 	String() string
 	RuntimeSemanticsEvaluation
@@ -1523,18 +1518,18 @@ func (s *SuperPropertyIdentifier) String() string {
 
 // SuperCall [Yield, Await] :
 // - super Arguments[?Yield, ?Await]
-type ExpressionSuperCall struct {
+type SuperCall struct {
 	Expression
 	Arguments Arguments
 }
 
-func (e *ExpressionSuperCall) AssignmentTargetType() AssignmentTargetType {
+func (e *SuperCall) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
 // Evaluation
 // spec: 13.3.7.1
-func (e *ExpressionSuperCall) Evaluation(vm *VM2) Value {
+func (e *SuperCall) Evaluation(vm *VM2) Value {
 	agent := vm.agent
 	newTarget := agent.GetNewTarget()
 	// alias of func
@@ -1551,7 +1546,7 @@ func (e *ExpressionSuperCall) Evaluation(vm *VM2) Value {
 	return result.ToValue()
 }
 
-func (e *ExpressionSuperCall) String() string {
+func (e *SuperCall) String() string {
 	return "super(" + e.Arguments.String() + ")"
 }
 
@@ -3262,7 +3257,6 @@ func (f *FormalParameter) String() string {
 // - BindingIdentifier[?Yield, ?Await] Initializer[+In, ?Yield, ?Await] opt
 type SingleNameBinding struct {
 	ASTNode
-	boundName
 	BindingIdentifier IdentifierName
 	Initializer       Expression
 }
@@ -3377,7 +3371,6 @@ func (a *ArrayBindingPattern) String() string {
 
 // BindingPattern : ObjectBindingPattern | ArrayBindingPattern
 type BindingPattern struct {
-	boundName
 	ObjectBindingPattern *ObjectBindingPattern
 	ArrayBindingPattern  *ArrayBindingPattern
 }
@@ -3987,12 +3980,12 @@ func (s *StatementContinue) String() string {
 // ReturnStatement [Yield, Await] :
 // - return ;
 // - return [no LineTerminator here] Expression[+In, ?Yield, ?Await] ;
-type StatementReturn struct {
+type ReturnStatement struct {
 	*StatementDefaultImpl
 	Expression Expression
 }
 
-func (s *StatementReturn) Evaluation(vm *VM2) Value {
+func (s *ReturnStatement) Evaluation(vm *VM2) Value {
 	defer func() {
 		vm.isReturn = true
 	}()
@@ -4006,7 +3999,7 @@ func (s *StatementReturn) Evaluation(vm *VM2) Value {
 	}
 }
 
-func (s *StatementReturn) String() string {
+func (s *ReturnStatement) String() string {
 	if s.Expression != nil {
 		return "CompletionTypeReturn " + s.Expression.String()
 	}
@@ -4718,7 +4711,7 @@ func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM2, ho
 		functionBody := &FunctionBody{
 			StatementList: StatementList{
 				&StatementListItemStatement{
-					Statement: &StatementReturn{
+					Statement: &ReturnStatement{
 						Expression: c.FieldDefinition.Initializer,
 					},
 				},

@@ -1,6 +1,6 @@
 package coldmoon
 
-// ListValue is a internal value wrapper for list
+// ListValue is an internal value wrapper for list
 type ListValue struct {
 	Value
 	Values []Value
