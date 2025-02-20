@@ -2273,7 +2273,8 @@ type EqualityExpression struct {
 	Right Expression
 }
 
-// 13.11.1
+// Evaluation
+// spec: 13.11.1
 func (e *EqualityExpression) Evaluation(vm *VM) Value {
 	lref := e.Left.Evaluation(vm)
 	lval := lref.GetValue(vm.agent)

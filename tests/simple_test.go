@@ -373,6 +373,7 @@ a += '1'
 assert(a === '1');
 `,
 		`
+// proxy1
 const target = {
     message1: "hello",
     message2: "everyone",
@@ -383,6 +384,22 @@ const handler1 = {};
 const proxy1 = new Proxy(target, handler1);
 assertEqual(proxy1.message1, "hello"); 
 assertEqual(proxy1.message2, "everyone"); 
+`, `
+// proxy2
+const target = {
+  message1: "hello",
+  message2: "everyone",
+};
+
+const handler2 = {
+  get(target, prop, receiver) {
+    return "world";
+  },
+};
+
+const proxy2 = new Proxy(target, handler2);
+assertEqual(proxy2.message1, "world"); // world
+assertEqual(proxy2.message2, "world"); // world
 `,
 		`
 let a = 1;

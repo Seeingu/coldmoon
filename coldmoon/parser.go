@@ -2105,7 +2105,7 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 	propertyName, ok := p.propertyName()
 	if methodType == MethodDefinitionTypeNil && ok {
 		literal, ok := propertyName.(LiteralPropertyName)
-		if ok {
+		if p.tokenizer.CurrentToken.Type != TLeftParen && ok {
 			isGet := literal.LiteralString() == "get"
 			isSet := literal.LiteralString() == "set"
 			if literal.LiteralString() == "async" {

@@ -307,10 +307,12 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().Delete(t, pk)
 		}
 
-		booleanTrapResult := (trap).ToValue().Call(
-			(h).ToValue(),
-			[]Value{(t).ToValue(), pk.ToValue()},
-		).ToBoolean()
+		booleanTrapResult := trap.
+			ToValue().
+			Call(
+				h.ToValue(),
+				[]Value{t.ToValue(), pk.ToValue()},
+			).ToBoolean()
 		if !booleanTrapResult {
 			return false
 		}
@@ -319,11 +321,11 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return true
 		}
 		if !targetDesc.Configurable {
-			panic("TypeError")
+			agent.ThrowTypeError("TypeError")
 		}
 		extensibleTarget := t.IsExtensible()
 		if !extensibleTarget {
-			panic("TypeError")
+			agent.ThrowTypeError("TypeError")
 		}
 		return true
 	}
@@ -337,8 +339,8 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().OwnPropertyKeys(t)
 		}
 
-		trapResultArray := (trap).ToValue().Call(
-			(h).ToValue(),
+		trapResultArray := trap.ToValue().Call(
+			h.ToValue(),
 			[]Value{(t).ToValue()},
 		)
 
