@@ -1,7 +1,7 @@
 package coldmoon
 
 // ReferenceRecordBase
-// [[Base]]
+// [[Base]]: Value, EnvironmentRecord, or UNRESOLVABLE
 type ReferenceRecordBase interface {
 	IsUnresolvable() bool
 	Env() (EnvironmentRecord, bool)

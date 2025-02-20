@@ -8,7 +8,7 @@ type ReferencedName struct {
 }
 
 type ReferenceRecord struct {
-	// [[Base]]: Value, EnvironmentRecord, or UNRESOLVABLE
+	// [[Base]]
 	Base ReferenceRecordBase
 	// [[ReferencedName]]
 	ReferencedName *ReferencedName

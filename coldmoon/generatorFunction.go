@@ -33,7 +33,7 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 
 func NewGeneratorFunctionPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype, "GeneratorFunctionPrototype")
-	object.defineBuiltinProperty(CMString("constructor"), NewValueFromObject(realm.Intrinsics.GeneratorFunctionConstructor).ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("constructor"), NewValueFromObject(realm.Intrinsics.GeneratorFunctionConstructor).ToBuiltinPropertyDescriptor())
 	object.defineBuiltinProperty(CMString("prototype"), &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototypePrototype),
 		Writable:     false,

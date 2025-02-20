@@ -446,8 +446,8 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 	object.defineBuiltinProperty(CMString("POSITIVE_INFINITY"), NewFrozenPropertyDescriptor(InfinityValue))
 	object.defineBuiltinProperty(CMString("NaN"), NewFrozenPropertyDescriptor(NaNValue))
 
-	object.defineBuiltinProperty(CMString("parseFloat"), realm.Intrinsics.ParseFloat.ToValue().ToPropertyDescriptor())
-	object.defineBuiltinProperty(CMString("parseInt"), realm.Intrinsics.ParseInt.ToValue().ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("parseFloat"), realm.Intrinsics.ParseFloat.ToValue().ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("parseInt"), realm.Intrinsics.ParseInt.ToValue().ToBuiltinPropertyDescriptor())
 
 	BindPrototypeAndConstructor(realm.Intrinsics.NumberPrototype, object)
 	return object

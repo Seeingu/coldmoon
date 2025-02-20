@@ -37,6 +37,73 @@ func (b *BaseValue) ToPropertyKey() PropertyKey {
 	}
 }
 
+// ToPropertyDescriptor
+// spec: 6.2.6.5
+func (b *BaseValue) ToPropertyDescriptor(agent *Agent) *PropertyDescriptor {
+	value := b.Value
+	if value == UndefinedValue {
+		return nil
+	}
+	objectValue, ok := value.(*ObjectValue)
+	if !ok {
+		agent.ThrowTypeError("Value is not an object")
+		return nil
+	}
+	object := objectValue.Object
+
+	desc := &PropertyDescriptor{}
+
+	hasEnumerable := object.HasProperty(NewStringPropertyKey("enumerable"))
+
+	if hasEnumerable {
+		enumerable := object.Get(NewStringPropertyKey("enumerable")).ToBoolean()
+		desc.Enumerable = enumerable
+	}
+
+	hasConfigurable := object.HasProperty(NewStringPropertyKey("configurable"))
+	if hasConfigurable {
+		configurable := object.Get(NewStringPropertyKey("configurable")).ToBoolean()
+		desc.Configurable = configurable
+	}
+
+	hasValue := object.HasProperty(NewStringPropertyKey("value"))
+	if hasValue {
+		desc.Value = object.Get(NewStringPropertyKey("value"))
+	}
+
+	hasWritable := object.HasProperty(NewStringPropertyKey("writable"))
+	if hasWritable {
+		writable := object.Get(NewStringPropertyKey("writable")).ToBoolean()
+		desc.Writable = writable
+	}
+
+	hasGet := object.HasProperty(NewStringPropertyKey("get"))
+	if hasGet {
+		get := object.Get(NewStringPropertyKey("get"))
+		if !IsCallable(get) && get != UndefinedValue {
+			panic("TypeError")
+		}
+		desc.Get = MustGetObject(get)
+	}
+
+	hasSet := object.HasProperty(NewStringPropertyKey("set"))
+	if hasSet {
+		set := object.Get(NewStringPropertyKey("set"))
+		if !IsCallable(set) && set != UndefinedValue {
+			panic("TypeError")
+		}
+		desc.Set = MustGetObject(set)
+	}
+
+	if hasGet || hasSet {
+		if hasValue || hasWritable {
+			panic("TypeError")
+		}
+	}
+
+	return desc
+}
+
 // TODO(BM): return a string completion or abrupt completion
 func (b *BaseValue) ThisStringValue() string {
 	switch v := b.Value.(type) {
@@ -80,7 +147,7 @@ func (b *BaseValue) ToObject(agent *Agent) ObjectType {
 	panic("unreachable")
 }
 
-func (b *BaseValue) ToPropertyDescriptor() *PropertyDescriptor {
+func (b *BaseValue) ToBuiltinPropertyDescriptor() *PropertyDescriptor {
 	return &PropertyDescriptor{
 		Value: b.Value,
 		// TODO(C): check writable

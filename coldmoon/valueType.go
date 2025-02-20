@@ -6,6 +6,9 @@ type Value interface {
 
 	Call(this Value, argumentsList ArgumentsList) Value
 	ToString() CMString
+	// ToPropertyDescriptor
+	// spec: 6.2.6.5
+	ToPropertyDescriptor(agent *Agent) *PropertyDescriptor
 	CallNoArgs(this Value) Value
 	// 7.1.18
 	ToObject(agent *Agent) ObjectType
@@ -20,7 +23,7 @@ type Value interface {
 	TypeString() string
 	String() string
 	ToCompletion() CompletionValue
-	ToPropertyDescriptor() *PropertyDescriptor
+	ToBuiltinPropertyDescriptor() *PropertyDescriptor
 	ToPropertyKey() PropertyKey
 	Hash() string
 

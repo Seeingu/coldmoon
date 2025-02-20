@@ -369,7 +369,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	typedArray.defineBuiltinFunction(realm, CMString("values"), taValues, 0)
 	typedArray.defineBuiltinFunction(realm, CMString("with"), taWith, 1)
 
-	typedArray.defineBuiltinProperty(CMString("toString"), realm.Intrinsics.ArrayPrototype.ToValue().ToPropertyDescriptor())
+	typedArray.defineBuiltinProperty(CMString("toString"), realm.Intrinsics.ArrayPrototype.ToValue().ToBuiltinPropertyDescriptor())
 
 	toStringTag := func(this Value, arguments []Value, newTarget ObjectType) Value {
 		if !ValueIsObject(this) {

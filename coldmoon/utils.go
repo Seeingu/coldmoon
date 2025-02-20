@@ -41,7 +41,7 @@ func BindPrototypeAndConstructor(proto ObjectType, constructor ObjectType) {
 			Enumerable:   false,
 			Configurable: false,
 		})
-	proto.defineBuiltinProperty(CMString("constructor"), constructor.ToValue().ToPropertyDescriptor())
+	proto.defineBuiltinProperty(CMString("constructor"), constructor.ToValue().ToBuiltinPropertyDescriptor())
 }
 
 // InitializeConstants initializes static constants

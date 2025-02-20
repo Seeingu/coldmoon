@@ -87,8 +87,8 @@ func NewErrorPrototype(realm *Realm) ObjectType {
 
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "ErrorPrototype")
 
-	object.defineBuiltinProperty(CMString("name"), NewStringValue("Error").ToPropertyDescriptor())
-	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("name"), NewStringValue("Error").ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToBuiltinPropertyDescriptor())
 
 	var toString BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
 		O, ok := thisValue.(*ObjectValue)
@@ -185,8 +185,8 @@ func NewNativeErrorPrototype(realm *Realm, name string) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ErrorPrototype, name+"Prototype")
 
-	object.defineBuiltinProperty(CMString("name"), NewStringValue(name).ToPropertyDescriptor())
-	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("name"), NewStringValue(name).ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToBuiltinPropertyDescriptor())
 
 	return object
 }
@@ -235,7 +235,7 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 func NewAggregateErrorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ErrorPrototype, "AggregateErrorPrototype")
-	object.defineBuiltinProperty(CMString("name"), NewStringValue("AggregateError").ToPropertyDescriptor())
-	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("name"), NewStringValue("AggregateError").ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToBuiltinPropertyDescriptor())
 	return object
 }

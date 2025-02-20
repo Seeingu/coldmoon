@@ -544,7 +544,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 
 		key := ToPropertyKey(agent, property)
-		desc := ToPropertyDescriptor(agent, attributes)
+		desc := attributes.ToPropertyDescriptor(agent)
 		MustGetObject(o).DefinePropertyOrThrow(key, desc)
 
 		return o
@@ -946,7 +946,7 @@ func objectDefineProperties(agent *Agent, object ObjectType, properties Value) O
 
 	for _, key := range keys {
 		descValue := props.Get(key)
-		desc := ToPropertyDescriptor(agent, descValue)
+		desc := descValue.ToPropertyDescriptor(agent)
 		if desc != nil {
 			object.DefinePropertyOrThrow(key, desc)
 		}
@@ -1029,14 +1029,14 @@ func (o *Object) defineBuiltinProperty(name PropertyConvertable, desc *PropertyD
 func (o *Object) defineToStringTag(name string) {
 	o.Ref().defineBuiltinProperty(
 		WellKnownSymbolsToStringTag,
-		NewStringValue(name).ToPropertyDescriptor(),
+		NewStringValue(name).ToBuiltinPropertyDescriptor(),
 	)
 }
 
 func (o *Object) defineUnscopables(value Value) {
 	o.Ref().defineBuiltinProperty(
 		WellKnownSymbolsUnscopables,
-		value.ToPropertyDescriptor(),
+		value.ToBuiltinPropertyDescriptor(),
 	)
 }
 
@@ -1053,7 +1053,7 @@ func (o *Object) defineBuiltinFunction(
 		name,
 		builtinFunctionArgs{realm: realm},
 	)
-	o.defineBuiltinProperty(name, f.ToValue().ToPropertyDescriptor())
+	o.defineBuiltinProperty(name, f.ToValue().ToBuiltinPropertyDescriptor())
 }
 
 type builtinAccessorParams struct {

@@ -53,7 +53,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		key := ToPropertyKey(agent, propertyKey)
 
-		desc := ToPropertyDescriptor(agent, attributes)
+		desc := attributes.ToPropertyDescriptor(agent)
 
 		targetObject := MustGetObject(target)
 
