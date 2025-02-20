@@ -292,7 +292,7 @@ func SetViewValue(
 	if IsBigIntElementType(size) {
 		numberValue = JSNumber(ToBigInt(agent, value).Data.Uint64())
 	} else {
-		numberValue = ToNumber(agent, value).Data
+		numberValue = value.ToNumber(agent).Data
 	}
 	if IsViewOutOfBounds(viewRecord) {
 		return NewCompletionValue(agent.ThrowException(RangeError, "DataView is out of bounds"))

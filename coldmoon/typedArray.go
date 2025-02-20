@@ -620,7 +620,7 @@ func CompareTypedArrayElements(agent *Agent, x, y Value, comparator ObjectType) 
 	yBigInt, yIsBigInt := y.(*BigIntValue)
 	Assert((xIsNumber && yIsNumber) || (xIsBigInt && yIsBigInt))
 	if comparator != nil {
-		v := ToNumber(agent, comparator.ToValue().Call(UndefinedValue, []Value{x, y}))
+		v := comparator.ToValue().Call(UndefinedValue, []Value{x, y}).ToNumber(agent)
 		if v.IsNaN() {
 			return 0
 		}
@@ -883,7 +883,7 @@ func TypedArraySetElement(agent *Agent, O *TypedArrayObject, index JSInt, value 
 	if O.ContentType == TypedArrayContentTypeBigInt {
 		numValue = ToBigInt(agent, value)
 	} else {
-		numValue = ToNumber(agent, value)
+		numValue = value.ToNumber(agent)
 	}
 
 	offset := O.ByteOffset
@@ -1296,7 +1296,7 @@ func typedArrayFill(agent *Agent, this Value, _value, start, end Value) Value {
 	if ta.ContentType == TypedArrayContentTypeBigInt {
 		value = ToBigInt(agent, _value)
 	} else {
-		value = ToNumber(agent, _value)
+		value = _value.ToNumber(agent)
 	}
 
 	relativeStart := ToIntegerOrInfinity(agent, start)
@@ -1835,7 +1835,7 @@ func typedArrayWith(agent *Agent, this Value, index, value Value) Value {
 	if ta.ContentType == TypedArrayContentTypeBigInt {
 		numericValue = ToBigInt(agent, value)
 	} else {
-		numericValue = ToNumber(agent, value)
+		numericValue = value.ToNumber(agent)
 	}
 	if !ta.IsValidIntegerIndex(agent, actualIndex) {
 		return agent.ThrowException(RangeError, "invalid index")

@@ -126,7 +126,7 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 
 	newLenValue := desc.Value
 	newLen := JSInt(newLenValue.(*NumberValue).Data)
-	numberLen := ToNumber(agent, newLenValue)
+	numberLen := newLenValue.ToNumber(agent)
 
 	if JSInt(numberLen.Data) != newLen {
 		panic("RangeError")
@@ -1472,11 +1472,10 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumb
 		return -1
 	}
 	if compareFn != nil {
-		v := ToNumber(agent,
-			compareFn.ToValue().Call(
-				UndefinedValue,
-				[]Value{x, y}),
-		)
+		v := compareFn.
+			ToValue().
+			Call(UndefinedValue, []Value{x, y}).
+			ToNumber(agent)
 		if v.IsNaN() {
 			return 0
 		}

@@ -2512,7 +2512,7 @@ func (u *UnaryExpression) Evaluation(vm *VM) Value {
 	case u.astIsAdd():
 		// 13.5.4.1
 		expr := u.Operand.Evaluation(vm)
-		return ToNumber(agent, expr.GetValue(agent))
+		return expr.GetValue(agent).ToNumber(agent)
 	case u.astIsSubtract():
 		// 13.5.5.1
 		expr := u.Operand.Evaluation(vm)

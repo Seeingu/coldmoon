@@ -252,7 +252,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		date := ToNumber(agent, args[0]).Data
+		date := args[0].ToNumber(agent).Data
 		if tv.IsNaN() {
 			return NaNValue
 		}
@@ -265,14 +265,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		year := ToNumber(agent, args[0]).Data
+		year := args[0].ToNumber(agent).Data
 		month := JSNumber(0.0)
 		date := JSNumber(1.0)
 		if len(args) >= 2 {
-			month = ToNumber(agent, args[1]).Data
+			month = args[1].ToNumber(agent).Data
 		}
 		if len(args) >= 3 {
-			date = ToNumber(agent, args[2]).Data
+			date = args[2].ToNumber(agent).Data
 		}
 		year = MakeFullYear(year)
 		day := MakeDay(year, month, date)
@@ -284,18 +284,18 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		hour := ToNumber(agent, args[0]).Data
+		hour := args[0].ToNumber(agent).Data
 		minute := JSNumber(0.0)
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			minute = ToNumber(agent, args[1]).Data
+			minute = args[1].ToNumber(agent).Data
 		}
 		if len(args) >= 3 {
-			sec = ToNumber(agent, args[2]).Data
+			sec = args[2].ToNumber(agent).Data
 		}
 		if len(args) >= 4 {
-			ms = ToNumber(agent, args[3]).Data
+			ms = args[3].ToNumber(agent).Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(hour, minute, sec, ms)
@@ -307,7 +307,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		ms := ToNumber(agent, args[0]).Data
+		ms := args[0].ToNumber(agent).Data
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms)
 		newDate := MakeDate(day, newTime)
@@ -318,14 +318,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		minute := ToNumber(agent, args[0]).Data
+		minute := args[0].ToNumber(agent).Data
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			sec = ToNumber(agent, args[1]).Data
+			sec = args[1].ToNumber(agent).Data
 		}
 		if len(args) >= 3 {
-			ms = ToNumber(agent, args[2]).Data
+			ms = args[2].ToNumber(agent).Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), minute, sec, ms)
@@ -337,10 +337,10 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		month := ToNumber(agent, args[0]).Data
+		month := args[0].ToNumber(agent).Data
 		date := JSNumber(1.0)
 		if len(args) >= 2 {
-			date = ToNumber(agent, args[1]).Data
+			date = args[1].ToNumber(agent).Data
 		}
 		day := MakeDay(YearFromTime(tv), month, date)
 		newDate := MakeDate(day, TimeWithinDay(tv))
@@ -351,10 +351,10 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		sec := ToNumber(agent, args[0]).Data
+		sec := args[0].ToNumber(agent).Data
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			ms = ToNumber(agent, args[1]).Data
+			ms = args[1].ToNumber(agent).Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), sec, ms)
@@ -365,14 +365,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	}
 	var setTime BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
-		t := ToNumber(agent, args[0]).Data
+		t := args[0].ToNumber(agent).Data
 		dateObject.Data = TimeClip(t)
 		return NewNumberValue(dateObject.Data)
 	}
 	var setUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		date := ToNumber(agent, args[0]).Data
+		date := args[0].ToNumber(agent).Data
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), date)
 		newDate := MakeDate(day, TimeWithinDay(tv))
 		u := TimeClip(UTC(newDate))
@@ -382,18 +382,18 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		hour := ToNumber(agent, args[0]).Data
+		hour := args[0].ToNumber(agent).Data
 		minute := JSNumber(0.0)
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			minute = ToNumber(agent, args[1]).Data
+			minute = args[1].ToNumber(agent).Data
 		}
 		if len(args) >= 3 {
-			sec = ToNumber(agent, args[2]).Data
+			sec = args[2].ToNumber(agent).Data
 		}
 		if len(args) >= 4 {
-			ms = ToNumber(agent, args[3]).Data
+			ms = args[3].ToNumber(agent).Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(hour, minute, sec, ms)
@@ -405,7 +405,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		ms := ToNumber(agent, args[0]).Data
+		ms := args[0].ToNumber(agent).Data
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms)
 		newDate := MakeDate(day, newTime)
@@ -416,14 +416,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		minute := ToNumber(agent, args[0]).Data
+		minute := args[0].ToNumber(agent).Data
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			sec = ToNumber(agent, args[1]).Data
+			sec = args[1].ToNumber(agent).Data
 		}
 		if len(args) >= 3 {
-			ms = ToNumber(agent, args[2]).Data
+			ms = args[2].ToNumber(agent).Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), minute, sec, ms)
@@ -435,10 +435,10 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		month := ToNumber(agent, args[0]).Data
+		month := args[0].ToNumber(agent).Data
 		date := JSNumber(1.0)
 		if len(args) >= 2 {
-			date = ToNumber(agent, args[1]).Data
+			date = args[1].ToNumber(agent).Data
 		}
 		day := MakeDay(YearFromTime(tv), month, date)
 		newDate := MakeDate(day, TimeWithinDay(tv))
@@ -449,10 +449,10 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		sec := ToNumber(agent, args[0]).Data
+		sec := args[0].ToNumber(agent).Data
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			ms = ToNumber(agent, args[1]).Data
+			ms = args[1].ToNumber(agent).Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), sec, ms)
@@ -821,29 +821,29 @@ func NewDateConstructor(realm *Realm) ObjectType {
 				if sv, ok := ValueGet[*StringValue](v); ok {
 					tv = DateTimeStringFormat(sv.Data)
 				} else {
-					tv = ToNumber(agent, v).Data
+					tv = v.ToNumber(agent).Data
 				}
 			}
 			dv = TimeClip(tv)
 		} else {
-			year := ToNumber(agent, args[0]).Data
-			month := ToNumber(agent, args[1]).Data
-			date := ToNumber(agent, args[2]).Data
+			year := args[0].ToNumber(agent).Data
+			month := args[1].ToNumber(agent).Data
+			date := args[2].ToNumber(agent).Data
 			hour := JSNumber(0.0)
 			minute := JSNumber(0.0)
 			sec := JSNumber(0.0)
 			ms := JSNumber(0.0)
 			if numberOfArgs >= 3 {
-				hour = ToNumber(agent, args[3]).Data
+				hour = args[3].ToNumber(agent).Data
 			}
 			if numberOfArgs >= 4 {
-				minute = ToNumber(agent, args[4]).Data
+				minute = args[4].ToNumber(agent).Data
 			}
 			if numberOfArgs >= 5 {
-				sec = ToNumber(agent, args[5]).Data
+				sec = args[5].ToNumber(agent).Data
 			}
 			if numberOfArgs >= 6 {
-				ms = ToNumber(agent, args[6]).Data
+				ms = args[6].ToNumber(agent).Data
 			}
 			year = MakeFullYear(year)
 			day := MakeDay(year, month, date)
@@ -870,7 +870,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		if numberOfArgs < 1 {
 			return NaNValue
 		}
-		year := ToNumber(agent, args[0]).Data
+		year := args[0].ToNumber(agent).Data
 		month := JSNumber(0.0)
 		date := JSNumber(1.0)
 		hour := JSNumber(0.0)
@@ -878,22 +878,22 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if numberOfArgs >= 2 {
-			month = ToNumber(agent, args[1]).Data
+			month = args[1].ToNumber(agent).Data
 		}
 		if numberOfArgs >= 3 {
-			date = ToNumber(agent, args[2]).Data
+			date = args[2].ToNumber(agent).Data
 		}
 		if numberOfArgs >= 4 {
-			hour = ToNumber(agent, args[3]).Data
+			hour = args[3].ToNumber(agent).Data
 		}
 		if numberOfArgs >= 5 {
-			minute = ToNumber(agent, args[4]).Data
+			minute = args[4].ToNumber(agent).Data
 		}
 		if numberOfArgs >= 6 {
-			sec = ToNumber(agent, args[5]).Data
+			sec = args[5].ToNumber(agent).Data
 		}
 		if numberOfArgs >= 7 {
-			ms = ToNumber(agent, args[6]).Data
+			ms = args[6].ToNumber(agent).Data
 		}
 		year = MakeFullYear(year)
 		day := MakeDay(year, month, date)

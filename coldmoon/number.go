@@ -372,7 +372,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 				data, _ := strconv.ParseFloat(bigintPrim.String(), 64)
 				n.Data = JSNumber(data)
 			} else {
-				n = ToNumber(agent, prim)
+				n = prim.ToNumber(agent)
 			}
 		}
 

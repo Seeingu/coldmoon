@@ -42,40 +42,17 @@ func NewValueFromObject(object ObjectType) Value {
 	return ov
 }
 
-// TODO(C): replace with value.ToNumber
-func ToNumber(agent *Agent, value Value) *NumberValue {
-	switch value := value.(type) {
-	case *NumberValue:
-		return value
-	case *undefinedValue:
-		return InfinityValue
-	case *nullValue:
-		return NewNumberValue(0)
-	case *BooleanValue:
-		if value.Data {
-			return NewNumberValue(1)
-		}
-		return NewNumberValue(0)
-	case *StringValue:
-		return StringToNumber(value)
-	case *ObjectValue:
-		primValue := value.ToPrimitive(agent, PreferredTypeNumber)
-		return ToNumber(agent, primValue)
-	}
-	panic("TypeError")
-}
-
 // 7.1.3
 func ToNumeric(agent *Agent, value Value) Value {
 	primValue := value.ToPrimitive(agent, PreferredTypeNumber)
 	if bigInt, ok := primValue.(*BigIntValue); ok {
 		return bigInt
 	}
-	return ToNumber(agent, primValue)
+	return primValue.ToNumber(agent)
 }
 
 func ToIntegerOrInfinity(agent *Agent, value Value) JSInt {
-	number := ToNumber(agent, value)
+	number := value.ToNumber(agent)
 	if number.IsNaN() {
 		return 0
 	}
@@ -99,7 +76,7 @@ var (
 )
 
 func ToInt32(agent *Agent, value Value) JSInt {
-	number := ToNumber(agent, value)
+	number := value.ToNumber(agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -115,7 +92,7 @@ func ToInt32(agent *Agent, value Value) JSInt {
 }
 
 func ToUint32(agent *Agent, value Value) JSInt {
-	number := ToNumber(agent, value)
+	number := value.ToNumber(agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -127,7 +104,7 @@ func ToUint32(agent *Agent, value Value) JSInt {
 }
 
 func ToInt16(value Value, agent *Agent) int16 {
-	number := ToNumber(agent, value)
+	number := value.ToNumber(agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -144,7 +121,7 @@ func ToInt16(value Value, agent *Agent) int16 {
 }
 
 func ToUint16(value Value, agent *Agent) uint16 {
-	number := ToNumber(agent, value)
+	number := value.ToNumber(agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -154,7 +131,7 @@ func ToUint16(value Value, agent *Agent) uint16 {
 }
 
 func ToInt8(value Value, agent *Agent) int8 {
-	number := ToNumber(agent, value)
+	number := value.ToNumber(agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -168,7 +145,7 @@ func ToInt8(value Value, agent *Agent) int8 {
 }
 
 func ToUint8(value Value, agent *Agent) uint8 {
-	number := ToNumber(agent, value)
+	number := value.ToNumber(agent)
 	if !number.IsFinite() || number.Data == 0 {
 		return 0
 	}
@@ -178,7 +155,7 @@ func ToUint8(value Value, agent *Agent) uint8 {
 }
 
 func ToUint8Clamp(value Value, agent *Agent) uint8 {
-	number := ToNumber(agent, value)
+	number := value.ToNumber(agent)
 	if number.IsNaN() {
 		return 0
 	}
@@ -465,8 +442,8 @@ func IsLessThanV2(agent *Agent, x, y Value, order isLessThanOrder) Value {
 	if isPxString && isPyString {
 		return NewBooleanValue(pxString.Data < pyString.Data)
 	} else {
-		nx := ToNumber(agent, px)
-		ny := ToNumber(agent, py)
+		nx := px.ToNumber(agent)
+		ny := py.ToNumber(agent)
 		if nx.IsNaN() || ny.IsNaN() {
 			return FalseValue
 		}
@@ -515,11 +492,11 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
 	_, yIsSymbol := y.(*SymbolValue)
 
 	if xIsNumber && yIsString {
-		return IsLooselyEqual(agent, x, ToNumber(agent, y))
+		return IsLooselyEqual(agent, x, y.ToNumber(agent))
 	}
 	if xIsString {
 		if yIsNumber {
-			return IsLooselyEqual(agent, ToNumber(agent, x), y)
+			return IsLooselyEqual(agent, x.ToNumber(agent), y)
 		}
 		if yIsBigInt {
 			return IsLooselyEqual(agent, y, x)
@@ -533,11 +510,11 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
 		return IsLooselyEqual(agent, x, n)
 	}
 	if xIsBoolean {
-		return IsLooselyEqual(agent, ToNumber(agent, x), y)
+		return IsLooselyEqual(agent, x.ToNumber(agent), y)
 	}
 
 	if yIsBoolean {
-		return IsLooselyEqual(agent, x, ToNumber(agent, y))
+		return IsLooselyEqual(agent, x, y.ToNumber(agent))
 	}
 
 	if (xIsString || xIsNumber || xIsBigInt || xIsSymbol) && yIsObject {

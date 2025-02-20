@@ -90,7 +90,7 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 
 func NewIsFinite(realm *Realm) ObjectType {
 	var isFinite BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		number := ToNumber(realm.Agent, args[0])
+		number := args[0].ToNumber(realm.Agent)
 		return NewBooleanValue(number.IsFinite())
 	}
 
@@ -101,7 +101,7 @@ func NewIsFinite(realm *Realm) ObjectType {
 
 func NewIsNaN(realm *Realm) ObjectType {
 	var isNaN BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
-		number := ToNumber(realm.Agent, args[0])
+		number := args[0].ToNumber(realm.Agent)
 		return NewBooleanValue(number.IsNaN())
 	}
 

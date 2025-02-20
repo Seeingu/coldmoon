@@ -203,12 +203,7 @@ func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
 		return StringToNumber(value)
 	case *ObjectValue:
 		primValue := value.ToPrimitive(agent, PreferredTypeNumber)
-
-		if _, ok := primValue.(*ObjectValue); !ok {
-			Assert(false)
-		}
-
-		return ToNumber(agent, primValue)
+		return primValue.ToNumber(agent)
 	}
 	agent.ThrowTypeError("TypeError")
 	return nil

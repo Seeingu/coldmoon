@@ -138,7 +138,7 @@ func NewJSON(realm *Realm) *JSON {
 
 		if obj, ok := ValueGetObject(space); ok {
 			if ObjectIs[*NumberObject](obj) {
-				space = ToNumber(agent, space)
+				space = space.ToNumber(agent)
 			} else if ObjectIs[*StringObject](obj) {
 				space = ToString(agent, space)
 			}
@@ -232,7 +232,7 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 
 	if obj, ok := ValueGetObject(value); ok {
 		if ObjectIs[*NumberObject](obj) {
-			value = ToNumber(agent, value)
+			value = value.ToNumber(agent)
 		} else if ObjectIs[*StringObject](obj) {
 			value = ToString(agent, value)
 		} else if ObjectIs[*BooleanObject](obj) {
