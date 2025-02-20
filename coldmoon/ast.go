@@ -149,30 +149,6 @@ func (p *IdentifierReference) String() string {
 
 // MARK: - Literal
 
-// TODO(SM): should be rename to Literal
-// Literal :
-// NullLiteral
-// BooleanLiteral
-// NumericLiteral
-// StringLiteral
-type PrimaryExpressionLiteral struct {
-	PrimaryExpression
-	Literal Literal
-}
-
-func (p *PrimaryExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
-	return AssignmentTargetTypeInvalid
-}
-
-// Evaluation Literal 13.2.3.1
-func (p *PrimaryExpressionLiteral) Evaluation(vm *VM) Value {
-	return p.Literal.Evaluation(vm)
-}
-
-func (p *PrimaryExpressionLiteral) String() string {
-	return p.Literal.String()
-}
-
 // MARK: - AsyncFunctionExpression
 
 type PrimaryExpressionAsyncFunctionExpression struct {
@@ -1132,8 +1108,13 @@ func (m *MemberExpression) String() string {
 
 // MARK: - Literal
 
+// Literal :
+// NullLiteral
+// BooleanLiteral
+// NumericLiteral
+// StringLiteral
 type Literal interface {
-	ASTNode
+	PrimaryExpression
 	Analyze(a AnalyzeQuery) bool
 	// 13.2.3.1
 }
@@ -1578,8 +1559,8 @@ func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
 
 	case AnalyzeQueryIsStringLiteral:
 		switch pe := e.(type) {
-		case *PrimaryExpressionLiteral:
-			return LiteralAnalyze(pe.Literal, a)
+		case Literal:
+			return LiteralAnalyze(pe, a)
 		default:
 			return false
 		}
@@ -5100,7 +5081,7 @@ func (s StatementList) ContainsDirective(directive string) bool {
 		statementItem := item.(*StatementListItemStatement).Statement
 		statementExpression := statementItem.(*StatementExpression).Expression
 		primary := statementExpression.(*ExpressionPrimary).PrimaryExpression
-		literal := primary.(*PrimaryExpressionLiteral).Literal.(*LiteralString)
+		literal := primary.(Literal).(*LiteralString)
 		if literal.Value == directive {
 			return true
 		}

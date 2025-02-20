@@ -1938,9 +1938,7 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		return p.templateLiteral()
 	default:
 		literal := p.literal()
-		return &PrimaryExpressionLiteral{
-			Literal: literal,
-		}
+		return literal
 	}
 }
 
