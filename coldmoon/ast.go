@@ -120,22 +120,21 @@ type (
 	PrivateIdentifierName string
 )
 
-// TODO(SM): should be rename to IdentifierReference
 // IdentifierReference [Yield, Await] :
 // Identifier
 // [~Yield] yield
 // [~Await] await
-type PrimaryExpressionIdentifierReference struct {
+type IdentifierReference struct {
 	PrimaryExpression
 	Identifier IdentifierName
 }
 
-func (p *PrimaryExpressionIdentifierReference) AssignmentTargetType() AssignmentTargetType {
+func (p *IdentifierReference) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeSimple
 }
 
 // Evaluation 13.1.3
-func (p *PrimaryExpressionIdentifierReference) Evaluation(vm *VM) Value {
+func (p *IdentifierReference) Evaluation(vm *VM) Value {
 	return NewReferenceRecordValue(
 		vm.agent.ResolveBinding(
 			p.Identifier,
@@ -144,7 +143,7 @@ func (p *PrimaryExpressionIdentifierReference) Evaluation(vm *VM) Value {
 	)
 }
 
-func (p *PrimaryExpressionIdentifierReference) String() string {
+func (p *IdentifierReference) String() string {
 	return string(p.Identifier)
 }
 
@@ -563,7 +562,7 @@ func (p *PropertyDefinitionMethodDefinition) PropertyDefinitionEvaluation(vm *VM
 
 type PropertyDefinitionIdentifierReference struct {
 	PropertyDefinition
-	IdentifierReference *PrimaryExpressionIdentifierReference
+	IdentifierReference *IdentifierReference
 }
 
 func (p *PropertyDefinitionIdentifierReference) String() string {
@@ -1569,7 +1568,7 @@ func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
 	switch a {
 	case AnalyzeQueryIsReference, AnalyzeQueryIsIdentifierReference:
 		switch pe := e.(type) {
-		case *PrimaryExpressionIdentifierReference:
+		case *IdentifierReference:
 			return true
 		case *PrimaryExpressionParenthesizedExpression:
 			return ParenthesizedExpressionAnalyze(pe, a)

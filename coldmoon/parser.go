@@ -1875,7 +1875,7 @@ func (p *Parser) parenthesizedExpression() *PrimaryExpressionParenthesizedExpres
 	}
 }
 
-func (p *Parser) identifierReference() *PrimaryExpressionIdentifierReference {
+func (p *Parser) identifierReference() *IdentifierReference {
 	t := p.tokenizer.CurrentToken
 	types := []TokenType{TIdentifier, TAwait, TYield}
 	if !lo.Contains(types, t.Type) {
@@ -1883,7 +1883,7 @@ func (p *Parser) identifierReference() *PrimaryExpressionIdentifierReference {
 	}
 	name := t.Value
 	p.tokenizer.Next()
-	return &PrimaryExpressionIdentifierReference{
+	return &IdentifierReference{
 		Identifier: IdentifierName(name),
 	}
 }
@@ -2217,7 +2217,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		identifier, ok := propertyName.(*PropertyNameLiteralIdentifier)
 		Assert(ok)
 		return &PropertyDefinitionIdentifierReference{
-			IdentifierReference: &PrimaryExpressionIdentifierReference{
+			IdentifierReference: &IdentifierReference{
 				Identifier: identifier.Identifier,
 			},
 		}
