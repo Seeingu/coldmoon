@@ -2343,8 +2343,8 @@ func (p *Parser) variableDeclaration() *VariableDeclaration {
 	}
 }
 
-func (p *Parser) blockStatement() *BlockStatementBlock {
-	return &BlockStatementBlock{
+func (p *Parser) blockStatement() *BlockStatement {
+	return &BlockStatement{
 		Block: p.block(),
 	}
 }

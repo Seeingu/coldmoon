@@ -2692,8 +2692,8 @@ func (c *CallExpression) astIsFunctionCall() bool {
 	return true
 }
 
-// TODO(SM): WIP
-// Evaluation 13.3.6.1
+// Evaluation
+// spec: 13.3.6.1
 func (c *CallExpression) Evaluation(vm *VM) Value {
 	if c.astIsCover() {
 		return c.coverCallExpressionAndAsyncArrowHead(vm)
@@ -2891,28 +2891,6 @@ func (v *VariableDeclaration) String() string {
 		return string(v.BindingIdentifier) + " = " + v.Initializer.String()
 	}
 	return string(v.BindingIdentifier)
-}
-
-// MARK: - BlockStatement
-
-type StatementBlock struct {
-	*StatementDefaultImpl
-	BlockStatement BlockStatement
-}
-
-var _ Statement = (*StatementBlock)(nil)
-
-func (s *StatementBlock) VarScopedDeclarations() (l []*VariableDeclaration) {
-	return s.BlockStatement.VarScopedDeclarations()
-}
-
-func (s *StatementBlock) VarDeclaredNames() (l []IdentifierName) {
-	return s.BlockStatement.VarDeclaredNames()
-}
-func (s *StatementBlock) _statement() {}
-
-func (s *StatementBlock) String() string {
-	return s.BlockStatement.String()
 }
 
 // MARK: - EmptyStatement
@@ -4976,9 +4954,10 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 	return function
 }
 
-// Evaluation 15.2.6
+// Evaluation
+// spec: 15.2.6
 func (f *FunctionDeclaration) Evaluation(vm *VM) Value {
-	// TODO(SM): check spec
+	// TODO(BM): match spec
 	realm := vm.agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := f.instantiateOrdinaryFunctionObject(vm.agent, env, nil)
@@ -4993,29 +4972,26 @@ func (f *FunctionDeclaration) String() string {
 
 // MARK: - BlockStatement
 
-type BlockStatement interface {
-	Statement
-}
-
-// TODO(SM): remove
-type BlockStatementBlock struct {
+// BlockStatement [Yield, Await, Return] :
+// - Block[?Yield, ?Await, ?Return]
+type BlockStatement struct {
 	Block *Block
 }
 
-func (b *BlockStatementBlock) _statement() {}
-func (b *BlockStatementBlock) VarScopedDeclarations() []*VariableDeclaration {
+func (b *BlockStatement) _statement() {}
+func (b *BlockStatement) VarScopedDeclarations() []*VariableDeclaration {
 	return b.Block.StatementList.VarScopedDeclarations()
 }
 
-func (b *BlockStatementBlock) VarDeclaredNames() []IdentifierName {
+func (b *BlockStatement) VarDeclaredNames() []IdentifierName {
 	return b.Block.StatementList.VarDeclaredNames()
 }
 
-func (b *BlockStatementBlock) Evaluation(vm *VM) Value {
+func (b *BlockStatement) Evaluation(vm *VM) Value {
 	return b.Block.Evaluation(vm)
 }
 
-func (b *BlockStatementBlock) String() string {
+func (b *BlockStatement) String() string {
 	return b.Block.StatementList.String()
 }
 
