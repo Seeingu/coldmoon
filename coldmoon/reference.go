@@ -1,38 +1,5 @@
 package coldmoon
 
-// TODO(BM): use convertable
-// ReferenceRecordBase Enum
-type ReferenceRecordBase struct {
-	value Value
-	env   EnvironmentRecord
-	// TODO(SM): use reference literal
-	unresolvable bool
-}
-
-func NewReferenceRecordBaseUnresolvable() *ReferenceRecordBase {
-	return &ReferenceRecordBase{unresolvable: true}
-}
-
-func NewReferenceRecordBaseValue(value Value) *ReferenceRecordBase {
-	return &ReferenceRecordBase{value: value}
-}
-
-func NewReferenceRecordBaseEnv(env EnvironmentRecord) *ReferenceRecordBase {
-	return &ReferenceRecordBase{env: env}
-}
-
-func (r *ReferenceRecordBase) Unresolvable() bool {
-	return r.unresolvable
-}
-
-func (r *ReferenceRecordBase) Env() (EnvironmentRecord, bool) {
-	return r.env, r.env != nil
-}
-
-func (r *ReferenceRecordBase) Value() (Value, bool) {
-	return r.value, r.value != nil
-}
-
 // ReferencedName Enum
 type ReferencedName struct {
 	String      string
@@ -42,7 +9,7 @@ type ReferencedName struct {
 
 type ReferenceRecord struct {
 	// [[Base]]: Value, EnvironmentRecord, or UNRESOLVABLE
-	Base *ReferenceRecordBase
+	Base ReferenceRecordBase
 	// [[ReferencedName]]
 	ReferencedName *ReferencedName
 	// [[Strict]]
@@ -68,7 +35,7 @@ func (r *ReferenceRecordValue) String() string {
 	return "ReferenceRecordValue"
 }
 
-func NewReferenceRecord(base *ReferenceRecordBase, referencedName *ReferencedName, strict bool, thisValue Value) *ReferenceRecord {
+func NewReferenceRecord(base ReferenceRecordBase, referencedName *ReferencedName, strict bool, thisValue Value) *ReferenceRecord {
 	return &ReferenceRecord{
 		Base:           base,
 		ReferencedName: referencedName,
@@ -85,7 +52,7 @@ func (r *ReferenceRecord) IsPropertyReference() bool {
 
 // 6.2.5.2
 func (r *ReferenceRecord) IsUnresolvableReference() bool {
-	return r.Base.Unresolvable()
+	return r.Base.IsUnresolvable()
 }
 
 // 6.2.5.3

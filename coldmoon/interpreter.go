@@ -66,13 +66,12 @@ func (v *VM) EvaluatePropertyAccessWithExpressionKey(
 // EvaluatePropertyAccessWithIdentifierKey
 // spec: 13.3.4
 func (v *VM) EvaluatePropertyAccessWithIdentifierKey(baseValue Value, identifierName IdentifierName, strict bool) *ReferenceRecord {
-	// TODO: use 13.1.2 Static Semantics: StringValue
 	propertyNameString := identifierName
 	return NewReferenceRecord(
-		&ReferenceRecordBase{value: baseValue},
+		NewReferenceRecordBaseValue(baseValue),
 		&ReferencedName{String: propertyNameString},
 		strict,
-		// TODO: EMPTY
+		// EMPTY
 		UndefinedValue,
 	)
 }
