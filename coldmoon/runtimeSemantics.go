@@ -2,7 +2,7 @@ package coldmoon
 
 // 13.1.3
 type RuntimeSemanticsEvaluation interface {
-	Evaluation(vm *VM2) Value
+	Evaluation(vm *VM) Value
 }
 
 // 8.4.5
@@ -13,29 +13,29 @@ type RuntimeSemanticsNamedEvaluation interface {
 // 13.2.5.5
 type RuntimeSemanticsPropertyDefinitionEvaluation interface {
 	// PropertyDefinitionEvaluation returns UNUSED
-	PropertyDefinitionEvaluation(vm *VM2, obj ObjectType)
+	PropertyDefinitionEvaluation(vm *VM, obj ObjectType)
 }
 
 // 13.3.8.1
 type RuntimeSemanticsArgumentListEvaluation interface {
-	ArgumentListEvaluation(vm *VM2) []Value
+	ArgumentListEvaluation(vm *VM) []Value
 }
 
 // 15.3.4
 type RuntimeSemanticsInstantiateArrowFunctionExpression interface {
-	InstantiateArrowFunctionExpression(vm *VM2, name string) Value
+	InstantiateArrowFunctionExpression(vm *VM, name string) Value
 }
 
 // 15.4.5
 type RuntimeSemanticsMethodDefinitionEvaluation interface {
 	// MethodDefinitionEvaluation returns PrivateElement or an abrupt Completion
-	MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) (pe *PrivateElement, err Value)
+	MethodDefinitionEvaluation(vm *VM, obj ObjectType, enumerable bool) (pe *PrivateElement, err Value)
 }
 
 // RuntimeSemanticsChainEvaluation
 // 13.3.9.2
 type RuntimeSemanticsChainEvaluation interface {
-	ChainEvaluation(vm *VM2, baseValue Value, baseReference Value) (value Value, err Value)
+	ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (value Value, err Value)
 }
 
 // MARK: - DefineMethod 15.4.4
@@ -46,7 +46,7 @@ type DefineMethodRecord struct {
 }
 type RuntimeSemanticsDefineMethod interface {
 	// proto is optional
-	DefineMethod(vm *VM2, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value)
+	DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value)
 }
 
 // MARK: - Class Related
@@ -54,7 +54,7 @@ type RuntimeSemanticsDefineMethod interface {
 // 15.7.15
 type RuntimeSemanticsBindingClassDeclarationEvaluation interface {
 	// BindingClassDeclarationEvaluation returns a function object or an abrupt Completion
-	BindingClassDeclarationEvaluation(vm *VM2) (obj ObjectType, err Value)
+	BindingClassDeclarationEvaluation(vm *VM) (obj ObjectType, err Value)
 }
 
 // RuntimeSemanticsInstantiateOrdinaryFunctionExpression
@@ -62,13 +62,13 @@ type RuntimeSemanticsBindingClassDeclarationEvaluation interface {
 type RuntimeSemanticsInstantiateOrdinaryFunctionExpression interface {
 	// InstantiateOrdinaryFunctionExpression
 	// name is optional
-	InstantiateOrdinaryFunctionExpression(vm *VM2, name PropertyKeyOrPrivateName) (fun ObjectType)
+	InstantiateOrdinaryFunctionExpression(vm *VM, name PropertyKeyOrPrivateName) (fun ObjectType)
 }
 
 // 15.7.14
 type RuntimeSemanticsClassDefinitionEvaluation interface {
 	// classBinding is optional
-	ClassDefinitionEvaluation(vm *VM2, classBinding string, className PropertyKeyOrPrivateName) (obj ObjectType, err Value)
+	ClassDefinitionEvaluation(vm *VM, classBinding string, className PropertyKeyOrPrivateName) (obj ObjectType, err Value)
 }
 
 // classEvaluationResult enum
@@ -80,12 +80,12 @@ type classEvaluationResult struct {
 
 // 15.7.13
 type RuntimeSemanticsClassElementEvaluation interface {
-	ClassElementEvaluation(vm *VM2, obj ObjectType) (result classEvaluationResult, err Value)
+	ClassElementEvaluation(vm *VM, obj ObjectType) (result classEvaluationResult, err Value)
 }
 
 // 15.7.10
 type RuntimeSemanticsClassFieldDefinitionEvaluation interface {
-	ClassFieldDefinitionEvaluation(vm *VM2, homeObject ObjectType) (field *ClassFieldDefinition, err Value)
+	ClassFieldDefinitionEvaluation(vm *VM, homeObject ObjectType) (field *ClassFieldDefinition, err Value)
 }
 
 // MARK: - Array
@@ -93,7 +93,7 @@ type RuntimeSemanticsClassFieldDefinitionEvaluation interface {
 // RuntimeSemanticsArrayAccumulation
 // spec: 13.2.4.1
 type RuntimeSemanticsArrayAccumulation interface {
-	ArrayAccumulation(vm *VM2, array *ArrayObject, nextIndex JSInt) (index JSInt, err Value)
+	ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSInt) (index JSInt, err Value)
 }
 
 // MARK: - Loop
@@ -101,19 +101,19 @@ type RuntimeSemanticsArrayAccumulation interface {
 // RuntimeSemanticsForInOfLoopEvaluation
 // spec: 13.7.5.5
 type RuntimeSemanticsForInOfLoopEvaluation interface {
-	ForInOfLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value)
+	ForInOfLoopEvaluation(vm *VM, labelSet []string) (value Value, err Value)
 }
 
 // RuntimeSemanticsWhileLoopEvaluation
 // spec: 14.7.3.2
 type RuntimeSemanticsWhileLoopEvaluation interface {
-	WhileLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value)
+	WhileLoopEvaluation(vm *VM, labelSet []string) (value Value, err Value)
 }
 
 // RuntimeSemanticsForDeclarationBindingInstantiation
 // spec: 14.7.5.4
 type RuntimeSemanticsForDeclarationBindingInstantiation interface {
-	ForDeclarationBindingInstantiation(vm *VM2, env EnvironmentRecord)
+	ForDeclarationBindingInstantiation(vm *VM, env EnvironmentRecord)
 }
 
 // MARK: - Generator
@@ -122,13 +122,13 @@ type RuntimeSemanticsForDeclarationBindingInstantiation interface {
 // spec: 15.5.4
 // name is optional
 type RuntimeSemanticsInstantiateGeneratorFunctionExpression interface {
-	InstantiateGeneratorFunctionExpression(vm *VM2, name PropertyKeyOrPrivateName) (fun ObjectType)
+	InstantiateGeneratorFunctionExpression(vm *VM, name PropertyKeyOrPrivateName) (fun ObjectType)
 }
 
 // MARK: - Async
 
 type RuntimeSemanticsInstantiateAsyncArrowFunctionExpression interface {
-	InstantiateAsyncArrowFunctionExpression(vm *VM2, name PropertyKeyOrPrivateName) (fun ObjectType)
+	InstantiateAsyncArrowFunctionExpression(vm *VM, name PropertyKeyOrPrivateName) (fun ObjectType)
 }
 
 // MARK: - Function

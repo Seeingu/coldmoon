@@ -68,7 +68,7 @@ func (p *ClassExpression) astHasIdentifier() bool {
 
 // Evaluation
 // spec: 15.7.16
-func (p *ClassExpression) Evaluation(vm *VM2) Value {
+func (p *ClassExpression) Evaluation(vm *VM) Value {
 	if p.astHasIdentifier() {
 		className := p.IdentifierName
 		value, err := p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className))
@@ -135,7 +135,7 @@ func (p *PrimaryExpressionIdentifierReference) AssignmentTargetType() Assignment
 }
 
 // Evaluation 13.1.3
-func (p *PrimaryExpressionIdentifierReference) Evaluation(vm *VM2) Value {
+func (p *PrimaryExpressionIdentifierReference) Evaluation(vm *VM) Value {
 	return NewReferenceRecordValue(
 		vm.agent.ResolveBinding(
 			p.Identifier,
@@ -166,7 +166,7 @@ func (p *PrimaryExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
 }
 
 // Evaluation Literal 13.2.3.1
-func (p *PrimaryExpressionLiteral) Evaluation(vm *VM2) Value {
+func (p *PrimaryExpressionLiteral) Evaluation(vm *VM) Value {
 	return p.Literal.Evaluation(vm)
 }
 
@@ -220,7 +220,7 @@ func (p *GeneratorExpression) astHasIdentifierName() bool {
 // InstantiateGeneratorFunctionExpression
 // spec: 15.5.4
 func (p *GeneratorExpression) InstantiateGeneratorFunctionExpression(
-	vm *VM2,
+	vm *VM,
 	name PropertyKeyOrPrivateName,
 ) (fun ObjectType) {
 	agent := vm.agent
@@ -276,7 +276,7 @@ func (p *GeneratorExpression) InstantiateGeneratorFunctionExpression(
 	}
 }
 
-func (p *GeneratorExpression) Evaluation(vm *VM2) Value {
+func (p *GeneratorExpression) Evaluation(vm *VM) Value {
 	// TODO: name
 	name := NewStringPropertyKey("")
 	return p.InstantiateGeneratorFunctionExpression(vm, name).ToValue()
@@ -320,7 +320,7 @@ func (p *PrimaryExpressionThis) AssignmentTargetType() AssignmentTargetType {
 
 // Evaluation
 // spec: 13.2.1.1
-func (p *PrimaryExpressionThis) Evaluation(vm *VM2) Value {
+func (p *PrimaryExpressionThis) Evaluation(vm *VM) Value {
 	return vm.agent.ResolveThisBinding()
 }
 
@@ -401,7 +401,7 @@ func (e ElementList) astHasElementListAndAssignmentExpression() (list ElementLis
 
 // ArrayAccumulation
 // spec: 13.2.4.1
-func (e ElementList) ArrayAccumulation(vm *VM2, array *ArrayObject, nextIndex JSInt) (index JSInt, err Value) {
+func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSInt) (index JSInt, err Value) {
 	if list, expr, ok := e.astHasElementListAndAssignmentExpression(); ok {
 		nextIndex, err = list.ArrayAccumulation(vm, array, nextIndex)
 		if err != nil {
@@ -443,7 +443,7 @@ func (p *ArrayLiteral) astElementListEmpty() bool {
 
 // Evaluation
 // spec: 13.2.4.2
-func (p *ArrayLiteral) Evaluation(vm *VM2) Value {
+func (p *ArrayLiteral) Evaluation(vm *VM) Value {
 	array := ArrayCreate(vm.agent, 0, nil)
 	if p.astElementListEmpty() {
 		return array.ToValue()
@@ -492,7 +492,7 @@ func (p *PrimaryExpressionObjectLiteral) astIsEmpty() bool {
 }
 
 // 13.2.5.4
-func (p *PrimaryExpressionObjectLiteral) Evaluation(vm *VM2) Value {
+func (p *PrimaryExpressionObjectLiteral) Evaluation(vm *VM) Value {
 	if p.astIsEmpty() {
 		return OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil).ToValue()
 	}
@@ -520,7 +520,7 @@ type PropertyDefinitionList struct {
 var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionList)(nil)
 
 // 13.2.5.4
-func (p *PropertyDefinitionList) PropertyDefinitionEvaluation(vm *VM2, obj ObjectType) {
+func (p *PropertyDefinitionList) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) {
 	for _, item := range p.Items {
 		item.PropertyDefinitionEvaluation(vm, obj)
 	}
@@ -557,7 +557,7 @@ type PropertyDefinitionMethodDefinition struct {
 
 var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionMethodDefinition)(nil)
 
-func (p *PropertyDefinitionMethodDefinition) PropertyDefinitionEvaluation(vm *VM2, obj ObjectType) {
+func (p *PropertyDefinitionMethodDefinition) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) {
 	p.MethodDefinition.MethodDefinitionEvaluation(vm, obj, true)
 }
 
@@ -576,7 +576,7 @@ type PropertyDefinitionNameAndExpression struct {
 	Expression Expression
 }
 
-func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *VM2, object ObjectType) {
+func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *VM, object ObjectType) {
 	propKey := p.Name.Evaluation(vm)
 	var isProtoSetter bool
 	if vm.IsJSONParse {
@@ -693,7 +693,7 @@ func (p *MethodDefinition) astIsGet() bool {
 
 // DefineMethod
 // spec: 15.4.4
-func (p *MethodDefinition) DefineMethod(vm *VM2, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value) {
+func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astIsClassElementName() {
@@ -726,7 +726,7 @@ func (p *MethodDefinition) DefineMethod(vm *VM2, obj ObjectType, proto ObjectTyp
 	}
 }
 
-func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM2, obj ObjectType, enumerable bool) (pe *PrivateElement, err Value) {
+func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, enumerable bool) (pe *PrivateElement, err Value) {
 	agent := vm.agent
 	if p.astIsGet() {
 		propKey := p.PropertyName.Evaluation(vm)
@@ -809,7 +809,7 @@ func (p *PropertyNameLiteralIdentifier) String() string {
 	return string(p.Identifier)
 }
 
-func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM2) Value {
+func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM) Value {
 	return NewStringValue(p.Identifier)
 }
 
@@ -852,7 +852,7 @@ func (p *ComputedPropertyName) String() string {
 
 // Evaluation
 // spec: 13.2.5.4
-func (p *ComputedPropertyName) Evaluation(vm *VM2) Value {
+func (p *ComputedPropertyName) Evaluation(vm *VM) Value {
 	exprValue := p.Expression.Evaluation(vm)
 	propName := exprValue.GetValue(vm.agent)
 	return ToPropertyKey(vm.agent, propName).ToValue()
@@ -883,7 +883,7 @@ func (p *FunctionExpression) astHasIdentifier() bool {
 
 // InstantiateOrdinaryFunctionExpression
 // spec: 15.2.5
-func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM2, propertyKeyOrPrivateName PropertyKeyOrPrivateName) (fun ObjectType) {
+func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM, propertyKeyOrPrivateName PropertyKeyOrPrivateName) (fun ObjectType) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astHasIdentifier() {
@@ -937,12 +937,12 @@ func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM2, prop
 
 // NamedEvaluation
 // spec: 8.4.5
-func (p *FunctionExpression) NamedEvaluation(vm *VM2, name PropertyKeyOrPrivateName) Value {
+func (p *FunctionExpression) NamedEvaluation(vm *VM, name PropertyKeyOrPrivateName) Value {
 	return p.InstantiateOrdinaryFunctionExpression(vm, name).ToValue()
 }
 
 // TODO: non standard
-func (p *FunctionExpression) Evaluation(vm *VM2) Value {
+func (p *FunctionExpression) Evaluation(vm *VM) Value {
 	return p.NamedEvaluation(vm, NewStringPropertyKey(""))
 }
 
@@ -970,12 +970,12 @@ func (p *AsyncArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *AsyncArrowFunction) Evaluation(vm *VM2) Value {
+func (p *AsyncArrowFunction) Evaluation(vm *VM) Value {
 	return p.InstantiateAsyncArrowFunctionExpression(vm, NewStringPropertyKey("")).ToValue()
 }
 
 func (p *AsyncArrowFunction) InstantiateAsyncArrowFunctionExpression(
-	vm *VM2,
+	vm *VM,
 	name PropertyKeyOrPrivateName,
 ) ObjectType {
 	functionExpression := p
@@ -1028,11 +1028,11 @@ func (p *ArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *ArrowFunction) Evaluation(vm *VM2) Value {
+func (p *ArrowFunction) Evaluation(vm *VM) Value {
 	return p.InstantiateArrowFunctionExpression(vm, "")
 }
 
-func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM2, name string) Value {
+func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM, name string) Value {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := vm.RunningLexicalEnvironment()
@@ -1108,7 +1108,7 @@ func (m *MemberExpression) astIsPropertyExpression() bool {
 
 // Evaluation
 // spec: 13.3.2.1
-func (m *MemberExpression) Evaluation(vm *VM2) Value {
+func (m *MemberExpression) Evaluation(vm *VM) Value {
 	baseReference := m.Member.Evaluation(vm)
 	baseValue := baseReference.GetValue(vm.agent)
 	strict := vm.containedInStrictCode
@@ -1156,7 +1156,7 @@ type LiteralNull struct {
 
 var _ Literal = (*LiteralNull)(nil)
 
-func (l *LiteralNull) Evaluation(vm *VM2) Value {
+func (l *LiteralNull) Evaluation(vm *VM) Value {
 	return NullValue
 }
 
@@ -1171,7 +1171,7 @@ type LiteralUndefined struct {
 var _ Literal = (*LiteralUndefined)(nil)
 
 // 13.2.3.1
-func (l *LiteralUndefined) Evaluation(vm *VM2) Value {
+func (l *LiteralUndefined) Evaluation(vm *VM) Value {
 	return UndefinedValue
 }
 
@@ -1186,7 +1186,7 @@ type LiteralBoolean struct {
 
 var _ Literal = (*LiteralBoolean)(nil)
 
-func (l *LiteralBoolean) Evaluation(vm *VM2) Value {
+func (l *LiteralBoolean) Evaluation(vm *VM) Value {
 	return NewBooleanValue(l.Bool)
 }
 
@@ -1245,7 +1245,7 @@ func (l *LiteralNumeric) NumericValue() (Value, error) {
 	return NewNumberValue(JSNumber(num)), nil
 }
 
-func (l *LiteralNumeric) Evaluation(vm *VM2) Value {
+func (l *LiteralNumeric) Evaluation(vm *VM) Value {
 	v, err := l.NumericValue()
 	if err != nil {
 		panic(err)
@@ -1273,7 +1273,7 @@ func (l *LiteralString) StringValue() Value {
 }
 
 // 13.2.3.1
-func (l *LiteralString) Evaluation(vm *VM2) Value {
+func (l *LiteralString) Evaluation(vm *VM) Value {
 	return l.StringValue()
 }
 
@@ -1370,7 +1370,7 @@ func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (o *OptionalExpression) Evaluation(vm *VM2) Value {
+func (o *OptionalExpression) Evaluation(vm *VM) Value {
 	baseReference := o.Expr.Evaluation(vm)
 	baseValue := baseReference.GetValue(vm.agent)
 	if IsUndefinedOrNull(baseValue) {
@@ -1416,7 +1416,7 @@ func (o *OptionalExpressionProperty) isStrict() bool {
 	return true
 }
 
-func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM2, baseValue Value, baseReference Value) (value Value, err Value) {
+func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (value Value, err Value) {
 	if o.astIsArguments() {
 		thisChain := o
 		// TODO
@@ -1529,7 +1529,7 @@ func (e *SuperCall) AssignmentTargetType() AssignmentTargetType {
 
 // Evaluation
 // spec: 13.3.7.1
-func (e *SuperCall) Evaluation(vm *VM2) Value {
+func (e *SuperCall) Evaluation(vm *VM) Value {
 	agent := vm.agent
 	newTarget := agent.GetNewTarget()
 	// alias of func
@@ -1604,7 +1604,7 @@ func (t *PrimaryExpressionTemplateLiteral) astNoSubstitution() bool {
 
 // Evaluation
 // spec: 13.2.8.6
-func (t *PrimaryExpressionTemplateLiteral) Evaluation(vm *VM2) Value {
+func (t *PrimaryExpressionTemplateLiteral) Evaluation(vm *VM) Value {
 	if t.astNoSubstitution() {
 		// NoSubstitutionTemplate
 		span := t.TemplateLiteral.Spans[0]
@@ -1714,7 +1714,7 @@ func (e *UpdateExpression) isPrefix() bool {
 // Evaluation
 // postfix: 13.4.2.1/13.4.3.1
 // prefix: 13.4.4.1/13.4.5.1
-func (e *UpdateExpression) Evaluation(vm *VM2) Value {
+func (e *UpdateExpression) Evaluation(vm *VM) Value {
 	expr := e.Operand.Evaluation(vm)
 	oldValue := ToNumeric(vm.agent, expr.GetValue(vm.agent))
 	var newValue Value
@@ -1899,7 +1899,7 @@ func (e *AssignmentExpression) astIsAssign() bool {
 
 // Evaluation
 // spec: 13.15.2
-func (e *AssignmentExpression) Evaluation(vm *VM2) Value {
+func (e *AssignmentExpression) Evaluation(vm *VM) Value {
 	if e.astIsAssign() {
 		_, isObjectLiteral := e.Left.(*PrimaryExpressionObjectLiteral)
 		_, isArrayLiteral := e.Left.(*ArrayLiteral)
@@ -1963,12 +1963,12 @@ func (e *NewExpression) AssignmentTargetType() AssignmentTargetType {
 }
 
 // 13.3.5.1
-func (e *NewExpression) Evaluation(vm *VM2) Value {
+func (e *NewExpression) Evaluation(vm *VM) Value {
 	return e.EvaluateNew(vm)
 }
 
 // 13.3.5.1.1
-func (e *NewExpression) EvaluateNew(vm *VM2) Value {
+func (e *NewExpression) EvaluateNew(vm *VM) Value {
 	ref := e.Callee.Evaluation(vm)
 	constructor := ref.GetValue(vm.agent)
 	var argList []Value
@@ -2072,7 +2072,7 @@ func (b *ExpressionBinaryExpression) AssignmentTargetType() AssignmentTargetType
 }
 
 // 13.15.4
-func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM2) Value {
+func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM) Value {
 	lref := b.Left.Evaluation(vm)
 	lval := lref.GetValue(vm.agent)
 
@@ -2081,7 +2081,7 @@ func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm 
 	return vm.ApplyStringOrNumericBinaryOperator(lval, rval, b.Operator)
 }
 
-func (b *ExpressionBinaryExpression) Evaluation(vm *VM2) Value {
+func (b *ExpressionBinaryExpression) Evaluation(vm *VM) Value {
 	return b.EvaluateStringOrNumericBinaryExpression(vm)
 }
 
@@ -2123,7 +2123,7 @@ type ConditionalExpression struct {
 
 // Evaluation
 // spec: 13.14.1
-func (e *ConditionalExpression) Evaluation(vm *VM2) Value {
+func (e *ConditionalExpression) Evaluation(vm *VM) Value {
 	agent := vm.agent
 	lref := e.Test.Evaluation(vm)
 	lval := lref.GetValue(agent)
@@ -2209,7 +2209,7 @@ func (e *ExpressionLogicalExpression) astNullishCoalescing() bool {
 
 // Evaluation
 // spec: 13.13.1
-func (e *ExpressionLogicalExpression) Evaluation(vm *VM2) Value {
+func (e *ExpressionLogicalExpression) Evaluation(vm *VM) Value {
 	switch {
 	case e.astIsOr():
 		lref := e.Left.Evaluation(vm)
@@ -2296,7 +2296,7 @@ type EqualityExpression struct {
 }
 
 // 13.11.1
-func (e *EqualityExpression) Evaluation(vm *VM2) Value {
+func (e *EqualityExpression) Evaluation(vm *VM) Value {
 	lref := e.Left.Evaluation(vm)
 	lval := lref.GetValue(vm.agent)
 
@@ -2379,7 +2379,7 @@ type RelationalExpression struct {
 
 // Evaluation
 // spec: 13.10.1
-func (e *RelationalExpression) Evaluation(vm *VM2) Value {
+func (e *RelationalExpression) Evaluation(vm *VM) Value {
 	lref := e.Left.Evaluation(vm)
 	lval := lref.GetValue(vm.agent)
 
@@ -2495,7 +2495,7 @@ func (u *UnaryExpression) astIsVoid() bool {
 
 // TODO: use Number::[op], BigInt::[op]
 // spec: 13.5.3.1, 13.5.4.1, 13.5.5.1, 13.5.6.1, 13.5.7.1
-func (u *UnaryExpression) Evaluation(vm *VM2) Value {
+func (u *UnaryExpression) Evaluation(vm *VM) Value {
 	agent := vm.agent
 	switch {
 	case u.astIsTypeof():
@@ -2632,7 +2632,7 @@ func (a Arguments) isEmpty() bool {
 	return len(a) == 0
 }
 
-func (a Arguments) ArgumentListEvaluation(vm *VM2) []Value {
+func (a Arguments) ArgumentListEvaluation(vm *VM) []Value {
 	if a.isEmpty() {
 		return []Value{}
 	}
@@ -2666,7 +2666,7 @@ func (a Arguments) String() string {
 // Evaluation 13.3.8.1
 // ArgumentListEvaluation
 // TODO(XXX): can we split it out based on different types of arguments?
-func (a Arguments) Evaluation(vm *VM2) Value {
+func (a Arguments) Evaluation(vm *VM) Value {
 	// Assigment
 	if len(a) == 0 {
 		return NewListValue([]Value{})
@@ -2716,7 +2716,7 @@ func (c *CallExpression) astIsFunctionCall() bool {
 
 // TODO(SM): WIP
 // Evaluation 13.3.6.1
-func (c *CallExpression) Evaluation(vm *VM2) Value {
+func (c *CallExpression) Evaluation(vm *VM) Value {
 	if c.astIsCover() {
 		return c.coverCallExpressionAndAsyncArrowHead(vm)
 	}
@@ -2741,7 +2741,7 @@ func (c *CallExpression) Evaluation(vm *VM2) Value {
 
 // coverCallExpressionAndAsyncArrowHead matches CallExpression : CoverCallExpressionAndAsyncArrowHead
 // spec: 13.3.6.1
-func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM2) Value {
+func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) Value {
 	callee := c.Callee.(*MemberExpression)
 	expr := callee
 	memberExpr := expr
@@ -2831,7 +2831,7 @@ func (s *StatementVariable) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return s.DeclarationList.VarScopedDeclarations()
 }
 
-func (s *StatementVariable) Evaluation(vm *VM2) Value {
+func (s *StatementVariable) Evaluation(vm *VM) Value {
 	return s.DeclarationList.Evaluation(vm)
 }
 
@@ -2851,7 +2851,7 @@ func (v *VariableDeclarationList) VarScopedDeclarations() (l []*VariableDeclarat
 	return v.Items
 }
 
-func (v *VariableDeclarationList) Evaluation(vm *VM2) Value {
+func (v *VariableDeclarationList) Evaluation(vm *VM) Value {
 	var lastValue Value
 	for _, item := range v.Items {
 		lastValue = item.Evaluation(vm)
@@ -2886,7 +2886,7 @@ func (v *VariableDeclaration) astHasInitializer() bool {
 	return v.Initializer != nil
 }
 
-func (v *VariableDeclaration) Evaluation(vm *VM2) Value {
+func (v *VariableDeclaration) Evaluation(vm *VM) Value {
 	if !v.astHasInitializer() {
 		return UndefinedValue
 	} else {
@@ -3021,7 +3021,7 @@ func (s *StatementExpression) VarScopedDeclarations() (l []*VariableDeclaration)
 	return
 }
 
-func (s *StatementExpression) Evaluation(vm *VM2) Value {
+func (s *StatementExpression) Evaluation(vm *VM) Value {
 	return s.Expression.Evaluation(vm)
 }
 
@@ -3041,7 +3041,7 @@ func (b *BreakableStatement) VarScopedDeclarations() (l []*VariableDeclaration) 
 	return b.IterationStatement.VarScopedDeclarations()
 }
 
-func (b *BreakableStatement) Evaluation(vm *VM2) Value {
+func (b *BreakableStatement) Evaluation(vm *VM) Value {
 	return b.IterationStatement.Evaluation(vm)
 }
 
@@ -3119,7 +3119,7 @@ func (f *FunctionBody) LexicallyDeclaredNames() (l []IdentifierName) {
 }
 
 // TODO(spec)
-func (f *FunctionBody) Evaluation(vm *VM2) Value {
+func (f *FunctionBody) Evaluation(vm *VM) Value {
 	return f.StatementList.Evaluation(vm)
 }
 
@@ -3476,7 +3476,7 @@ func (s *IfStatement) astHasElse() bool {
 
 // Evaluation
 // spec: 14.6.2
-func (s *IfStatement) Evaluation(vm *VM2) Value {
+func (s *IfStatement) Evaluation(vm *VM) Value {
 	if s.astHasElse() {
 		exprRef := s.Condition.Evaluation(vm)
 		exprValue := exprRef.GetValue(vm.agent)
@@ -3536,7 +3536,7 @@ func (s *WhileStatement) VarScopedDeclarations() []*VariableDeclaration {
 	return s.Body.VarScopedDeclarations()
 }
 
-func (s *WhileStatement) Evaluation(vm *VM2) Value {
+func (s *WhileStatement) Evaluation(vm *VM) Value {
 	// TODO
 	var labelSet []string
 	vm.loopNodeStack.Push(s)
@@ -3548,7 +3548,7 @@ func (s *WhileStatement) Evaluation(vm *VM2) Value {
 
 // WhileLoopEvaluation
 // spec: 14.7.3.2
-func (s *WhileStatement) WhileLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value) {
+func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (value Value, err Value) {
 	var V Value = UndefinedValue
 	for {
 		exprRef := s.Condition.Evaluation(vm)
@@ -3618,7 +3618,7 @@ func (f *ForStatementInitializerVariable) String() string {
 	return f.VariableStatement.String()
 }
 
-func (f *ForStatementInitializerVariable) Evaluation(vm *VM2) Value {
+func (f *ForStatementInitializerVariable) Evaluation(vm *VM) Value {
 	return f.VariableStatement.Evaluation(vm)
 }
 
@@ -3662,7 +3662,7 @@ func (s *ForStatement) isVariableDeclarationList() bool {
 }
 
 // ForLoopEvaluation 14.7.4.2
-func (s *ForStatement) ForLoopEvaluation(vm *VM2) Value {
+func (s *ForStatement) ForLoopEvaluation(vm *VM) Value {
 	// TODO: label set
 	if s.isVariableDeclarationList() {
 		s.Initializer.Evaluation(vm)
@@ -3680,7 +3680,7 @@ func (s *ForStatement) ForLoopEvaluation(vm *VM2) Value {
 	panic("unimplemented")
 }
 
-func (s *ForStatement) Evaluation(vm *VM2) Value {
+func (s *ForStatement) Evaluation(vm *VM) Value {
 	return s.ForLoopEvaluation(vm)
 }
 
@@ -3762,7 +3762,7 @@ func (f *ForInOfStatement) BoundNames() (l []IdentifierName) {
 	return
 }
 
-func (f *ForInOfStatement) Evaluation(vm *VM2) Value {
+func (f *ForInOfStatement) Evaluation(vm *VM) Value {
 	// TODO
 	var labelSet []string
 	result, err := f.ForInOfLoopEvaluation(vm, labelSet)
@@ -3790,7 +3790,7 @@ func (f *ForInOfStatement) astIsForDeclaration() bool {
 
 // ForInOfLoopEvaluation
 // spec: 14.7.5.5
-func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM2, labelSet []string) (value Value, err Value) {
+func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (value Value, err Value) {
 	if f.astIsForDeclaration() {
 		forDeclaration := f.Initializer.ForDeclaration
 		if f.astIsOf() {
@@ -3922,7 +3922,7 @@ var (
 	_ RuntimeSemanticsForDeclarationBindingInstantiation = (*ForDeclaration)(nil)
 )
 
-func (f *ForDeclaration) ForDeclarationBindingInstantiation(vm *VM2, env EnvironmentRecord) {
+func (f *ForDeclaration) ForDeclarationBindingInstantiation(vm *VM, env EnvironmentRecord) {
 	for _, name := range f.ForBinding.BoundNames() {
 		if f.LetOrConst.IsConstantDeclaration() {
 			env.CreateImmutableBinding(name, true)
@@ -3985,7 +3985,7 @@ type ReturnStatement struct {
 	Expression Expression
 }
 
-func (s *ReturnStatement) Evaluation(vm *VM2) Value {
+func (s *ReturnStatement) Evaluation(vm *VM) Value {
 	defer func() {
 		vm.isReturn = true
 	}()
@@ -4057,7 +4057,7 @@ type DeclarationHoistableFunction struct {
 	FunctionDeclaration *FunctionDeclaration
 }
 
-func (d *DeclarationHoistableFunction) Evaluation(vm *VM2) Value {
+func (d *DeclarationHoistableFunction) Evaluation(vm *VM) Value {
 	return d.FunctionDeclaration.Evaluation(vm)
 }
 
@@ -4079,7 +4079,7 @@ type DeclarationHoistableAsyncFunction struct {
 
 func (d *DeclarationHoistableAsyncFunction) _declaration() {}
 
-func (d *DeclarationHoistableAsyncFunction) Evaluation(vm *VM2) Value {
+func (d *DeclarationHoistableAsyncFunction) Evaluation(vm *VM) Value {
 	return d.AsyncFunctionDeclaration.Evaluation(vm)
 }
 
@@ -4096,7 +4096,7 @@ type AsyncFunctionDeclaration struct {
 }
 
 // TODO: not standard
-func (d *AsyncFunctionDeclaration) Evaluation(vm *VM2) Value {
+func (d *AsyncFunctionDeclaration) Evaluation(vm *VM) Value {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := realm.GlobalEnv
@@ -4134,7 +4134,7 @@ type DeclarationHoistableAsyncGenerator struct {
 	AsyncGeneratorDeclaration *AsyncGeneratorDeclaration
 }
 
-func (d *DeclarationHoistableAsyncGenerator) Evaluation(vm *VM2) Value {
+func (d *DeclarationHoistableAsyncGenerator) Evaluation(vm *VM) Value {
 	return d.AsyncGeneratorDeclaration.Evaluation(vm)
 }
 
@@ -4151,7 +4151,7 @@ type AsyncGeneratorDeclaration struct {
 }
 
 // TODO: not standard
-func (d *AsyncGeneratorDeclaration) Evaluation(vm *VM2) Value {
+func (d *AsyncGeneratorDeclaration) Evaluation(vm *VM) Value {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := realm.GlobalEnv
@@ -4197,7 +4197,7 @@ type DeclarationHoistableGenerator struct {
 	GeneratorDeclaration *GeneratorDeclaration
 }
 
-func (d *DeclarationHoistableGenerator) Evaluation(vm *VM2) Value {
+func (d *DeclarationHoistableGenerator) Evaluation(vm *VM) Value {
 	return d.GeneratorDeclaration.Evaluation(vm)
 }
 
@@ -4214,7 +4214,7 @@ type GeneratorDeclaration struct {
 }
 
 // TODO: not standard
-func (d *GeneratorDeclaration) Evaluation(vm *VM2) Value {
+func (d *GeneratorDeclaration) Evaluation(vm *VM) Value {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := realm.GlobalEnv
@@ -4289,7 +4289,7 @@ func (d *ClassDeclaration) astHasIdentifier() bool {
 }
 
 // 15.7.16
-func (d *ClassDeclaration) Evaluation(vm *VM2) Value {
+func (d *ClassDeclaration) Evaluation(vm *VM) Value {
 	d.BindingClassDeclarationEvaluation(vm)
 	// return EMPTY
 	return UndefinedValue
@@ -4297,7 +4297,7 @@ func (d *ClassDeclaration) Evaluation(vm *VM2) Value {
 
 // BindingClassDeclarationEvaluation
 // spec: 15.7.15
-func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM2) (obj ObjectType, err Value) {
+func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM) (obj ObjectType, err Value) {
 	if d.astHasIdentifier() {
 		className := d.IdentifierName
 		value, err := d.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className))
@@ -4331,7 +4331,7 @@ var _ RuntimeSemanticsClassDefinitionEvaluation = (*ClassTail)(nil)
 
 // ClassDefinitionEvaluation
 // spec: 15.7.14
-func (c *ClassTail) ClassDefinitionEvaluation(vm *VM2, classBinding string, className PropertyKeyOrPrivateName) (obj ObjectType, err Value) {
+func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, className PropertyKeyOrPrivateName) (obj ObjectType, err Value) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	// outer env of class
@@ -4688,13 +4688,13 @@ var (
 	_ RuntimeSemanticsClassFieldDefinitionEvaluation = (*ClassElementFieldDefinition)(nil)
 )
 
-func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM2, obj ObjectType) (result classEvaluationResult, err Value) {
+func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (result classEvaluationResult, err Value) {
 	field, err := c.ClassFieldDefinitionEvaluation(vm, obj)
 	result.classFieldDefinition = field
 	return
 }
 
-func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM2, homeObject ObjectType) (field *ClassFieldDefinition, err Value) {
+func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM, homeObject ObjectType) (field *ClassFieldDefinition, err Value) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	var name PropertyKeyOrPrivateName
@@ -4768,7 +4768,7 @@ func (c *ClassElementEmpty) ClassElementKind() ClassElementKind {
 	return ClassElementKindEmpty
 }
 
-func (c *ClassElementEmpty) ClassElementEvaluation(vm *VM2, function ObjectType) (result classEvaluationResult, err Value) {
+func (c *ClassElementEmpty) ClassElementEvaluation(vm *VM, function ObjectType) (result classEvaluationResult, err Value) {
 	// return UNUSED
 	return
 }
@@ -4794,7 +4794,7 @@ type ClassElementMethodDefinition struct {
 	IsStatic         bool
 }
 
-func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM2, obj ObjectType) (result classEvaluationResult, err Value) {
+func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (result classEvaluationResult, err Value) {
 	privateElement, err := c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false)
 	if err != nil {
 		return result, err
@@ -4849,7 +4849,7 @@ func (d *LexicalDeclaration) IsConstantDeclaration() bool {
 }
 
 // Evaluation 14.3.1.2
-func (d *LexicalDeclaration) Evaluation(vm *VM2) Value {
+func (d *LexicalDeclaration) Evaluation(vm *VM) Value {
 	d.BindingList.Evaluation(vm)
 	// return EMPTY
 	return UndefinedValue
@@ -4878,7 +4878,7 @@ func (b *BindingList) BoundNames() (l []IdentifierName) {
 	return
 }
 
-func (b *BindingList) Evaluation(vm *VM2) Value {
+func (b *BindingList) Evaluation(vm *VM) Value {
 	var list []Value
 	for _, item := range b.Items {
 		list = append(list, item.Evaluation(vm))
@@ -4918,7 +4918,7 @@ func (l *LexicalBinding) BoundNames() (list []IdentifierName) {
 }
 
 // 14.3.1.2
-func (l *LexicalBinding) Evaluation(vm *VM2) Value {
+func (l *LexicalBinding) Evaluation(vm *VM) Value {
 	switch {
 	case l.Identifier != "" && l.Initializer == nil:
 		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
@@ -4998,7 +4998,7 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 }
 
 // Evaluation 15.2.6
-func (f *FunctionDeclaration) Evaluation(vm *VM2) Value {
+func (f *FunctionDeclaration) Evaluation(vm *VM) Value {
 	// TODO(SM): check spec
 	realm := vm.agent.CurrentRealm()
 	env := realm.GlobalEnv
@@ -5032,7 +5032,7 @@ func (b *BlockStatementBlock) VarDeclaredNames() []IdentifierName {
 	return b.Block.StatementList.VarDeclaredNames()
 }
 
-func (b *BlockStatementBlock) Evaluation(vm *VM2) Value {
+func (b *BlockStatementBlock) Evaluation(vm *VM) Value {
 	return b.Block.Evaluation(vm)
 }
 
@@ -5045,7 +5045,7 @@ type Block struct {
 }
 
 // 14.2.2
-func (b *Block) Evaluation(vm *VM2) Value {
+func (b *Block) Evaluation(vm *VM) Value {
 	return b.StatementList.Evaluation(vm)
 }
 
@@ -5109,7 +5109,7 @@ func (s StatementList) ContainsDirective(directive string) bool {
 	return false
 }
 
-func (s StatementList) Evaluation(vm *VM2) Value {
+func (s StatementList) Evaluation(vm *VM) Value {
 	var lastValue Value
 	for i, item := range s {
 		lastValue = item.Evaluation(vm)
@@ -5199,7 +5199,7 @@ func (s *StatementListItemStatement) VarScopedDeclarations() (l []*VariableDecla
 	return vars
 }
 
-func (s *StatementListItemStatement) Evaluation(vm *VM2) Value {
+func (s *StatementListItemStatement) Evaluation(vm *VM) Value {
 	return s.Statement.Evaluation(vm)
 }
 
@@ -5236,7 +5236,7 @@ func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDec
 	return
 }
 
-func (s *StatementListItemDeclaration) Evaluation(vm *VM2) Value {
+func (s *StatementListItemDeclaration) Evaluation(vm *VM) Value {
 	return s.Declaration.Evaluation(vm)
 }
 
@@ -5248,7 +5248,7 @@ type ExpressionStatement struct {
 	Expression Expression
 }
 
-func (e *ExpressionStatement) Evaluation(vm *VM2) Value {
+func (e *ExpressionStatement) Evaluation(vm *VM) Value {
 	return e.Expression.Evaluation(vm)
 }
 
@@ -5263,7 +5263,7 @@ type Script struct {
 	StatementList StatementList
 }
 
-func (s *Script) Evaluation(vm *VM2) Value {
+func (s *Script) Evaluation(vm *VM) Value {
 	return s.StatementList.Evaluation(vm)
 }
 
@@ -5291,7 +5291,7 @@ var (
 )
 
 // TODO: spec reference
-func (m *Module) Evaluation(vm *VM2) Value {
+func (m *Module) Evaluation(vm *VM) Value {
 	var list []Value
 	for _, moduleItem := range m.ModuleItemList {
 		switch stmt := moduleItem.(type) {
@@ -5445,7 +5445,7 @@ func (m *ModuleItemStatementListItem) moduleRequests() (l []string) {
 	return
 }
 
-func (m *ModuleItemStatementListItem) Evaluation(vm *VM2) Value {
+func (m *ModuleItemStatementListItem) Evaluation(vm *VM) Value {
 	return m.StatementListItem.Evaluation(vm)
 }
 
@@ -5498,7 +5498,7 @@ var (
 	_ ASTNode                      = (*ModuleItemExportDeclaration)(nil)
 )
 
-func (m *ModuleItemExportDeclaration) Evaluation(vm *VM2) Value {
+func (m *ModuleItemExportDeclaration) Evaluation(vm *VM) Value {
 	switch {
 	case m.ExportFrom != nil || m.NamedExports != nil:
 		return UndefinedValue
@@ -5746,7 +5746,7 @@ func (y *YieldExpression) astHasAssignmentExpression() bool {
 	return y.AssignmentExpression != nil
 }
 
-func (y *YieldExpression) Evaluation(vm *VM2) Value {
+func (y *YieldExpression) Evaluation(vm *VM) Value {
 	if !y.astHasAssignmentExpression() {
 		return vm.GetCompletionValueOrPanic(Yield(vm.agent, UndefinedValue))
 	} else if y.hasStar {

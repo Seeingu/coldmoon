@@ -6,7 +6,7 @@ import (
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
-type VM2 struct {
+type VM struct {
 	agent                 *Agent
 	containedInStrictCode bool
 	// IsJSONParse handle is parsed from JSON.parse
@@ -22,28 +22,28 @@ type VM2 struct {
 	isInLoop               bool
 }
 
-func NewVM2(agent *Agent) *VM2 {
-	return &VM2{
+func NewVM2(agent *Agent) *VM {
+	return &VM{
 		agent: agent,
 	}
 }
 
-func (v *VM2) RunningLexicalEnvironment() EnvironmentRecord {
+func (v *VM) RunningLexicalEnvironment() EnvironmentRecord {
 	return v.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 }
 
-func (v *VM2) RunningPrivateEnvironment() *PrivateEnvironment {
+func (v *VM) RunningPrivateEnvironment() *PrivateEnvironment {
 	return v.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 }
 
 // TODO(BM): error handling
-func (v *VM2) panic(err Value) {
+func (v *VM) panic(err Value) {
 	panic(err)
 }
 
 // InitializeBoundName
 // spec: 8.6.2.1
-func (v *VM2) InitializeBoundName(name string, value Value, env EnvironmentRecord) {
+func (v *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord) {
 	if env == nil {
 		lhs := v.agent.ResolveBinding(name, nil, true)
 		lhs.PutValue(v.agent, value)
@@ -54,7 +54,7 @@ func (v *VM2) InitializeBoundName(name string, value Value, env EnvironmentRecor
 
 // EvaluatePropertyAccessWithExpressionKey
 // spec: 13.3.3
-func (v *VM2) EvaluatePropertyAccessWithExpressionKey(
+func (v *VM) EvaluatePropertyAccessWithExpressionKey(
 	baseValue Value, expression Expression, strict bool,
 ) *ReferenceRecord {
 	propertyNameReference := expression.Evaluation(v)
@@ -65,7 +65,7 @@ func (v *VM2) EvaluatePropertyAccessWithExpressionKey(
 
 // EvaluatePropertyAccessWithIdentifierKey
 // spec: 13.3.4
-func (v *VM2) EvaluatePropertyAccessWithIdentifierKey(baseValue Value, identifierName IdentifierName, strict bool) *ReferenceRecord {
+func (v *VM) EvaluatePropertyAccessWithIdentifierKey(baseValue Value, identifierName IdentifierName, strict bool) *ReferenceRecord {
 	// TODO: use 13.1.2 Static Semantics: StringValue
 	propertyNameString := identifierName
 	return NewReferenceRecord(
@@ -79,7 +79,7 @@ func (v *VM2) EvaluatePropertyAccessWithIdentifierKey(baseValue Value, identifie
 
 // InstanceOfOperator
 // spec: 13.10.2
-func (v *VM2) InstanceOfOperator(value Value, target Value) bool {
+func (v *VM) InstanceOfOperator(value Value, target Value) bool {
 	agent := v.agent
 	if _, ok := target.(*ObjectValue); !ok {
 		agent.ThrowTypeError("target is not an object")
@@ -102,7 +102,7 @@ func (v *VM2) InstanceOfOperator(value Value, target Value) bool {
 }
 
 // 7.3.21
-func (v *VM2) OrdinaryHasInstance(c Value, value Value) Completion[bool] {
+func (v *VM) OrdinaryHasInstance(c Value, value Value) Completion[bool] {
 	agent := v.agent
 	if !IsCallable(c) {
 		return NewNormalCompletion(false)
@@ -137,7 +137,7 @@ func (v *VM2) OrdinaryHasInstance(c Value, value Value) Completion[bool] {
 }
 
 // spec: 13.15.3
-func (v *VM2) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOperator) Value {
+func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOperator) Value {
 	agent := v.agent
 	lhs := left
 	rhs := right
@@ -248,7 +248,7 @@ func (v *VM2) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOpe
 
 // EvaluateCall ( func, ref, arguments, tailPosition )
 // spec: 13.3.6.2
-func (v *VM2) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) Value {
+func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) Value {
 	agent := v.agent
 	var thisValue Value
 	if rr, ok := ref.ReferenceRecord(); ok {
@@ -281,7 +281,7 @@ func (v *VM2) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool)
 type LabelSet = []string
 
 // 14.7.4.3
-func (v *VM2) ForBodyEvaluation(test, increment Expression, stmt Statement, perIterationBindings []string, labelSet LabelSet) Value {
+func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIterationBindings []string, labelSet LabelSet) Value {
 	var V Value = UndefinedValue
 	CreatePerIterationEnvironment(perIterationBindings)
 	for {
@@ -309,7 +309,7 @@ func (v *VM2) ForBodyEvaluation(test, increment Expression, stmt Statement, perI
 
 // ForInOfHeadEvaluation
 // spec: 14.7.5.6
-func (v *VM2) ForInOfHeadEvaluation(
+func (v *VM) ForInOfHeadEvaluation(
 	uninitializedBoundNames []string,
 	expr Expression,
 	iterationKind ForInOfIterationKind,
@@ -357,7 +357,7 @@ func (v *VM2) ForInOfHeadEvaluation(
 // ForInOfBodyEvaluation
 // spec: 14.7.5.7
 // iteratorKind is optional
-func (v *VM2) ForInOfBodyEvaluation(
+func (v *VM) ForInOfBodyEvaluation(
 	lhs Expression,
 	stmt Statement,
 	iteratorRecord *IteratorRecord,
@@ -456,14 +456,14 @@ func UpdateEmpty(result, V Value) Value {
 	return V
 }
 
-func (v *VM2) GetValueOrPanic(result Value, err Value) Value {
+func (v *VM) GetValueOrPanic(result Value, err Value) Value {
 	if result == nil {
 		v.panic(err)
 	}
 	return result
 }
 
-func (v *VM2) GetCompletionValueOrPanic(c CompletionValue) Value {
+func (v *VM) GetCompletionValueOrPanic(c CompletionValue) Value {
 	if c.IsError() {
 		v.panic(c.Error())
 	}
