@@ -80,7 +80,7 @@ func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody Gene
 		// TODO: result should be a completion
 		var result Value
 		if body, ok := genVM.suspendedGeneratorBody.(RuntimeSemanticsEvaluation); ok {
-			result = body.Evaluation(genVM)
+			result = body.Evaluation(genVM).value
 		} else {
 			result = generatorBody.(AbstractClosure)()
 		}

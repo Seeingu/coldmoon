@@ -66,24 +66,24 @@ func (p *ClassExpression) astHasIdentifier() bool {
 
 // Evaluation
 // spec: 15.7.16
-func (p *ClassExpression) Evaluation(vm *VM) Value {
-	// TODO: refactor after evaluation return type updated
-	var co CompletionValue
+func (p *ClassExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if p.astHasIdentifier() {
 		className := p.IdentifierName
-		value, isAbrupt, _ := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)), co)
+		value, isAbrupt, rt := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)), co)
 		if isAbrupt {
-			panic("unimplemented")
+			return rt
 		}
 		// TODO: set sourceText
-		return value.ToValue()
+		co.value = value.ToValue()
+		return
 	} else {
-		value, isAbrupt, _ := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("")), co)
+		value, isAbrupt, rt := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("")), co)
 		if isAbrupt {
-			panic("unimplemented")
+			return rt
 		}
 		// TODO: set sourceText
-		return value.ToValue()
+		co.value = value.ToValue()
+		return
 	}
 }
 
@@ -134,13 +134,13 @@ func (p *IdentifierReference) AssignmentTargetType() AssignmentTargetType {
 }
 
 // Evaluation 13.1.3
-func (p *IdentifierReference) Evaluation(vm *VM) Value {
+func (p *IdentifierReference) Evaluation(vm *VM) CompletionValue {
 	return NewReferenceRecordValue(
 		vm.agent.ResolveBinding(
 			p.Identifier,
 			nil, vm.containedInStrictCode,
 		),
-	)
+	).ToCompletion()
 }
 
 func (p *IdentifierReference) String() string {
@@ -249,10 +249,10 @@ func (p *GeneratorExpression) InstantiateGeneratorFunctionExpression(
 	}
 }
 
-func (p *GeneratorExpression) Evaluation(vm *VM) Value {
+func (p *GeneratorExpression) Evaluation(vm *VM) CompletionValue {
 	// TODO: name
 	name := NewStringPropertyKey("")
-	return p.InstantiateGeneratorFunctionExpression(vm, name).ToValue()
+	return p.InstantiateGeneratorFunctionExpression(vm, name).ToValue().ToCompletion()
 }
 
 func (p *GeneratorExpression) String() string {
@@ -293,8 +293,8 @@ func (p *PrimaryExpressionThis) AssignmentTargetType() AssignmentTargetType {
 
 // Evaluation
 // spec: 13.2.1.1
-func (p *PrimaryExpressionThis) Evaluation(vm *VM) Value {
-	return vm.agent.ResolveThisBinding()
+func (p *PrimaryExpressionThis) Evaluation(vm *VM) CompletionValue {
+	return vm.agent.ResolveThisBinding().ToCompletion()
 }
 
 func (p *PrimaryExpressionThis) String() string {
@@ -326,7 +326,7 @@ func (p *ParenthesizedExpression) AssignmentTargetType() AssignmentTargetType {
 
 // Evaluation
 // spec: 13.2.9.2
-func (p *ParenthesizedExpression) Evaluation(vm *VM) Value {
+func (p *ParenthesizedExpression) Evaluation(vm *VM) CompletionValue {
 	return p.Expression.Evaluation(vm)
 }
 
@@ -390,13 +390,13 @@ func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSI
 		}
 		// TODO: check elision
 		initResult := expr.Expression.Evaluation(vm)
-		initValue := initResult.GetValue(vm.agent)
+		initValue := initResult.value.GetValue(vm.agent)
 		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
 		return nextIndex + 1, nil
 	} else if expr, ok = e.astIsOnlyHasAssigmentExpression(); ok {
 		// TODO: check elision
 		initResult := expr.Expression.Evaluation(vm)
-		initValue := initResult.GetValue(vm.agent)
+		initValue := initResult.value.GetValue(vm.agent)
 		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
 		return nextIndex + 1, nil
 	} else {
@@ -424,16 +424,16 @@ func (p *ArrayLiteral) astElementListEmpty() bool {
 
 // Evaluation
 // spec: 13.2.4.2
-func (p *ArrayLiteral) Evaluation(vm *VM) Value {
+func (p *ArrayLiteral) Evaluation(vm *VM) CompletionValue {
 	array := ArrayCreate(vm.agent, 0, nil)
 	if p.astElementListEmpty() {
-		return array.ToValue()
+		return array.ToValue().ToCompletion()
 	}
 	if p.astHasElision() {
 	} else {
 		p.ElementList.ArrayAccumulation(vm, array, 0)
 	}
-	return array.ToValue()
+	return array.ToValue().ToCompletion()
 }
 
 func (p *ArrayLiteral) String() string {
@@ -473,14 +473,14 @@ func (p *PrimaryExpressionObjectLiteral) astIsEmpty() bool {
 }
 
 // 13.2.5.4
-func (p *PrimaryExpressionObjectLiteral) Evaluation(vm *VM) Value {
+func (p *PrimaryExpressionObjectLiteral) Evaluation(vm *VM) CompletionValue {
 	if p.astIsEmpty() {
-		return OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil).ToValue()
+		return OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil).ToValue().ToCompletion()
 	}
 
 	obj := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
 	p.PropertyList.PropertyDefinitionEvaluation(vm, obj)
-	return obj.ToValue()
+	return obj.ToValue().ToCompletion()
 }
 
 func (p *PrimaryExpressionObjectLiteral) String() string {
@@ -550,6 +550,7 @@ func (p *PropertyDefinitionIdentifierReference) String() string {
 	return p.IdentifierReference.String()
 }
 
+// PropertyDefinition : PropertyName : AssignmentExpression
 type PropertyDefinitionNameAndExpression struct {
 	PropertyDefinition
 	Name       PropertyName
@@ -561,7 +562,7 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 	var isProtoSetter bool
 	if vm.IsJSONParse {
 		isProtoSetter = false
-	} else if propKey.String() == "__proto__" && !IsComputedPropertyKeyDefault(p.Name) {
+	} else if propKey.value.String() == "__proto__" && !IsComputedPropertyKeyDefault(p.Name) {
 		isProtoSetter = true
 	} else {
 		isProtoSetter = false
@@ -572,7 +573,7 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 		panic("unimplemented")
 	} else {
 		exprValueRef := p.Expression.Evaluation(vm)
-		propValue = exprValueRef.GetValue(vm.agent)
+		propValue = exprValueRef.value.GetValue(vm.agent)
 	}
 	if isProtoSetter {
 		if propValue.IsObject() || propValue == NullValue {
@@ -583,7 +584,7 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 	// TODO: assert no non-configurable properties
 	Assert(object.IsOrdinary() && object.IsExtensible())
 	object.CreateDataPropertyOrThrow(
-		ToPropertyKey(vm.agent, propKey), propValue)
+		ToPropertyKey(vm.agent, propKey.value), propValue)
 }
 
 func (p *PropertyDefinitionNameAndExpression) String() string {
@@ -699,7 +700,7 @@ func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType
 		)
 		MakeMethod(closure, obj)
 		c.value = &DefineMethodRecord{
-			Key:     ToPropertyKey(agent, propKey),
+			Key:     ToPropertyKey(agent, propKey.value),
 			Closure: closure,
 		}
 		return
@@ -730,7 +731,7 @@ func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, en
 		)
 		MakeMethod(closure, obj)
 		// TODO: check propKey is private name
-		SetFunctionName(closure, propKey.ToPropertyKey(), "get")
+		SetFunctionName(closure, propKey.value.ToPropertyKey(), "get")
 		// TODO: check propKey is private name
 		isPrivateName := false
 		if isPrivateName {
@@ -741,7 +742,7 @@ func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, en
 				Enumerable:   enumerable,
 				Configurable: true,
 			}
-			obj.DefinePropertyOrThrow(propKey.ToPropertyKey(), desc)
+			obj.DefinePropertyOrThrow(propKey.value.ToPropertyKey(), desc)
 			// return UNUSED
 			return
 		}
@@ -793,8 +794,8 @@ func (p *PropertyNameLiteralIdentifier) String() string {
 	return string(p.Identifier)
 }
 
-func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM) Value {
-	return NewStringValue(p.Identifier)
+func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM) CompletionValue {
+	return NewStringValue(p.Identifier).ToCompletion()
 }
 
 type PropertyNameLiteralString struct {
@@ -836,10 +837,10 @@ func (p *ComputedPropertyName) String() string {
 
 // Evaluation
 // spec: 13.2.5.4
-func (p *ComputedPropertyName) Evaluation(vm *VM) Value {
+func (p *ComputedPropertyName) Evaluation(vm *VM) CompletionValue {
 	exprValue := p.Expression.Evaluation(vm)
-	propName := exprValue.GetValue(vm.agent)
-	return ToPropertyKey(vm.agent, propName).ToValue()
+	propName := exprValue.value.GetValue(vm.agent)
+	return ToPropertyKey(vm.agent, propName).ToValue().ToCompletion()
 }
 
 // MARK: - FunctionExpression
@@ -926,8 +927,8 @@ func (p *FunctionExpression) NamedEvaluation(vm *VM, name PropertyKeyOrPrivateNa
 }
 
 // TODO: non standard
-func (p *FunctionExpression) Evaluation(vm *VM) Value {
-	return p.NamedEvaluation(vm, NewStringPropertyKey(""))
+func (p *FunctionExpression) Evaluation(vm *VM) CompletionValue {
+	return p.NamedEvaluation(vm, NewStringPropertyKey("")).ToCompletion()
 }
 
 func (p *FunctionExpression) String() string {
@@ -954,8 +955,8 @@ func (p *AsyncArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *AsyncArrowFunction) Evaluation(vm *VM) Value {
-	return p.InstantiateAsyncArrowFunctionExpression(vm, NewStringPropertyKey("")).ToValue()
+func (p *AsyncArrowFunction) Evaluation(vm *VM) CompletionValue {
+	return p.InstantiateAsyncArrowFunctionExpression(vm, NewStringPropertyKey("")).ToValue().ToCompletion()
 }
 
 func (p *AsyncArrowFunction) InstantiateAsyncArrowFunctionExpression(
@@ -1012,8 +1013,8 @@ func (p *ArrowFunction) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *ArrowFunction) Evaluation(vm *VM) Value {
-	return p.InstantiateArrowFunctionExpression(vm, "")
+func (p *ArrowFunction) Evaluation(vm *VM) CompletionValue {
+	return p.InstantiateArrowFunctionExpression(vm, "").ToCompletion()
 }
 
 func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM, name string) Value {
@@ -1092,9 +1093,9 @@ func (m *MemberExpression) astIsPropertyExpression() bool {
 
 // Evaluation
 // spec: 13.3.2.1
-func (m *MemberExpression) Evaluation(vm *VM) Value {
+func (m *MemberExpression) Evaluation(vm *VM) CompletionValue {
 	baseReference := m.Member.Evaluation(vm)
-	baseValue := baseReference.GetValue(vm.agent)
+	baseValue := baseReference.value.GetValue(vm.agent)
 	strict := vm.containedInStrictCode
 
 	switch prop := m.Property.(type) {
@@ -1102,11 +1103,11 @@ func (m *MemberExpression) Evaluation(vm *VM) Value {
 		// TODO: check source text is strict
 		return NewReferenceRecordValue(
 			vm.EvaluatePropertyAccessWithExpressionKey(baseValue, prop.Expression, strict),
-		)
+		).ToCompletion()
 	case *ASTPropertyIdentifier:
 		return NewReferenceRecordValue(
 			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, prop.Identifier, strict),
-		)
+		).ToCompletion()
 	}
 	panic("unimplemented")
 }
@@ -1145,8 +1146,8 @@ type LiteralNull struct {
 
 var _ Literal = (*LiteralNull)(nil)
 
-func (l *LiteralNull) Evaluation(vm *VM) Value {
-	return NullValue
+func (l *LiteralNull) Evaluation(vm *VM) CompletionValue {
+	return NullValue.ToCompletion()
 }
 
 func (l *LiteralNull) String() string {
@@ -1160,8 +1161,8 @@ type LiteralUndefined struct {
 var _ Literal = (*LiteralUndefined)(nil)
 
 // 13.2.3.1
-func (l *LiteralUndefined) Evaluation(vm *VM) Value {
-	return UndefinedValue
+func (l *LiteralUndefined) Evaluation(vm *VM) CompletionValue {
+	return UndefinedValue.ToCompletion()
 }
 
 func (l *LiteralUndefined) String() string {
@@ -1175,8 +1176,8 @@ type LiteralBoolean struct {
 
 var _ Literal = (*LiteralBoolean)(nil)
 
-func (l *LiteralBoolean) Evaluation(vm *VM) Value {
-	return NewBooleanValue(l.Bool)
+func (l *LiteralBoolean) Evaluation(vm *VM) CompletionValue {
+	return NewBooleanValue(l.Bool).ToCompletion()
 }
 
 func (l *LiteralBoolean) String() string {
@@ -1234,12 +1235,12 @@ func (l *LiteralNumeric) NumericValue() (Value, error) {
 	return NewNumberValue(JSNumber(num)), nil
 }
 
-func (l *LiteralNumeric) Evaluation(vm *VM) Value {
+func (l *LiteralNumeric) Evaluation(vm *VM) CompletionValue {
 	v, err := l.NumericValue()
 	if err != nil {
 		panic(err)
 	}
-	return v
+	return v.ToCompletion()
 }
 
 func (l *LiteralNumeric) String() string {
@@ -1261,8 +1262,8 @@ func (l *StringLiteral) StringValue() Value {
 }
 
 // 13.2.3.1
-func (l *StringLiteral) Evaluation(vm *VM) Value {
-	return l.StringValue()
+func (l *StringLiteral) Evaluation(vm *VM) CompletionValue {
+	return l.StringValue().ToCompletion()
 }
 
 func (l *StringLiteral) String() string {
@@ -1358,17 +1359,19 @@ func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (o *OptionalExpression) Evaluation(vm *VM) Value {
+// Evaluation
+// spec: 13.3.9.1
+func (o *OptionalExpression) Evaluation(vm *VM) (co CompletionValue) {
 	baseReference := o.Expr.Evaluation(vm)
-	baseValue := baseReference.GetValue(vm.agent)
+	baseValue := baseReference.value.GetValue(vm.agent)
 	if IsUndefinedOrNull(baseValue) {
-		return UndefinedValue
+		return UndefinedValue.ToCompletion()
 	}
-	result, err := o.Property.ChainEvaluation(vm, baseValue, baseReference)
-	if err != nil {
-		vm.panic(err)
+	result, isAbrupt, rt := ReturnIfAbrupt(o.Property.ChainEvaluation(vm, baseValue, baseReference.value), co)
+	if isAbrupt {
+		return rt
 	}
-	return result
+	return result.ToCompletion()
 }
 
 func (o *OptionalExpression) String() string {
@@ -1404,23 +1407,23 @@ func (o *OptionalExpressionProperty) isStrict() bool {
 	return true
 }
 
-func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (value Value, err Value) {
+func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (co CompletionValue) {
 	if o.astIsArguments() {
 		thisChain := o
 		// TODO
 		tailCall := false
 		arguments := thisChain.Arguments.Evaluation(vm)
-		return vm.EvaluateCall(baseValue, baseReference, arguments.(*ListValue).Values, tailCall), nil
+		return vm.EvaluateCall(baseValue, baseReference, arguments.value.(*ListValue).Values, tailCall).ToCompletion()
 	} else if o.astIsExpression() {
 		strict := o.isStrict()
 		return NewReferenceRecordValue(
 			vm.EvaluatePropertyAccessWithExpressionKey(baseValue, o.Expression, strict),
-		), nil
+		).ToCompletion()
 	} else if o.astIsIdentifier() {
 		strict := o.isStrict()
 		return NewReferenceRecordValue(
 			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, o.Identifier, strict),
-		), nil
+		).ToCompletion()
 	} else {
 		panic("unimplemented")
 	}
@@ -1517,21 +1520,22 @@ func (e *SuperCall) AssignmentTargetType() AssignmentTargetType {
 
 // Evaluation
 // spec: 13.3.7.1
-func (e *SuperCall) Evaluation(vm *VM) Value {
+func (e *SuperCall) Evaluation(vm *VM) (co CompletionValue) {
 	agent := vm.agent
 	newTarget := agent.GetNewTarget()
 	// alias of func
 	f := agent.GetSuperConstructor()
 	argList := e.Arguments.ArgumentListEvaluation(vm)
 	if !IsConstructor(f) {
-		return agent.ThrowTypeError("SuperCall: not a constructor")
+		co.err = agent.ThrowTypeError("SuperCall: not a constructor")
+		return
 	}
 	result := MustGetObject(f).Construct(argList, newTarget)
 	thisER := agent.GetThisEnvironment().(*FunctionEnvironment)
 	thisER.BindThisValue(result.ToValue())
 	F := thisER.FunctionObject
 	result.InitializeInstanceElements(F)
-	return result.ToValue()
+	return result.ToValue().ToCompletion()
 }
 
 func (e *SuperCall) String() string {
@@ -1592,11 +1596,11 @@ func (t *PrimaryExpressionTemplateLiteral) astNoSubstitution() bool {
 
 // Evaluation
 // spec: 13.2.8.6
-func (t *PrimaryExpressionTemplateLiteral) Evaluation(vm *VM) Value {
+func (t *PrimaryExpressionTemplateLiteral) Evaluation(vm *VM) CompletionValue {
 	if t.astNoSubstitution() {
 		// NoSubstitutionTemplate
 		span := t.TemplateLiteral.Spans[0]
-		return span.TV().ToValue()
+		return span.TV().ToValue().ToCompletion()
 	} else {
 		// TODO(BM): after remove old vm
 	}
@@ -1702,9 +1706,9 @@ func (e *UpdateExpression) isPrefix() bool {
 // Evaluation
 // postfix: 13.4.2.1/13.4.3.1
 // prefix: 13.4.4.1/13.4.5.1
-func (e *UpdateExpression) Evaluation(vm *VM) Value {
+func (e *UpdateExpression) Evaluation(vm *VM) CompletionValue {
 	expr := e.Operand.Evaluation(vm)
-	oldValue := ToNumeric(vm.agent, expr.GetValue(vm.agent))
+	oldValue := ToNumeric(vm.agent, expr.value.GetValue(vm.agent))
 	var newValue Value
 	if n, bi, ok := oldValue.NumberOrBigInt(); ok {
 		if n != nil {
@@ -1725,15 +1729,15 @@ func (e *UpdateExpression) Evaluation(vm *VM) Value {
 	} else {
 		Assert(false)
 	}
-	if r, ok := expr.ReferenceRecord(); ok {
+	if r, ok := expr.value.ReferenceRecord(); ok {
 		r.PutValue(vm.agent, newValue)
 	} else {
 		panic("unreachable")
 	}
 	if e.isPrefix() {
-		return newValue
+		return newValue.ToCompletion()
 	}
-	return oldValue
+	return oldValue.ToCompletion()
 }
 
 func (e *UpdateExpression) String() string {
@@ -1887,7 +1891,7 @@ func (e *AssignmentExpression) astIsAssign() bool {
 
 // Evaluation
 // spec: 13.15.2
-func (e *AssignmentExpression) Evaluation(vm *VM) Value {
+func (e *AssignmentExpression) Evaluation(vm *VM) CompletionValue {
 	if e.astIsAssign() {
 		_, isObjectLiteral := e.Left.(*PrimaryExpressionObjectLiteral)
 		_, isArrayLiteral := e.Left.(*ArrayLiteral)
@@ -1899,14 +1903,14 @@ func (e *AssignmentExpression) Evaluation(vm *VM) Value {
 				panic("")
 			} else {
 				rref := e.Right.Evaluation(vm)
-				rval = rref.GetValue(vm.agent)
+				rval = rref.value.GetValue(vm.agent)
 			}
-			if ref, ok := lref.ReferenceRecord(); ok {
+			if ref, ok := lref.value.ReferenceRecord(); ok {
 				ref.PutValue(vm.agent, rval)
 			} else {
 				panic("unreachable")
 			}
-			return rval
+			return rval.ToCompletion()
 		} else {
 			// TODO(BM): DestructuringAssignmentEvaluation
 			// assignmentPattern := e.Left
@@ -1917,17 +1921,17 @@ func (e *AssignmentExpression) Evaluation(vm *VM) Value {
 	} else {
 		// TODO: handle &&= ||=, ??=
 		lref := e.Left.Evaluation(vm)
-		lval := lref.GetValue(vm.agent)
+		lval := lref.value.GetValue(vm.agent)
 		rref := e.Right.Evaluation(vm)
-		rval := rref.GetValue(vm.agent)
+		rval := rref.value.GetValue(vm.agent)
 		r := vm.ApplyStringOrNumericBinaryOperator(lval, rval, e.Operator.ToBinaryOperator())
 
-		if ref, ok := lref.ReferenceRecord(); ok {
+		if ref, ok := lref.value.ReferenceRecord(); ok {
 			ref.PutValue(vm.agent, r)
 		} else {
 			panic("unreachable")
 		}
-		return r
+		return r.ToCompletion()
 	}
 }
 
@@ -1951,14 +1955,14 @@ func (e *NewExpression) AssignmentTargetType() AssignmentTargetType {
 }
 
 // 13.3.5.1
-func (e *NewExpression) Evaluation(vm *VM) Value {
-	return e.EvaluateNew(vm)
+func (e *NewExpression) Evaluation(vm *VM) CompletionValue {
+	return e.EvaluateNew(vm).ToCompletion()
 }
 
 // 13.3.5.1.1
 func (e *NewExpression) EvaluateNew(vm *VM) Value {
 	ref := e.Callee.Evaluation(vm)
-	constructor := ref.GetValue(vm.agent)
+	constructor := ref.value.GetValue(vm.agent)
 	var argList []Value
 	if len(e.Arguments) == 0 {
 		argList = []Value{}
@@ -2062,15 +2066,15 @@ func (b *ExpressionBinaryExpression) AssignmentTargetType() AssignmentTargetType
 // 13.15.4
 func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM) Value {
 	lref := b.Left.Evaluation(vm)
-	lval := lref.GetValue(vm.agent)
+	lval := lref.value.GetValue(vm.agent)
 
 	rref := b.Right.Evaluation(vm)
-	rval := rref.GetValue(vm.agent)
+	rval := rref.value.GetValue(vm.agent)
 	return vm.ApplyStringOrNumericBinaryOperator(lval, rval, b.Operator)
 }
 
-func (b *ExpressionBinaryExpression) Evaluation(vm *VM) Value {
-	return b.EvaluateStringOrNumericBinaryExpression(vm)
+func (b *ExpressionBinaryExpression) Evaluation(vm *VM) CompletionValue {
+	return b.EvaluateStringOrNumericBinaryExpression(vm).ToCompletion()
 }
 
 func (b *ExpressionBinaryExpression) String() string {
@@ -2111,16 +2115,16 @@ type ConditionalExpression struct {
 
 // Evaluation
 // spec: 13.14.1
-func (e *ConditionalExpression) Evaluation(vm *VM) Value {
+func (e *ConditionalExpression) Evaluation(vm *VM) CompletionValue {
 	agent := vm.agent
 	lref := e.Test.Evaluation(vm)
-	lval := lref.GetValue(agent)
+	lval := lref.value.GetValue(agent)
 	if lval.ToBoolean() {
 		trueRef := e.Consequent.Evaluation(vm)
-		return trueRef.GetValue(agent)
+		return trueRef.value.GetValue(agent).ToCompletion()
 	} else {
 		falseRef := e.Alternate.Evaluation(vm)
-		return falseRef.GetValue(agent)
+		return falseRef.value.GetValue(agent).ToCompletion()
 	}
 }
 
@@ -2197,34 +2201,34 @@ func (e *ExpressionLogicalExpression) astNullishCoalescing() bool {
 
 // Evaluation
 // spec: 13.13.1
-func (e *ExpressionLogicalExpression) Evaluation(vm *VM) Value {
+func (e *ExpressionLogicalExpression) Evaluation(vm *VM) CompletionValue {
 	switch {
 	case e.astIsOr():
 		lref := e.Left.Evaluation(vm)
-		lval := lref.GetValue(vm.agent)
+		lval := lref.value.GetValue(vm.agent)
 		lbool := lval.ToBoolean()
 		if lbool {
-			return lval
+			return lval.ToCompletion()
 		}
 		rref := e.Right.Evaluation(vm)
-		return rref.GetValue(vm.agent)
+		return rref.value.GetValue(vm.agent).ToCompletion()
 	case e.astIsAnd():
 		lref := e.Left.Evaluation(vm)
-		lval := lref.GetValue(vm.agent)
+		lval := lref.value.GetValue(vm.agent)
 		lbool := lval.ToBoolean()
 		if !lbool {
-			return lval
+			return lval.ToCompletion()
 		}
 		rref := e.Right.Evaluation(vm)
-		return rref.GetValue(vm.agent)
+		return rref.value.GetValue(vm.agent).ToCompletion()
 	case e.astNullishCoalescing():
 		lref := e.Left.Evaluation(vm)
-		lval := lref.GetValue(vm.agent)
+		lval := lref.value.GetValue(vm.agent)
 		if IsUndefinedOrNil(lval) || lval == NullValue {
 			rref := e.Right.Evaluation(vm)
-			return rref.GetValue(vm.agent)
+			return rref.value.GetValue(vm.agent).ToCompletion()
 		} else {
-			return lval
+			return lval.ToCompletion()
 		}
 	}
 	panic("unreachable")
@@ -2285,22 +2289,22 @@ type EqualityExpression struct {
 
 // Evaluation
 // spec: 13.11.1
-func (e *EqualityExpression) Evaluation(vm *VM) Value {
+func (e *EqualityExpression) Evaluation(vm *VM) CompletionValue {
 	lref := e.Left.Evaluation(vm)
-	lval := lref.GetValue(vm.agent)
+	lval := lref.value.GetValue(vm.agent)
 
 	rref := e.Right.Evaluation(vm)
-	rval := rref.GetValue(vm.agent)
+	rval := rref.value.GetValue(vm.agent)
 
 	switch e.Operator {
 	case EqualityOperatorEqual:
-		return NewBooleanValue(IsLooselyEqual(vm.agent, lval, rval))
+		return NewBooleanValue(IsLooselyEqual(vm.agent, lval, rval)).ToCompletion()
 	case EqualityOperatorNotEqual:
-		return NewBooleanValue(!IsLooselyEqual(vm.agent, lval, rval))
+		return NewBooleanValue(!IsLooselyEqual(vm.agent, lval, rval)).ToCompletion()
 	case EqualityOperatorStrictEqual:
-		return NewBooleanValue(IsStrictlyEqual(lval, rval))
+		return NewBooleanValue(IsStrictlyEqual(lval, rval)).ToCompletion()
 	case EqualityOperatorStrictNotEqual:
-		return NewBooleanValue(!IsStrictlyEqual(lval, rval))
+		return NewBooleanValue(!IsStrictlyEqual(lval, rval)).ToCompletion()
 	}
 	panic("unreachable")
 }
@@ -2368,12 +2372,12 @@ type RelationalExpression struct {
 
 // Evaluation
 // spec: 13.10.1
-func (e *RelationalExpression) Evaluation(vm *VM) Value {
+func (e *RelationalExpression) Evaluation(vm *VM) CompletionValue {
 	lref := e.Left.Evaluation(vm)
-	lval := lref.GetValue(vm.agent)
+	lval := lref.value.GetValue(vm.agent)
 
 	rref := e.Right.Evaluation(vm)
-	rval := rref.GetValue(vm.agent)
+	rval := rref.value.GetValue(vm.agent)
 
 	switch e.Operator {
 	case RelationalOperatorLessThan, RelationalOperatorGreaterThan:
@@ -2383,7 +2387,7 @@ func (e *RelationalExpression) Evaluation(vm *VM) Value {
 		} else {
 			order = IsLessThanOrderRightFirst
 		}
-		return NewBooleanValue(IsLessThan(vm.agent, lval, rval, order))
+		return NewBooleanValue(IsLessThan(vm.agent, lval, rval, order)).ToCompletion()
 	case RelationalOperatorLessThanOrEqual, RelationalOperatorGreaterThanOrEqual:
 		var order isLessThanOrder
 		if e.Operator == RelationalOperatorLessThanOrEqual {
@@ -2391,9 +2395,9 @@ func (e *RelationalExpression) Evaluation(vm *VM) Value {
 		} else {
 			order = IsLessThanOrderLeftFirst
 		}
-		return NewBooleanValue(!IsLessThan(vm.agent, rval, lval, order))
+		return NewBooleanValue(!IsLessThan(vm.agent, rval, lval, order)).ToCompletion()
 	case RelationalOperatorInstanceof:
-		return NewBooleanValue(vm.InstanceOfOperator(lval, rval))
+		return NewBooleanValue(vm.InstanceOfOperator(lval, rval)).ToCompletion()
 	case RelationalOperatorIn:
 		panic("unimplemented")
 	}
@@ -2484,33 +2488,33 @@ func (u *UnaryExpression) astIsVoid() bool {
 
 // TODO: use Number::[op], BigInt::[op]
 // spec: 13.5.3.1, 13.5.4.1, 13.5.5.1, 13.5.6.1, 13.5.7.1
-func (u *UnaryExpression) Evaluation(vm *VM) Value {
+func (u *UnaryExpression) Evaluation(vm *VM) CompletionValue {
 	agent := vm.agent
 	switch {
 	case u.astIsTypeof():
 		// 13.5.3.1
-		val := u.Operand.Evaluation(vm)
+		val := u.Operand.Evaluation(vm).value
 		if r, ok := val.ReferenceRecord(); ok {
 			if r.IsUnresolvableReference() {
-				return NewStringValue("undefined")
+				return NewStringValue("undefined").ToCompletion()
 			}
 		}
 		val = val.GetValue(agent)
 		// TODO: B.3.6.3 isHTMLDDA
-		return NewStringValue(val.TypeString())
+		return NewStringValue(val.TypeString()).ToCompletion()
 	case u.astIsAdd():
 		// 13.5.4.1
 		expr := u.Operand.Evaluation(vm)
-		return expr.GetValue(agent).ToNumber(agent)
+		return expr.value.GetValue(agent).ToNumber(agent).ToCompletion()
 	case u.astIsSubtract():
 		// 13.5.5.1
 		expr := u.Operand.Evaluation(vm)
-		oldValue := ToNumeric(agent, expr.GetValue(agent))
+		oldValue := ToNumeric(agent, expr.value.GetValue(agent))
 		if n, b, ok := oldValue.NumberOrBigInt(); ok {
 			if n != nil {
-				return NewNumberValue(-n.Data)
+				return NewNumberValue(-n.Data).ToCompletion()
 			} else {
-				return NewBigIntValue(b.Data.Neg(nil))
+				return NewBigIntValue(b.Data.Neg(nil)).ToCompletion()
 			}
 		} else {
 			Assert(false)
@@ -2518,12 +2522,12 @@ func (u *UnaryExpression) Evaluation(vm *VM) Value {
 	case u.astIsBitwiseNot():
 		// 13.5.6.1
 		expr := u.Operand.Evaluation(vm)
-		oldValue := ToNumeric(agent, expr.GetValue(agent))
+		oldValue := ToNumeric(agent, expr.value.GetValue(agent))
 		if n, b, ok := oldValue.NumberOrBigInt(); ok {
 			if n != nil {
-				return NewNumberValue(JSNumber(^int64(n.Data)))
+				return NewNumberValue(JSNumber(^int64(n.Data))).ToCompletion()
 			} else {
-				return NewBigIntValue(b.Data.Not(nil))
+				return NewBigIntValue(b.Data.Not(nil)).ToCompletion()
 			}
 		} else {
 			Assert(false)
@@ -2531,37 +2535,37 @@ func (u *UnaryExpression) Evaluation(vm *VM) Value {
 	case u.astIsLogicalNot():
 		// 13.5.7.1
 		expr := u.Operand.Evaluation(vm)
-		oldValue := expr.GetValue(agent).ToBoolean()
+		oldValue := expr.value.GetValue(agent).ToBoolean()
 		if oldValue {
-			return FalseValue
+			return FalseValue.ToCompletion()
 		} else {
-			return TrueValue
+			return TrueValue.ToCompletion()
 		}
 	case u.astIsTypeof():
 		// 13.5.3.1
 		val := u.Operand.Evaluation(vm)
-		if ref, ok := val.ReferenceRecord(); ok {
+		if ref, ok := val.value.ReferenceRecord(); ok {
 			if ref.IsUnresolvableReference() {
-				return NewStringValue("undefined")
+				return NewStringValue("undefined").ToCompletion()
 			}
 		}
-		val = val.GetValue(agent)
-		return NewStringValue(val.TypeString())
+		val = val.value.GetValue(agent).ToCompletion()
+		return NewStringValue(val.value.TypeString()).ToCompletion()
 	case u.astIsVoid():
 		// 13.5.2.1
 		expr := u.Operand.Evaluation(vm)
-		expr.GetValue(agent)
-		return UndefinedValue
+		expr.value.GetValue(agent)
+		return UndefinedValue.ToCompletion()
 	case u.astIsDelete():
 		// 13.5.1.2
 		refValue := u.Operand.Evaluation(vm)
-		ref, ok := refValue.ReferenceRecord()
+		ref, ok := refValue.value.ReferenceRecord()
 		if !ok {
-			return TrueValue
+			return TrueValue.ToCompletion()
 		}
 		if ref.IsUnresolvableReference() {
 			Assert(!ref.Strict)
-			return TrueValue
+			return TrueValue.ToCompletion()
 		}
 		if ref.IsPropertyReference() {
 			Assert(!ref.IsPrivateReference())
@@ -2582,11 +2586,11 @@ func (u *UnaryExpression) Evaluation(vm *VM) Value {
 			if !deleteStatus && ref.Strict {
 				vm.panic(agent.ThrowTypeError("cannot delete property"))
 			}
-			return NewBooleanValue(deleteStatus)
+			return NewBooleanValue(deleteStatus).ToCompletion()
 		} else {
 			base, ok := ref.Base.Env()
 			Assert(ok)
-			return NewBooleanValue(base.DeleteBinding(ref.ReferencedName.String))
+			return NewBooleanValue(base.DeleteBinding(ref.ReferencedName.String)).ToCompletion()
 		}
 	}
 	panic("unimplemented")
@@ -2631,12 +2635,12 @@ func (a Arguments) ArgumentListEvaluation(vm *VM) []Value {
 			panic("unimplemented")
 		}
 		ref := a[0].Evaluation(vm)
-		arg := ref.GetValue(vm.agent)
+		arg := ref.value.GetValue(vm.agent)
 		return []Value{arg}
 	} else {
 		// TODO: handle spread
 		last := a[len(a)-1].Evaluation(vm)
-		return append(a[:len(a)-1].ArgumentListEvaluation(vm), last.GetValue(vm.agent))
+		return append(a[:len(a)-1].ArgumentListEvaluation(vm), last.value.GetValue(vm.agent))
 	}
 }
 
@@ -2655,19 +2659,19 @@ func (a Arguments) String() string {
 // Evaluation 13.3.8.1
 // ArgumentListEvaluation
 // TODO(XXX): can we split it out based on different types of arguments?
-func (a Arguments) Evaluation(vm *VM) Value {
+func (a Arguments) Evaluation(vm *VM) CompletionValue {
 	// Assigment
 	if len(a) == 0 {
-		return NewListValue([]Value{})
+		return NewListValue([]Value{}).ToCompletion()
 	} else if len(a) == 1 {
 		ref := a[0].Evaluation(vm)
-		arg := ref.GetValue(vm.agent)
-		return NewListValue([]Value{arg})
+		arg := ref.value.GetValue(vm.agent)
+		return NewListValue([]Value{arg}).ToCompletion()
 	} else if len(a) > 1 {
 		precedingArgs := a[:len(a)-1].Evaluation(vm)
 		ref := a[len(a)-1].Evaluation(vm)
-		arg := ref.GetValue(vm.agent)
-		return NewListValue(append(precedingArgs.(*ListValue).Values, arg))
+		arg := ref.value.GetValue(vm.agent)
+		return NewListValue(append(precedingArgs.value.(*ListValue).Values, arg)).ToCompletion()
 	} else {
 		panic("unimplemented")
 	}
@@ -2705,16 +2709,16 @@ func (c *CallExpression) astIsFunctionCall() bool {
 
 // Evaluation
 // spec: 13.3.6.1
-func (c *CallExpression) Evaluation(vm *VM) Value {
+func (c *CallExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if c.astIsCover() {
-		return c.coverCallExpressionAndAsyncArrowHead(vm)
+		return c.coverCallExpressionAndAsyncArrowHead(vm).ToCompletion()
 	}
 	if !c.astIsFunctionCall() {
 		panic("unimplemented")
 	}
 	ref := c.Callee.Evaluation(vm)
 	// rename from func
-	f := ref.GetValue(vm.agent)
+	f := ref.value.GetValue(vm.agent)
 
 	// TODO: this ref
 	// i.This(c)
@@ -2725,7 +2729,8 @@ func (c *CallExpression) Evaluation(vm *VM) Value {
 	// i.Let("tailPosition")
 
 	arguments := c.Arguments.Evaluation(vm)
-	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, false)
+	co.value = vm.EvaluateCall(f, ref.value, arguments.value.(*ListValue).Values, false)
+	return
 }
 
 // coverCallExpressionAndAsyncArrowHead matches CallExpression : CoverCallExpressionAndAsyncArrowHead
@@ -2737,8 +2742,8 @@ func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) Value {
 	// TODO(XXX): is pass Arguments to evaluate directly?
 	arguments := c.Arguments.Evaluation(vm)
 	ref := memberExpr.Evaluation(vm)
-	f := ref.GetValue(vm.agent)
-	if r, ok := ref.ReferenceRecord(); ok {
+	f := ref.value.GetValue(vm.agent)
+	if r, ok := ref.value.ReferenceRecord(); ok {
 		if !r.IsPropertyReference() && r.ReferencedName.String == "eval" {
 			panic("unimplemented")
 		}
@@ -2747,7 +2752,7 @@ func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) Value {
 	// TODO: check is tailPosition
 	tailCall := false
 
-	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, tailCall)
+	return vm.EvaluateCall(f, ref.value, arguments.value.(*ListValue).Values, tailCall)
 }
 
 func (c *CallExpression) String() string {
@@ -2821,7 +2826,7 @@ func (s *VariableStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return s.DeclarationList.VarScopedDeclarations()
 }
 
-func (s *VariableStatement) Evaluation(vm *VM) Value {
+func (s *VariableStatement) Evaluation(vm *VM) CompletionValue {
 	return s.DeclarationList.Evaluation(vm)
 }
 
@@ -2841,15 +2846,15 @@ func (v *VariableDeclarationList) VarScopedDeclarations() (l []*VariableDeclarat
 	return v.Items
 }
 
-func (v *VariableDeclarationList) Evaluation(vm *VM) Value {
+func (v *VariableDeclarationList) Evaluation(vm *VM) CompletionValue {
 	var lastValue Value
 	for _, item := range v.Items {
-		lastValue = item.Evaluation(vm)
+		lastValue = item.Evaluation(vm).value
 	}
 	if lastValue == nil {
-		return UndefinedValue
+		return UndefinedValue.ToCompletion()
 	}
-	return lastValue
+	return lastValue.ToCompletion()
 }
 
 func (v *VariableDeclarationList) String() string {
@@ -2876,9 +2881,9 @@ func (v *VariableDeclaration) astHasInitializer() bool {
 	return v.Initializer != nil
 }
 
-func (v *VariableDeclaration) Evaluation(vm *VM) Value {
+func (v *VariableDeclaration) Evaluation(vm *VM) CompletionValue {
 	if !v.astHasInitializer() {
-		return UndefinedValue
+		return UndefinedValue.ToCompletion()
 	} else {
 		bindingId := v.BindingIdentifier
 		lhs := vm.agent.ResolveBinding(bindingId, nil, false)
@@ -2888,13 +2893,13 @@ func (v *VariableDeclaration) Evaluation(vm *VM) Value {
 			panic("")
 		} else {
 			rhs := v.Initializer.Evaluation(vm)
-			value = rhs.GetValue(vm.agent)
+			value = rhs.value.GetValue(vm.agent)
 		}
 		lhs.PutValue(vm.agent, value)
 	}
 
 	// return EMPTY
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 func (v *VariableDeclaration) String() string {
@@ -2992,7 +2997,7 @@ func (t *TryStatement) astHasFinally() bool {
 
 // Evaluation
 // spec: 14.15.3
-func (t *TryStatement) Evaluation(vm *VM) Value {
+func (t *TryStatement) Evaluation(vm *VM) CompletionValue {
 	panic("unimplemented")
 }
 
@@ -3032,7 +3037,7 @@ func (s *StatementExpression) VarScopedDeclarations() (l []*VariableDeclaration)
 	return
 }
 
-func (s *StatementExpression) Evaluation(vm *VM) Value {
+func (s *StatementExpression) Evaluation(vm *VM) CompletionValue {
 	return s.Expression.Evaluation(vm)
 }
 
@@ -3052,7 +3057,7 @@ func (b *BreakableStatement) VarScopedDeclarations() (l []*VariableDeclaration) 
 	return b.IterationStatement.VarScopedDeclarations()
 }
 
-func (b *BreakableStatement) Evaluation(vm *VM) Value {
+func (b *BreakableStatement) Evaluation(vm *VM) CompletionValue {
 	return b.IterationStatement.Evaluation(vm)
 }
 
@@ -3130,7 +3135,7 @@ func (f *FunctionBody) LexicallyDeclaredNames() (l []IdentifierName) {
 }
 
 // TODO(spec)
-func (f *FunctionBody) Evaluation(vm *VM) Value {
+func (f *FunctionBody) Evaluation(vm *VM) CompletionValue {
 	return f.StatementList.Evaluation(vm)
 }
 
@@ -3487,25 +3492,25 @@ func (s *IfStatement) astHasElse() bool {
 
 // Evaluation
 // spec: 14.6.2
-func (s *IfStatement) Evaluation(vm *VM) Value {
+func (s *IfStatement) Evaluation(vm *VM) CompletionValue {
 	if s.astHasElse() {
 		exprRef := s.Condition.Evaluation(vm)
-		exprValue := exprRef.GetValue(vm.agent)
+		exprValue := exprRef.value.GetValue(vm.agent)
 		var stmtCompletion Value
 		if exprValue.ToBoolean() {
-			stmtCompletion = s.Consequent.Evaluation(vm)
+			stmtCompletion = s.Consequent.Evaluation(vm).value
 		} else {
-			stmtCompletion = s.Alternate.Evaluation(vm)
+			stmtCompletion = s.Alternate.Evaluation(vm).value
 		}
-		return UpdateEmpty(stmtCompletion, UndefinedValue)
+		return UpdateEmpty(stmtCompletion, UndefinedValue).ToCompletion()
 	} else {
 		exprRef := s.Condition.Evaluation(vm)
-		exprValue := exprRef.GetValue(vm.agent)
+		exprValue := exprRef.value.GetValue(vm.agent)
 		if !exprValue.ToBoolean() {
-			return UndefinedValue
+			return UndefinedValue.ToCompletion()
 		} else {
 			stmtCompletion := s.Consequent.Evaluation(vm)
-			return UpdateEmpty(stmtCompletion, UndefinedValue)
+			return UpdateEmpty(stmtCompletion.value, UndefinedValue).ToCompletion()
 		}
 	}
 }
@@ -3547,14 +3552,14 @@ func (s *WhileStatement) VarScopedDeclarations() []*VariableDeclaration {
 	return s.Body.VarScopedDeclarations()
 }
 
-func (s *WhileStatement) Evaluation(vm *VM) Value {
+func (s *WhileStatement) Evaluation(vm *VM) CompletionValue {
 	// TODO
 	var labelSet []string
 	vm.loopNodeStack.Push(s)
 	defer func() {
 		vm.loopNodeStack.Pop()
 	}()
-	return vm.GetValueOrPanic(s.WhileLoopEvaluation(vm, labelSet))
+	return vm.GetValueOrPanic(s.WhileLoopEvaluation(vm, labelSet)).ToCompletion()
 }
 
 // WhileLoopEvaluation
@@ -3563,19 +3568,19 @@ func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (value V
 	var V Value = UndefinedValue
 	for {
 		exprRef := s.Condition.Evaluation(vm)
-		exprValue := exprRef.GetValue(vm.agent)
+		exprValue := exprRef.value.GetValue(vm.agent)
 		if !exprValue.ToBoolean() {
 			return V, nil
 		}
 		stmtResult := s.Body.Evaluation(vm)
 		if vm.isYield {
-			return stmtResult, nil
+			return stmtResult.value, nil
 		}
-		if !LoopContinues(stmtResult, labelSet) {
-			return UpdateEmpty(stmtResult, V), nil
+		if !LoopContinues(stmtResult.value, labelSet) {
+			return UpdateEmpty(stmtResult.value, V), nil
 		}
-		if !IsUndefinedOrNil(stmtResult) {
-			V = stmtResult
+		if !IsUndefinedOrNil(stmtResult.value) {
+			V = stmtResult.value
 		}
 	}
 }
@@ -3629,7 +3634,7 @@ func (f *ForStatementInitializerVariable) String() string {
 	return f.VariableStatement.String()
 }
 
-func (f *ForStatementInitializerVariable) Evaluation(vm *VM) Value {
+func (f *ForStatementInitializerVariable) Evaluation(vm *VM) CompletionValue {
 	return f.VariableStatement.Evaluation(vm)
 }
 
@@ -3691,8 +3696,8 @@ func (s *ForStatement) ForLoopEvaluation(vm *VM) Value {
 	panic("unimplemented")
 }
 
-func (s *ForStatement) Evaluation(vm *VM) Value {
-	return s.ForLoopEvaluation(vm)
+func (s *ForStatement) Evaluation(vm *VM) CompletionValue {
+	return s.ForLoopEvaluation(vm).ToCompletion()
 }
 
 func (s *ForStatement) String() string {
@@ -3773,14 +3778,14 @@ func (f *ForInOfStatement) BoundNames() (l []IdentifierName) {
 	return
 }
 
-func (f *ForInOfStatement) Evaluation(vm *VM) Value {
+func (f *ForInOfStatement) Evaluation(vm *VM) CompletionValue {
 	// TODO
 	var labelSet []string
 	result, err := f.ForInOfLoopEvaluation(vm, labelSet)
 	if err != nil {
 		panic(err)
 	}
-	return result
+	return result.ToCompletion()
 }
 
 func (f *ForInOfStatement) astIsLeftHandSideExpression() bool {
@@ -3996,17 +4001,17 @@ type ReturnStatement struct {
 	Expression Expression
 }
 
-func (s *ReturnStatement) Evaluation(vm *VM) Value {
+func (s *ReturnStatement) Evaluation(vm *VM) CompletionValue {
 	defer func() {
 		vm.isReturn = true
 	}()
 	if s.Expression == nil {
-		return UndefinedValue
+		return UndefinedValue.ToCompletion()
 	} else {
 		exprRef := s.Expression.Evaluation(vm)
-		exprValue := exprRef.GetValue(vm.agent)
+		exprValue := exprRef.value.GetValue(vm.agent)
 		// TODO: GetGeneratorKind
-		return exprValue
+		return exprValue.ToCompletion()
 	}
 }
 
@@ -4068,7 +4073,7 @@ type DeclarationHoistableFunction struct {
 	FunctionDeclaration *FunctionDeclaration
 }
 
-func (d *DeclarationHoistableFunction) Evaluation(vm *VM) Value {
+func (d *DeclarationHoistableFunction) Evaluation(vm *VM) CompletionValue {
 	return d.FunctionDeclaration.Evaluation(vm)
 }
 
@@ -4090,7 +4095,7 @@ type DeclarationHoistableAsyncFunction struct {
 
 func (d *DeclarationHoistableAsyncFunction) _declaration() {}
 
-func (d *DeclarationHoistableAsyncFunction) Evaluation(vm *VM) Value {
+func (d *DeclarationHoistableAsyncFunction) Evaluation(vm *VM) CompletionValue {
 	return d.AsyncFunctionDeclaration.Evaluation(vm)
 }
 
@@ -4107,13 +4112,13 @@ type AsyncFunctionDeclaration struct {
 }
 
 // TODO: not standard
-func (d *AsyncFunctionDeclaration) Evaluation(vm *VM) Value {
+func (d *AsyncFunctionDeclaration) Evaluation(vm *VM) CompletionValue {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := d.instantiateAsyncFunctionObject(agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 func (d *AsyncFunctionDeclaration) instantiateAsyncFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
@@ -4145,7 +4150,7 @@ type DeclarationHoistableAsyncGenerator struct {
 	AsyncGeneratorDeclaration *AsyncGeneratorDeclaration
 }
 
-func (d *DeclarationHoistableAsyncGenerator) Evaluation(vm *VM) Value {
+func (d *DeclarationHoistableAsyncGenerator) Evaluation(vm *VM) CompletionValue {
 	return d.AsyncGeneratorDeclaration.Evaluation(vm)
 }
 
@@ -4162,13 +4167,13 @@ type AsyncGeneratorDeclaration struct {
 }
 
 // TODO: not standard
-func (d *AsyncGeneratorDeclaration) Evaluation(vm *VM) Value {
+func (d *AsyncGeneratorDeclaration) Evaluation(vm *VM) CompletionValue {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := d.instantiateAsyncGeneratorFunctionObject(agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 // 15.6.3
@@ -4208,7 +4213,7 @@ type DeclarationHoistableGenerator struct {
 	GeneratorDeclaration *GeneratorDeclaration
 }
 
-func (d *DeclarationHoistableGenerator) Evaluation(vm *VM) Value {
+func (d *DeclarationHoistableGenerator) Evaluation(vm *VM) CompletionValue {
 	return d.GeneratorDeclaration.Evaluation(vm)
 }
 
@@ -4225,13 +4230,13 @@ type GeneratorDeclaration struct {
 }
 
 // TODO: not standard
-func (d *GeneratorDeclaration) Evaluation(vm *VM) Value {
+func (d *GeneratorDeclaration) Evaluation(vm *VM) CompletionValue {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := d.instantiateGeneratorFunctionObject(agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(CMString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 // 15.5.3
@@ -4300,10 +4305,10 @@ func (d *ClassDeclaration) astHasIdentifier() bool {
 }
 
 // 15.7.16
-func (d *ClassDeclaration) Evaluation(vm *VM) Value {
+func (d *ClassDeclaration) Evaluation(vm *VM) CompletionValue {
 	d.BindingClassDeclarationEvaluation(vm)
 	// return EMPTY
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 // BindingClassDeclarationEvaluation
@@ -4846,10 +4851,10 @@ func (d *LexicalDeclaration) IsConstantDeclaration() bool {
 }
 
 // Evaluation 14.3.1.2
-func (d *LexicalDeclaration) Evaluation(vm *VM) Value {
+func (d *LexicalDeclaration) Evaluation(vm *VM) CompletionValue {
 	d.BindingList.Evaluation(vm)
 	// return EMPTY
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 func (d *LexicalDeclaration) String() string {
@@ -4875,12 +4880,12 @@ func (b *BindingList) BoundNames() (l []IdentifierName) {
 	return
 }
 
-func (b *BindingList) Evaluation(vm *VM) Value {
+func (b *BindingList) Evaluation(vm *VM) CompletionValue {
 	var list []Value
 	for _, item := range b.Items {
-		list = append(list, item.Evaluation(vm))
+		list = append(list, item.Evaluation(vm).value)
 	}
-	return NewListValue(list)
+	return NewListValue(list).ToCompletion()
 }
 
 func (b *BindingList) String() string {
@@ -4915,7 +4920,7 @@ func (l *LexicalBinding) BoundNames() (list []IdentifierName) {
 }
 
 // 14.3.1.2
-func (l *LexicalBinding) Evaluation(vm *VM) Value {
+func (l *LexicalBinding) Evaluation(vm *VM) CompletionValue {
 	switch {
 	case l.Identifier != "" && l.Initializer == nil:
 		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
@@ -4928,11 +4933,11 @@ func (l *LexicalBinding) Evaluation(vm *VM) Value {
 			panic("")
 		} else {
 			rhs := l.Initializer.Evaluation(vm)
-			value := rhs.GetValue(vm.agent)
+			value := rhs.value.GetValue(vm.agent)
 			lhs.InitializeReferencedBinding(value)
 		}
 		// return EMPTY
-		return UndefinedValue
+		return UndefinedValue.ToCompletion()
 	}
 	panic("unimplemented")
 }
@@ -4996,14 +5001,14 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 
 // Evaluation
 // spec: 15.2.6
-func (f *FunctionDeclaration) Evaluation(vm *VM) Value {
+func (f *FunctionDeclaration) Evaluation(vm *VM) CompletionValue {
 	// TODO(BM): match spec
 	realm := vm.agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := f.instantiateOrdinaryFunctionObject(vm.agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), function.ToValue(), setThrowTypeIgnore)
 	// return EMPTY
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 func (f *FunctionDeclaration) String() string {
@@ -5027,7 +5032,7 @@ func (b *BlockStatement) VarDeclaredNames() []IdentifierName {
 	return b.Block.StatementList.VarDeclaredNames()
 }
 
-func (b *BlockStatement) Evaluation(vm *VM) Value {
+func (b *BlockStatement) Evaluation(vm *VM) CompletionValue {
 	return b.Block.Evaluation(vm)
 }
 
@@ -5040,7 +5045,7 @@ type Block struct {
 }
 
 // 14.2.2
-func (b *Block) Evaluation(vm *VM) Value {
+func (b *Block) Evaluation(vm *VM) CompletionValue {
 	return b.StatementList.Evaluation(vm)
 }
 
@@ -5104,8 +5109,8 @@ func (s StatementList) ContainsDirective(directive string) bool {
 	return false
 }
 
-func (s StatementList) Evaluation(vm *VM) Value {
-	var lastValue Value
+func (s StatementList) Evaluation(vm *VM) CompletionValue {
+	var lastValue CompletionValue
 	for i, item := range s {
 		lastValue = item.Evaluation(vm)
 		if vm.isReturn {
@@ -5131,8 +5136,8 @@ func (s StatementList) Evaluation(vm *VM) Value {
 			return lastValue
 		}
 	}
-	if lastValue == nil {
-		return UndefinedValue
+	if lastValue.value == nil {
+		return UndefinedValue.ToCompletion()
 	}
 	return lastValue
 }
@@ -5194,7 +5199,7 @@ func (s *StatementListItemStatement) VarScopedDeclarations() (l []*VariableDecla
 	return vars
 }
 
-func (s *StatementListItemStatement) Evaluation(vm *VM) Value {
+func (s *StatementListItemStatement) Evaluation(vm *VM) CompletionValue {
 	return s.Statement.Evaluation(vm)
 }
 
@@ -5231,7 +5236,7 @@ func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDec
 	return
 }
 
-func (s *StatementListItemDeclaration) Evaluation(vm *VM) Value {
+func (s *StatementListItemDeclaration) Evaluation(vm *VM) CompletionValue {
 	return s.Declaration.Evaluation(vm)
 }
 
@@ -5243,7 +5248,7 @@ type ExpressionStatement struct {
 	Expression Expression
 }
 
-func (e *ExpressionStatement) Evaluation(vm *VM) Value {
+func (e *ExpressionStatement) Evaluation(vm *VM) CompletionValue {
 	return e.Expression.Evaluation(vm)
 }
 
@@ -5258,7 +5263,7 @@ type Script struct {
 	StatementList StatementList
 }
 
-func (s *Script) Evaluation(vm *VM) Value {
+func (s *Script) Evaluation(vm *VM) CompletionValue {
 	return s.StatementList.Evaluation(vm)
 }
 
@@ -5286,21 +5291,21 @@ var (
 )
 
 // TODO: spec reference
-func (m *Module) Evaluation(vm *VM) Value {
+func (m *Module) Evaluation(vm *VM) CompletionValue {
 	var list []Value
 	for _, moduleItem := range m.ModuleItemList {
 		switch stmt := moduleItem.(type) {
 		case *ModuleItemImportDeclaration:
-			return UndefinedValue
+			return UndefinedValue.ToCompletion()
 		case *ModuleItemStatementListItem:
-			list = append(list, stmt.Evaluation(vm))
+			list = append(list, stmt.Evaluation(vm).value)
 		case *ModuleItemExportDeclaration:
-			list = append(list, stmt.Evaluation(vm))
+			list = append(list, stmt.Evaluation(vm).value)
 		default:
 			panic("unimplemented")
 		}
 	}
-	return NewListValue(list)
+	return NewListValue(list).ToCompletion()
 }
 
 func (m *Module) String() string {
@@ -5440,7 +5445,7 @@ func (m *ModuleItemStatementListItem) moduleRequests() (l []string) {
 	return
 }
 
-func (m *ModuleItemStatementListItem) Evaluation(vm *VM) Value {
+func (m *ModuleItemStatementListItem) Evaluation(vm *VM) CompletionValue {
 	return m.StatementListItem.Evaluation(vm)
 }
 
@@ -5493,10 +5498,10 @@ var (
 	_ ASTNode                      = (*ModuleItemExportDeclaration)(nil)
 )
 
-func (m *ModuleItemExportDeclaration) Evaluation(vm *VM) Value {
+func (m *ModuleItemExportDeclaration) Evaluation(vm *VM) CompletionValue {
 	switch {
 	case m.ExportFrom != nil || m.NamedExports != nil:
-		return UndefinedValue
+		return UndefinedValue.ToCompletion()
 	case m.Declaration != nil:
 		return m.Declaration.Evaluation(vm)
 	case m.VariableStatement != nil:
@@ -5741,15 +5746,15 @@ func (y *YieldExpression) astHasAssignmentExpression() bool {
 	return y.AssignmentExpression != nil
 }
 
-func (y *YieldExpression) Evaluation(vm *VM) Value {
+func (y *YieldExpression) Evaluation(vm *VM) CompletionValue {
 	if !y.astHasAssignmentExpression() {
-		return vm.GetCompletionValueOrPanic(Yield(vm.agent, UndefinedValue))
+		return vm.GetCompletionValueOrPanic(Yield(vm.agent, UndefinedValue)).ToCompletion()
 	} else if y.hasStar {
 		panic("unimplemented")
 	} else {
 		exprRef := y.AssignmentExpression.Evaluation(vm)
-		value := exprRef.GetValue(vm.agent)
+		value := exprRef.value.GetValue(vm.agent)
 		vm.isYield = true
-		return vm.GetCompletionValueOrPanic(Yield(vm.agent, value))
+		return vm.GetCompletionValueOrPanic(Yield(vm.agent, value)).ToCompletion()
 	}
 }

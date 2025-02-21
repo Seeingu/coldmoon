@@ -1,8 +1,8 @@
 package coldmoon
 
-// 13.1.3
+// spec: 8.1
 type RuntimeSemanticsEvaluation interface {
-	Evaluation(vm *VM) Value
+	Evaluation(vm *VM) (co CompletionValue)
 }
 
 // 8.4.5
@@ -36,7 +36,7 @@ type RuntimeSemanticsMethodDefinitionEvaluation interface {
 // RuntimeSemanticsChainEvaluation
 // 13.3.9.2
 type RuntimeSemanticsChainEvaluation interface {
-	ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (value Value, err Value)
+	ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (co CompletionValue)
 }
 
 type DefineMethodRecord struct {

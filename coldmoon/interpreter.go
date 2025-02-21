@@ -93,7 +93,7 @@ func (v *VM) EvaluatePropertyAccessWithExpressionKey(
 	baseValue Value, expression Expression, strict bool,
 ) *ReferenceRecord {
 	propertyNameReference := expression.Evaluation(v)
-	propertyNameValue := propertyNameReference.GetValue(v.agent)
+	propertyNameValue := propertyNameReference.value.GetValue(v.agent)
 	propertyKey := ToPropertyKey(v.agent, propertyNameValue)
 	return NewReferenceRecord(NewReferenceRecordBaseValue(baseValue), propertyKey.ToReference(), strict, UndefinedValue)
 }
@@ -325,12 +325,12 @@ func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIt
 	CreatePerIterationEnvironment(perIterationBindings)
 	for {
 		if test != nil {
-			testRef := test.Evaluation(v)
+			testRef := test.Evaluation(v).value
 			testValue := testRef.GetValue(v.agent)
 			if !testValue.ToBoolean() {
 				return V
 			}
-			result := stmt.Evaluation(v)
+			result := stmt.Evaluation(v).value
 			if !LoopContinues(result, labelSet) {
 				return UpdateEmpty(result, V)
 			}
@@ -339,7 +339,7 @@ func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIt
 				CreatePerIterationEnvironment(perIterationBindings)
 				if increment != nil {
 					incRef := increment.Evaluation(v)
-					incRef.GetValue(v.agent)
+					incRef.value.GetValue(v.agent)
 				}
 			}
 		}
@@ -365,7 +365,7 @@ func (v *VM) ForInOfHeadEvaluation(
 	}
 	exprRef := expr.Evaluation(v)
 	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
-	exprValue := exprRef.GetValue(agent)
+	exprValue := exprRef.value.GetValue(agent)
 	if iterationKind == ForInOfIterationKindEnumerate {
 		if IsUndefinedOrNil(exprValue) || exprValue == NullValue {
 			// TODO: return { [[Type]]: BREAK, [[Value]]: EMPTY, [[Target]]: EMPTY }
@@ -452,7 +452,7 @@ func (v *VM) ForInOfBodyEvaluation(
 			}
 		}
 		// TODO: handle status
-		result := stmt.Evaluation(v)
+		result := stmt.Evaluation(v).value
 		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
 		if !LoopContinues(result, labelSet) {
 			if iterationKind == ForInOfIterationKindEnumerate {
@@ -495,6 +495,7 @@ func UpdateEmpty(result, V Value) Value {
 	return V
 }
 
+// Deprecated
 func (v *VM) GetValueOrPanic(result Value, err Value) Value {
 	if result == nil {
 		v.panic(err)
@@ -512,8 +513,5 @@ func (v *VM) GetCompletionValueOrPanic(c Completion[Value]) Value {
 
 func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {
 	vm2 := NewVM2(agent)
-	value := node.Evaluation(vm2)
-	// TODO: use completion return
-	co.value = value
-	return
+	return node.Evaluation(vm2)
 }
