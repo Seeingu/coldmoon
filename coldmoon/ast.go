@@ -382,23 +382,25 @@ func (e ElementList) astHasElementListAndAssignmentExpression() (list ElementLis
 
 // ArrayAccumulation
 // spec: 13.2.4.1
-func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSInt) (index JSInt, err Value) {
+func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSInt) (co Completion[JSInt]) {
 	if list, expr, ok := e.astHasElementListAndAssignmentExpression(); ok {
-		nextIndex, err = list.ArrayAccumulation(vm, array, nextIndex)
-		if err != nil {
-			return
+		nextIndex, isAbrupt, rt := ReturnIfAbrupt(list.ArrayAccumulation(vm, array, nextIndex), co)
+		if isAbrupt {
+			return rt
 		}
 		// TODO: check elision
 		initResult := expr.Expression.Evaluation(vm)
 		initValue := initResult.value.GetValue(vm.agent)
 		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
-		return nextIndex + 1, nil
+		co.value = nextIndex + 1
+		return
 	} else if expr, ok = e.astIsOnlyHasAssigmentExpression(); ok {
 		// TODO: check elision
 		initResult := expr.Expression.Evaluation(vm)
 		initValue := initResult.value.GetValue(vm.agent)
 		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
-		return nextIndex + 1, nil
+		co.value = nextIndex + 1
+		return
 	} else {
 		panic("unimplemented")
 	}
@@ -3103,23 +3105,19 @@ var _ RuntimeSemanticsEvaluateBody = (*FunctionBody)(nil)
 
 // EvaluateBody
 // spec: 10.2.1.3
-func (f *FunctionBody) EvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentList []Value) (value Value, err Value) {
-	var completion CompletionValue
+func (f *FunctionBody) EvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentList []Value) (value CompletionValue) {
 	switch f.Type {
 	case FunctionTypeNormal:
-		completion = EvaluateFunctionBody(agent, function, argumentList)
+		return EvaluateFunctionBody(agent, function, argumentList)
 	case FunctionTypeGenerator:
-		completion = EvaluateGeneratorBody(agent, function, argumentList)
+		return EvaluateGeneratorBody(agent, function, argumentList)
 	case FunctionTypeAsyncGenerator:
-		completion = EvaluateAsyncGeneratorBody(agent, function, argumentList)
+		return EvaluateAsyncGeneratorBody(agent, function, argumentList)
 	case FunctionTypeAsync:
-		completion = EvaluateAsyncFunctionBody(agent, function, argumentList)
+		return EvaluateAsyncFunctionBody(agent, function, argumentList)
 	}
 
-	if completion.IsError() {
-		return nil, completion.Error()
-	}
-	return completion.Data(), nil
+	panic("unreachable")
 }
 
 func (f *FunctionBody) VarScopedDeclarations() (l []*VariableDeclaration) {
@@ -3496,13 +3494,13 @@ func (s *IfStatement) Evaluation(vm *VM) CompletionValue {
 	if s.astHasElse() {
 		exprRef := s.Condition.Evaluation(vm)
 		exprValue := exprRef.value.GetValue(vm.agent)
-		var stmtCompletion Value
+		var stmtCompletion CompletionValue
 		if exprValue.ToBoolean() {
-			stmtCompletion = s.Consequent.Evaluation(vm).value
+			stmtCompletion = s.Consequent.Evaluation(vm)
 		} else {
-			stmtCompletion = s.Alternate.Evaluation(vm).value
+			stmtCompletion = s.Alternate.Evaluation(vm)
 		}
-		return UpdateEmpty(stmtCompletion, UndefinedValue).ToCompletion()
+		return UpdateEmpty(stmtCompletion, UndefinedValue)
 	} else {
 		exprRef := s.Condition.Evaluation(vm)
 		exprValue := exprRef.value.GetValue(vm.agent)
@@ -3510,7 +3508,7 @@ func (s *IfStatement) Evaluation(vm *VM) CompletionValue {
 			return UndefinedValue.ToCompletion()
 		} else {
 			stmtCompletion := s.Consequent.Evaluation(vm)
-			return UpdateEmpty(stmtCompletion.value, UndefinedValue).ToCompletion()
+			return UpdateEmpty(stmtCompletion, UndefinedValue)
 		}
 	}
 }
@@ -3559,25 +3557,25 @@ func (s *WhileStatement) Evaluation(vm *VM) CompletionValue {
 	defer func() {
 		vm.loopNodeStack.Pop()
 	}()
-	return vm.GetValueOrPanic(s.WhileLoopEvaluation(vm, labelSet)).ToCompletion()
+	return s.WhileLoopEvaluation(vm, labelSet)
 }
 
 // WhileLoopEvaluation
 // spec: 14.7.3.2
-func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (value Value, err Value) {
+func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue) {
 	var V Value = UndefinedValue
 	for {
 		exprRef := s.Condition.Evaluation(vm)
 		exprValue := exprRef.value.GetValue(vm.agent)
 		if !exprValue.ToBoolean() {
-			return V, nil
+			return V.ToCompletion()
 		}
 		stmtResult := s.Body.Evaluation(vm)
 		if vm.isYield {
-			return stmtResult.value, nil
+			return stmtResult
 		}
 		if !LoopContinues(stmtResult.value, labelSet) {
-			return UpdateEmpty(stmtResult.value, V), nil
+			return UpdateEmpty(stmtResult, V)
 		}
 		if !IsUndefinedOrNil(stmtResult.value) {
 			V = stmtResult.value
@@ -3678,7 +3676,7 @@ func (s *ForStatement) isVariableDeclarationList() bool {
 }
 
 // ForLoopEvaluation 14.7.4.2
-func (s *ForStatement) ForLoopEvaluation(vm *VM) Value {
+func (s *ForStatement) ForLoopEvaluation(vm *VM) CompletionValue {
 	// TODO: label set
 	if s.isVariableDeclarationList() {
 		s.Initializer.Evaluation(vm)
@@ -3697,7 +3695,7 @@ func (s *ForStatement) ForLoopEvaluation(vm *VM) Value {
 }
 
 func (s *ForStatement) Evaluation(vm *VM) CompletionValue {
-	return s.ForLoopEvaluation(vm).ToCompletion()
+	return s.ForLoopEvaluation(vm)
 }
 
 func (s *ForStatement) String() string {
@@ -3778,14 +3776,15 @@ func (f *ForInOfStatement) BoundNames() (l []IdentifierName) {
 	return
 }
 
-func (f *ForInOfStatement) Evaluation(vm *VM) CompletionValue {
+func (f *ForInOfStatement) Evaluation(vm *VM) (co CompletionValue) {
 	// TODO
 	var labelSet []string
-	result, err := f.ForInOfLoopEvaluation(vm, labelSet)
-	if err != nil {
-		panic(err)
+	result, isAbrupt, rt := ReturnIfAbrupt(f.ForInOfLoopEvaluation(vm, labelSet), co)
+	if isAbrupt {
+		return rt
 	}
-	return result.ToCompletion()
+	co.value = result
+	return
 }
 
 func (f *ForInOfStatement) astIsLeftHandSideExpression() bool {
@@ -3806,13 +3805,14 @@ func (f *ForInOfStatement) astIsForDeclaration() bool {
 
 // ForInOfLoopEvaluation
 // spec: 14.7.5.5
-func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (value Value, err Value) {
+func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue) {
 	if f.astIsForDeclaration() {
 		forDeclaration := f.Initializer.ForDeclaration
 		if f.astIsOf() {
 			keyResult, err := vm.ForInOfHeadEvaluation(forDeclaration.BoundNames(), f.Expression, ForInOfIterationKindIterate)
 			if err != nil {
-				return nil, err
+				co.err = err
+				return
 			}
 			return vm.ForInOfBodyEvaluation(
 				forDeclaration,
@@ -3827,7 +3827,8 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (val
 			// for in
 			keyResult, err := vm.ForInOfHeadEvaluation(forDeclaration.BoundNames(), f.Expression, ForInOfIterationKindEnumerate)
 			if err != nil {
-				return nil, err
+				co.err = err
+				return
 			}
 			return vm.ForInOfBodyEvaluation(
 				forDeclaration,
@@ -4708,15 +4709,18 @@ var (
 
 // ClassElementEvaluation
 // spec: 15.7.13
-func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (result Completion[*classEvaluationResult]) {
-	field, _ := c.ClassFieldDefinitionEvaluation(vm, obj)
-	result.value = &classEvaluationResult{
+func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (co Completion[*classEvaluationResult]) {
+	field, isAbrupt, rt := ReturnIfAbrupt(c.ClassFieldDefinitionEvaluation(vm, obj), co)
+	if isAbrupt {
+		return rt
+	}
+	co.value = &classEvaluationResult{
 		classFieldDefinition: field,
 	}
 	return
 }
 
-func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM, homeObject ObjectType) (field *ClassFieldDefinition, err Value) {
+func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM, homeObject ObjectType) (co Completion[*ClassFieldDefinition]) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	var name PropertyKeyOrPrivateName
@@ -4754,15 +4758,17 @@ func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM, hom
 		MakeMethod(initializer.(*ECMAScriptFunction), homeObject)
 		initializer.(InternalSlotClassFieldInitializerName).SetClassFieldInitializerName(name)
 	} else {
-		return &ClassFieldDefinition{
+		co.value = &ClassFieldDefinition{
 			Name: name,
-		}, nil
+		}
+		return
 	}
 
-	return &ClassFieldDefinition{
+	co.value = &ClassFieldDefinition{
 		Name:        name,
 		Initializer: initializer.(*ECMAScriptFunction),
-	}, nil
+	}
+	return
 }
 
 func (c *ClassElementFieldDefinition) ClassElementKind() ClassElementKind {
@@ -5746,15 +5752,15 @@ func (y *YieldExpression) astHasAssignmentExpression() bool {
 	return y.AssignmentExpression != nil
 }
 
-func (y *YieldExpression) Evaluation(vm *VM) CompletionValue {
+func (y *YieldExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if !y.astHasAssignmentExpression() {
-		return vm.GetCompletionValueOrPanic(Yield(vm.agent, UndefinedValue)).ToCompletion()
+		return Yield(vm.agent, UndefinedValue)
 	} else if y.hasStar {
 		panic("unimplemented")
 	} else {
 		exprRef := y.AssignmentExpression.Evaluation(vm)
 		value := exprRef.value.GetValue(vm.agent)
 		vm.isYield = true
-		return vm.GetCompletionValueOrPanic(Yield(vm.agent, value)).ToCompletion()
+		return Yield(vm.agent, value)
 	}
 }

@@ -319,8 +319,9 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 
 type LabelSet = []string
 
-// 14.7.4.3
-func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIterationBindings []string, labelSet LabelSet) Value {
+// ForBodyEvaluation
+// spec: 14.7.4.3
+func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIterationBindings []string, labelSet LabelSet) CompletionValue {
 	var V Value = UndefinedValue
 	CreatePerIterationEnvironment(perIterationBindings)
 	for {
@@ -328,11 +329,11 @@ func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIt
 			testRef := test.Evaluation(v).value
 			testValue := testRef.GetValue(v.agent)
 			if !testValue.ToBoolean() {
-				return V
+				return V.ToCompletion()
 			}
 			result := stmt.Evaluation(v).value
 			if !LoopContinues(result, labelSet) {
-				return UpdateEmpty(result, V)
+				return UpdateEmpty(result.ToCompletion(), V)
 			}
 			if !IsUndefinedOrNil(result) {
 				V = result
@@ -404,7 +405,7 @@ func (v *VM) ForInOfBodyEvaluation(
 	lhsKind ForInOfLhsKind,
 	labelSet LabelSet,
 	iteratorKind IteratorKind,
-) (value Value, err Value) {
+) (co CompletionValue) {
 	agent := v.agent
 	oldEnv := v.RunningLexicalEnvironment()
 	var V Value = UndefinedValue
@@ -419,11 +420,13 @@ func (v *VM) ForInOfBodyEvaluation(
 		}
 		nextResult, ok := nextResultValue.GetObject()
 		if !ok {
-			return nil, v.agent.ThrowTypeError("Iterator result is not an object")
+			co.err = v.agent.ThrowTypeError("Iterator result is not an object")
+			return
 		}
 		done := IteratorComplete(nextResult)
 		if done {
-			return V, nil
+			co.value = V
+			return
 		}
 		nextValue := IteratorValue(nextResult)
 		if lhsKind == ForInOfLhsKindAssignment || lhsKind == ForInOfLhsKindVarBinding {
@@ -452,11 +455,11 @@ func (v *VM) ForInOfBodyEvaluation(
 			}
 		}
 		// TODO: handle status
-		result := stmt.Evaluation(v).value
+		result := stmt.Evaluation(v)
 		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
-		if !LoopContinues(result, labelSet) {
+		if !LoopContinues(result.value, labelSet) {
 			if iterationKind == ForInOfIterationKindEnumerate {
-				return UpdateEmpty(result, V), nil
+				return UpdateEmpty(result, V)
 			} else {
 				Assert(iterationKind == ForInOfIterationKindIterate)
 				UpdateEmpty(result, V)
@@ -465,11 +468,12 @@ func (v *VM) ForInOfBodyEvaluation(
 				}
 				// TODO: handle return value
 				iteratorRecord.IteratorClose()
-				return UndefinedValue, nil
+				co.value = UndefinedValue
+				return
 			}
 		}
-		if result != nil {
-			V = result
+		if result.value != nil {
+			V = result.value
 		}
 	}
 }
@@ -485,30 +489,13 @@ func LoopContinues(result Value, labelSet LabelSet) bool {
 	return true
 }
 
-// TODO: return completion
 // UpdateEmpty
 // spec: 6.2.4.3
-func UpdateEmpty(result, V Value) Value {
-	if result != nil {
+func UpdateEmpty(result CompletionValue, V Value) CompletionValue {
+	if result.value != nil {
 		return result
 	}
-	return V
-}
-
-// Deprecated
-func (v *VM) GetValueOrPanic(result Value, err Value) Value {
-	if result == nil {
-		v.panic(err)
-	}
-	return result
-}
-
-// Deprecated
-func (v *VM) GetCompletionValueOrPanic(c Completion[Value]) Value {
-	if c.IsError() {
-		v.panic(c.Error())
-	}
-	return c.Data()
+	return V.ToCompletion()
 }
 
 func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {

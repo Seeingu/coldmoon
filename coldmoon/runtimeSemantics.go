@@ -91,7 +91,7 @@ type RuntimeSemanticsClassElementEvaluation interface {
 
 // 15.7.10
 type RuntimeSemanticsClassFieldDefinitionEvaluation interface {
-	ClassFieldDefinitionEvaluation(vm *VM, homeObject ObjectType) (field *ClassFieldDefinition, err Value)
+	ClassFieldDefinitionEvaluation(vm *VM, homeObject ObjectType) (co Completion[*ClassFieldDefinition])
 }
 
 // MARK: - Array
@@ -99,7 +99,7 @@ type RuntimeSemanticsClassFieldDefinitionEvaluation interface {
 // RuntimeSemanticsArrayAccumulation
 // spec: 13.2.4.1
 type RuntimeSemanticsArrayAccumulation interface {
-	ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSInt) (index JSInt, err Value)
+	ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSInt) (co Completion[JSInt])
 }
 
 // MARK: - Loop
@@ -107,13 +107,13 @@ type RuntimeSemanticsArrayAccumulation interface {
 // RuntimeSemanticsForInOfLoopEvaluation
 // spec: 13.7.5.5
 type RuntimeSemanticsForInOfLoopEvaluation interface {
-	ForInOfLoopEvaluation(vm *VM, labelSet []string) (value Value, err Value)
+	ForInOfLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue)
 }
 
 // RuntimeSemanticsWhileLoopEvaluation
 // spec: 14.7.3.2
 type RuntimeSemanticsWhileLoopEvaluation interface {
-	WhileLoopEvaluation(vm *VM, labelSet []string) (value Value, err Value)
+	WhileLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue)
 }
 
 // RuntimeSemanticsForDeclarationBindingInstantiation
@@ -142,7 +142,7 @@ type RuntimeSemanticsInstantiateAsyncArrowFunctionExpression interface {
 // RuntimeSemanticsEvaluateBody
 // spec: 10.2.1.3
 type RuntimeSemanticsEvaluateBody interface {
-	EvaluateBody(agent *Agent, functionObject *ECMAScriptFunction, argumentList []Value) (value Value, err Value)
+	EvaluateBody(agent *Agent, functionObject *ECMAScriptFunction, argumentList []Value) (co CompletionValue)
 }
 
 // MARK: - Try Catch

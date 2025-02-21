@@ -79,7 +79,8 @@ func (e *ECMAScriptFunction) GetFunctionRealm() *Realm {
 	return e.Realm
 }
 
-// 10.2.1
+// Call
+// spec: 10.2.1
 func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Value {
 	agent := e.Agent()
 	function := e
@@ -93,18 +94,16 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Val
 
 	OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
 
-	result, err := OrdinaryCallEvaluateBody(agent, function, argumentsList)
-	if err != nil {
-		panic(err)
-	}
+	// TODO(BM): update Call return type
+	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
 
 	agent.ExecutionContextStack.Pop()
 
+	if result.t == CompletionTypeReturn {
+		return result.Data()
+	}
 	// TODO(BM): check is return from e
-	//if result.Type == CompletionTypeReturn {
-	//	return result.Data()
-	//}
-	return result
+	return result.value
 }
 
 // 10.2.1.1
@@ -159,7 +158,7 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 
 // OrdinaryCallEvaluateBody
 // spec: 10.2.1.4
-func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (value Value, err Value) {
+func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (value CompletionValue) {
 	return function.ECMAScriptCode.EvaluateBody(agent, function, argumentsList)
 }
 
@@ -417,18 +416,18 @@ func (e *ECMAScriptFunction) Construct(
 
 	constructorEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
 
-	result, err := OrdinaryCallEvaluateBody(agent, function, argumentsList)
+	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
 
 	agent.ExecutionContextStack.Pop()
 
-	if err == nil {
-		if o, ok := result.(*ObjectValue); ok {
+	if !result.IsAbrupt() {
+		if o, ok := result.value.(*ObjectValue); ok {
 			return o.Object
 		}
 		if kind == ConstructorKindBase {
 			return MustGetObject(thisArgument)
 		}
-		if result != UndefinedValue {
+		if result.value != UndefinedValue {
 			panic("TypeError")
 		}
 	} else {
