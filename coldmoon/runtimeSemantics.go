@@ -138,3 +138,11 @@ type RuntimeSemanticsInstantiateAsyncArrowFunctionExpression interface {
 type RuntimeSemanticsEvaluateBody interface {
 	EvaluateBody(agent *Agent, functionObject *ECMAScriptFunction, argumentList []Value) (value Value, err Value)
 }
+
+// MARK: - Try Catch
+
+// RuntimeSemanticsCatchClauseEvaluation
+// spec: 14.15.2
+type RuntimeSemanticsCatchClauseEvaluation interface {
+	CatchClauseEvaluation(vm *VM, thrownValue Value) (c Completion[Value])
+}

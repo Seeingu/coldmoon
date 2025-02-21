@@ -609,7 +609,7 @@ func (p *Parser) throwStatement() *StatementThrow {
 	}
 }
 
-func (p *Parser) tryStatement() *StatementTry {
+func (p *Parser) tryStatement() *TryStatement {
 	p.tokenizer.MustMatch(TTry)
 	block := p.block()
 	var catch *Block
@@ -630,11 +630,13 @@ func (p *Parser) tryStatement() *StatementTry {
 	if catch == nil && finally == nil {
 		panic("tryStatement: expected catch or finally")
 	}
-	return &StatementTry{
-		CatchParameter: catchParameter,
-		TryBlock:       block,
-		CatchBlock:     catch,
-		FinallyBlock:   finally,
+	return &TryStatement{
+		Catch: &Catch{
+			CatchParameter: catchParameter,
+			CatchBlock:     catch,
+		},
+		TryBlock:     block,
+		FinallyBlock: finally,
 	}
 }
 

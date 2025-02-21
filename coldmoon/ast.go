@@ -145,8 +145,6 @@ func (p *IdentifierReference) String() string {
 	return string(p.Identifier)
 }
 
-// MARK: - Literal
-
 // MARK: - AsyncFunctionExpression
 
 type PrimaryExpressionAsyncFunctionExpression struct {
@@ -2920,28 +2918,57 @@ func (s *StatementEmpty) String() string {
 
 // MARK: - TryStatement
 
+// TODO(BM)
+// CatchParameter [Yield, Await] :
+// - BindingIdentifier[?Yield, ?Await]
+// - BindingPattern[?Yield, ?Await]
 type CatchParameter IdentifierName
 
 func (c CatchParameter) ToIdentifier() IdentifierName {
 	return IdentifierName(c)
 }
 
-type StatementTry struct {
-	Statement
+// Catch [Yield, Await, Return] :
+// catch ( CatchParameter[?Yield, ?Await] ) Block[?Yield, ?Await, ?Return]
+// catch Block[?Yield, ?Await, ?Return]
+type Catch struct {
 	CatchParameter CatchParameter
-	TryBlock       *Block
 	CatchBlock     *Block
-	FinallyBlock   *Block
 }
 
-func (t *StatementTry) _statement() {}
+var _ RuntimeSemanticsCatchClauseEvaluation = (*Catch)(nil)
 
-var _ Statement = (*StatementTry)(nil)
+func (c *Catch) CatchClauseEvaluation(vm *VM, thrownValue Value) (comp Completion[Value]) {
+	oldEnv := vm.RunningLexicalEnvironment()
+	catchEnv := NewDeclarativeEnvironment(oldEnv)
+	// TODO(BM): handle BindingPattern
+	catchEnv.CreateMutableBinding(string(c.CatchParameter), false)
+	vm.SetRunningLexicalEnvironment(catchEnv)
+	panic("unimplemented")
 
-func (t *StatementTry) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return
+}
+
+// TryStatement [Yield, Await, Return] :
+// - try Block[?Yield, ?Await, ?Return] Catch[?Yield, ?Await, ?Return]
+// - try Block[?Yield, ?Await, ?Return] Finally[?Yield, ?Await, ?Return]
+// - try Block[?Yield, ?Await, ?Return] Catch[?Yield, ?Await, ?Return]
+// - Finally[?Yield, ?Await, ?Return]
+type TryStatement struct {
+	Statement
+	TryBlock     *Block
+	Catch        *Catch
+	FinallyBlock *Block
+}
+
+func (t *TryStatement) _statement() {}
+
+var _ Statement = (*TryStatement)(nil)
+
+func (t *TryStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	l = append(l, t.TryBlock.StatementList.VarScopedDeclarations()...)
-	if t.CatchBlock != nil {
-		l = append(l, t.CatchBlock.StatementList.VarScopedDeclarations()...)
+	if t.Catch.CatchBlock != nil {
+		l = append(l, t.Catch.CatchBlock.StatementList.VarScopedDeclarations()...)
 	}
 	if t.FinallyBlock != nil {
 		l = append(l, t.FinallyBlock.StatementList.VarScopedDeclarations()...)
@@ -2949,10 +2976,24 @@ func (t *StatementTry) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return
 }
 
-func (t *StatementTry) String() string {
+func (t *TryStatement) astHasCatch() bool {
+	return t.Catch != nil
+}
+
+func (t *TryStatement) astHasFinally() bool {
+	return t.FinallyBlock != nil
+}
+
+// Evaluation
+// spec: 14.15.3
+func (t *TryStatement) Evaluation(vm *VM) Value {
+	panic("unimplemented")
+}
+
+func (t *TryStatement) String() string {
 	sb := "try " + t.TryBlock.String()
-	if t.CatchBlock != nil {
-		sb += " catch (" + string(t.CatchParameter) + ") " + t.CatchBlock.String()
+	if t.Catch.CatchBlock != nil {
+		sb += " catch (" + string(t.Catch.CatchParameter) + ") " + t.Catch.CatchBlock.String()
 	}
 	if t.FinallyBlock != nil {
 		sb += " finally " + t.FinallyBlock.String()

@@ -32,6 +32,10 @@ func (v *VM) RunningLexicalEnvironment() EnvironmentRecord {
 	return v.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
 }
 
+func (v *VM) SetRunningLexicalEnvironment(env EnvironmentRecord) {
+	v.agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+}
+
 func (v *VM) RunningPrivateEnvironment() *PrivateEnvironment {
 	return v.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 }
@@ -39,6 +43,15 @@ func (v *VM) RunningPrivateEnvironment() *PrivateEnvironment {
 // TODO(BM): error handling
 func (v *VM) panic(err Value) {
 	panic(err)
+}
+
+// TODO(BM): rename completion
+// Completion
+// spec: 5.2.3.1
+func CompletionHandle[T any](completion Completion[T]) Completion[T] {
+	// do nothing
+	// - received `completion` is already a completion record
+	return completion
 }
 
 // InitializeBoundName
