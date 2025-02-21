@@ -57,7 +57,7 @@ type RuntimeSemanticsDefineMethod interface {
 // 15.7.15
 type RuntimeSemanticsBindingClassDeclarationEvaluation interface {
 	// BindingClassDeclarationEvaluation returns a function object or an abrupt Completion
-	BindingClassDeclarationEvaluation(vm *VM) (obj ObjectType, err Value)
+	BindingClassDeclarationEvaluation(vm *VM) (co Completion[ObjectType])
 }
 
 // RuntimeSemanticsInstantiateOrdinaryFunctionExpression

@@ -67,13 +67,21 @@ func (p *ClassExpression) astHasIdentifier() bool {
 // Evaluation
 // spec: 15.7.16
 func (p *ClassExpression) Evaluation(vm *VM) Value {
+	// TODO: refactor after evaluation return type updated
+	var co CompletionValue
 	if p.astHasIdentifier() {
 		className := p.IdentifierName
-		value, _ := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)))
+		value, isAbrupt, _ := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)), co)
+		if isAbrupt {
+			panic("unimplemented")
+		}
 		// TODO: set sourceText
 		return value.ToValue()
 	} else {
-		value, _ := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("")))
+		value, isAbrupt, _ := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("")), co)
+		if isAbrupt {
+			panic("unimplemented")
+		}
 		// TODO: set sourceText
 		return value.ToValue()
 	}
@@ -738,12 +746,12 @@ func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, en
 			return
 		}
 	} else if p.astIsClassElementName() {
-		methodDef, completion := ReturnIfAbrupt(p.DefineMethod(vm, obj, nil))
-		if methodDef == nil {
-			return CompletionFrom(co, completion)
+		if methodDef, isAbrupt, rt := ReturnIfAbrupt(p.DefineMethod(vm, obj, nil), co); isAbrupt {
+			return rt
+		} else {
+			SetFunctionName(methodDef.Closure, methodDef.Key, "")
+			return DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable)
 		}
-		SetFunctionName(methodDef.Closure, methodDef.Key, "")
-		return DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable)
 	} else {
 		panic("unimplemented")
 	}
@@ -4300,18 +4308,27 @@ func (d *ClassDeclaration) Evaluation(vm *VM) Value {
 
 // BindingClassDeclarationEvaluation
 // spec: 15.7.15
-func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM) (obj ObjectType, err Value) {
+func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM) (co Completion[ObjectType]) {
 	if d.astHasIdentifier() {
 		className := d.IdentifierName
-		value, _ := ReturnIfAbrupt(d.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)))
+		value, isAbrupt, rt := ReturnIfAbrupt(d.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)), co)
+		if isAbrupt {
+			return rt
+		}
 		// TODO: set [[SourceText]]
 		env := vm.RunningLexicalEnvironment()
 		vm.InitializeBoundName(className, value.ToValue(), env)
-		return value, nil
+		co.value = value
+		return
 	} else {
-		value, _ := ReturnIfAbrupt(d.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("default")))
+		value, isAbrupt, rt := ReturnIfAbrupt(d.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("default")), co)
+		if isAbrupt {
+			return rt
+		}
 		// TODO: set [[SourceText]]
-		return value, nil
+
+		co.value = value
+		return
 	}
 }
 
@@ -4772,12 +4789,12 @@ type ClassElementMethodDefinition struct {
 
 // ClassElementEvaluation
 // spec: 15.7.13
-func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (result Completion[*classEvaluationResult]) {
-	privateElement, completion := ReturnIfAbrupt(c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false))
-	if privateElement == nil {
-		return CompletionFrom(result, completion)
+func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (co Completion[*classEvaluationResult]) {
+	privateElement, isAbrupt, rt := ReturnIfAbrupt(c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false), co)
+	if isAbrupt {
+		return rt
 	}
-	result.value = &classEvaluationResult{
+	co.value = &classEvaluationResult{
 		privateElement: privateElement,
 	}
 	return

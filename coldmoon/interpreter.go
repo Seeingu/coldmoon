@@ -56,14 +56,16 @@ func CompletionHandle[T any](completion Completion[T]) Completion[T] {
 
 // ReturnIfAbrupt
 // spec: 5.2.3.3
-// return first value if completion is not abrupt
-// else return second
-func ReturnIfAbrupt[T any](completion Completion[T]) (value T, c Completion[T]) {
-	c = completion
+// caller should return `rt` if `isAbrupt` is true
+// TODO: can we simplify caller code?
+func ReturnIfAbrupt[T any, RT any](completion Completion[T], returnCompletion Completion[RT]) (value T, isAbrupt bool, rt Completion[RT]) {
 	if completion.IsAbrupt() {
+		isAbrupt = true
+		rt = CompletionFrom(returnCompletion, completion)
 		return
 	}
-	return completion.value, completion
+	value = completion.value
+	return
 }
 
 // ReturnAssertNormal
