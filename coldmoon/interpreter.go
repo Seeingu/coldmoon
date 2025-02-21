@@ -54,6 +54,26 @@ func CompletionHandle[T any](completion Completion[T]) Completion[T] {
 	return completion
 }
 
+// ReturnIfAbrupt
+// spec: 5.2.3.3
+// return first value if completion is not abrupt
+// else return second
+func ReturnIfAbrupt[T any](completion Completion[T]) (value T, c Completion[T]) {
+	c = completion
+	if completion.IsAbrupt() {
+		return
+	}
+	return completion.value, completion
+}
+
+// ReturnAssertNormal
+//
+// not standard: 5.2.3.4 ReturnIfAbrupt Shorthands
+func ReturnAssertNormal[T any](c Completion[T]) T {
+	Assert(!c.IsAbrupt())
+	return c.value
+}
+
 // InitializeBoundName
 // spec: 8.6.2.1
 func (v *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord) {
@@ -110,40 +130,47 @@ func (v *VM) InstanceOfOperator(value Value, target Value) bool {
 		agent.ThrowTypeError("target is not callable")
 		return false
 	}
-	return v.OrdinaryHasInstance(target, value).Data()
+	completion := v.OrdinaryHasInstance(target, value)
+	return completion.Data()
 }
 
 // 7.3.21
-func (v *VM) OrdinaryHasInstance(c Value, value Value) Completion[bool] {
+func (v *VM) OrdinaryHasInstance(c Value, value Value) (co Completion[bool]) {
 	agent := v.agent
 	if !IsCallable(c) {
-		return NewNormalCompletion(false)
+		co.value = false
+		return
 	}
 	o := MustGetObject(c)
 	if b, ok := o.(*BoundFunctionObject); ok {
 		bc := b.BoundTargetFunction
-		return NewNormalCompletion(v.InstanceOfOperator(value, bc.ToValue()))
+		co.value = v.InstanceOfOperator(value, bc.ToValue())
+		return
 	}
 
 	objectValue, ok := value.(*ObjectValue)
 	if !ok {
-		return NewNormalCompletion(false)
+		co.value = false
+		return
 	}
 
 	proto := o.Get(NewStringPropertyKey("prototype"))
 	protoObject, ok := proto.(*ObjectValue)
 	if !ok {
-		return NewThrowCompletion[bool](agent.ThrowException(TypeError, "prototype is not an object"))
+		co.err = agent.ThrowException(TypeError, "prototype is not an object")
+		return
 	}
 
 	object := objectValue.Object
 	for {
 		object = object.InternalMethods().GetPrototypeOf(object)
 		if object == nil {
-			return NewNormalCompletion(false)
+			co.value = false
+			return
 		}
 		if protoObject.Object == object {
-			return NewNormalCompletion(true)
+			co.value = true
+			return
 		}
 	}
 }
@@ -473,16 +500,18 @@ func (v *VM) GetValueOrPanic(result Value, err Value) Value {
 	return result
 }
 
-func (v *VM) GetCompletionValueOrPanic(c CompletionValue) Value {
+// Deprecated
+func (v *VM) GetCompletionValueOrPanic(c Completion[Value]) Value {
 	if c.IsError() {
 		v.panic(c.Error())
 	}
 	return c.Data()
 }
 
-func RunNode(agent *Agent, node ASTNode) CompletionValue {
+func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {
 	vm2 := NewVM2(agent)
 	value := node.Evaluation(vm2)
 	// TODO: use completion return
-	return NewCompletionReturnValue(value)
+	co.value = value
+	return
 }

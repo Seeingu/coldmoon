@@ -83,7 +83,9 @@ func HostLoadImportedModule(
 		FileName: path.Base(filePath),
 		BaseDir:  path.Dir(filePath),
 	})
-	result := NewCompletionModule(module)
+	result := Completion[ModuleRecord]{
+		value: module,
+	}
 	FinishLoadingImportedModule(agent, referrer, specifier, payload, result)
 }
 

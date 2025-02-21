@@ -6,6 +6,8 @@ type ModuleRecord interface {
 	_moduleRecord()
 }
 
+type CompletionModule = Completion[ModuleRecord]
+
 type ResolveSet struct {
 	// [[Module]]
 	Module ModuleRecord
@@ -99,7 +101,7 @@ func FinishLoadingImportedModule(
 	payload ImportedModulePayload,
 	result CompletionModule,
 ) {
-	if result.Type == CompletionTypeNormal {
+	if result.t == CompletionTypeNormal {
 		module := result.Data()
 		if referrer.Script != nil {
 			_, ok := referrer.Script.LoadedModules[specifier]

@@ -4,8 +4,9 @@ type BaseValue struct {
 	Value
 }
 
-func (b *BaseValue) ToCompletion() CompletionValue {
-	return NewCompletionValue(b.Value)
+func (b *BaseValue) ToCompletion() (co CompletionValue) {
+	co.value = b.Value
+	return
 }
 
 func (b *BaseValue) Hash() string {

@@ -320,24 +320,29 @@ func (o *Object) LengthOfArrayLike() JSInt {
 }
 
 // 7.3.22
-func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) CompletionObject {
+func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) (co Completion[ObjectType]) {
 	objectRef := o.Ref()
 	c := objectRef.Get(NewStringPropertyKey("constructor"))
 	if c == UndefinedValue {
-		return NewCompletionObject(defaultConstructor)
+		co.value = defaultConstructor
+		return
 	}
 	if !c.IsObject() {
-		return NewCompletionObjectError(objectRef.Agent().ThrowException(TypeError, c.String()+" is not an object"))
+		co.err = objectRef.Agent().ThrowException(TypeError, c.String()+" is not an object")
+		return
 	}
 	cObject := MustGetObject(c)
 	s := cObject.Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]))
 	if s == UndefinedValue || s == NullValue {
-		return NewCompletionObject(defaultConstructor)
+		co.value = defaultConstructor
+		return
 	}
 	if IsConstructor(s) {
-		return NewCompletionObject(MustGetObject(s))
+		co.value = MustGetObject(s)
+		return
 	}
-	return NewCompletionObject(defaultConstructor)
+	co.value = defaultConstructor
+	return
 }
 
 func (o *Object) ToCompletion() CompletionValue {

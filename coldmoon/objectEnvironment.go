@@ -70,14 +70,15 @@ func (o *ObjectEnvironment) SetMutableBinding(name string, value Value, strict b
 }
 
 // 9.1.1.2.6
-func (o *ObjectEnvironment) GetBindingValue(agent *Agent, name string, strict bool) CompletionValue {
+func (o *ObjectEnvironment) GetBindingValue(agent *Agent, name string, strict bool) (co CompletionValue) {
 	bindingObject := o.BindingObject
 	value := bindingObject.HasProperty(NewStringPropertyKey(name))
 	if !value {
 		if !strict {
 			return UndefinedValue.ToCompletion()
 		}
-		return NewCompletionValueError(agent.ThrowException(ReferenceError, "Binding not found"))
+		co.err = agent.ThrowException(ReferenceError, "Binding not found")
+		return
 	}
 	result := bindingObject.Get(NewStringPropertyKey(name))
 	return result.ToCompletion()

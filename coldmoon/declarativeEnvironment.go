@@ -29,10 +29,11 @@ func (d *DeclarativeEnvironment) HasThisBinding() bool {
 }
 
 // 9.1.1.1.6
-func (d *DeclarativeEnvironment) GetBindingValue(agent *Agent, name string, strict bool) CompletionValue {
+func (d *DeclarativeEnvironment) GetBindingValue(agent *Agent, name string, strict bool) (co Completion[Value]) {
 	binding, ok := d.Bindings[name]
 	if !ok || binding.Value == nil {
-		return NewCompletionValueError(agent.ThrowException(ReferenceError, "Binding not found"))
+		co.err = agent.ThrowException(ReferenceError, "Binding not found")
+		return
 	}
 	return binding.Value.ToCompletion()
 }

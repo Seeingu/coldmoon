@@ -70,7 +70,7 @@ func (e *ECMAScriptFunction) SetClassFieldInitializerName(n ClassFieldInitialize
 	e.classFieldInitializerName = n
 }
 
-func (e *ECMAScriptFunction) EvaluateBody() CompletionValue {
+func (e *ECMAScriptFunction) EvaluateBody() Completion[Value] {
 	return RunNode(e.Agent(), e.ECMAScriptCode)
 }
 
@@ -163,7 +163,7 @@ func OrdinaryCallEvaluateBody(agent *Agent, function *ECMAScriptFunction, argume
 	return function.ECMAScriptCode.EvaluateBody(agent, function, argumentsList)
 }
 
-func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
+func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (co Completion[Value]) {
 	realm := agent.CurrentRealm()
 	promiseCapability := NewPromiseCapability(agent, (realm.Intrinsics.Promise).ToValue())
 	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
@@ -177,7 +177,9 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 	} else {
 		panic("unimplemented")
 	}
-	return NewCompletionReturnValue((promiseCapability.Promise).ToValue())
+	co.t = CompletionTypeReturn
+	co.value = promiseCapability.Promise.ToValue()
+	return
 }
 
 func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
@@ -186,15 +188,17 @@ func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsL
 	return RunNode(agent, functionBody)
 }
 
-func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
+func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (co CompletionValue) {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	G := OrdinaryCreateFromConstructor(agent, function, "%AsyncGeneratorFunction.prototype.prototype%", nil)
-	return NewCompletionReturnValue((G).ToValue())
+	co.t = CompletionTypeReturn
+	co.value = G.ToValue()
+	return
 }
 
 // EvaluateGeneratorBody
 // spec: 15.5.2
-func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
+func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (co CompletionValue) {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
 	o := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
 	G := &GeneratorObject{
@@ -203,11 +207,13 @@ func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, arguments
 	G.ref = G
 
 	GeneratorStart(agent, G, function.ECMAScriptCode)
-	return NewCompletionReturnValue(G.ToValue())
+	co.t = CompletionTypeReturn
+	co.value = G.ToValue()
+	return
 }
 
 // 10.2.11
-func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) CompletionValue {
+func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) (co Completion[Value]) {
 	calleeContext := agent.RunningExecutionContext()
 	code := function.ECMAScriptCode
 	strict := function.Strict
@@ -297,9 +303,10 @@ loop:
 			}
 			ref := agent.ResolveBinding(string(name), e, strict)
 			if initializer != nil {
-				value = RunNode(agent, &ExpressionStatement{
+				node := RunNode(agent, &ExpressionStatement{
 					Expression: initializer,
-				}).Data()
+				})
+				value = node.Data()
 			}
 			if e == nil {
 				ref.PutValue(agent, value)
@@ -351,7 +358,8 @@ loop:
 				var initialValue Value
 				if !lo.Contains(parameterNames, varName) || lo.Contains(functionNames, varName) {
 				} else {
-					initialValue = env.GetBindingValue(agent, string(varName), false).Data()
+					value := env.GetBindingValue(agent, string(varName), false)
+					initialValue = value.Data()
 				}
 				varEnv.InitializeBinding(string(varName), initialValue)
 			}
@@ -363,7 +371,8 @@ loop:
 		lexEnv = NewDeclarativeEnvironment(varEnv)
 	}
 	calleeContext.ECMAScriptCode.LexicalEnvironment = lexEnv
-	return UndefinedNormalCompletion
+	co.value = UndefinedValue
+	return
 }
 
 type functionCreateThisMode int
@@ -576,15 +585,16 @@ type (
 // DefineMethodProperty
 // spec: 10.2.8
 // return PrivateElement or nil(UNUSED)
-func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, closure ObjectType, enumerable bool) *PrivateElement {
+func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, closure ObjectType, enumerable bool) (c Completion[*PrivateElement]) {
 	Assert(homeObject.IsExtensible())
 	switch k := key.(type) {
 	case PropertyKeyOrPrivateNameName:
-		return &PrivateElement{
+		c.value = &PrivateElement{
 			Key:   k.PrivateName,
 			Kind:  PrivateElementKindMethod,
 			Value: closure.ToValue(),
 		}
+		return
 	case PropertyKey:
 		desc := &PropertyDescriptor{
 			Value:        closure.ToValue(),
@@ -594,10 +604,10 @@ func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, c
 		}
 		homeObject.DefinePropertyOrThrow(k, desc)
 		// unused
-		return nil
+		return
 	}
 	panic("unreachable")
-	return nil
+	return
 }
 
 // 10.2.9

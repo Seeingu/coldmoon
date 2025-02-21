@@ -9,7 +9,7 @@ type EnvironmentRecord interface {
 	InitializeBinding(name string, value Value)
 	SetMutableBinding(name string, value Value, strict bool)
 	// GetBindingValue ( N, S ) returns either a normal completion value or a throw completion.
-	GetBindingValue(agent *Agent, name string, strict bool) CompletionValue
+	GetBindingValue(agent *Agent, name string, strict bool) Completion[Value]
 	DeleteBinding(name string) bool
 	HasThisBinding() bool
 	HasSuperBinding() bool

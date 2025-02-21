@@ -54,14 +54,15 @@ type ArrayBufferObject struct {
 }
 
 // 25.1.3.1
-func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength JSInt, maxByteLength JSInt) CompletionObject {
+func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength JSInt, maxByteLength JSInt) (co Completion[ObjectType]) {
 	var allocatingResizableBuffer bool
 	if maxByteLength != 0 {
 		allocatingResizableBuffer = true
 	}
 	if allocatingResizableBuffer {
 		if byteLength > maxByteLength {
-			return NewCompletionObjectError(agent.ThrowException(RangeError, "byteLength > maxByteLength"))
+			co.err = agent.ThrowException(RangeError, "byteLength > maxByteLength")
+			return
 		}
 	}
 	object := OrdinaryCreateFromConstructor(agent, constructor, "%ArrayBuffer.prototype%", nil)
@@ -70,12 +71,13 @@ func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength JSInt,
 		ArrayBufferData:       CreateByteDataBlock(agent, byteLength),
 		ArrayBufferByteLength: byteLength,
 	}
-	return NewCompletionObject(arrayBuffer)
+	co.value = arrayBuffer
+	return
 }
 
 // 25.1.3.6
 // return either an ArrayBufferObject or a throw completion
-func CloneArrayBuffer(agent *Agent, srcBuffer *ArrayBufferLike, srcByteOffset JSInt, srcLength JSInt) CompletionObject {
+func CloneArrayBuffer(agent *Agent, srcBuffer *ArrayBufferLike, srcByteOffset JSInt, srcLength JSInt) Completion[ObjectType] {
 	realm := agent.CurrentRealm()
 	Assert(!IsDetachedBuffer(srcBuffer))
 	targetBuffer := AllocateArrayBuffer(agent, realm.Intrinsics.ArrayBufferConstructor, srcLength, 0)
@@ -262,7 +264,8 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		}
 		byteLength := ToIndex(agent, length)
 		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
-		return (AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).Data()).ToValue()
+		arrayBuffer := AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength)
+		return arrayBuffer.Data().ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, CMString("ArrayBuffer"), builtinFunctionArgs{
 		realm:         realm,

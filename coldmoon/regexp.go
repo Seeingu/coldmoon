@@ -31,28 +31,36 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "RegExp")
 
 	dotAll := func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "s").Data()
+		flag := RegExpHasFlag(agent, this, "s")
+		return flag.Data()
 	}
 	global := func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "g").Data()
+		flag := RegExpHasFlag(agent, this, "g")
+		return flag.Data()
 	}
 	hasIndices := func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "d").Data()
+		flag := RegExpHasFlag(agent, this, "d")
+		return flag.Data()
 	}
 	ignoreCase := func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "i").Data()
+		flag := RegExpHasFlag(agent, this, "i")
+		return flag.Data()
 	}
 	multiline := func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "m").Data()
+		flag := RegExpHasFlag(agent, this, "m")
+		return flag.Data()
 	}
 	sticky := func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "y").Data()
+		flag := RegExpHasFlag(agent, this, "y")
+		return flag.Data()
 	}
 	unicode := func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "u").Data()
+		flag := RegExpHasFlag(agent, this, "u")
+		return flag.Data()
 	}
 	unicodeSets := func(this Value, arguments []Value, _ ObjectType) Value {
-		return RegExpHasFlag(agent, this, "v").Data()
+		flag := RegExpHasFlag(agent, this, "v")
+		return flag.Data()
 	}
 	flags := func(this Value, arguments []Value, _ ObjectType) Value {
 		if !this.IsObject() {
@@ -123,12 +131,12 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		s := ToString(agent, arguments[0])
 		result := RegExpBuiltinExec(agent, r, s.Data)
-		if result.IsNull() {
+		if result.Data() == NullValue {
 			return NullValue
 		} else if result.IsError() {
 			panic("RegExp.prototype.exec: error")
 		} else {
-			return (result.Data()).ToValue()
+			return result.Data()
 		}
 	}
 	test := func(this Value, arguments []Value, _ ObjectType) Value {
@@ -141,7 +149,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		s := ToString(agent, arguments[0])
 		m := RegExpExec(agent, r, s.Data)
-		if m.IsNull() {
+		if m.Data() == NullValue {
 			return FalseValue
 		}
 		return TrueValue
@@ -162,10 +170,10 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		if !SameValue(currentLastIndex, previousLastIndex) {
 			rxObject.Set(NewStringPropertyKey("lastIndex"), previousLastIndex, setThrowTypeThrow)
 		}
-		if result.IsNull() {
+		if result.Data() == NullValue {
 			return NewNumberValue(-1)
 		}
-		return result.Data().Get(NewStringPropertyKey("index"))
+		return MustGetObject(result.Data()).Get(NewStringPropertyKey("index"))
 	}
 	matchAll := func(this Value, arguments []Value, _ ObjectType) Value {
 		if !this.IsObject() {
@@ -267,7 +275,8 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 			f = flags
 		}
 		o := RegExpAlloc(agent, target)
-		return RegExpInitialize(agent, o, p, f).Data().ToValue()
+		initialize := RegExpInitialize(agent, o, p, f)
+		return initialize.Data().ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 2, CMString("RegExp"), builtinFunctionArgs{
 		realm:         realm,
@@ -286,7 +295,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 }
 
 // 22.2.3.1
-func RegExpCreate(agent *Agent, pattern Value, flags Value) CompletionObject {
+func RegExpCreate(agent *Agent, pattern Value, flags Value) Completion[ObjectType] {
 	realm := agent.CurrentRealm()
 
 	obj := RegExpAlloc(agent, realm.Intrinsics.RegExpConstructor)
@@ -339,24 +348,27 @@ type MatchRecord struct {
 }
 
 // 22.2.7.1
-func RegExpExec(agent *Agent, regExp *RegExpObject, s string) CompletionObject {
+func RegExpExec(agent *Agent, regExp *RegExpObject, s string) (co Completion[Value]) {
 	exec := regExp.Get(NewStringPropertyKey("exec"))
 	if IsCallable(exec) {
 		result := exec.Call(regExp.ToValue(), []Value{NewStringValue(s)})
 		if !result.IsObject() && result != NullValue {
-			return NewCompletionObjectError(agent.ThrowException(TypeError, "RegExpExec: exec is not an object"))
+			co.err = agent.ThrowException(TypeError, "RegExpExec: exec is not an object")
+			return
 		}
 		if result == NullValue {
-			return NewCompletionObjectNull()
+			co.value = NullValue
+			return
 		}
-		return NewCompletionObject(MustGetObject(result))
+		co.value = result
+		return
 	}
 	return RegExpBuiltinExec(agent, regExp, s)
 }
 
 // 22.2.7.2
 // return null, object, or throw
-func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionObject {
+func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) (co Completion[Value]) {
 	length := len(s)
 	lastIndex := int(ToLength(agent, regExp.Get(NewStringPropertyKey("lastIndex"))))
 
@@ -384,19 +396,23 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 			if global || sticky {
 				regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeIgnore)
 			}
-			return NewCompletionObjectNull()
+			co.value = NullValue
+			return
 		}
 		r, err := matcher.FindStringMatch(input[lastIndex:])
 
 		if err != nil {
 			if sticky {
 				regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow)
-				return NewCompletionObjectNull()
+				co.value = NullValue
+				return
 			}
 			lastIndex++
-			return NewCompletionObjectError(NewStringValue(err.Error()))
+			co.err = NewStringValue(err.Error())
+			return
 		} else if r == nil {
-			return NewCompletionObjectNull()
+			co.value = NullValue
+			return
 		} else {
 			match = r
 			matchSucceeded = true
@@ -472,7 +488,8 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) CompletionO
 		indicesArray := MakeMatchIndicesIndexPairArray(agent, s, indices, groupNames, hasGroups)
 		A.CreateDataPropertyOrThrow(NewStringPropertyKey("indices"), (indicesArray).ToValue())
 	}
-	return NewCompletionObject(A)
+	co.value = A.ToValue()
+	return
 }
 
 // 22.2.7.3

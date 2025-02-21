@@ -6,17 +6,18 @@ type ArgumentsObject struct {
 }
 
 // 10.4.4.1
-func argumentsGetOwnProperty(object ObjectType, key PropertyKey) CompletionPropertyDescriptor {
+func argumentsGetOwnProperty(object ObjectType, key PropertyKey) (co Completion[*PropertyDescriptor]) {
 	desc := OrdinaryGetOwnProperty(object, key)
 	if desc == nil {
-		return NewCompletionPropertyDescriptorUndefined()
+		return
 	}
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	if isMapped {
 		desc.Value = _map.Get(key)
 	}
-	return NewCompletionPropertyDescriptor(desc)
+	co.value = desc
+	return
 }
 
 // 10.4.4.2
@@ -49,14 +50,15 @@ func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *Proper
 }
 
 // 10.4.4.3
-func argumentsGet(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
+func argumentsGet(object ObjectType, key PropertyKey, receiver Value) (co CompletionValue) {
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	if !isMapped {
 		return OrdinaryGet(object, key, receiver).ToCompletion()
 	} else {
 		value := _map.Get(key)
-		return NewCompletionValue(value)
+		co.value = value
+		return
 	}
 }
 
@@ -137,7 +139,8 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 	}
 	internalMethods.DefineOwnProperty = argumentsDefineOwnProperty
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
-		return argumentsGet(obj, p, receiver).Data()
+		completionValue := argumentsGet(obj, p, receiver)
+		return completionValue.Data()
 	}
 	internalMethods.Set = argumentsSet
 	internalMethods.Delete = argumentsDelete
@@ -205,7 +208,8 @@ func MakeArgGetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 	var getterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
 		function := agent.ActiveFunctionObject()
 		_captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*ArgGetterSetterCaptures)
-		return _captures.Env.GetBindingValue(agent, _captures.Name, false).Data()
+		bindingValue := _captures.Env.GetBindingValue(agent, _captures.Name, false)
+		return bindingValue.Data()
 	}
 	getter := CreateBuiltinFunction(agent, getterClosure, 1, CMString(""), builtinFunctionArgs{
 		additionalFieldsV2: captures,

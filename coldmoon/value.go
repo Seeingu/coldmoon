@@ -654,7 +654,7 @@ func RegExpAlloc(agent *Agent, newTarget ObjectType) ObjectType {
 }
 
 // 22.2.3.3
-func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) CompletionObject {
+func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) (co Completion[ObjectType]) {
 	var p Value
 	if pattern == UndefinedValue {
 		p = NewStringValue("")
@@ -697,10 +697,12 @@ func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) 
 		case 'v':
 			flagsBit = flagsV
 		default:
-			return NewCompletionObjectError(agent.ThrowException(SyntaxError, "Invalid flags"))
+			co.err = agent.ThrowException(SyntaxError, "Invalid flags")
+			return
 		}
 		if flagsBitSet.Test(flagsBit) {
-			return NewCompletionObjectError(agent.ThrowException(SyntaxError, "Duplicate flags"))
+			co.err = agent.ThrowException(SyntaxError, "Duplicate flags")
+			return
 		}
 		flagsBitSet.Set(flagsBit)
 	}
@@ -708,7 +710,8 @@ func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) 
 	patternText := p.String()
 	parseResult, err := ParsePattern(patternText, flagsBitSet.Test(flagsU), flagsBitSet.Test(flagsV))
 	if err != nil {
-		return NewCompletionObjectError(agent.ThrowException(SyntaxError, "Invalid pattern"))
+		co.err = agent.ThrowException(SyntaxError, "Invalid pattern")
+		return
 	}
 
 	regexpObject := obj.(*RegExpObject)
@@ -729,7 +732,8 @@ func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) 
 
 	obj.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow)
 
-	return NewCompletionObject(obj)
+	co.value = obj
+	return
 }
 
 func CountLeftCapturingParensWithin(r *regexp2.Regexp) int {

@@ -38,7 +38,10 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 	var iteratorReturn BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		value := pkg.SliceSafeGet(argumentsList, 0)
 		generator := this
-		C := NewCompletionReturnValue(value)
+		C := Completion[Value]{
+			t:     CompletionTypeReturn,
+			value: value,
+		}
 		return GeneratorResumeAbrupt(agent, generator, C)
 	}
 
@@ -131,7 +134,7 @@ func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion Compl
 		state = GeneratorStateCompleted
 	}
 	if state == GeneratorStateCompleted {
-		if abruptCompletion.Type == CompletionTypeReturn {
+		if abruptCompletion.t == CompletionTypeReturn {
 			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
 		}
 		agent.exception = abruptCompletion.Error()
@@ -166,7 +169,7 @@ func GetGeneratorKind(agent *Agent) GeneratorKind {
 
 // GeneratorYield
 // spec: 27.5.3.6
-func GeneratorYield(agent *Agent, iterNextObj ObjectType) CompletionValue {
+func GeneratorYield(agent *Agent, iterNextObj ObjectType) (co CompletionValue) {
 	genContext := agent.RunningExecutionContext()
 	Assert(genContext.Generator != nil)
 	generator := genContext.Generator
@@ -174,7 +177,8 @@ func GeneratorYield(agent *Agent, iterNextObj ObjectType) CompletionValue {
 	generator.GeneratorState = GeneratorStateSuspendedYield
 	agent.ExecutionContextStack.Pop()
 	generator.result = iterNextObj.ToValue()
-	return NewCompletionValue(iterNextObj.Get(CMString("value").ToPropertyKey()))
+	co.value = iterNextObj.Get(CMString("value").ToPropertyKey())
+	return
 }
 
 // Yield

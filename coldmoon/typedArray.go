@@ -504,7 +504,8 @@ func SetTypedArrayFromTypedArray(agent *Agent, target *TypedArrayObject, targetO
 	var srcByteIndex JSInt
 	if SameObject(srcBuffer, targetBuffer) || sameSharedArrayBuffer {
 		srcByteLength := TypedArrayByteLength(srcRecord)
-		srcBuffer = NewArrayBufferLike(CloneArrayBuffer(agent, srcBuffer, srcByteOffset, srcByteLength).Data())
+		buffer := CloneArrayBuffer(agent, srcBuffer, srcByteOffset, srcByteLength)
+		srcBuffer = NewArrayBufferLike(buffer.Data())
 		srcByteIndex = 0
 	} else {
 		srcByteIndex = srcByteOffset
@@ -978,7 +979,7 @@ func TypedArrayElementSize(O *TypedArrayObject) JSInt {
 	return getTypedArraySizeFromName(O.TypedArrayName)
 }
 
-func InitializeTypedArrayFromTypedArray(agent *Agent, O, srcArray *TypedArrayObject) CompletionObject {
+func InitializeTypedArrayFromTypedArray(agent *Agent, O, srcArray *TypedArrayObject) (co Completion[ObjectType]) {
 	realm := agent.CurrentRealm()
 	srcData := srcArray.ViewedArrayBuffer
 	elementSize := TypedArrayElementSize(O)
@@ -988,17 +989,19 @@ func InitializeTypedArrayFromTypedArray(agent *Agent, O, srcArray *TypedArrayObj
 	srcByteOffset := srcArray.ByteOffset
 	srcRecord := MakeTypedArrayWithBufferWitnessRecord(srcArray, SeqCst)
 	if IsTypedArrayOutOfBounds(srcRecord) {
-		return NewCompletionObjectError(agent.ThrowException(RangeError, "out of bounds"))
+		co.err = agent.ThrowException(RangeError, "out of bounds")
+		return
 	}
 	elementLength := TypedArrayLength(srcRecord)
 	byteLength := elementLength * elementSize
-	var data CompletionObject
+	var data Completion[ObjectType]
 	if elementType == srcType {
 		data = CloneArrayBuffer(agent, srcData, srcByteOffset, byteLength)
 	} else {
 		data = AllocateArrayBuffer(agent, realm.Intrinsics.ArrayBufferConstructor, byteLength, 0)
 		if srcArray.ContentType != O.ContentType {
-			return NewCompletionObjectError(agent.ThrowException(TypeError, "different content type"))
+			co.err = agent.ThrowException(TypeError, "different content type")
+			return
 		}
 		srcByteIndex := srcByteOffset
 		targetByteIndex := JSInt(0)
@@ -1024,18 +1027,19 @@ func InitializeTypedArrayFromTypedArray(agent *Agent, O, srcArray *TypedArrayObj
 	O.ByteOffset = 0
 	O.ArrayLength = NewByteLength(elementLength)
 	// return UNUSED
-	return NewCompletionObjectNull()
+	return
 }
 
 func InitializeTypedArrayFromArrayBuffer(
 	agent *Agent,
 	O *TypedArrayObject,
 	buffer *ArrayBufferLike, byteOffset, length Value,
-) CompletionObject {
+) (co Completion[ObjectType]) {
 	elementSize := TypedArrayElementSize(O)
 	offset := ToIndex(agent, byteOffset)
 	if offset%elementSize != 0 {
-		return NewCompletionObjectError(agent.ThrowException(RangeError, "offset is not a multiple of element size"))
+		co.err = agent.ThrowException(RangeError, "offset is not a multiple of element size")
+		return
 	}
 	bufferIsFixedLength := IsFixedLengthArrayBuffer(buffer)
 	var newLength JSInt
@@ -1043,12 +1047,14 @@ func InitializeTypedArrayFromArrayBuffer(
 		newLength = ToIndex(agent, length)
 	}
 	if IsDetachedBuffer(buffer) {
-		return NewCompletionObjectError(agent.ThrowException(TypeError, "detached buffer"))
+		co.err = agent.ThrowException(TypeError, "detached buffer")
+		return
 	}
 	bufferByteLength := ArrayBufferByteLength(buffer, SeqCst)
 	if IsUndefinedOrNil(length) && !bufferIsFixedLength {
 		if offset > bufferByteLength {
-			return NewCompletionObjectError(agent.ThrowException(RangeError, "offset > bufferByteLength"))
+			co.err = agent.ThrowException(RangeError, "offset > bufferByteLength")
+			return
 		}
 		O.ByteLength.toAuto()
 		O.ArrayLength.toAuto()
@@ -1056,13 +1062,15 @@ func InitializeTypedArrayFromArrayBuffer(
 		var byteLength JSInt
 		if IsUndefinedOrNil(length) {
 			if bufferByteLength%elementSize != 0 {
-				return NewCompletionObjectError(agent.ThrowException(RangeError, "bufferByteLength is not a multiple of element size"))
+				co.err = agent.ThrowException(RangeError, "bufferByteLength is not a multiple of element size")
+				return
 			}
 			byteLength = bufferByteLength - offset
 		} else {
 			newByteLength := newLength * elementSize
 			if offset+newByteLength > bufferByteLength {
-				return NewCompletionObjectError(agent.ThrowException(RangeError, "out of bounds"))
+				co.err = agent.ThrowException(RangeError, "out of bounds")
+				return
 			}
 			byteLength = newByteLength
 		}
@@ -1072,7 +1080,7 @@ func InitializeTypedArrayFromArrayBuffer(
 	O.ViewedArrayBuffer = buffer
 	O.ByteOffset = offset
 	// return UNUSED
-	return NewCompletionObjectNull()
+	return
 }
 
 // MARK: - TypedArrayWithBufferWitnessRecord

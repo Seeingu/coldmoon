@@ -26,10 +26,11 @@ type RuntimeSemanticsInstantiateArrowFunctionExpression interface {
 	InstantiateArrowFunctionExpression(vm *VM, name string) Value
 }
 
-// 15.4.5
+// RuntimeSemanticsMethodDefinitionEvaluation
+// spec: 15.4.5
 type RuntimeSemanticsMethodDefinitionEvaluation interface {
 	// MethodDefinitionEvaluation returns PrivateElement or an abrupt Completion
-	MethodDefinitionEvaluation(vm *VM, obj ObjectType, enumerable bool) (pe *PrivateElement, err Value)
+	MethodDefinitionEvaluation(vm *VM, obj ObjectType, enumerable bool) Completion[*PrivateElement]
 }
 
 // RuntimeSemanticsChainEvaluation
@@ -38,15 +39,17 @@ type RuntimeSemanticsChainEvaluation interface {
 	ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (value Value, err Value)
 }
 
-// MARK: - DefineMethod 15.4.4
-
 type DefineMethodRecord struct {
 	Key     PropertyKey
 	Closure ObjectType
 }
+
+// RuntimeSemanticsDefineMethod
+// spec: 15.4.4
 type RuntimeSemanticsDefineMethod interface {
+	// DefineMethod
 	// proto is optional
-	DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value)
+	DefineMethod(vm *VM, obj ObjectType, proto ObjectType) Completion[*DefineMethodRecord]
 }
 
 // MARK: - Class Related
@@ -65,10 +68,12 @@ type RuntimeSemanticsInstantiateOrdinaryFunctionExpression interface {
 	InstantiateOrdinaryFunctionExpression(vm *VM, name PropertyKeyOrPrivateName) (fun ObjectType)
 }
 
-// 15.7.14
+// RuntimeSemanticsClassDefinitionEvaluation
+// spec: 15.7.14
 type RuntimeSemanticsClassDefinitionEvaluation interface {
+	// ClassDefinitionEvaluation
 	// classBinding is optional
-	ClassDefinitionEvaluation(vm *VM, classBinding string, className PropertyKeyOrPrivateName) (obj ObjectType, err Value)
+	ClassDefinitionEvaluation(vm *VM, classBinding string, className PropertyKeyOrPrivateName) (c Completion[ObjectType])
 }
 
 // classEvaluationResult enum
@@ -78,9 +83,10 @@ type classEvaluationResult struct {
 	privateElement        *PrivateElement
 }
 
-// 15.7.13
+// RuntimeSemanticsClassElementEvaluation
+// spec: 15.7.13
 type RuntimeSemanticsClassElementEvaluation interface {
-	ClassElementEvaluation(vm *VM, obj ObjectType) (result classEvaluationResult, err Value)
+	ClassElementEvaluation(vm *VM, obj ObjectType) (result Completion[*classEvaluationResult])
 }
 
 // 15.7.10

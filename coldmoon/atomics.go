@@ -1,27 +1,25 @@
 package coldmoon
 
 // 25.4.3.1
-func ValidateIntegerTypedArray(agent *Agent, typedArray Value, waitable bool) Completion[*TypedArrayWithBufferWitnessRecord] {
+func ValidateIntegerTypedArray(agent *Agent, typedArray Value, waitable bool) (c Completion[*TypedArrayWithBufferWitnessRecord]) {
 	taRecord := ValidateTypedArray(agent, typedArray, Relaxed)
 	ta := taRecord.TypedArray
 	name := ta.TypedArrayName
 	if waitable {
 		if name != TypedArrayNameInt32 && name != TypedArrayNameBigInt64 {
-			return newCompletionError[*TypedArrayWithBufferWitnessRecord](
-				agent.ThrowTypeError("waitable typed array"))
+			c.err = agent.ThrowTypeError("waitable typed array")
+			return
 		}
 	} else {
 		size := getTypedArraySizeFromName(name)
 		if !IsUnclampedIntegerElementType(size) &&
 			!IsBigIntElementType(size) {
-			return newCompletionError[*TypedArrayWithBufferWitnessRecord](
-				agent.ThrowTypeError("non-waitable typed array"))
+			c.err = agent.ThrowTypeError("non-waitable typed array")
+			return
 		}
 	}
-	return newCompletionNormal(
-		completionNormalArgs[*TypedArrayWithBufferWitnessRecord]{
-			data: taRecord,
-		})
+	c.value = taRecord
+	return
 }
 
 type AtomicOp int
@@ -46,29 +44,28 @@ func ValidateAtomicAccessOnIntegerTypedArray(
 	agent *Agent,
 	typedArrayValue, requestedIndex Value,
 	waitable bool,
-) Completion[JSInt] {
+) (co Completion[JSInt]) {
 	taRecord := ValidateIntegerTypedArray(agent, typedArrayValue, waitable)
 	if taRecord.IsError() {
-		return newCompletionError[JSInt](taRecord.Error())
+		co.err = taRecord.Error()
+		return
 	}
 	return ValidateAtomicAccess(agent, taRecord.Data(), requestedIndex)
 }
 
-func ValidateAtomicAccess(agent *Agent, taRecord *TypedArrayWithBufferWitnessRecord, requestIndex Value) Completion[JSInt] {
+func ValidateAtomicAccess(agent *Agent, taRecord *TypedArrayWithBufferWitnessRecord, requestIndex Value) (co Completion[JSInt]) {
 	length := TypedArrayLength(taRecord)
 	accessIndex := ToIndex(agent, requestIndex)
 	if accessIndex >= length {
-		return newCompletionError[JSInt](agent.ThrowRangeError("out of range"))
+		co.err = agent.ThrowRangeError("out of range")
+		return
 	}
 
 	typedArray := taRecord.TypedArray
 	elementSize := TypedArrayElementSize(typedArray)
 	offset := typedArray.ByteOffset
-	return newCompletionNormal(
-		completionNormalArgs[JSInt]{
-			data: (accessIndex * elementSize) + offset,
-		},
-	)
+	co.value = (accessIndex * elementSize) + offset
+	return
 }
 
 // 25.4.3.17
@@ -151,17 +148,19 @@ func GetModifySetValueInBuffer(
 }
 
 // 25.4.3.4
-func RevalidateAtomicAccess(agent *Agent, typedArray *TypedArrayObject, byteIndexInBuffer JSInt) Completion[any] {
+func RevalidateAtomicAccess(agent *Agent, typedArray *TypedArrayObject, byteIndexInBuffer JSInt) (co Completion[any]) {
 	taRecord := MakeTypedArrayWithBufferWitnessRecord(typedArray, SeqCst)
 	if IsTypedArrayOutOfBounds(taRecord) {
-		return newCompletionError[any](agent.ThrowRangeError("out of range"))
+		co.err = agent.ThrowRangeError("out of range")
+		return
 	}
 	Assert(byteIndexInBuffer >= typedArray.ByteOffset)
 	if byteIndexInBuffer >= taRecord.CachedBufferByteLength.Value {
-		return newCompletionError[any](agent.ThrowRangeError("invalid index for typed array"))
+		co.err = agent.ThrowRangeError("invalid index for typed array")
+		return
 	}
 
-	return newCompletionNormal(completionNormalArgs[any]{})
+	return
 }
 
 func NewAtomics(realm *Realm) ObjectType {

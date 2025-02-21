@@ -32,22 +32,22 @@ func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 		}
 
 		match := RegExpExec(agent, iterator.RegExp, iterator.string)
-		if match.IsNull() {
+		if match.Data() == NullValue {
 			iterator.Completed = true
 			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()
 		}
 		if !iterator.Global {
 			iterator.Completed = true
-			return (CreateIterResultObject(agent, (match.Data()).ToValue(), false)).ToValue()
+			return (CreateIterResultObject(agent, match.Data(), false)).ToValue()
 		}
 
-		matchStr := ToString(agent, match.Data().Get(NewStringPropertyKey("0")))
+		matchStr := ToString(agent, MustGetObject(match.Data()).Get(NewStringPropertyKey("0")))
 		if matchStr.Data == "" {
 			thisIndex := ToLength(agent, iterator.RegExp.Get(NewStringPropertyKey("lastIndex")))
 			nextIndex := AdvanceStringIndex(iterator.string, thisIndex, iterator.FullUnicode)
 			iterator.RegExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(nextIndex.ToNumber()), setThrowTypeThrow)
 		}
-		return (CreateIterResultObject(agent, (match.Data()).ToValue(), false)).ToValue()
+		return (CreateIterResultObject(agent, match.Data(), false)).ToValue()
 	}
 	object.defineBuiltinFunction(realm, CMString("next"), next, 0)
 	object.defineToStringTag("RegExp String Iterator")

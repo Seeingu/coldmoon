@@ -69,17 +69,11 @@ func (p *ClassExpression) astHasIdentifier() bool {
 func (p *ClassExpression) Evaluation(vm *VM) Value {
 	if p.astHasIdentifier() {
 		className := p.IdentifierName
-		value, err := p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className))
-		if err != nil {
-			vm.panic(err)
-		}
+		value, _ := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)))
 		// TODO: set sourceText
 		return value.ToValue()
 	} else {
-		value, err := p.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey(""))
-		if err != nil {
-			vm.panic(err)
-		}
+		value, _ := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("")))
 		// TODO: set sourceText
 		return value.ToValue()
 	}
@@ -671,7 +665,7 @@ func (p *MethodDefinition) astIsGet() bool {
 
 // DefineMethod
 // spec: 15.4.4
-func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (record DefineMethodRecord, err Value) {
+func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (c Completion[*DefineMethodRecord]) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astIsClassElementName() {
@@ -696,15 +690,19 @@ func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType
 			privateEnv,
 		)
 		MakeMethod(closure, obj)
-		record.Key = ToPropertyKey(agent, propKey)
-		record.Closure = closure
+		c.value = &DefineMethodRecord{
+			Key:     ToPropertyKey(agent, propKey),
+			Closure: closure,
+		}
 		return
 	} else {
 		panic("unreachable")
 	}
 }
 
-func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, enumerable bool) (pe *PrivateElement, err Value) {
+// MethodDefinitionEvaluation
+// spec: 15.4.5
+func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, enumerable bool) (co Completion[*PrivateElement]) {
 	agent := vm.agent
 	if p.astIsGet() {
 		propKey := p.PropertyName.Evaluation(vm)
@@ -740,12 +738,12 @@ func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, en
 			return
 		}
 	} else if p.astIsClassElementName() {
-		methodDef, err := p.DefineMethod(vm, obj, nil)
-		if err != nil {
-			return nil, err
+		methodDef, completion := ReturnIfAbrupt(p.DefineMethod(vm, obj, nil))
+		if methodDef == nil {
+			return CompletionFrom(co, completion)
 		}
 		SetFunctionName(methodDef.Closure, methodDef.Key, "")
-		return DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable), nil
+		return DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable)
 	} else {
 		panic("unimplemented")
 	}
@@ -4305,19 +4303,13 @@ func (d *ClassDeclaration) Evaluation(vm *VM) Value {
 func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM) (obj ObjectType, err Value) {
 	if d.astHasIdentifier() {
 		className := d.IdentifierName
-		value, err := d.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className))
-		if err != nil {
-			return nil, err
-		}
+		value, _ := ReturnIfAbrupt(d.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)))
 		// TODO: set [[SourceText]]
 		env := vm.RunningLexicalEnvironment()
 		vm.InitializeBoundName(className, value.ToValue(), env)
 		return value, nil
 	} else {
-		value, err := d.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("default"))
-		if err != nil {
-			return nil, err
-		}
+		value, _ := ReturnIfAbrupt(d.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("default")))
 		// TODO: set [[SourceText]]
 		return value, nil
 	}
@@ -4336,7 +4328,7 @@ var _ RuntimeSemanticsClassDefinitionEvaluation = (*ClassTail)(nil)
 
 // ClassDefinitionEvaluation
 // spec: 15.7.14
-func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, className PropertyKeyOrPrivateName) (obj ObjectType, err Value) {
+func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, className PropertyKeyOrPrivateName) (returnCompletion Completion[ObjectType]) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	// outer env of class
@@ -4436,10 +4428,10 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 				},
 			})
 	} else {
-		constructorInfo, err := constructor.DefineMethod(vm, proto, constructorParent)
-		if err != nil {
-			vm.panic(err)
-		}
+		// 15.
+		constructorInfo := ReturnAssertNormal(
+			constructor.DefineMethod(vm, proto, constructorParent),
+		)
 		F := constructorInfo.Closure
 		MakeClassConstructor(F.(*ECMAScriptFunction))
 		SetFunctionName(F, className.(PropertyKey), "")
@@ -4469,18 +4461,22 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 	staticClassFields := make([]*ClassFieldDefinition, 0)
 	staticStaticBlocks := make([]*ClassStaticBlockDefinition, 0)
 
+	// 25.
 	for _, classElement := range elements {
-		var err Value
-		var result classEvaluationResult
+		var completion Completion[*classEvaluationResult]
 		if !ClassElementIsStatic(classElement) {
-			result, err = classElement.ClassElementEvaluation(vm, proto)
+			completion = CompletionHandle(classElement.ClassElementEvaluation(vm, proto))
 		} else {
-			result, err = classElement.ClassElementEvaluation(vm, function)
+			completion = CompletionHandle(classElement.ClassElementEvaluation(vm, function))
 		}
-		if err != nil {
+		if completion.IsAbrupt() {
 			agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
 			agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
-			vm.panic(err)
+			return CompletionFrom(returnCompletion, completion)
+		}
+		result := completion.value
+		if result == nil {
+			result = &classEvaluationResult{}
 		}
 		if result.classFieldDefinition != nil {
 			if !ClassElementIsStatic(classElement) {
@@ -4556,7 +4552,8 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 
 	agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
 
-	return function, nil
+	returnCompletion.value = function
+	return
 }
 
 type ClassBody struct {
@@ -4687,9 +4684,13 @@ var (
 	_ RuntimeSemanticsClassFieldDefinitionEvaluation = (*ClassElementFieldDefinition)(nil)
 )
 
-func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (result classEvaluationResult, err Value) {
-	field, err := c.ClassFieldDefinitionEvaluation(vm, obj)
-	result.classFieldDefinition = field
+// ClassElementEvaluation
+// spec: 15.7.13
+func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (result Completion[*classEvaluationResult]) {
+	field, _ := c.ClassFieldDefinitionEvaluation(vm, obj)
+	result.value = &classEvaluationResult{
+		classFieldDefinition: field,
+	}
 	return
 }
 
@@ -4756,7 +4757,7 @@ func (c *ClassElementEmpty) ClassElementKind() ClassElementKind {
 	return ClassElementKindEmpty
 }
 
-func (c *ClassElementEmpty) ClassElementEvaluation(vm *VM, function ObjectType) (result classEvaluationResult, err Value) {
+func (c *ClassElementEmpty) ClassElementEvaluation(vm *VM, obj ObjectType) (result Completion[*classEvaluationResult]) {
 	// return UNUSED
 	return
 }
@@ -4769,12 +4770,16 @@ type ClassElementMethodDefinition struct {
 	IsStatic         bool
 }
 
-func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (result classEvaluationResult, err Value) {
-	privateElement, err := c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false)
-	if err != nil {
-		return result, err
+// ClassElementEvaluation
+// spec: 15.7.13
+func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (result Completion[*classEvaluationResult]) {
+	privateElement, completion := ReturnIfAbrupt(c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false))
+	if privateElement == nil {
+		return CompletionFrom(result, completion)
 	}
-	result.privateElement = privateElement
+	result.value = &classEvaluationResult{
+		privateElement: privateElement,
+	}
 	return
 }
 

@@ -19,8 +19,9 @@ func (o *ObjectValue) CallNoArgs(this Value) Value {
 	return o.Call(this, nil)
 }
 
-func (o *ObjectValue) ToCompletion() CompletionValue {
-	return NewCompletionValue(o)
+func (o *ObjectValue) ToCompletion() (co Completion[Value]) {
+	co.value = o
+	return
 }
 
 func (o *ObjectValue) ToString() CMString {

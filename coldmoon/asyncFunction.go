@@ -49,7 +49,7 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 		result := asyncFunction.EvaluateBody()
 		agent.ExecutionContextStack.Pop()
 
-		if result.Type == CompletionTypeNormal {
+		if result.t == CompletionTypeNormal {
 			promiseCapability.Resolve.Call(
 				UndefinedValue, []Value{result.Data()})
 		} else {

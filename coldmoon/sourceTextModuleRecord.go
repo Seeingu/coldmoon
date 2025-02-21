@@ -499,7 +499,7 @@ func (s *SourceTextModule) LoadRequestedModules(hostDefined HostDefined) *Promis
 }
 
 // 16.2.1.6.4
-func (s *SourceTextModule) InitializeEnvironment() CompletionValue {
+func (s *SourceTextModule) InitializeEnvironment() (co CompletionValue) {
 	realm := s.Realm
 	agent := realm.Agent
 	env := NewModuleEnvironment(realm.GlobalEnv)
@@ -516,11 +516,11 @@ func (s *SourceTextModule) InitializeEnvironment() CompletionValue {
 		} else {
 			resolution := importedModule.ResolveExport(string(importName), []ResolveSet{})
 			if resolution.IsNull() {
-				return NewCompletionValueError(
-					agent.ThrowException(SyntaxError, "Failed to resolve export"))
+				co.err = agent.ThrowException(SyntaxError, "Failed to resolve export")
+				return
 			} else if resolution.IsAmbiguous() {
-				return NewCompletionValueError(
-					agent.ThrowException(SyntaxError, "Ambiguous export"))
+				co.err = agent.ThrowException(SyntaxError, "Ambiguous export")
+				return
 			}
 			if resolution.BindingName.Namespace {
 				namespace := GetModuleNamespace(agent, resolution.Module.(*SourceTextModule))
@@ -562,7 +562,8 @@ func (s *SourceTextModule) InitializeEnvironment() CompletionValue {
 	// TODO:
 
 	agent.ExecutionContextStack.Pop()
-	return NewCompletionValue(UndefinedValue)
+	co.value = UndefinedValue
+	return
 }
 
 func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {

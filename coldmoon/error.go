@@ -215,7 +215,8 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 		}
 
 		InstallErrorCause(agent, errorObject, options)
-		errorsList := GetIterator(agent, errors, IteratorKindSync).Data().IteratorToList()
+		iterator := GetIterator(agent, errors, IteratorKindSync)
+		errorsList := iterator.Data().IteratorToList()
 		errorObject.DefinePropertyOrThrow(NewStringPropertyKey("errors"), &PropertyDescriptor{
 			Value:        (CreateArrayFromList(agent, errorsList)).ToValue(),
 			Writable:     true,

@@ -35,7 +35,7 @@ type ObjectType interface {
 	InternalMethods() *InternalMethods
 	Prototype() ObjectType
 	Extensible() bool
-	SpeciesConstructor(defaultConstructor ObjectType) CompletionObject
+	SpeciesConstructor(defaultConstructor ObjectType) Completion[ObjectType]
 	// PrivateMethodOrAccessorAdd 7.3.28
 	PrivateMethodOrAccessorAdd(method *PrivateElement)
 	PrivateGet(privateName PrivateName) Value

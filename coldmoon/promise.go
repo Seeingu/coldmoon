@@ -595,12 +595,12 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 		var handlerResult CompletionValue
 		if handler == nil {
 			if t == PromiseReactionTypeFulfill {
-				handlerResult = NewCompletionValue(argument)
+				handlerResult.value = argument
 			} else {
-				handlerResult = NewCompletionValueError(agent.exception)
+				handlerResult.err = agent.exception
 			}
 		} else {
-			handlerResult = NewCompletionValue(agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument}))
+			handlerResult.value = agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument})
 		}
 		if promiseCapability == nil {
 			return UndefinedValue
@@ -715,7 +715,7 @@ func PerformPromiseAll(
 	constructor ObjectType,
 	resultCapability *PromiseCapability,
 	promiseResolve ObjectType,
-) CompletionValue {
+) (co Completion[Value]) {
 	values := []Value{}
 	remainingElements := &RemainingElements{Value: 1}
 	var index int = 0
@@ -728,7 +728,8 @@ func PerformPromiseAll(
 				valuesArray := CreateArrayFromList(agent, values)
 				resultCapability.Resolve.Call(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
-			return NewCompletionValue(resultCapability.Promise.ToValue())
+			co.value = resultCapability.Promise.ToValue()
+			return
 		}
 
 		nextValue := IteratorValue(next)
@@ -776,7 +777,7 @@ func PerformPromiseAllSettled(
 	constructor ObjectType,
 	resultCapability *PromiseCapability,
 	promiseResolve ObjectType,
-) CompletionValue {
+) (co Completion[Value]) {
 	var values []Value
 	remainingElements := &RemainingElements{Value: 1}
 	var index int = 0
@@ -789,7 +790,8 @@ func PerformPromiseAllSettled(
 				valuesArray := CreateArrayFromList(agent, values)
 				resultCapability.Resolve.Call(UndefinedValue, []Value{valuesArray.ToValue()})
 			}
-			return NewCompletionValue(resultCapability.Promise.ToValue())
+			co.value = resultCapability.Promise.ToValue()
+			return
 		}
 
 		nextValue := IteratorValue(next)
@@ -870,7 +872,7 @@ func PerformPromiseAny(
 	constructor ObjectType,
 	resultCapability *PromiseCapability,
 	promiseResolve ObjectType,
-) CompletionValue {
+) (co Completion[Value]) {
 	var errors []Value
 	remainingElements := &RemainingElements{Value: 1}
 	var index int = 0
@@ -887,9 +889,11 @@ func PerformPromiseAny(
 					Enumerable:   false,
 					Configurable: true,
 				})
-				return NewCompletionValueError(err.ToValue())
+				co.err = err.ToValue()
+				return
 			}
-			return NewCompletionValue(resultCapability.Promise.ToValue())
+			co.value = resultCapability.Promise.ToValue()
+			return
 		}
 
 		nextValue := IteratorValue(next)
@@ -979,12 +983,13 @@ func PerformPromiseRace(
 	constructor ObjectType,
 	resultCapability *PromiseCapability,
 	promiseResolve ObjectType,
-) CompletionValue {
+) (co Completion[Value]) {
 	for {
 		next := iterator.IteratorStep()
 		if next == nil {
 			iterator.Done = true
-			return resultCapability.Promise.ToCompletion()
+			co.value = resultCapability.Promise.ToValue()
+			return
 		}
 
 		nextValue := IteratorValue(next)
@@ -994,10 +999,12 @@ func PerformPromiseRace(
 }
 
 // 27.2.4.1.1
-func GetPromiseResolve(agent *Agent, promiseConstructor ObjectType) CompletionObject {
+func GetPromiseResolve(agent *Agent, promiseConstructor ObjectType) (co Completion[ObjectType]) {
 	promiseResolve := promiseConstructor.Get(NewStringPropertyKey("resolve"))
 	if !IsCallable(promiseResolve) {
-		return NewCompletionObjectError(agent.ThrowException(TypeError, "Promise.resolve is not callable"))
+		co.err = agent.ThrowException(TypeError, "Promise.resolve is not callable")
+		return
 	}
-	return NewCompletionObject(MustGetObject(promiseResolve))
+	co.value = MustGetObject(promiseResolve)
+	return
 }

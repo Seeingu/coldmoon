@@ -36,7 +36,7 @@ func (m *ModuleEnvironment) CreateImportBinding(name string, module *SourceTextM
 }
 
 // 9.1.1.5.1
-func (m *ModuleEnvironment) GetBindingValue(agent *Agent, name string, strict bool) CompletionValue {
+func (m *ModuleEnvironment) GetBindingValue(agent *Agent, name string, strict bool) (co CompletionValue) {
 	// TODO: should be strict
 	// Assert(strict)
 	Assert(m.HasBinding(name))
@@ -45,7 +45,8 @@ func (m *ModuleEnvironment) GetBindingValue(agent *Agent, name string, strict bo
 		bindingName := binding.BindingName
 		targetEnv := m.Environment
 		if targetEnv == nil {
-			return NewCompletionValueError(agent.ThrowException(ReferenceError, "Module is not initialized"))
+			co.err = agent.ThrowException(ReferenceError, "Module is not initialized")
+			return
 		}
 		return targetEnv.GetBindingValue(agent, bindingName, true)
 	}
