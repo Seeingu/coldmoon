@@ -42,6 +42,8 @@ func (o *ObjectValue) ToBoolean() bool {
 		return oo.Data != ""
 	case *Object:
 		return true
+	case *NumberObject:
+		return oo.Data != 0
 	default:
 		panic("unimplemented")
 
