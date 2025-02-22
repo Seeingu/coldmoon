@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+
+	"github.com/Seeingu/coldmoon/pkg"
 )
 
 // MARK: - JSNumber
@@ -475,7 +477,7 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 
 	agent := realm.Agent
 	var toString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
-		radix := arguments[0]
+		radix := pkg.SliceSafeGet(arguments, 0)
 
 		x := thisNumberValue(agent, this)
 		var radixMV JSInt = 10
