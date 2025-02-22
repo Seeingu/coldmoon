@@ -187,7 +187,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		s := ToString(agent, arguments[0])
 		c := r.SpeciesConstructor(realm.Intrinsics.RegExpConstructor)
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
-		matcher := c.Data().Construct([]Value{this, _flags}, nil)
+		matcher := c.Data().Construct([]Value{this, _flags}, nil).value
 		lastIndex := ToLength(agent, r.Get(NewStringPropertyKey("lastIndex")))
 		matcher.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(JSNumber(lastIndex)), setThrowTypeThrow)
 		_global := strings.Contains(_flags.Data, "g")

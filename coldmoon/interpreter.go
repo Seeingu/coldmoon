@@ -127,7 +127,7 @@ func (v *VM) InstanceOfOperator(value Value, target Value) bool {
 		target,
 		NewSymbolPropertyKey(symbol))
 	if instOfHandler != nil {
-		return instOfHandler.Call(target, []Value{value}).ToBoolean()
+		return instOfHandler.Call(target, []Value{value}).value.ToBoolean()
 	}
 
 	if !IsCallable(target) {
@@ -379,7 +379,7 @@ func (v *VM) ForInOfHeadEvaluation(
 			// return EMPTY
 			return
 		}
-		obj := exprValue.ToObject(agent)
+		obj := exprValue.ToObject(agent).value
 		iterator := obj.EnumerateObjectProperties()
 		nextMethod := GetV(agent, iterator.ToValue(), NewStringPropertyKey("next"))
 		co.value = &IteratorRecord{

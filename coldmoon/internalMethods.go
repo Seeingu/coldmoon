@@ -28,8 +28,8 @@ type InternalMethods struct {
 	Set               SetFn
 	Delete            func(o ObjectType, p PropertyKey) bool
 	OwnPropertyKeys   func(o ObjectType) []PropertyKey
-	Call              func(o ObjectType, this Value, arguments []Value) Value
-	Construct         func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType
+	Call              func(o ObjectType, this Value, arguments []Value) CompletionValue
+	Construct         func(o ObjectType, arguments []Value, newTarget ObjectType) Completion[ObjectType]
 }
 
 func NewInternalMethods() InternalMethods {

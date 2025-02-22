@@ -42,7 +42,7 @@ func HostPromiseRejectionTracker(promise *PromiseObject, operation PromiseReject
 	// TODO
 }
 
-func HostCallJobCallback(callback *JobCallback, this Value, arguments []Value) Value {
+func HostCallJobCallback(callback *JobCallback, this Value, arguments []Value) CompletionValue {
 	Assert(IsCallable(callback.Callback.ToValue()))
 	return callback.Callback.Call(this, arguments)
 }

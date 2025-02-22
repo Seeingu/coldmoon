@@ -38,7 +38,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		handlerPrototype := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue()},
-		)
+		).value
 		handlerProtoObject, handlerProtoIsObject := handlerPrototype.(*ObjectValue)
 
 		if !handlerProtoIsObject && handlerPrototype != NullValue {
@@ -74,7 +74,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		booleanTrapResult := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue(), prototype.ToValue()},
-		).ToBoolean()
+		).value.ToBoolean()
 		if !booleanTrapResult {
 			return false
 		}
@@ -101,7 +101,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		booleanTrapResult := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue()},
-		).ToBoolean()
+		).value.ToBoolean()
 		targetExtensible := t.IsExtensible()
 		if booleanTrapResult != targetExtensible {
 			agent.ThrowTypeError("TypeError")
@@ -121,7 +121,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		booleanTrapResult := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue()},
-		).ToBoolean()
+		).value.ToBoolean()
 		if booleanTrapResult {
 			targetExtensible := t.IsExtensible()
 			if targetExtensible {
@@ -143,7 +143,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		trapResultObjValue := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue(), pk.ToValue()},
-		)
+		).value
 		_, trapResultIsObject := trapResultObjValue.(*ObjectValue)
 		if !trapResultIsObject {
 			panic("TypeError")
@@ -178,7 +178,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		booleanTrapResult := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue(), pk.ToValue(), descObj.ToValue()},
-		).ToBoolean()
+		).value.ToBoolean()
 
 		if !booleanTrapResult {
 			return false
@@ -222,7 +222,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		booleanTrapResult := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue(), pk.ToValue()},
-		).ToBoolean()
+		).value.ToBoolean()
 		if !booleanTrapResult {
 			targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
 			if targetDesc != nil && !targetDesc.Configurable {
@@ -249,7 +249,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		trapResult := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue(), pk.ToValue(), receiver},
-		)
+		).value
 		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
 		if targetDesc != nil && !targetDesc.Configurable {
 			if targetDesc.IsDataDescriptor() && !targetDesc.Writable {
@@ -278,7 +278,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		booleanTrapResult := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue(), pk.ToValue(), v, receiver},
-		).ToBoolean()
+		).value.ToBoolean()
 		if !booleanTrapResult {
 			return false
 		}
@@ -342,7 +342,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		trapResultArray := trap.Call(
 			h.ToValue(),
 			[]Value{(t).ToValue()},
-		)
+		).value
 
 		elements := CreateListFromArrayLike(agent, trapResultArray)
 		var trapResult []PropertyKey
@@ -408,7 +408,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return trapResult
 	}
-	call := func(o ObjectType, this Value, arguments []Value) Value {
+	call := func(o ObjectType, this Value, arguments []Value) CompletionValue {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -424,7 +424,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			[]Value{t.ToValue(), this, argArray.ToValue()},
 		)
 	}
-	construct := func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
+	construct := func(o ObjectType, arguments []Value, newTarget ObjectType) Completion[ObjectType] {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -439,11 +439,11 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		newObj := trap.Call(
 			h.ToValue(),
 			[]Value{t.ToValue(), argArray.ToValue(), (newTarget).ToValue()},
-		)
+		).value
 		if !newObj.IsObject() {
 			panic("TypeError")
 		}
-		return MustGetObject(newObj)
+		return MustGetObject(newObj).ToCompletion()
 	}
 
 	p.InternalMethods().GetPrototypeOf = getPrototypeOf

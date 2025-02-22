@@ -31,7 +31,7 @@ type ObjectType interface {
 	Construct(
 		argumentLists []Value,
 		newTarget ObjectType,
-	) ObjectType
+	) Completion[ObjectType]
 	InternalMethods() *InternalMethods
 	Prototype() ObjectType
 	Extensible() bool
@@ -39,14 +39,14 @@ type ObjectType interface {
 	// PrivateMethodOrAccessorAdd 7.3.28
 	PrivateMethodOrAccessorAdd(method *PrivateElement)
 	PrivateGet(privateName PrivateName) Value
-	ToCompletion() CompletionValue
+	ToCompletion() Completion[ObjectType]
 	ToValue() Value
 	// --- internal methods ---
 
 	String() string
 	Ref() ObjectType
 	IsOrdinary() bool
-	Call(this Value, argumentsList ArgumentsList) Value
+	Call(this Value, argumentsList ArgumentsList) CompletionValue
 	// defineBuiltinProperty is an alias of DefinePropertyOrThrow
 	// used to define internal property
 	defineBuiltinProperty(name PropertyConvertable, desc *PropertyDescriptor)

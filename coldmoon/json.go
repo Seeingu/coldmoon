@@ -227,7 +227,7 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 	}
 
 	if state.ReplacerFunction != nil {
-		value = state.ReplacerFunction.Call(holder.ToValue(), []Value{key.ToValue(), value})
+		value = state.ReplacerFunction.Call(holder.ToValue(), []Value{key.ToValue(), value}).value
 	}
 
 	if obj, ok := value.GetObject(); ok {

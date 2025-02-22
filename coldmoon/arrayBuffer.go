@@ -338,7 +338,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		newLen := JSInt(math.Max(float64(final-first), 0))
 		ctor := o.SpeciesConstructor(realm.Intrinsics.ArrayBufferConstructor)
 		newObject := ctor.Data().Construct([]Value{NewNumberValue(JSNumber(newLen))}, nil)
-		_new := RequireInternalSlot[*ArrayBufferLike]((newObject).ToValue())
+		_new := RequireInternalSlot[*ArrayBufferLike](newObject.value.ToValue())
 		if IsDetachedBuffer(_new) {
 			panic("TypeError")
 		}

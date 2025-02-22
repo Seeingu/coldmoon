@@ -536,7 +536,7 @@ func SetTypedArrayFromArrayLike(agent *Agent, target *TypedArrayObject, targetOf
 		panic("TypeError")
 	}
 	targetLength := TypedArrayLength(targetRecord)
-	src := source.ToObject(agent)
+	src := source.ToObject(agent).value
 	srcLength := src.LengthOfArrayLike()
 
 	if targetOffset.IsPositiveInf() {
@@ -577,7 +577,7 @@ func TypedArrayCreateFromConstructor(
 	constructor ObjectType,
 	argumentList []Value,
 ) ObjectType {
-	newTypedArray := constructor.Construct(argumentList, nil)
+	newTypedArray := constructor.Construct(argumentList, nil).value
 	taRecord := ValidateTypedArray(agent, newTypedArray.ToValue(), SeqCst)
 
 	if len(argumentList) == 1 {
@@ -621,7 +621,7 @@ func CompareTypedArrayElements(agent *Agent, x, y Value, comparator ObjectType) 
 	yBigInt, yIsBigInt := y.(*BigIntValue)
 	Assert((xIsNumber && yIsNumber) || (xIsBigInt && yIsBigInt))
 	if comparator != nil {
-		v := comparator.Call(UndefinedValue, []Value{x, y}).ToNumber(agent)
+		v := comparator.Call(UndefinedValue, []Value{x, y}).value.ToNumber(agent)
 		if v.IsNaN() {
 			return 0
 		}

@@ -304,7 +304,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		if regexp != UndefinedValue && regexp != NullValue {
 			searcher := GetMethod(agent, regexp, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]))
 			if searcher != nil {
-				return searcher.Call(regexp, []Value{o})
+				return searcher.Call(regexp, []Value{o}).value
 			}
 		}
 
@@ -326,7 +326,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 			}
 			matcher := GetMethod(agent, regexp, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatchAll]))
 			if matcher != nil {
-				return matcher.Call(regexp, []Value{o})
+				return matcher.Call(regexp, []Value{o}).value
 			}
 		}
 		s := ToString(agent, o)

@@ -546,7 +546,7 @@ func IsStrictlyEqual(x Value, y Value) bool {
 
 // 7.3.3
 func GetV(agent *Agent, value Value, key PropertyKey) Value {
-	object := value.ToObject(agent)
+	object := value.ToObject(agent).value
 	return object.InternalMethods().Get(object, key, value)
 }
 

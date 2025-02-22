@@ -185,7 +185,7 @@ func sharedArrayBufferSlice(agent *Agent, this Value, start Value, end Value) Va
 
 	newLen := (final - first).Max(0)
 	ctor := O.SpeciesConstructor(realm.Intrinsics.SharedArrayBufferConstructor)
-	newObject := ctor.Data().Construct([]Value{newLen.ToValue()}, nil)
+	newObject := ctor.Data().Construct([]Value{newLen.ToValue()}, nil).value
 	sharedArrayBuffer := RequireInternalSlot[*SharedArrayBufferObject](newObject.ToValue())
 	if sharedArrayBuffer.ArrayBufferData.Equal(O.ArrayBufferData) {
 		return agent.ThrowTypeError("should return a new ArrayBuffer instance")

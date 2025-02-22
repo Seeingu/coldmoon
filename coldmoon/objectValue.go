@@ -12,7 +12,7 @@ func (o *ObjectValue) Call(this Value, argumentsList ArgumentsList) Value {
 		panic("TypeError")
 	}
 	object := o.Object
-	return object.InternalMethods().Call(object, this, argumentsList)
+	return object.InternalMethods().Call(object, this, argumentsList).value
 }
 
 func (o *ObjectValue) CallNoArgs(this Value) Value {

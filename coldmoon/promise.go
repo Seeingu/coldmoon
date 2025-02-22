@@ -51,7 +51,7 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 		return nil
 	}
 	return &PromiseCapability{
-		Promise: promise.(*PromiseObject),
+		Promise: promise.value.(*PromiseObject),
 		Resolve: MustGetObject(resolvingFunctions.Resolve),
 		Reject:  MustGetObject(resolvingFunctions.Reject),
 	}
@@ -600,7 +600,7 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 				handlerResult.err = agent.exception
 			}
 		} else {
-			handlerResult.value = agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument})
+			handlerResult.value = agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument}).value
 		}
 		if promiseCapability == nil {
 			return UndefinedValue
@@ -609,12 +609,12 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 			reason := handlerResult.Error()
 			return promiseCapability.Reject.Call(
 				UndefinedValue, []Value{reason},
-			)
+			).value
 		} else {
 			value := handlerResult.Data()
 			return promiseCapability.Resolve.Call(
 				UndefinedValue, []Value{value},
-			)
+			).value
 		}
 	}
 	job := &Job{
@@ -750,7 +750,7 @@ func PerformPromiseAll(
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				valuesArray := CreateArrayFromList(agent, _values)
-				return resultCapability.Resolve.Call(UndefinedValue, []Value{valuesArray.ToValue()})
+				return resultCapability.Resolve.Call(UndefinedValue, []Value{valuesArray.ToValue()}).value
 			}
 			return UndefinedValue
 		}
@@ -766,7 +766,7 @@ func PerformPromiseAll(
 		})
 
 		remainingElements.Value++
-		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
+		ValueInvoke(agent, nextPromise.value, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
 		index++
 	}
 }
@@ -814,7 +814,7 @@ func PerformPromiseAllSettled(
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				valuesArray := CreateArrayFromList(agent, _values)
-				return resultCapability.Resolve.Call(UndefinedValue, []Value{valuesArray.ToValue()})
+				return resultCapability.Resolve.Call(UndefinedValue, []Value{valuesArray.ToValue()}).value
 			}
 			return UndefinedValue
 		}
@@ -845,7 +845,7 @@ func PerformPromiseAllSettled(
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
 				valuesArray := CreateArrayFromList(agent, _values)
-				return resultCapability.Resolve.Call(UndefinedValue, []Value{valuesArray.ToValue()})
+				return resultCapability.Resolve.Call(UndefinedValue, []Value{valuesArray.ToValue()}).value
 			}
 			return UndefinedValue
 		}
@@ -861,7 +861,7 @@ func PerformPromiseAllSettled(
 		})
 
 		remainingElements.Value++
-		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), onRejected.ToValue()})
+		ValueInvoke(agent, nextPromise.value, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), onRejected.ToValue()})
 		index++
 	}
 }
@@ -919,7 +919,7 @@ func PerformPromiseAny(
 					Enumerable:   false,
 					Configurable: true,
 				})
-				return resultCapability.Reject.Call(UndefinedValue, []Value{err.ToValue()})
+				return resultCapability.Reject.Call(UndefinedValue, []Value{err.ToValue()}).value
 			}
 			return UndefinedValue
 		}
@@ -935,7 +935,7 @@ func PerformPromiseAny(
 		})
 
 		remainingElements.Value++
-		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
+		ValueInvoke(agent, nextPromise.value, NewStringPropertyKey("then"), []Value{onFulfilled.ToValue(), resultCapability.Reject.ToValue()})
 		index++
 	}
 }
@@ -957,7 +957,7 @@ func NewPromiseResolveThenableJob(agent *Agent, promise *PromiseObject, thenable
 
 		resolvingFunctions := CreateResolvingFunctions(agent, promiseToResolve)
 		thenCallResult := agent.HostHooks.HostCallJobCallback(thenJobCallback, thenable.ToValue(), []Value{resolvingFunctions.Resolve, resolvingFunctions.Reject})
-		return thenCallResult
+		return thenCallResult.value
 	}
 	job := &Job{
 		Fun:      fun,
@@ -994,7 +994,7 @@ func PerformPromiseRace(
 
 		nextValue := IteratorValue(next)
 		nextPromise := promiseResolve.Call(constructor.ToValue(), []Value{nextValue})
-		ValueInvoke(agent, nextPromise, NewStringPropertyKey("then"), []Value{resultCapability.Resolve.ToValue(), resultCapability.Reject.ToValue()})
+		ValueInvoke(agent, nextPromise.value, NewStringPropertyKey("then"), []Value{resultCapability.Resolve.ToValue(), resultCapability.Reject.ToValue()})
 	}
 }
 

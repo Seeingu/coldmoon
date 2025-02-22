@@ -35,7 +35,7 @@ func (b *BuiltinFunction) SetFields(f []*ClassFieldDefinition) {
 func (b *BuiltinFunction) Construct(
 	argumentLists []Value,
 	newTarget ObjectType,
-) ObjectType {
+) Completion[ObjectType] {
 	if newTarget == nil {
 		newTarget = b
 	}
@@ -52,7 +52,7 @@ func (b *BuiltinFunction) GetFunctionRealm() *Realm {
 }
 
 // 10.3.1
-func BuiltinCall(o ObjectType, thisArgument Value, argumentsList []Value) Value {
+func BuiltinCall(o ObjectType, thisArgument Value, argumentsList []Value) CompletionValue {
 	return o.(*BuiltinFunction).BuiltinCallOrConstruct(thisArgument, argumentsList, nil)
 }
 
@@ -60,17 +60,20 @@ func BuiltinCall(o ObjectType, thisArgument Value, argumentsList []Value) Value 
 // [[Construct]]
 // spec: 10.3.2
 func BuiltinConstruct(
-	agent *Agent,
 	b ObjectType,
 	argumentsList []Value,
 	newTarget ObjectType,
-) ObjectType {
-	r := b.(*BuiltinFunction).BuiltinCallOrConstruct(NullValue, argumentsList, newTarget)
-	return r.ToObject(agent)
+) (co Completion[ObjectType]) {
+	r, isAbrupt, rt := ReturnIfAbrupt(b.(*BuiltinFunction).BuiltinCallOrConstruct(NullValue, argumentsList, newTarget), co)
+	if isAbrupt {
+		return rt
+	}
+	return r.ToObject(b.Agent())
 }
 
-// 10.3.3
-func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+// BuiltinCallOrConstruct
+// spec: 10.3.3
+func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsList []Value, newTarget ObjectType) (co CompletionValue) {
 	a := b.Agent()
 	callerContext := a.RunningExecutionContext()
 	_ = callerContext
@@ -86,7 +89,8 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 	result := b.Behavior(thisArgument, argumentsList, newTarget)
 
 	a.ExecutionContextStack.Pop()
-	return result
+	co.value = result
+	return
 }
 
 type builtinFunctionArgs struct {
@@ -138,9 +142,7 @@ func CreateBuiltinFunction(
 	function.ref = function
 	function.InternalMethods().Call = BuiltinCall
 	if args.isConstructor {
-		function.InternalMethods().Construct = func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
-			return BuiltinConstruct(agent, o, arguments, newTarget)
-		}
+		function.InternalMethods().Construct = BuiltinConstruct
 	}
 
 	SetFunctionLength(function.Object, length)

@@ -81,7 +81,7 @@ func (e *ECMAScriptFunction) GetFunctionRealm() *Realm {
 
 // Call
 // spec: 10.2.1
-func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Value {
+func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) CompletionValue {
 	agent := e.Agent()
 	function := e
 
@@ -94,20 +94,14 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Val
 
 	OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
 
-	// TODO(BM): update Call return type
 	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
 
 	agent.ExecutionContextStack.Pop()
 
-	// TODO: handle error gracefully
-	// TODO: show error trace stack
-	if result.IsError() {
-		panic("throw error: " + result.Error().String())
-	}
 	if result.IsAbrupt() {
-		return result.value
+		return result
 	}
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 // 10.2.1.1
@@ -148,7 +142,7 @@ func OrdinaryCallBindThis(agent *Agent, function *ECMAScriptFunction, calleeCont
 			globalEnv := calleeRealm.GlobalEnv
 			thisValue = (globalEnv.GlobalThisValue).ToValue()
 		} else {
-			thisValue = thisArgument.ToObject(agent).ToValue()
+			thisValue = thisArgument.ToObject(agent).value.ToValue()
 		}
 	}
 
@@ -385,11 +379,12 @@ const (
 	functionCreateThisModeNonLexical
 )
 
-// 10.2.2
+// Construct
+// spec: 10.2.2
 func (e *ECMAScriptFunction) Construct(
 	argumentsList []Value,
 	_newTarget ObjectType,
-) ObjectType {
+) (co Completion[ObjectType]) {
 	newTarget := _newTarget
 	if newTarget == nil {
 		newTarget = e
@@ -426,10 +421,10 @@ func (e *ECMAScriptFunction) Construct(
 
 	if !result.IsAbrupt() {
 		if o, ok := result.value.(*ObjectValue); ok {
-			return o.Object
+			return o.Object.ToCompletion()
 		}
 		if kind == ConstructorKindBase {
-			return MustGetObject(thisArgument)
+			return MustGetObject(thisArgument).ToCompletion()
 		}
 		if result.value != UndefinedValue {
 			panic("TypeError")
@@ -442,14 +437,14 @@ func (e *ECMAScriptFunction) Construct(
 	thisBindingObject, ok := thisBinding.(*ObjectValue)
 	Assert(ok)
 
-	return thisBindingObject.Object
+	return thisBindingObject.Object.ToCompletion()
 }
 
 func ECMAScriptFunctionConstruct(
 	object ObjectType,
 	argumentsList []Value,
 	newTarget ObjectType,
-) ObjectType {
+) Completion[ObjectType] {
 	return object.(*ECMAScriptFunction).Construct(argumentsList, newTarget)
 }
 
@@ -492,10 +487,9 @@ func OrdinaryFunctionCreate(
 		ConstructorKind:    ConstructorKindBase,
 	}
 	function.ref = function
-	call := func(o ObjectType, this Value, arguments []Value) Value {
+	function.InternalMethods().Call = func(o ObjectType, this Value, arguments []Value) CompletionValue {
 		return o.(*ECMAScriptFunction).Call(this, arguments)
 	}
-	function.InternalMethods().Call = call
 
 	length := parameterList.ExpectedArgumentCount()
 	SetFunctionLength(function.Object, length)
@@ -541,9 +535,7 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 		)
 		F.InternalMethods().Construct = ECMAScriptFunctionConstruct
 	} else {
-		F.InternalMethods().Construct = func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
-			return BuiltinConstruct(agent, o, arguments, newTarget)
-		}
+		F.InternalMethods().Construct = BuiltinConstruct
 	}
 
 	if isECMAScriptFunction {

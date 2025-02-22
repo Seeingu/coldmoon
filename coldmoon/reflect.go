@@ -40,7 +40,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		args := CreateListFromArrayLike(agent, argumentsList)
 
-		return ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object).ToValue()
+		return ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object).value.ToValue()
 	}
 	var defineProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]

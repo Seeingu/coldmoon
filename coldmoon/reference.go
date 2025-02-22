@@ -72,7 +72,7 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 	}
 	if r.IsPropertyReference() {
 		value, _ := r.Base.Value()
-		baseObj := value.ToObject(agent)
+		baseObj := value.ToObject(agent).value
 		if r.IsPrivateReference() {
 			return baseObj.PrivateGet(*r.ReferencedName.PrivateName)
 		}
@@ -108,7 +108,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 
 	if r.IsPropertyReference() {
 		v, _ := r.Base.Value()
-		baseObj := v.ToObject(agent)
+		baseObj := v.ToObject(agent).value
 
 		if r.IsPrivateReference() {
 			panic("unimplemented")

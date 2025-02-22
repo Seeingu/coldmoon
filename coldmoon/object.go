@@ -133,9 +133,16 @@ func (o *Object) IsCallable() bool {
 	return false
 }
 
-func (o *Object) Call(this Value, argumentsList ArgumentsList) Value {
+// Call
+// spec: 7.3.13
+// argumentsList is optional
+func (o *Object) Call(this Value, argumentsList ArgumentsList) (co CompletionValue) {
 	if !o.IsCallable() {
-		panic("TypeError")
+		co.ThrowTypeError(o.Agent(), fmt.Sprintf("TypeError: %s is not callable", o.String()))
+		return
+	}
+	if argumentsList == nil {
+		argumentsList = ArgumentsList{}
 	}
 	object := o.Ref()
 	return object.InternalMethods().Call(object, this, argumentsList)
@@ -229,7 +236,7 @@ func ObjectConstruct(
 	o ObjectType,
 	_argumentLists []Value,
 	_newTarget ObjectType,
-) ObjectType {
+) Completion[ObjectType] {
 	newTarget := _newTarget
 	if newTarget == nil {
 		newTarget = o
@@ -240,7 +247,7 @@ func ObjectConstruct(
 func (o *Object) Construct(
 	argumentLists []Value,
 	newTarget ObjectType,
-) ObjectType {
+) (co Completion[ObjectType]) {
 	if newTarget == nil {
 		newTarget = o
 	}
@@ -345,8 +352,9 @@ func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) (co Completio
 	return
 }
 
-func (o *Object) ToCompletion() CompletionValue {
-	return (o).ToValue().ToCompletion()
+func (o *Object) ToCompletion() (co Completion[ObjectType]) {
+	co.value = o
+	return
 }
 
 // MARK: - 7.3.23
@@ -389,13 +397,13 @@ func (o *Object) GetFunctionRealm() *Realm {
 	return o.Agent().CurrentRealm()
 }
 
-// MARK: - 7.3.25
-
+// CopyDataProperties
+// spec: 7.3.25
 func (o *Object) CopyDataProperties(source Value, excludedItems []PropertyKey) {
-	if source == UndefinedValue || source == NullValue {
+	if IsUndefinedOrNull(source) {
 		return
 	}
-	from := source.ToObject(o.Agent())
+	from := ReturnAssertNormal(source.ToObject(o.Agent()))
 	keys := from.InternalMethods().OwnPropertyKeys(from)
 
 	for _, key := range keys {
@@ -479,7 +487,7 @@ func (o *Object) PrivateGet(privateName PrivateName) Value {
 		if getter == nil {
 			return o.Agent().ThrowTypeError("PrivateGet failed: getter is nil")
 		}
-		return getter.Call(o.ToValue(), []Value{})
+		return getter.Call(o.ToValue(), []Value{}).value
 	}
 	panic("unreachable")
 }
@@ -589,7 +597,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var getOwnPropertyDescriptor BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := args[0]
 		p := args[1]
-		obj := o.ToObject(agent)
+		obj := ReturnAssertNormal(o.ToObject(agent))
 		key := ToPropertyKey(agent, p)
 		desc := obj.InternalMethods().GetOwnProperty(obj, key)
 
@@ -601,7 +609,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	// 20.1.2.9
 	var getOwnPropertyDescriptors BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := args[0]
-		obj := o.ToObject(agent)
+		obj := ReturnAssertNormal(o.ToObject(agent))
 
 		ownKeys := obj.InternalMethods().OwnPropertyKeys(obj)
 
@@ -620,9 +628,9 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var getPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := args[0]
 
-		obj := o.ToObject(agent)
+		obj := ReturnAssertNormal(o.ToObject(agent))
 		proto := obj.InternalMethods().GetPrototypeOf(obj)
-		return (proto).ToValue()
+		return proto.ToValue()
 	}
 
 	// 20.1.2.15
@@ -723,39 +731,39 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		objectValue := args[0]
 		key := args[1]
 
-		obj := objectValue.ToObject(agent)
+		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		p := ToPropertyKey(agent, key)
 		return NewBooleanValue(ObjectHasOwnProperty(obj, p))
 	}
 
 	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
-		obj := objectValue.ToObject(agent)
+		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		entryList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKeyAndValue)
 		return (CreateArrayFromList(agent, entryList)).ToValue()
 	}
 	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
-		obj := objectValue.ToObject(agent)
+		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		keyList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKey)
 		return (CreateArrayFromList(agent, keyList)).ToValue()
 	}
 	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
-		obj := objectValue.ToObject(agent)
+		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		valueList := obj.EnumerableOwnProperties(objectOwnPropertiesKindValue)
 		return (CreateArrayFromList(agent, valueList)).ToValue()
 	}
 	var assign BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		target := args[0]
-		to := target.ToObject(agent)
+		to := ReturnAssertNormal(target.ToObject(agent))
 		sources := args[1:]
 		if len(sources) == 0 {
-			return (to).ToValue()
+			return to.ToValue()
 		}
 		for _, nextSource := range sources {
 			if nextSource != UndefinedValue && nextSource != NullValue {
-				from := this.ToObject(agent)
+				from := ReturnAssertNormal(this.ToObject(agent))
 				pKeys := from.InternalMethods().OwnPropertyKeys(from)
 				for _, nextKey := range pKeys {
 					desc := from.InternalMethods().GetOwnProperty(from, nextKey)
@@ -770,7 +778,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 	var getOwnPropertyNames BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
-		obj := objectValue.ToObject(agent)
+		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		keys := obj.InternalMethods().OwnPropertyKeys(obj)
 		keyNames := lo.Filter(keys, func(key PropertyKey, _ int) bool {
 			_, ok := key.(SymbolPropertyKey)
@@ -783,7 +791,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]
-		obj := objectValue.ToObject(agent)
+		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		keys := obj.InternalMethods().OwnPropertyKeys(obj)
 		symbols := lo.Filter(keys, func(key PropertyKey, _ int) bool {
 			_, ok := key.(SymbolPropertyKey)
@@ -857,7 +865,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	realm.Intrinsics.ObjectPrototype = object
 
 	valueOf := func(this Value, args []Value, newTarget ObjectType) Value {
-		return (this.ToObject(agent)).ToValue()
+		return ReturnAssertNormal(this.ToObject(agent)).ToValue()
 	}
 
 	// 20.1.3.6 toString
@@ -868,7 +876,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		if this == NullValue {
 			return NewStringValue("[object Null]")
 		}
-		o := this.ToObject(agent)
+		o := ReturnAssertNormal(this.ToObject(agent))
 		_isArray := IsArray(this)
 		var builtInTag string
 		if _isArray {
@@ -903,7 +911,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		return NewStringValue("[object " + tag + "]")
 	}
 	hasOwnProperty := func(this Value, args []Value, newTarget ObjectType) Value {
-		o := this.ToObject(agent)
+		o := ReturnAssertNormal(this.ToObject(agent))
 		p := ToPropertyKey(agent, args[0])
 		return NewBooleanValue(ObjectHasOwnProperty(o, p))
 	}
@@ -912,8 +920,8 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		if !v.IsObject() {
 			return NewBooleanValue(false)
 		}
-		o := this.ToObject(agent)
-		target := this.ToObject(agent)
+		o := ReturnAssertNormal(this.ToObject(agent))
+		target := ReturnAssertNormal(this.ToObject(agent))
 		for {
 			target = target.InternalMethods().GetPrototypeOf(target)
 			if target == nil {
@@ -925,7 +933,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 	}
 	propertyIsEnumerable := func(this Value, args []Value, newTarget ObjectType) Value {
-		o := this.ToObject(agent)
+		o := ReturnAssertNormal(this.ToObject(agent))
 		p := ToPropertyKey(agent, args[0])
 		desc := o.InternalMethods().GetOwnProperty(o, p)
 		if desc == nil {
@@ -934,7 +942,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		return NewBooleanValue(desc.Enumerable)
 	}
 	toLocaleString := func(this Value, args []Value, newTarget ObjectType) Value {
-		o := this.ToObject(agent)
+		o := ReturnAssertNormal(this.ToObject(agent))
 		return ValueInvoke(agent, o.ToValue(), NewStringPropertyKey("toString"), []Value{})
 	}
 
@@ -953,14 +961,14 @@ func CoerceOptionsToObject(agent *Agent, options Value) ObjectType {
 	if options == UndefinedValue {
 		return nil
 	}
-	return options.ToObject(agent)
+	return options.ToObject(agent).value
 }
 
 // 9.2.13
 
 // 20.1.2.3.1
 func objectDefineProperties(agent *Agent, object ObjectType, properties Value) ObjectType {
-	props := properties.ToObject(agent)
+	props := ReturnAssertNormal(properties.ToObject(agent))
 
 	keys := props.InternalMethods().OwnPropertyKeys(props)
 

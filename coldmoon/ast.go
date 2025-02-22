@@ -600,7 +600,7 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 	}
 	if isProtoSetter {
 		if propValue.IsObject() || propValue == NullValue {
-			object.SetPrototype(propValue.ToObject(vm.agent))
+			object.SetPrototype(propValue.ToObject(vm.agent).value)
 		}
 		return
 	}
@@ -1553,7 +1553,7 @@ func (e *SuperCall) Evaluation(vm *VM) (co CompletionValue) {
 		co.err = agent.ThrowTypeError("SuperCall: not a constructor")
 		return
 	}
-	result := MustGetObject(f).Construct(argList, newTarget)
+	result := MustGetObject(f).Construct(argList, newTarget).value
 	thisER := agent.GetThisEnvironment().(*FunctionEnvironment)
 	thisER.BindThisValue(result.ToValue())
 	F := thisER.FunctionObject
@@ -1996,7 +1996,7 @@ func (e *NewExpression) EvaluateNew(vm *VM) Value {
 		return vm.agent.ThrowTypeError("constructor is not a constructor")
 	}
 	o := MustGetObject(constructor)
-	return o.Construct(argList, nil).ToValue()
+	return o.Construct(argList, nil).value.ToValue()
 }
 
 func (e *NewExpression) String() string {
@@ -2596,7 +2596,7 @@ func (u *UnaryExpression) Evaluation(vm *VM) CompletionValue {
 				vm.panic(agent.ThrowException(ReferenceError, "cannot delete super property"))
 			}
 			v, _ := ref.Base.Value()
-			baseObj := v.ToObject(agent)
+			baseObj := v.ToObject(agent).value
 			var referencedName PropertyKey
 			if ref.ReferencedName.PrivateName != nil {
 				panic("unreachable")
@@ -4563,7 +4563,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 				if !IsConstructor((fun).ToValue()) {
 					panic("TypeError: prototype is not a constructor")
 				}
-				result = fun.Construct(args, newTarget)
+				result = fun.Construct(args, newTarget).value
 			} else {
 				result = OrdinaryCreateFromConstructor(agent, newTarget, "%Object.prototype", nil)
 			}

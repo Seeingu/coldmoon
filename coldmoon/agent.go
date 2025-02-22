@@ -21,7 +21,7 @@ type HostHooks struct {
 	HostEnsureCanCompileStrings    func(realm *Realm)
 	HostHasSourceTextAvailable     func(o ObjectType) bool
 	HostMakeJobCallback            func(callback ObjectType) *JobCallback
-	HostCallJobCallback            func(callback *JobCallback, this Value, arguments []Value) Value
+	HostCallJobCallback            func(callback *JobCallback, this Value, arguments []Value) CompletionValue
 	HostEnqueuePromiseJob          func(agent *Agent, job *Job, realm *Realm)
 	HostPromiseRejectionTracker    func(promise *PromiseObject, operation PromiseRejectionTrackerOperation)
 	HostResizeArrayBuffer          func(buffer *ArrayBufferLike, newByteLength JSInt) ResizeArrayBufferHandled
@@ -140,7 +140,7 @@ func (a *Agent) GetGlobalObject() *Object {
 func (a *Agent) ThrowException(exceptionType ExceptionType, message string) Value {
 	realm := a.CurrentRealm()
 	constructor := realm.Intrinsics.Get(exceptionType.ToIntrinsicName())
-	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
+	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil).value
 	a.exception = errorObject.ToValue()
 	return a.exception
 }
@@ -156,7 +156,7 @@ func (a *Agent) ThrowRangeError(message string) Value {
 func (a *Agent) ThrowRangeExceptionObject(message string) ObjectType {
 	realm := a.CurrentRealm()
 	constructor := realm.Intrinsics.Get(RangeError.ToIntrinsicName())
-	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
+	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil).value
 	a.exception = errorObject.ToValue()
 	return errorObject
 }
@@ -164,7 +164,7 @@ func (a *Agent) ThrowRangeExceptionObject(message string) ObjectType {
 func (a *Agent) ThrowTypeExceptionObject(message string) ObjectType {
 	realm := a.CurrentRealm()
 	constructor := realm.Intrinsics.Get(TypeError.ToIntrinsicName())
-	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil)
+	errorObject := constructor.Construct([]Value{NewStringValue(message)}, nil).value
 	a.exception = errorObject.ToValue()
 	return errorObject
 }

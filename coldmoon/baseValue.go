@@ -117,7 +117,7 @@ func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) Value {
 
 			result := exoticToPrim.Call(value, []Value{
 				NewStringValue(hintString),
-			})
+			}).value
 			if _, isObject = result.(*ObjectValue); !isObject {
 				return result
 			}
@@ -155,27 +155,27 @@ func (b *BaseValue) ToString() CMString {
 
 // spec: 7.1.18
 // TODO: type error handling
-func (b *BaseValue) ToObject(agent *Agent) ObjectType {
+func (b *BaseValue) ToObject(agent *Agent) (co Completion[ObjectType]) {
 	realm := agent.CurrentRealm()
 	switch v := b.Value.(type) {
 	case *undefinedValue, *nullValue:
-		agent.ThrowTypeError("TypeError")
+		co.ThrowTypeError(agent, "ToObject")
 	case *BooleanValue:
-		return NewBooleanObject(agent, v.Data, realm.Intrinsics.BooleanPrototype)
+		co.value = NewBooleanObject(agent, v.Data, realm.Intrinsics.BooleanPrototype)
 	case *ObjectValue:
-		return v.Object
+		co.value = v.Object
 	case *StringValue:
-		return NewStringObject(agent, v.Data, realm.Intrinsics.StringPrototype)
+		co.value = NewStringObject(agent, v.Data, realm.Intrinsics.StringPrototype)
 	case *NumberValue:
-		return NewNumberObject(agent, v.Data, realm.Intrinsics.NumberPrototype)
+		co.value = NewNumberObject(agent, v.Data, realm.Intrinsics.NumberPrototype)
 	case *SymbolValue:
-		return NewSymbolObject(agent, v, realm.Intrinsics.SymbolPrototype)
+		co.value = NewSymbolObject(agent, v, realm.Intrinsics.SymbolPrototype)
 	case *BigIntValue:
-		return NewBigIntObject(agent, v, realm.Intrinsics.BigIntPrototype)
+		co.value = NewBigIntObject(agent, v, realm.Intrinsics.BigIntPrototype)
 	default:
 		panic("unimplemented")
 	}
-	panic("unreachable")
+	return
 }
 
 func (b *BaseValue) ToBuiltinPropertyDescriptor() *PropertyDescriptor {

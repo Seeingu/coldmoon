@@ -24,9 +24,10 @@ func NewIteratorPrototype(realm *Realm) ObjectType {
 	return object
 }
 
-// 7.4.2
+// GetIteratorFromMethod
+// spec: 7.4.2
 func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *IteratorRecord {
-	iterator := method.Call(object, nil)
+	iterator := method.Call(object, nil).value
 	if !iterator.IsObject() {
 		panic("TypeError")
 	}
