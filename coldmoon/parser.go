@@ -1404,7 +1404,6 @@ func (p *Parser) newExpression() (*NewExpression, bool) {
 	if p.tokenizer.CurrentToken.Type == TLeftParen {
 		args = p.arguments()
 	}
-	p.automaticSemicolonInsertion()
 	return &NewExpression{
 		Callee:    expr,
 		Arguments: args,
