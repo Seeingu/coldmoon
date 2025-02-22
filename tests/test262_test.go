@@ -5,6 +5,8 @@ import (
 	"path"
 	"testing"
 
+	"github.com/Seeingu/coldmoon/runtime"
+
 	"github.com/Seeingu/coldmoon/pkg"
 
 	. "github.com/Seeingu/coldmoon/coldmoon"
@@ -149,24 +151,11 @@ func testArray(realm *Realm) {
 func TestHarness(t *testing.T) {
 	// FIXME: it is not working with new VM
 	t.Skip("")
-	files := []string{
-		"sta.js",
-		"assert.js",
-		"isConstructor.js",
-		"nans.js",
-		"assertRelativeDateMs.js",
-		"propertyHelper.js",
-		"testTypedArray.js",
-		"testAtomics.js",
-	}
-
 	agent := NewAgent()
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	for _, f := range files {
-		runTestHarness(realm, f, false)
-	}
+	runtime.RegisterTest262Runtime(realm)
 
 	testArray(realm)
 	testDataView(realm)
