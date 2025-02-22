@@ -614,12 +614,16 @@ func (p *Parser) tryStatement() *TryStatement {
 	block := p.block()
 	var catch *Block
 	var finally *Block
-	var catchParameter CatchParameter
+	var catchParameter *CatchParameter
 	if p.tokenizer.CurrentToken.Type == TCatch {
 		p.tokenizer.Next()
 		if p.tokenizer.CurrentToken.Type == TLeftParen {
 			p.tokenizer.Next()
-			catchParameter = CatchParameter(p.bindingIdentifier())
+			catchParameter = &CatchParameter{
+				Identifier: &BindingIdentifier{
+					identifier: p.bindingIdentifier(),
+				},
+			}
 			p.tokenizer.MustMatch(TRightParen)
 		}
 		catch = p.block()
@@ -1890,6 +1894,7 @@ func (p *Parser) identifierReference() *IdentifierReference {
 	}
 }
 
+// TODO(BM): should return BindingIdentifier
 func (p *Parser) bindingIdentifier() IdentifierName {
 	t := p.tokenizer.CurrentToken
 	types := []TokenType{TIdentifier, TAwait, TYield}

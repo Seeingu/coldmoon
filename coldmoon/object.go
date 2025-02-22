@@ -779,7 +779,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		keyValues := lo.Map(keyNames, func(key PropertyKey, _ int) Value {
 			return key.ToValue()
 		})
-		return (CreateArrayFromList(agent, keyValues)).ToValue()
+		return CreateArrayFromList(agent, keyValues).ToValue()
 	}
 	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		objectValue := args[0]

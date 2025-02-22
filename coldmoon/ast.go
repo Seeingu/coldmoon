@@ -113,6 +113,27 @@ func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLite
 	return true
 }
 
+// BindingIdentifier [Yield, Await] :
+// - Identifier
+// - yield
+// - await
+type BindingIdentifier struct {
+	identifier IdentifierName
+	isYield    bool
+	isAwait    bool
+}
+
+var _ RuntimeSemanticsBindingInitialization = (*BindingIdentifier)(nil)
+
+func (b *BindingIdentifier) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
+	if b.identifier != "" {
+		name := b.identifier
+		return vm.InitializeBoundName(name, value, env)
+	} else {
+		panic("unimplemented")
+	}
+}
+
 // MARK: - IdentifierReference
 
 type (
@@ -2931,35 +2952,53 @@ func (s *StatementEmpty) String() string {
 
 // MARK: - TryStatement
 
-// TODO(BM)
 // CatchParameter [Yield, Await] :
 // - BindingIdentifier[?Yield, ?Await]
 // - BindingPattern[?Yield, ?Await]
-type CatchParameter IdentifierName
+type CatchParameter struct {
+	Identifier *BindingIdentifier
+	// TODO(BM): pattern
+	Pattern *BindingPattern
+}
 
-func (c CatchParameter) ToIdentifier() IdentifierName {
-	return IdentifierName(c)
+var _ RuntimeSemanticsBindingInitialization = (*CatchParameter)(nil)
+
+func (c *CatchParameter) astIsIdentifier() bool {
+	return c.Identifier != nil
+}
+
+func (c *CatchParameter) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
+	if c.astIsIdentifier() {
+		return c.Identifier.BindingInitialization(vm, value, env)
+	} else {
+		panic("unimplemented")
+	}
 }
 
 // Catch [Yield, Await, Return] :
 // catch ( CatchParameter[?Yield, ?Await] ) Block[?Yield, ?Await, ?Return]
 // catch Block[?Yield, ?Await, ?Return]
 type Catch struct {
-	CatchParameter CatchParameter
+	CatchParameter *CatchParameter
 	CatchBlock     *Block
 }
 
 var _ RuntimeSemanticsCatchClauseEvaluation = (*Catch)(nil)
 
-func (c *Catch) CatchClauseEvaluation(vm *VM, thrownValue Value) (comp Completion[Value]) {
+func (c *Catch) CatchClauseEvaluation(vm *VM, thrownValue Value) (co CompletionValue) {
 	oldEnv := vm.RunningLexicalEnvironment()
 	catchEnv := NewDeclarativeEnvironment(oldEnv)
 	// TODO(BM): handle BindingPattern
-	catchEnv.CreateMutableBinding(string(c.CatchParameter), false)
+	catchEnv.CreateMutableBinding(c.CatchParameter.Identifier.identifier, false)
 	vm.SetRunningLexicalEnvironment(catchEnv)
-	panic("unimplemented")
-
-	return
+	status := c.CatchParameter.BindingInitialization(vm, thrownValue, catchEnv)
+	if status.IsAbrupt() {
+		vm.SetRunningLexicalEnvironment(oldEnv)
+		return status
+	}
+	B := CompletionHandle(c.CatchBlock.Evaluation(vm))
+	vm.SetRunningLexicalEnvironment(oldEnv)
+	return B
 }
 
 // TryStatement [Yield, Await, Return] :
@@ -3000,13 +3039,45 @@ func (t *TryStatement) astHasFinally() bool {
 // Evaluation
 // spec: 14.15.3
 func (t *TryStatement) Evaluation(vm *VM) CompletionValue {
-	panic("unimplemented")
+	switch {
+	case t.astHasCatch() && t.astHasFinally():
+		B := CompletionHandle(t.TryBlock.Evaluation(vm))
+		var C CompletionValue
+		if B.t == CompletionTypeThrow {
+			C = CompletionHandle(t.Catch.CatchClauseEvaluation(vm, B.value))
+		} else {
+			C = B
+		}
+		F := CompletionHandle(t.FinallyBlock.Evaluation(vm))
+		if F.t == CompletionTypeNormal {
+			F = C
+		}
+		return UpdateEmpty(F, UndefinedValue)
+	case t.astHasCatch():
+		B := CompletionHandle(t.TryBlock.Evaluation(vm))
+		var C CompletionValue
+		if B.t == CompletionTypeThrow {
+			C = CompletionHandle(t.Catch.CatchClauseEvaluation(vm, B.value))
+		} else {
+			C = B
+		}
+		return UpdateEmpty(C, UndefinedValue)
+	case t.astHasFinally():
+		B := CompletionHandle(t.TryBlock.Evaluation(vm))
+		F := CompletionHandle(t.FinallyBlock.Evaluation(vm))
+		if F.t == CompletionTypeNormal {
+			F = B
+		}
+		return UpdateEmpty(F, UndefinedValue)
+	default:
+		panic("unreachable")
+	}
 }
 
 func (t *TryStatement) String() string {
 	sb := "try " + t.TryBlock.String()
 	if t.Catch.CatchBlock != nil {
-		sb += " catch (" + string(t.Catch.CatchParameter) + ") " + t.Catch.CatchBlock.String()
+		sb += " catch (" + string(t.Catch.CatchParameter.Identifier.identifier) + ") " + t.Catch.CatchBlock.String()
 	}
 	if t.FinallyBlock != nil {
 		sb += " finally " + t.FinallyBlock.String()
@@ -3803,16 +3874,19 @@ func (f *ForInOfStatement) astIsForDeclaration() bool {
 	return f.Initializer.ForDeclaration != nil
 }
 
+func (f *ForInOfStatement) astIsVarForBinding() bool {
+	return f.Initializer.ForBinding != nil
+}
+
 // ForInOfLoopEvaluation
 // spec: 14.7.5.5
 func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue) {
 	if f.astIsForDeclaration() {
 		forDeclaration := f.Initializer.ForDeclaration
 		if f.astIsOf() {
-			keyResult, err := vm.ForInOfHeadEvaluation(forDeclaration.BoundNames(), f.Expression, ForInOfIterationKindIterate)
-			if err != nil {
-				co.err = err
-				return
+			keyResult, isAbrupt, rt := ReturnIfAbrupt(vm.ForInOfHeadEvaluation(forDeclaration.BoundNames(), f.Expression, ForInOfIterationKindIterate), co)
+			if isAbrupt {
+				return rt
 			}
 			return vm.ForInOfBodyEvaluation(
 				forDeclaration,
@@ -3825,10 +3899,14 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co 
 			)
 		} else {
 			// for in
-			keyResult, err := vm.ForInOfHeadEvaluation(forDeclaration.BoundNames(), f.Expression, ForInOfIterationKindEnumerate)
-			if err != nil {
-				co.err = err
-				return
+			keyResult, isAbrupt, rt := ReturnIfAbrupt(
+				vm.ForInOfHeadEvaluation(
+					forDeclaration.BoundNames(),
+					f.Expression,
+					ForInOfIterationKindEnumerate,
+				), co)
+			if isAbrupt {
+				return rt
 			}
 			return vm.ForInOfBodyEvaluation(
 				forDeclaration,
@@ -3840,8 +3918,29 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co 
 				IteratorKindSync,
 			)
 		}
+	} else if f.astIsVarForBinding() {
+		keyResult, isAbrupt, rt := ReturnIfAbrupt(
+			vm.ForInOfHeadEvaluation(
+				[]string{},
+				f.Expression,
+				ForInOfIterationKindEnumerate,
+			), co)
+		if isAbrupt {
+			return rt
+		}
+		return vm.ForInOfBodyEvaluation(
+			f.Initializer.ForBinding,
+			f.Body,
+			keyResult,
+			ForInOfIterationKindEnumerate,
+			ForInOfLhsKindVarBinding,
+			labelSet,
+			IteratorKindSync,
+		)
+
+	} else {
+		panic("unimplemented")
 	}
-	panic("unimplemented")
 }
 
 type ForInOfIterationKind int
@@ -3905,6 +4004,7 @@ func (f *ForInOfStatementInitializer) String() string {
 // - BindingIdentifier[?Yield, ?Await]
 // - BindingPattern[?Yield, ?Await]
 type ForBinding struct {
+	ASTNode
 	BindingIdentifier IdentifierName
 	BindingPattern    *BindingPattern
 }

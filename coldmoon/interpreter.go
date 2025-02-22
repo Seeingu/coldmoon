@@ -78,12 +78,16 @@ func ReturnAssertNormal[T any](c Completion[T]) T {
 
 // InitializeBoundName
 // spec: 8.6.2.1
-func (v *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord) {
-	if env == nil {
-		lhs := v.agent.ResolveBinding(name, nil, true)
-		lhs.PutValue(v.agent, value)
-	} else {
+// return UNUSED or abrupt
+func (v *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord) (co CompletionValue) {
+	if env != nil {
 		env.InitializeBinding(name, value)
+		return
+	} else {
+		lhs := v.agent.ResolveBinding(name, nil, true)
+		// TODO(BM): return this
+		lhs.PutValue(v.agent, value)
+		return
 	}
 }
 
@@ -331,18 +335,18 @@ func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIt
 			if !testValue.ToBoolean() {
 				return V.ToCompletion()
 			}
-			result := stmt.Evaluation(v).value
-			if !LoopContinues(result, labelSet) {
-				return UpdateEmpty(result.ToCompletion(), V)
-			}
-			if !IsUndefinedOrNil(result) {
-				V = result
-				CreatePerIterationEnvironment(perIterationBindings)
-				if increment != nil {
-					incRef := increment.Evaluation(v)
-					incRef.value.GetValue(v.agent)
-				}
-			}
+		}
+		result := CompletionHandle(stmt.Evaluation(v))
+		if !LoopContinues(result.value, labelSet) {
+			return UpdateEmpty(result, V)
+		}
+		if !IsUndefinedOrNil(result.value) {
+			V = result.value
+		}
+		CreatePerIterationEnvironment(perIterationBindings)
+		if increment != nil {
+			incRef := increment.Evaluation(v)
+			incRef.value.GetValue(v.agent)
 		}
 	}
 }
@@ -353,7 +357,7 @@ func (v *VM) ForInOfHeadEvaluation(
 	uninitializedBoundNames []string,
 	expr Expression,
 	iterationKind ForInOfIterationKind,
-) (iterator *IteratorRecord, err Value) {
+) (co Completion[*IteratorRecord]) {
 	agent := v.agent
 	oldEnv := v.RunningLexicalEnvironment()
 	if len(uninitializedBoundNames) > 0 {
@@ -370,15 +374,18 @@ func (v *VM) ForInOfHeadEvaluation(
 	if iterationKind == ForInOfIterationKindEnumerate {
 		if IsUndefinedOrNil(exprValue) || exprValue == NullValue {
 			// TODO: return { [[Type]]: BREAK, [[Value]]: EMPTY, [[Target]]: EMPTY }
-			return &IteratorRecord{}, nil
+			co.t = CompletionTypeBreak
+			// return EMPTY
+			return
 		}
 		obj := exprValue.ToObject(agent)
 		iterator := obj.EnumerateObjectProperties()
 		nextMethod := GetV(agent, iterator.ToValue(), NewStringPropertyKey("next"))
-		return &IteratorRecord{
+		co.value = &IteratorRecord{
 			Iterator:   iterator,
 			NextMethod: nextMethod,
-		}, nil
+		}
+		return
 	} else {
 		var iteratorKind IteratorKind
 		if iterationKind == ForInOfIterationKindAsyncIterate {
@@ -386,11 +393,12 @@ func (v *VM) ForInOfHeadEvaluation(
 		} else {
 			iteratorKind = IteratorKindSync
 		}
-		completion := GetIterator(agent, exprValue, iteratorKind)
-		if completion.IsError() {
-			return nil, completion.Error()
+		value, isAbrupt, rt := ReturnIfAbrupt(GetIterator(agent, exprValue, iteratorKind), co)
+		if isAbrupt {
+			return rt
 		}
-		return completion.Data(), nil
+		co.value = value
+		return
 	}
 }
 
@@ -398,7 +406,7 @@ func (v *VM) ForInOfHeadEvaluation(
 // spec: 14.7.5.7
 // iteratorKind is optional
 func (v *VM) ForInOfBodyEvaluation(
-	lhs Expression,
+	lhs ASTNode,
 	stmt Statement,
 	iteratorRecord *IteratorRecord,
 	iterationKind ForInOfIterationKind,

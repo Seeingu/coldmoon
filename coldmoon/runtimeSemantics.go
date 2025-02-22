@@ -1,5 +1,6 @@
 package coldmoon
 
+// RuntimeSemanticsEvaluation
 // spec: 8.1
 type RuntimeSemanticsEvaluation interface {
 	Evaluation(vm *VM) (co CompletionValue)
@@ -8,6 +9,15 @@ type RuntimeSemanticsEvaluation interface {
 // 8.4.5
 type RuntimeSemanticsNamedEvaluation interface {
 	NamedEvaluation(name string, expr Expression) ObjectType
+}
+
+// RuntimeSemanticsBindingInitialization
+// 8.6.2
+type RuntimeSemanticsBindingInitialization interface {
+	// BindingInitialization
+	// env is EnvironmentRecord or undefined
+	// return UNUSED or abrupt
+	BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue
 }
 
 // 13.2.5.5
