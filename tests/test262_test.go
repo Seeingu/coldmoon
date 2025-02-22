@@ -149,8 +149,6 @@ func testArray(realm *Realm) {
 }
 
 func TestHarness(t *testing.T) {
-	// FIXME: it is not working with new VM
-	t.Skip("")
 	agent := NewAgent()
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)

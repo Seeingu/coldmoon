@@ -12,9 +12,10 @@ const (
 
 // 6.2.4
 type Completion[T any] struct {
-	err   Value
-	value T
-	t     CompletionType
+	err    Value
+	value  T
+	t      CompletionType
+	target string
 }
 
 func (c *Completion[T]) IsError() bool {

@@ -565,7 +565,7 @@ func (p *Parser) statement() Statement {
 	}
 }
 
-func (p *Parser) breakStatement() *StatementBreak {
+func (p *Parser) breakStatement() *BreakStatement {
 	p.tokenizer.MustMatch(TBreak)
 	if !p.inBreakable {
 		panic("breakStatement: not in breakable")
@@ -578,7 +578,7 @@ func (p *Parser) breakStatement() *StatementBreak {
 		p.tokenizer.Next()
 	}
 	p.automaticSemicolonInsertion()
-	return &StatementBreak{
+	return &BreakStatement{
 		Label: IdentifierName(label),
 	}
 }
@@ -600,11 +600,11 @@ func (p *Parser) continueStatement() *StatementContinue {
 	}
 }
 
-func (p *Parser) throwStatement() *StatementThrow {
+func (p *Parser) throwStatement() *ThrowStatement {
 	p.tokenizer.MustMatch(TThrow)
 	p.noLineTerminatorHere()
 	expr := p.expression(p.acceptContextLowest())
-	return &StatementThrow{
+	return &ThrowStatement{
 		Expression: expr,
 	}
 }

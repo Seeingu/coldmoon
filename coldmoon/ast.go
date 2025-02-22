@@ -2800,23 +2800,6 @@ type Statement interface {
 	_statement()
 }
 
-type StatementDefaultImpl struct {
-	Statement
-}
-
-func (s *StatementDefaultImpl) _statement() {}
-func (s *StatementDefaultImpl) VarScopedDeclarations() (l []*VariableDeclaration) {
-	return nil
-}
-
-func (s *StatementDefaultImpl) VarDeclaredNames() (l []IdentifierName) {
-	return
-}
-
-func (s *StatementDefaultImpl) String() string {
-	panic("should implement")
-}
-
 func StatementAnalyze(s Statement, a AnalyzeQuery) bool {
 	exprStmt, isExpr := s.(*StatementExpression)
 	if isExpr {
@@ -3140,13 +3123,32 @@ func (b *BreakableStatement) String() string {
 
 // MARK: - ThrowStatement
 
-type StatementThrow struct {
-	*StatementDefaultImpl
+// ThrowStatement [Yield, Await] :
+// - throw [no LineTerminator here] Expression[+In, ?Yield, ?Await] ;
+type ThrowStatement struct {
+	Statement
 	Expression Expression
 }
 
-func (s *StatementThrow) String() string {
-	return "CompletionTypeThrow " + s.Expression.String()
+var _ RuntimeSemanticsEvaluation = (*ThrowStatement)(nil)
+
+func (s *ThrowStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+func (s *ThrowStatement) Evaluation(vm *VM) (co CompletionValue) {
+	exprRef, isAbrupt, rt := ReturnIfAbrupt(s.Expression.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	exprValue := exprRef.GetValue(vm.agent)
+	co.t = CompletionTypeThrow
+	co.err = exprValue
+	return
+}
+
+func (s *ThrowStatement) String() string {
+	return "ThrowStatement " + s.Expression.String()
 }
 
 // MARK: - Function
@@ -4066,12 +4068,37 @@ func (f *ForDeclaration) String() string {
 
 // MARK: - BreakStatement
 
-type StatementBreak struct {
-	*StatementDefaultImpl
+// BreakStatement [Yield, Await] :
+// - break ;
+// - break [no LineTerminator here] LabelIdentifier[?Yield, ?Await] ;
+type BreakStatement struct {
+	Statement
 	Label IdentifierName
 }
 
-func (s *StatementBreak) String() string {
+var _ RuntimeSemanticsEvaluation = (*BreakStatement)(nil)
+
+func (s *BreakStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+func (s *BreakStatement) astHasIdentifier() bool {
+	return s.Label != ""
+}
+
+func (s *BreakStatement) Evaluation(vm *VM) (co CompletionValue) {
+	if s.astHasIdentifier() {
+		label := s.Label
+		co.target = label
+		co.t = CompletionTypeBreak
+		return
+	} else {
+		co.t = CompletionTypeBreak
+		return
+	}
+}
+
+func (s *BreakStatement) String() string {
 	if s.Label != "" {
 		return "Break " + string(s.Label)
 	}
@@ -4098,8 +4125,12 @@ func (s *StatementContinue) String() string {
 // - return ;
 // - return [no LineTerminator here] Expression[+In, ?Yield, ?Await] ;
 type ReturnStatement struct {
-	*StatementDefaultImpl
+	Statement
 	Expression Expression
+}
+
+func (s *ReturnStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
 }
 
 func (s *ReturnStatement) Evaluation(vm *VM) CompletionValue {
