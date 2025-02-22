@@ -99,11 +99,15 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Val
 
 	agent.ExecutionContextStack.Pop()
 
-	if result.t == CompletionTypeReturn {
-		return result.Data()
+	// TODO: handle error gracefully
+	// TODO: show error trace stack
+	if result.IsError() {
+		panic("throw error: " + result.Error().String())
 	}
-	// TODO(BM): check is return from e
-	return result.value
+	if result.IsAbrupt() {
+		return result.value
+	}
+	return UndefinedValue
 }
 
 // 10.2.1.1
@@ -537,7 +541,9 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 		)
 		F.InternalMethods().Construct = ECMAScriptFunctionConstruct
 	} else {
-		F.InternalMethods().Construct = BuiltinConstruct
+		F.InternalMethods().Construct = func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
+			return BuiltinConstruct(agent, o, arguments, newTarget)
+		}
 	}
 
 	if isECMAScriptFunction {

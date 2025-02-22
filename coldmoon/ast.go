@@ -1436,7 +1436,7 @@ func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM, baseValue Value, ba
 		// TODO
 		tailCall := false
 		arguments := thisChain.Arguments.Evaluation(vm)
-		return vm.EvaluateCall(baseValue, baseReference, arguments.value.(*ListValue).Values, tailCall).ToCompletion()
+		return vm.EvaluateCall(baseValue, baseReference, arguments.value.(*ListValue).Values, tailCall)
 	} else if o.astIsExpression() {
 		strict := o.isStrict()
 		return NewReferenceRecordValue(
@@ -2734,7 +2734,7 @@ func (c *CallExpression) astIsFunctionCall() bool {
 // spec: 13.3.6.1
 func (c *CallExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if c.astIsCover() {
-		return c.coverCallExpressionAndAsyncArrowHead(vm).ToCompletion()
+		return c.coverCallExpressionAndAsyncArrowHead(vm)
 	}
 	if !c.astIsFunctionCall() {
 		panic("unimplemented")
@@ -2752,13 +2752,12 @@ func (c *CallExpression) Evaluation(vm *VM) (co CompletionValue) {
 	// i.Let("tailPosition")
 
 	arguments := c.Arguments.Evaluation(vm)
-	co.value = vm.EvaluateCall(f, ref.value, arguments.value.(*ListValue).Values, false)
-	return
+	return vm.EvaluateCall(f, ref.value, arguments.value.(*ListValue).Values, false)
 }
 
 // coverCallExpressionAndAsyncArrowHead matches CallExpression : CoverCallExpressionAndAsyncArrowHead
 // spec: 13.3.6.1
-func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) Value {
+func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) CompletionValue {
 	callee := c.Callee.(*MemberExpression)
 	expr := callee
 	memberExpr := expr
@@ -4133,17 +4132,20 @@ func (s *ReturnStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return nil
 }
 
-func (s *ReturnStatement) Evaluation(vm *VM) CompletionValue {
-	defer func() {
-		vm.isReturn = true
-	}()
+// Evaluation
+// spec: 14.10.1
+func (s *ReturnStatement) Evaluation(vm *VM) (co CompletionValue) {
 	if s.Expression == nil {
-		return UndefinedValue.ToCompletion()
+		co.value = UndefinedValue
+		co.t = CompletionTypeReturn
+		return
 	} else {
 		exprRef := s.Expression.Evaluation(vm)
 		exprValue := exprRef.value.GetValue(vm.agent)
+		co.value = exprValue
+		co.t = CompletionTypeReturn
 		// TODO: GetGeneratorKind
-		return exprValue.ToCompletion()
+		return
 	}
 }
 
@@ -4157,9 +4159,9 @@ func (s *ReturnStatement) String() string {
 // MARK: - Declaration
 
 // Declaration [Yield, Await] :
-// HoistableDeclaration[?Yield, ?Await, ~Default]
-// ClassDeclaration[?Yield, ?Await, ~Default]
-// LexicalDeclaration[+In, ?Yield, ?Await]
+// - HoistableDeclaration[?Yield, ?Await, ~Default]
+// - ClassDeclaration[?Yield, ?Await, ~Default]
+// - LexicalDeclaration[+In, ?Yield, ?Await]
 type Declaration interface {
 	ASTNode
 	BoundNames() []IdentifierName
@@ -5250,7 +5252,7 @@ func (s StatementList) Evaluation(vm *VM) CompletionValue {
 	var lastValue CompletionValue
 	for i, item := range s {
 		lastValue = item.Evaluation(vm)
-		if vm.isReturn {
+		if lastValue.IsAbrupt() {
 			return lastValue
 		}
 		if vm.isYield {
@@ -5294,8 +5296,8 @@ func (s StatementList) String() string {
 }
 
 // StatementListItem [Yield, Await, GetLastValue] :
-// Statement[?Yield, ?Await, ?GetLastValue]
-// Declaration[?Yield, ?Await]
+// - Statement[?Yield, ?Await, ?GetLastValue]
+// - Declaration[?Yield, ?Await]
 type StatementListItem interface {
 	ASTNode
 	VarScopedDeclarations() []*VariableDeclaration
@@ -5429,20 +5431,23 @@ var (
 
 // TODO: spec reference
 func (m *Module) Evaluation(vm *VM) CompletionValue {
-	var list []Value
+	var lastValue CompletionValue
 	for _, moduleItem := range m.ModuleItemList {
 		switch stmt := moduleItem.(type) {
 		case *ModuleItemImportDeclaration:
 			return UndefinedValue.ToCompletion()
 		case *ModuleItemStatementListItem:
-			list = append(list, stmt.Evaluation(vm).value)
+			lastValue = stmt.Evaluation(vm)
 		case *ModuleItemExportDeclaration:
-			list = append(list, stmt.Evaluation(vm).value)
+			lastValue = stmt.Evaluation(vm)
 		default:
 			panic("unimplemented")
 		}
+		if lastValue.IsAbrupt() {
+			return lastValue
+		}
 	}
-	return NewListValue(list).ToCompletion()
+	return lastValue
 }
 
 func (m *Module) String() string {

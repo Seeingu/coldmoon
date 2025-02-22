@@ -566,6 +566,8 @@ func (s *SourceTextModule) InitializeEnvironment() (co CompletionValue) {
 	return
 }
 
+// ExecuteModule
+// spec: 16.2.1.6.5
 func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 	agent := s.Realm.Agent
 	moduleContext := &ExecutionContext{
@@ -579,9 +581,14 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 	if !s.HasTLA {
 		Assert(capability == nil)
 		agent.ExecutionContextStack.Push(moduleContext)
-		RunNode(agent, s.ECMAScriptCode)
+		result := RunNode(agent, s.ECMAScriptCode)
+		// TODO: standardize
+		if result.IsAbrupt() {
+			panic("execute module failed")
+		}
 		agent.ExecutionContextStack.Pop()
 	} else {
+		panic("unimplemented")
 	}
 }
 

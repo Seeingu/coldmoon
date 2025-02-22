@@ -12,8 +12,6 @@ type VM struct {
 	// IsJSONParse handle is parsed from JSON.parse
 	// 25.5.1: Step 7
 	IsJSONParse bool
-	// isReturn indicates the current execution context is a return statement
-	isReturn bool
 	// isYield indicates the current execution context is a yield statement
 	isYield bool
 	// visitedNodesMap is used to store visited nodes
@@ -293,7 +291,7 @@ func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOper
 
 // EvaluateCall ( func, ref, arguments, tailPosition )
 // spec: 13.3.6.2
-func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) Value {
+func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) (co CompletionValue) {
 	agent := v.agent
 	var thisValue Value
 	if rr, ok := ref.ReferenceRecord(); ok {
@@ -312,13 +310,16 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 		thisValue = UndefinedValue
 	}
 	if !fun.IsObject() {
-		return agent.ThrowTypeError("function is not an object")
+		co.err = agent.ThrowTypeError("function is not an object")
+		return
 	}
 	if !IsCallable(fun) {
-		return agent.ThrowTypeError("function is not callable")
+		co.err = agent.ThrowTypeError("function is not callable")
+		return
 	}
 	// TODO: WIP: tailPosition
-	return fun.Call(thisValue, arguments)
+	co.value = fun.Call(thisValue, arguments)
+	return
 }
 
 type LabelSet = []string

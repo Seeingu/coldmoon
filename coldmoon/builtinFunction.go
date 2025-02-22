@@ -56,10 +56,17 @@ func BuiltinCall(o ObjectType, thisArgument Value, argumentsList []Value) Value 
 	return o.(*BuiltinFunction).BuiltinCallOrConstruct(thisArgument, argumentsList, nil)
 }
 
-// 10.3.2
-func BuiltinConstruct(b ObjectType, argumentsList []Value, newTarget ObjectType) ObjectType {
+// BuiltinConstruct
+// [[Construct]]
+// spec: 10.3.2
+func BuiltinConstruct(
+	agent *Agent,
+	b ObjectType,
+	argumentsList []Value,
+	newTarget ObjectType,
+) ObjectType {
 	r := b.(*BuiltinFunction).BuiltinCallOrConstruct(NullValue, argumentsList, newTarget)
-	return r.(*ObjectValue).Object
+	return r.ToObject(agent)
 }
 
 // 10.3.3
@@ -131,7 +138,9 @@ func CreateBuiltinFunction(
 	function.ref = function
 	function.InternalMethods().Call = BuiltinCall
 	if args.isConstructor {
-		function.InternalMethods().Construct = BuiltinConstruct
+		function.InternalMethods().Construct = func(o ObjectType, arguments []Value, newTarget ObjectType) ObjectType {
+			return BuiltinConstruct(agent, o, arguments, newTarget)
+		}
 	}
 
 	SetFunctionLength(function.Object, length)

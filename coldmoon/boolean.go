@@ -103,8 +103,9 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 		Data:   false,
 	}
 	object.ref = object
+	agent := realm.Agent
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		b := thisBooleanValue(realm.Agent, thisArgument)
+		b := thisBooleanValue(agent, thisArgument)
 		if b {
 			return NewStringValue("true")
 		} else {
