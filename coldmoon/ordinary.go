@@ -282,24 +282,26 @@ func OrdinaryHasProperty(object ObjectType, key PropertyKey) bool {
 	return false
 }
 
-func InternalGet(object ObjectType, key PropertyKey, receiver Value) Value {
+func InternalGet(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
 	return OrdinaryGet(object, key, receiver)
 }
 
-func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) Value {
+// OrdinaryGet
+// spec: 10.1.8.1
+func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
 	desc := object.InternalMethods().GetOwnProperty(object, key)
 
 	if desc == nil {
 		parent := object.InternalMethods().GetPrototypeOf(object)
 		if parent == nil {
-			return UndefinedValue
+			return UndefinedValue.ToCompletion()
 		}
 
 		return parent.InternalMethods().Get(parent, key, receiver)
 	}
 
 	if desc.IsDataDescriptor() {
-		return desc.Value
+		return desc.Value.ToCompletion()
 	}
 
 	if !desc.IsAccessorDescriptor() {
@@ -308,7 +310,7 @@ func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) Value {
 
 	getter := desc.Get
 	if getter == nil {
-		return UndefinedValue
+		return UndefinedValue.ToCompletion()
 	}
 
 	return getter.ToValue().CallNoArgs(receiver)

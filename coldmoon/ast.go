@@ -5058,8 +5058,9 @@ func (l *LexicalBinding) BoundNames() (list []IdentifierName) {
 	return
 }
 
-// 14.3.1.2
-func (l *LexicalBinding) Evaluation(vm *VM) CompletionValue {
+// Evaluation
+// spec: 14.3.1.2
+func (l *LexicalBinding) Evaluation(vm *VM) (co CompletionValue) {
 	switch {
 	case l.Identifier != "" && l.Initializer == nil:
 		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
@@ -5071,8 +5072,11 @@ func (l *LexicalBinding) Evaluation(vm *VM) CompletionValue {
 			// FIXME: handle named evaluation
 			panic("")
 		} else {
-			rhs := l.Initializer.Evaluation(vm)
-			value := rhs.value.GetValue(vm.agent)
+			rhs, isAbrupt, rt := ReturnIfAbrupt(l.Initializer.Evaluation(vm), co)
+			if isAbrupt {
+				return rt
+			}
+			value := rhs.GetValue(vm.agent)
 			lhs.InitializeReferencedBinding(value)
 		}
 		// return EMPTY

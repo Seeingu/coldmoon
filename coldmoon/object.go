@@ -114,7 +114,7 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 	for _, name := range methodNames {
 		method := o.Get(NewStringPropertyKey(name))
 		if IsCallable(method) {
-			result := method.CallNoArgs(o.ToValue())
+			result := method.CallNoArgs(o.ToValue()).value
 			if _, isObject := result.(*ObjectValue); !isObject {
 				return result
 			}
@@ -153,9 +153,15 @@ func (o *Object) IsExtensible() bool {
 	return o.InternalMethods().IsExtensible(o)
 }
 
-// 7.3.2
+// TODO(BM): return CompletionValue
+// spec: 7.3.2
 func (o *Object) Get(key PropertyKey) Value {
-	return o.InternalMethods().Get(o.Ref(), key, o.ToValue())
+	r := o.InternalMethods().Get(o.Ref(), key, o.ToValue())
+	// FIXME: no need when return CompletionValue
+	if r.t == CompletionTypeReturn {
+		return r.value
+	}
+	return ReturnAssertNormal(r)
 }
 
 // 7.3.4
@@ -1024,7 +1030,7 @@ func (o *Object) FindViaPredicate(
 		}
 		pk := NewIntegerIndexPropertyKey(k)
 		kValue := o.Ref().Get(pk)
-		testResult := predicate.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()})
+		testResult := predicate.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()}).value
 
 		if testResult.ToBoolean() {
 			return FoundResult{

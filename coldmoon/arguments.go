@@ -54,7 +54,7 @@ func argumentsGet(object ObjectType, key PropertyKey, receiver Value) (co Comple
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	if !isMapped {
-		return OrdinaryGet(object, key, receiver).ToCompletion()
+		return OrdinaryGet(object, key, receiver)
 	} else {
 		value := _map.Get(key)
 		co.value = value
@@ -138,9 +138,9 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 		return pp.Data()
 	}
 	internalMethods.DefineOwnProperty = argumentsDefineOwnProperty
-	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
+	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) CompletionValue {
 		completionValue := argumentsGet(obj, p, receiver)
-		return completionValue.Data()
+		return completionValue
 	}
 	internalMethods.Set = argumentsSet
 	internalMethods.Delete = argumentsDelete

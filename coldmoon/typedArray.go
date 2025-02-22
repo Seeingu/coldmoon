@@ -399,10 +399,11 @@ func NewTypedArrayNamePrototype(realm *Realm, name TypedArrayName) ObjectType {
 		Configurable: false,
 		Enumerable:   false,
 	})
-	object.InternalMethods().Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
+	object.InternalMethods().Get = func(o ObjectType, p PropertyKey, receiver Value) (co CompletionValue) {
 		if s, ok := p.(StringPropertyKey); ok {
 			if s.Value == "buffer" {
-				return agent.ThrowException(TypeError, "Method get %TypedArray%.prototype.buffer called on incompatible receiver")
+				co.ThrowTypeError(agent, "Method get %TypedArray%.prototype.buffer called on incompatible receiver")
+				return
 			}
 		}
 		return InternalGet(o, p, receiver)
@@ -436,7 +437,9 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 			kValue := values[k]
 			var mappedValue Value
 			if mapping {
-				mappedValue = mapper.Call(thisArg, []Value{kValue, k.ToValue(), source})
+				mappedValue = ReturnAssertNormal(
+					mapper.Call(thisArg, []Value{kValue, k.ToValue(), source}),
+				)
 			} else {
 				mappedValue = kValue
 			}
@@ -454,7 +457,9 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 		kValue := arrayLike.Get(Pk)
 		var mappedValue Value
 		if mapping {
-			mappedValue = mapper.Call(thisArg, []Value{kValue, k.ToValue(), source})
+			mappedValue = ReturnAssertNormal(
+				mapper.Call(thisArg, []Value{kValue, k.ToValue(), source}),
+			)
 		} else {
 			mappedValue = kValue
 		}
@@ -843,9 +848,9 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		}
 		return true
 	}
-	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) Value {
+	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) CompletionValue {
 		if i, err := p.GetIndex(); err == nil {
-			return TypedArrayGetElement(agent, o.(*TypedArrayObject), i)
+			return TypedArrayGetElement(agent, o.(*TypedArrayObject), i).ToCompletion()
 		}
 		return OrdinaryGet(o.(*TypedArrayObject).Object, p, receiver)
 	}
@@ -1285,7 +1290,9 @@ func typedArrayEvery(agent *Agent, this Value, callback Value, thisArg Value) Va
 	for k < length {
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
-		testResult := callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()})
+		testResult := ReturnAssertNormal(
+			callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
+		)
 		if !testResult.ToBoolean() {
 			return FalseValue
 		}
@@ -1362,7 +1369,9 @@ func typedArrayFilter(agent *Agent, this Value, callback Value, thisArg Value) V
 	for k < length {
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
-		selected := callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()})
+		selected := ReturnAssertNormal(
+			callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
+		)
 		if selected.ToBoolean() {
 			kept = append(kept, kValue)
 			captured++
@@ -1547,7 +1556,9 @@ func typedArrayMap(agent *Agent, this Value, callback Value, thisArg Value) Valu
 	for k < length {
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
-		mappedValue := callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()})
+		mappedValue := ReturnAssertNormal(
+			callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
+		)
 		A.Set(Pk, mappedValue, setThrowTypeThrow)
 		k++
 	}
@@ -1577,7 +1588,9 @@ func typedArrayReduce(agent *Agent, this Value, callback Value, initialValue Val
 	for k < length {
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
-		accumulator = callback.Call(UndefinedValue, []Value{accumulator, kValue, k.ToValue(), ta.ToValue()})
+		accumulator = ReturnAssertNormal(
+			callback.Call(UndefinedValue, []Value{accumulator, kValue, k.ToValue(), ta.ToValue()}),
+		)
 		k++
 	}
 	return accumulator
@@ -1606,7 +1619,9 @@ func typedArrayReduceRight(agent *Agent, this Value, callback Value, initialValu
 	for k >= 0 {
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
-		accumulator = callback.Call(UndefinedValue, []Value{accumulator, kValue, k.ToValue(), ta.ToValue()})
+		accumulator = ReturnAssertNormal(
+			callback.Call(UndefinedValue, []Value{accumulator, kValue, k.ToValue(), ta.ToValue()}),
+		)
 		k--
 	}
 	return accumulator
@@ -1719,7 +1734,9 @@ func typedArraySome(agent *Agent, this Value, callback Value, thisArg Value) Val
 	for k < length {
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
-		testResult := callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()})
+		testResult := ReturnAssertNormal(
+			callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
+		)
 		if testResult.ToBoolean() {
 			return TrueValue
 		}

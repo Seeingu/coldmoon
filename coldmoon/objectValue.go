@@ -7,15 +7,11 @@ type ObjectValue struct {
 
 var _ Value = (*ObjectValue)(nil)
 
-func (o *ObjectValue) Call(this Value, argumentsList ArgumentsList) Value {
-	if !IsCallable(o) {
-		panic("TypeError")
-	}
-	object := o.Object
-	return object.InternalMethods().Call(object, this, argumentsList).value
+func (o *ObjectValue) Call(this Value, argumentsList ArgumentsList) (co CompletionValue) {
+	return o.Object.Call(this, argumentsList)
 }
 
-func (o *ObjectValue) CallNoArgs(this Value) Value {
+func (o *ObjectValue) CallNoArgs(this Value) CompletionValue {
 	return o.Call(this, nil)
 }
 
@@ -26,7 +22,7 @@ func (o *ObjectValue) ToCompletion() (co Completion[Value]) {
 
 func (o *ObjectValue) ToString() CMString {
 	pk := CMString("toString").ToPropertyKey()
-	return o.Object.Get(pk).CallNoArgs(o).ToString()
+	return o.Object.Get(pk).CallNoArgs(o).value.ToString()
 }
 
 // String is for internal use only.

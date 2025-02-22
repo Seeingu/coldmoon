@@ -31,7 +31,7 @@ func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *Itera
 	if !iterator.IsObject() {
 		panic("TypeError")
 	}
-	nextMethod := GetV(agent, iterator, NewStringPropertyKey("next"))
+	nextMethod := ReturnAssertNormal(GetV(agent, iterator, NewStringPropertyKey("next")))
 	// TODO: not standard, for debug
 	Assert(nextMethod != UndefinedValue)
 	iteratorRecord := &IteratorRecord{
@@ -71,14 +71,14 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) (co Completion[*Ite
 
 // 7.4.4
 func (i *IteratorRecord) IteratorNext(value Value) ObjectType {
-	var result Value
+	var result CompletionValue
 	if value == nil {
 		result = i.NextMethod.CallNoArgs(i.Iterator.ToValue())
 	} else {
 		result = i.NextMethod.Call((i.Iterator).ToValue(), []Value{value})
 	}
 
-	resultObject, ok := result.(*ObjectValue)
+	resultObject, ok := result.value.(*ObjectValue)
 	if !ok {
 		panic("TypeError")
 	}

@@ -61,7 +61,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		if !IsCallable(fun) {
 			panic("TypeError")
 		}
-		return fun.Call(thisArg, args)
+		return ReturnAssertNormal(fun.Call(thisArg, args))
 	}
 	bind := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
 		thisArg := argumentsList[0]
@@ -111,11 +111,11 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		}
 
 		if argArray == UndefinedValue || argArray == NullValue {
-			return fun.Call(thisArg, []Value{})
+			return ReturnAssertNormal(fun.Call(thisArg, []Value{}))
 		}
 
 		argList := CreateListFromArrayLike(realm.Agent, argArray)
-		return fun.Call(thisArg, argList)
+		return ReturnAssertNormal(fun.Call(thisArg, argList))
 	}
 	f.defineBuiltinFunction(realm, CMString("apply"), apply, 2)
 }

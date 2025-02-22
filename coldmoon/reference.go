@@ -85,7 +85,9 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 		} else {
 			propKey = NewStringPropertyKey(r.ReferencedName.String)
 		}
-		return baseObj.InternalMethods().Get(baseObj, propKey, r.GetThisValue())
+		return ReturnAssertNormal(
+			baseObj.InternalMethods().Get(baseObj, propKey, r.GetThisValue()),
+		)
 	} else {
 		base, _ := r.Base.Env()
 		name := r.ReferencedName.String

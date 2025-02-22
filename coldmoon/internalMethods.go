@@ -24,7 +24,7 @@ type InternalMethods struct {
 	GetOwnProperty    GetOwnPropertyFn
 	DefineOwnProperty DefineOwnPropertyFn
 	HasProperty       func(o ObjectType, p PropertyKey) bool
-	Get               func(o ObjectType, p PropertyKey, receiver Value) Value
+	Get               func(o ObjectType, p PropertyKey, receiver Value) CompletionValue
 	Set               SetFn
 	Delete            func(o ObjectType, p PropertyKey) bool
 	OwnPropertyKeys   func(o ObjectType) []PropertyKey

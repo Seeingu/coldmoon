@@ -214,15 +214,19 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 			}
 		}
 	}
-	return reviver.Call(holder.ToValue(), []Value{name.ToValue(), value})
+	return ReturnAssertNormal(
+		reviver.Call(holder.ToValue(), []Value{name.ToValue(), value}),
+	)
 }
 
 func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key PropertyKey, holder ObjectType) string {
 	value := holder.Get(key)
 	if value.IsObject() || ValueIs[*BigIntValue](value) {
-		toJSON := GetV(agent, value, NewStringPropertyKey("toJSON"))
+		toJSON := ReturnAssertNormal(GetV(agent, value, NewStringPropertyKey("toJSON")))
 		if IsCallable(toJSON) {
-			value = toJSON.Call(value, []Value{key.ToValue()})
+			value = ReturnAssertNormal(
+				toJSON.Call(value, []Value{key.ToValue()}),
+			)
 		}
 	}
 

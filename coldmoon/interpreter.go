@@ -57,12 +57,12 @@ func CompletionHandle[T any](completion Completion[T]) Completion[T] {
 // caller should return `rt` if `isAbrupt` is true
 // TODO: can we simplify caller code?
 func ReturnIfAbrupt[T any, RT any](completion Completion[T], returnCompletion Completion[RT]) (value T, isAbrupt bool, rt Completion[RT]) {
+	value = completion.value
 	if completion.IsAbrupt() {
 		isAbrupt = true
 		rt = CompletionFrom(returnCompletion, completion)
 		return
 	}
-	value = completion.value
 	return
 }
 
@@ -318,7 +318,12 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 		return
 	}
 	// TODO: WIP: tailPosition
-	co.value = fun.Call(thisValue, arguments)
+	value, isAbrupt, rt := ReturnIfAbrupt(fun.Call(thisValue, arguments), co)
+	if isAbrupt {
+		rt.value = value
+		return rt
+	}
+	co.value = value
 	return
 }
 
@@ -381,7 +386,7 @@ func (v *VM) ForInOfHeadEvaluation(
 		}
 		obj := exprValue.ToObject(agent).value
 		iterator := obj.EnumerateObjectProperties()
-		nextMethod := GetV(agent, iterator.ToValue(), NewStringPropertyKey("next"))
+		nextMethod := ReturnAssertNormal(GetV(agent, iterator.ToValue(), NewStringPropertyKey("next")))
 		co.value = &IteratorRecord{
 			Iterator:   iterator,
 			NextMethod: nextMethod,
@@ -423,7 +428,7 @@ func (v *VM) ForInOfBodyEvaluation(
 	if destructuring {
 	}
 	for {
-		nextResultValue := iteratorRecord.NextMethod.Call(iteratorRecord.Iterator.ToValue(), nil)
+		nextResultValue := ReturnAssertNormal(iteratorRecord.NextMethod.Call(iteratorRecord.Iterator.ToValue(), nil))
 		if iteratorKind == IteratorKindAsync {
 			// TODO: Await
 		}

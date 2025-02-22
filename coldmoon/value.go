@@ -545,7 +545,7 @@ func IsStrictlyEqual(x Value, y Value) bool {
 }
 
 // 7.3.3
-func GetV(agent *Agent, value Value, key PropertyKey) Value {
+func GetV(agent *Agent, value Value, key PropertyKey) CompletionValue {
 	object := value.ToObject(agent).value
 	return object.InternalMethods().Get(object, key, value)
 }
@@ -553,8 +553,8 @@ func GetV(agent *Agent, value Value, key PropertyKey) Value {
 // 7.3.11
 // TODO: Should Return UndefinedValue
 func GetMethod(agent *Agent, value Value, key PropertyKey) ObjectType {
-	fun := GetV(agent, value, key)
-	if fun == UndefinedValue || fun == NullValue {
+	fun := ReturnAssertNormal(GetV(agent, value, key))
+	if IsUndefinedOrNull(fun) {
 		return nil
 	}
 
@@ -596,17 +596,18 @@ func CreateListFromArrayLike(agent *Agent, self Value) []Value {
 	var list []Value
 	for i := JSInt(0); i < length; i++ {
 		index := NewIntegerIndexPropertyKey(i)
-		next := GetV(agent, self, index)
+		next := ReturnAssertNormal(GetV(agent, self, index))
 		list = append(list, next)
 	}
 
 	return list
 }
 
-// 7.3.21
+// ValueInvoke Invoke
+// 7.3.20
 func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsList []Value) Value {
-	fun := GetV(agent, self, propertyKey)
-	return fun.Call(self, argumentsList)
+	fun := ReturnAssertNormal(GetV(agent, self, propertyKey))
+	return ReturnAssertNormal(fun.Call(self, argumentsList))
 }
 
 // 7.2.8

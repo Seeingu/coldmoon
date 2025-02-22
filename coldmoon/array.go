@@ -303,10 +303,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		A := ArraySpeciesCreate(agent, array, length)
 		for k := range length {
 			pk := NewIntegerIndexPropertyKey(k)
-			mappedValue := callbackFn.Call(
+			mappedValue := ReturnAssertNormal(callbackFn.Call(
 				thisArg,
 				[]Value{array.Get(pk), NewNumberValue(k.ToNumber()), this},
-			)
+			))
 
 			A.CreateDataPropertyOrThrow(pk, mappedValue)
 		}
@@ -341,7 +341,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if !IsCallable(fun) {
 			fun = realm.Intrinsics.ObjectPrototype.Get(NewStringPropertyKey("toString"))
 		}
-		return fun.Call(this, nil)
+		return ReturnAssertNormal(fun.Call(this, nil))
 	}
 
 	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
@@ -569,7 +569,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				testResult := callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
+				testResult := ReturnAssertNormal(
+					callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+				)
 				if !testResult.ToBoolean() {
 					return FalseValue
 				}
@@ -592,7 +594,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				testResult := callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
+				testResult := ReturnAssertNormal(
+					callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+				)
 				if testResult.ToBoolean() {
 					return TrueValue
 				}
@@ -660,7 +664,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				nextValue := IteratorValue(next)
 				var mappedValue Value
 				if mapping {
-					mappedValue = mapFn.Call(thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())})
+					mappedValue = ReturnAssertNormal(
+						mapFn.Call(thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())}),
+					)
 				} else {
 					mappedValue = nextValue
 				}
@@ -682,7 +688,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kValue := arrayLike.Get(pk)
 			var mappedValue Value
 			if mapping {
-				mappedValue = mapFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber())})
+				mappedValue = ReturnAssertNormal(
+					mapFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber())}),
+				)
 			} else {
 				mappedValue = kValue
 			}
@@ -775,7 +783,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				selected := callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this})
+				selected := ReturnAssertNormal(
+					callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+				)
 				if selected.ToBoolean() {
 					A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(to), kValue)
 					to++
@@ -821,7 +831,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				accumulator = callbackFn.Call(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this})
+				accumulator = ReturnAssertNormal(
+					callbackFn.Call(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
+				)
 			}
 			k++
 		}
@@ -863,7 +875,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				accumulator = callbackFn.Call(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this})
+				accumulator = ReturnAssertNormal(
+					callbackFn.Call(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
+				)
 			}
 			k--
 		}
@@ -1475,6 +1489,7 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumb
 		v := compareFn.
 			ToValue().
 			Call(UndefinedValue, []Value{x, y}).
+			value.
 			ToNumber(agent)
 		if v.IsNaN() {
 			return 0

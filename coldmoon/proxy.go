@@ -236,7 +236,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return booleanTrapResult
 	}
-	get := func(o ObjectType, pk PropertyKey, receiver Value) Value {
+	get := func(o ObjectType, pk PropertyKey, receiver Value) CompletionValue {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -263,7 +263,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 				}
 			}
 		}
-		return trapResult
+		return trapResult.ToCompletion()
 	}
 	set := func(o ObjectType, pk PropertyKey, v Value, receiver Value) bool {
 		proxy := o.(*ProxyObject)
@@ -312,7 +312,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			Call(
 				h.ToValue(),
 				[]Value{t.ToValue(), pk.ToValue()},
-			).ToBoolean()
+			).value.ToBoolean()
 		if !booleanTrapResult {
 			return false
 		}

@@ -195,7 +195,7 @@ func thenFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget O
 	function := agent.ActiveFunctionObject()
 	captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*PromiseThenFinallyCaptures)
 	onFinally := captures.OnFinally
-	result := onFinally.CallNoArgs(UndefinedValue)
+	result := ReturnAssertNormal(onFinally.CallNoArgs(UndefinedValue))
 	p := PromiseResolve(agent, captures.Constructor, result)
 
 	var returnValue BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
@@ -213,7 +213,7 @@ func catchFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget 
 	function := agent.ActiveFunctionObject()
 	captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*PromiseThenFinallyCaptures)
 	onFinally := captures.OnFinally
-	result := onFinally.CallNoArgs(UndefinedValue)
+	result := ReturnAssertNormal(onFinally.CallNoArgs(UndefinedValue))
 	p := PromiseResolve(agent, captures.Constructor, result)
 	reason := arguments[0]
 

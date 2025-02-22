@@ -21,7 +21,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		args := CreateListFromArrayLike(agent, argumentsList)
 
-		return target.Call(thisArgument, args)
+		return ReturnAssertNormal(target.Call(thisArgument, args))
 	}
 	var construct BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
@@ -90,7 +90,9 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		targetObject := MustGetObject(target)
 
-		return targetObject.InternalMethods().Get(targetObject, key, receiver)
+		return ReturnAssertNormal(
+			targetObject.InternalMethods().Get(targetObject, key, receiver),
+		)
 	}
 	var getOwnPropertyDescriptor BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
 		target := arguments[0]
