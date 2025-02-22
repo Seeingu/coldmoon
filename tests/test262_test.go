@@ -148,6 +148,7 @@ func testArray(realm *Realm) {
 	}
 }
 
+// TODO(BM): coverage
 func TestHarness(t *testing.T) {
 	agent := NewAgent()
 	InitializeConstants()
@@ -160,8 +161,6 @@ func TestHarness(t *testing.T) {
 	testTypedArrayName(realm)
 	testTypedArray(realm)
 
-	Debug.Enable()
 	testSharedArrayBuffer(realm)
 	// testBoolean(realm)
-	Debug.Disable()
 }
