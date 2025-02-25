@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 
@@ -11,15 +12,22 @@ import (
 )
 
 func main() {
+	isTest262 := flag.Bool("test262", false, "register test262 runtime")
+	flag.Parse()
 	InitializeConstants()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	runtime.RegisterTerminalRuntime(realm)
-	// runtime.RegisterTest262Runtime(realm)
+	if *isTest262 {
+		fmt.Println("register test262 runtime")
+		runtime.RegisterTest262Runtime(realm)
+	} else {
+		runtime.RegisterTerminalRuntime(realm)
+	}
 
-	// get args, if is file, read file and evaluate
-	args := os.Args[1:]
+	// get args, if is a file, read and evaluate
+	// else run as repl
+	args := flag.Args()
 	if len(args) > 0 {
 		EvaluateModule(args[0], realm)
 		return
