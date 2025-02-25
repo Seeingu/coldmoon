@@ -3103,17 +3103,33 @@ func (s *StatementExpression) String() string {
 
 // MARK: - BreakableStatement
 
+// BreakableStatement [Yield, Await, Return] :
+// - IterationStatement[?Yield, ?Await, ?Return]
+// - SwitchStatement[?Yield, ?Await, ?Return]
 type BreakableStatement struct {
 	Statement
 	IterationStatement IterationStatement
+	SwitchStatement    *SwitchStatement
+}
+
+func (b *BreakableStatement) astIsIteration() bool {
+	return b.IterationStatement != nil
 }
 
 func (b *BreakableStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
-	return b.IterationStatement.VarScopedDeclarations()
+	if b.astIsIteration() {
+		return b.IterationStatement.VarScopedDeclarations()
+	} else {
+		return b.SwitchStatement.VarScopedDeclarations()
+	}
 }
 
 func (b *BreakableStatement) Evaluation(vm *VM) CompletionValue {
-	return b.IterationStatement.Evaluation(vm)
+	if b.astIsIteration() {
+		return b.IterationStatement.Evaluation(vm)
+	} else {
+		return b.SwitchStatement.Evaluation(vm)
+	}
 }
 
 func (b *BreakableStatement) String() string {
@@ -3594,6 +3610,236 @@ func (s *IfStatement) String() string {
 		sb += s.Alternate.String()
 	}
 	return sb
+}
+
+// MARK: - SwitchStatement
+
+// SwitchStatement [Yield, Await, Return] :
+// - switch ( Expression[+In, ?Yield, ?Await] ) CaseBlock[?Yield, ?Await, ?Return]
+type SwitchStatement struct {
+	Expression Expression
+	CaseBlock  *CaseBlock
+}
+
+var (
+	_ RuntimeSemanticsEvaluation = (*SwitchStatement)(nil)
+	_ ASTNode                    = (*SwitchStatement)(nil)
+)
+
+// Evaluation
+// spec: 14.12.4
+func (s *SwitchStatement) Evaluation(vm *VM) (co CompletionValue) {
+	exprRef, isAbrupt, rt := ReturnIfAbrupt(s.Expression.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	switchValue := exprRef.GetValue(vm.agent)
+	oldEnv := vm.RunningLexicalEnvironment()
+	blockEnv := NewDeclarativeEnvironment(oldEnv)
+	vm.BlockDeclarationInstantiation(s.CaseBlock, blockEnv)
+	vm.SetRunningLexicalEnvironment(blockEnv)
+	R := CompletionHandle(s.CaseBlock.CaseBlockEvaluation(vm, switchValue))
+	vm.SetRunningLexicalEnvironment(oldEnv)
+	return R
+}
+
+func (s *SwitchStatement) String() string {
+	sb := "Switch"
+	sb += " " + s.Expression.String() + " \n"
+	sb += s.CaseBlock.String()
+	return sb
+}
+
+func (s *SwitchStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+// CaseBlock [Yield, Await, Return] :
+// - { CaseClauses[?Yield, ?Await, ?Return] opt }
+// - { CaseClauses[?Yield, ?Await, ?Return] opt DefaultClause[?Yield, ?Await, ?Return]
+// - CaseClauses[?Yield, ?Await, ?Return] opt }
+//
+// CaseClauses[Yield, Await, Return] :
+// - CaseClause[?Yield, ?Await, ?Return]
+// - CaseClauses[?Yield, ?Await, ?Return] CaseClause[?Yield, ?Await, ?Return]
+type CaseBlock struct {
+	CaseClauses   []*CaseClause
+	DefaultClause *DefaultClause
+}
+
+var (
+	_ StaticSemanticsLexicallyScopedDeclarations = (*CaseBlock)(nil)
+	_ RuntimeSemanticsCaseBlockEvaluation        = (*CaseBlock)(nil)
+)
+
+func (c *CaseBlock) astHasDefault() bool {
+	return c.DefaultClause != nil
+}
+
+func (c *CaseBlock) astIsEmpty() bool {
+	return !c.astHasDefault() && len(c.CaseClauses) == 0
+}
+
+// CaseBlockEvaluation
+// spec: 14.12.2
+// TODO(WIP): handle cases after default clauses
+func (c *CaseBlock) CaseBlockEvaluation(vm *VM, input Value) (co CompletionValue) {
+	if c.astIsEmpty() {
+		co.value = UndefinedValue
+		return
+	} else if c.astHasDefault() {
+		var V Value = UndefinedValue
+		found := false
+		for _, clause := range c.CaseClauses {
+			if !found {
+				f, isAbrupt, rt := ReturnIfAbrupt(clause.CaseClauseIsSelected(vm, input), co)
+				if isAbrupt {
+					return rt
+				}
+				found = f
+			}
+			if found {
+				R := CompletionHandle(clause.Evaluation(vm))
+				if !IsUndefinedOrNil(R.value) {
+					V = R.value
+				}
+				if R.IsAbrupt() {
+					return UpdateEmpty(R, V)
+				}
+			}
+		}
+		defaultR := CompletionHandle(c.DefaultClause.Evaluation(vm))
+		if !IsUndefinedOrNil(defaultR.value) {
+			V = defaultR.value
+		}
+		if defaultR.IsAbrupt() {
+			return UpdateEmpty(defaultR, V)
+		}
+		co.value = V
+		// TODO(WIP): handle cases after default clauses
+		return
+	} else {
+		var V Value = UndefinedValue
+		found := false
+		for _, clause := range c.CaseClauses {
+			if !found {
+				f, isAbrupt, rt := ReturnIfAbrupt(clause.CaseClauseIsSelected(vm, input), co)
+				if isAbrupt {
+					return rt
+				}
+				found = f
+			}
+			if found {
+				R := CompletionHandle(clause.Evaluation(vm))
+				if !IsUndefinedOrNil(R.value) {
+					V = R.value
+				}
+				if R.IsAbrupt() {
+					return UpdateEmpty(R, V)
+				}
+			}
+		}
+		co.value = V
+		return
+	}
+}
+
+func (c *CaseBlock) LexicallyScopedDeclarations() (l []ASTNode) {
+	for _, clause := range c.CaseClauses {
+		l = append(l, clause.LexicallyScopedDeclarations()...)
+	}
+	l = append(l, c.DefaultClause.LexicallyScopedDeclarations()...)
+	return
+}
+
+func (c *CaseBlock) String() string {
+	sb := "CaseBlock"
+	for _, clause := range c.CaseClauses {
+		sb += clause.String()
+	}
+	if c.DefaultClause != nil {
+		sb += c.DefaultClause.String()
+	}
+	return sb
+}
+
+// CaseClause [Yield, Await, Return] :
+// - case Expression[+In, ?Yield, ?Await] : StatementList[?Yield, ?Await, ?Return] opt
+type CaseClause struct {
+	Expression    Expression
+	StatementList StatementList
+}
+
+var (
+	_ StaticSemanticsLexicallyScopedDeclarations = (*CaseClause)(nil)
+	_ RuntimeSemanticsEvaluation                 = (*CaseClause)(nil)
+)
+
+func (c *CaseClause) astIsStatementListEmpty() bool {
+	return len(c.StatementList) == 0
+}
+
+// Evaluation
+// spec: 14.12.4
+// returns UndefinedValue for EMPTY
+func (c *CaseClause) Evaluation(vm *VM) (co CompletionValue) {
+	if c.astIsStatementListEmpty() {
+		co.value = UndefinedValue
+		return
+	} else {
+		return c.StatementList.Evaluation(vm)
+	}
+}
+
+// CaseClauseIsSelected
+// spec: 14.12.3
+func (c *CaseClause) CaseClauseIsSelected(vm *VM, input Value) (co Completion[bool]) {
+	exprRef, isAbrupt, rt := ReturnIfAbrupt(c.Expression.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	clauseSelector := exprRef.GetValue(vm.agent)
+	co.value = IsStrictlyEqual(input, clauseSelector)
+	return
+}
+
+func (c *CaseClause) LexicallyScopedDeclarations() (l []ASTNode) {
+	return c.StatementList.LexicallyScopedDeclarations()
+}
+
+func (c *CaseClause) String() string {
+	return "CaseClause " + c.Expression.String() + " " + c.StatementList.String()
+}
+
+// DefaultClause [Yield, Await, Return] :
+// - default : StatementList[?Yield, ?Await, ?Return] opt
+type DefaultClause struct {
+	StatementList StatementList
+}
+
+var (
+	_ StaticSemanticsLexicallyScopedDeclarations = (*DefaultClause)(nil)
+	_ RuntimeSemanticsEvaluation                 = (*DefaultClause)(nil)
+)
+
+func (d *DefaultClause) astIsStatementListEmpty() bool {
+	return len(d.StatementList) == 0
+}
+
+func (d *DefaultClause) Evaluation(vm *VM) CompletionValue {
+	if d.astIsStatementListEmpty() {
+		return UndefinedValue.ToCompletion()
+	} else {
+		return d.StatementList.Evaluation(vm)
+	}
+}
+
+func (d *DefaultClause) LexicallyScopedDeclarations() []ASTNode {
+	return d.StatementList.LexicallyScopedDeclarations()
+}
+
+func (d *DefaultClause) String() string {
+	return "DefaultClause " + d.StatementList.String()
 }
 
 // MARK: - IterationStatement
@@ -5198,6 +5444,15 @@ func (b *Block) String() string {
 
 type StatementList []StatementListItem
 
+var _ StaticSemanticsLexicallyScopedDeclarations = StatementList(nil)
+
+func (s StatementList) LexicallyScopedDeclarations() (l []ASTNode) {
+	for _, item := range s {
+		l = append(l, item.LexicallyScopedDeclarations()...)
+	}
+	return
+}
+
 func (s StatementList) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
 	for _, item := range s {
 		l = append(l, StatementListItemTopLevelLexicallyDeclaredNames(item)...)
@@ -5307,6 +5562,7 @@ type StatementListItem interface {
 	VarScopedDeclarations() []*VariableDeclaration
 	VarDeclaredNames() []IdentifierName
 	LexicallyDeclaredNames() []IdentifierName
+	StaticSemanticsLexicallyScopedDeclarations
 }
 
 func StatementListItemAnalyze(s StatementListItem, a AnalyzeQuery) bool {
@@ -5324,9 +5580,17 @@ type StatementListItemStatement struct {
 	Statement Statement
 }
 
-var _ ASTNode = (*StatementListItemStatement)(nil)
+var (
+	_ ASTNode                                    = (*StatementListItemStatement)(nil)
+	_ StaticSemanticsLexicallyScopedDeclarations = (*StatementListItemStatement)(nil)
+)
 
 func (s *StatementListItemStatement) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
+	return
+}
+
+func (s *StatementListItemStatement) LexicallyScopedDeclarations() (l []ASTNode) {
+	// TODO(WIP): LabelledStatement
 	return
 }
 

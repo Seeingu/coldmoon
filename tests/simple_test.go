@@ -12,25 +12,21 @@ import (
 )
 
 func testSource(t *testing.T, source string) {
-	Debug.Enable()
 	agent := NewAgent()
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	cr.RegisterTerminalRuntime(realm)
 	Evaluate(source, realm)
-	Debug.Disable()
 }
 
 func testModule(t *testing.T, f string) {
-	Debug.Enable()
 	agent := NewAgent()
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	cr.RegisterTerminalRuntime(realm)
 	EvaluateModule(resolveTestdataPath(f), realm)
-	Debug.Disable()
 }
 
 func TestBaselineNew(t *testing.T) {
@@ -424,6 +420,21 @@ assert(2 != 1);
 assert(2 > 1);
 assert(2 >= 2);
 assert(2 < 31);
+`, `const expr = "Papayas";
+let a = 1;
+switch (expr) {
+    case "Oranges":
+        a = 2
+        break;
+    case "Mangoes":
+    case "Papayas":
+        a = 3
+        break;
+    default:
+        a = 4
+}
+
+assert(a === 3);
 `,
 	}
 	testNewSources(t, sourceTexts)

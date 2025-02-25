@@ -546,7 +546,7 @@ func (p *Parser) statement() Statement {
 		return &StatementDebugger{}
 	case TIf:
 		return p.ifStatement()
-	case TWhile, TDo, TFor:
+	case TWhile, TDo, TFor, TSwitch:
 		return p.breakableStatement()
 	case TThrow:
 		return p.throwStatement()
@@ -1110,8 +1110,86 @@ func (p *Parser) breakableStatement() *BreakableStatement {
 	defer func() {
 		p.inBreakable = inBreakable
 	}()
+	if p.tokenizer.CurrentToken.Type == TSwitch {
+		return &BreakableStatement{
+			SwitchStatement: p.switchStatement(),
+		}
+	}
 	return &BreakableStatement{
 		IterationStatement: p.iterationStatement(),
+	}
+}
+
+func (p *Parser) switchStatement() *SwitchStatement {
+	p.tokenizer.MustMatch(TSwitch)
+	p.tokenizer.MustMatch(TLeftParen)
+	expression := p.expression(p.acceptContextLowest())
+	p.tokenizer.MustMatch(TRightParen)
+	p.tokenizer.MustMatch(TLeftBrace)
+	var cases []*CaseClause
+	var defaultClause *DefaultClause
+	for {
+		if p.tokenizer.CurrentToken.Type == TRightBrace {
+			break
+		}
+		if p.tokenizer.CurrentToken.Type == TDefault {
+			defaultClause = p.defaultClause()
+		} else if p.tokenizer.CurrentToken.Type == TCase {
+			cases = append(cases, p.caseClause())
+		} else {
+			panic("switchStatement: expected case or default")
+		}
+	}
+	p.tokenizer.MustMatch(TRightBrace)
+	return &SwitchStatement{
+		Expression: expression,
+		CaseBlock: &CaseBlock{
+			CaseClauses:   cases,
+			DefaultClause: defaultClause,
+		},
+	}
+}
+
+func (p *Parser) caseClause() *CaseClause {
+	p.tokenizer.MustMatch(TCase)
+	expression := p.expression(p.acceptContextLowest())
+	p.tokenizer.MustMatch(TColon)
+	var statements []StatementListItem
+	for {
+		tt := p.tokenizer.CurrentToken.Type
+		if tt == TCase || tt == TDefault || tt == TRightBrace {
+			break
+		}
+		statements = append(statements, p.statementListItem())
+	}
+	return &CaseClause{
+		Expression:    expression,
+		StatementList: statements,
+	}
+}
+
+func (p *Parser) defaultClause() *DefaultClause {
+	p.tokenizer.MustMatch(TDefault)
+	p.tokenizer.MustMatch(TColon)
+	var hasBrace bool
+	if p.tokenizer.Match(TLeftBrace) {
+		hasBrace = true
+	}
+	var statements []StatementListItem
+	// TODO: handle end of block
+	for {
+		tt := p.tokenizer.CurrentToken.Type
+		if tt == TRightBrace {
+			if hasBrace {
+				p.tokenizer.Next()
+				continue
+			}
+			break
+		}
+		statements = append(statements, p.statementListItem())
+	}
+	return &DefaultClause{
+		StatementList: statements,
 	}
 }
 

@@ -6,9 +6,17 @@ type RuntimeSemanticsEvaluation interface {
 	Evaluation(vm *VM) (co CompletionValue)
 }
 
-// 8.4.5
+// RuntimeSemanticsNamedEvaluation
+// spec: 8.4.5
 type RuntimeSemanticsNamedEvaluation interface {
 	NamedEvaluation(name string, expr Expression) ObjectType
+}
+
+// RuntimeSemanticsInstantiateFunctionObject
+// 8.6.1
+type RuntimeSemanticsInstantiateFunctionObject interface {
+	// InstantiateFunctionObject return a FunctionObject
+	InstantiateFunctionObject(env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType
 }
 
 // RuntimeSemanticsBindingInitialization
@@ -161,4 +169,12 @@ type RuntimeSemanticsEvaluateBody interface {
 // spec: 14.15.2
 type RuntimeSemanticsCatchClauseEvaluation interface {
 	CatchClauseEvaluation(vm *VM, thrownValue Value) (c Completion[Value])
+}
+
+// MARK: - Switch
+
+// RuntimeSemanticsCaseBlockEvaluation
+// spec: 14.12.2
+type RuntimeSemanticsCaseBlockEvaluation interface {
+	CaseBlockEvaluation(vm *VM, input Value) (co CompletionValue)
 }

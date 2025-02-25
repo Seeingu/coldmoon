@@ -492,6 +492,37 @@ func (v *VM) ForInOfBodyEvaluation(
 	}
 }
 
+// BlockDeclarationInstantiation
+// spec: 14.2.3, B.3.2.6
+func (v *VM) BlockDeclarationInstantiation(code StaticSemanticsLexicallyScopedDeclarations, env EnvironmentRecord) {
+	declarations := code.LexicallyScopedDeclarations()
+	privateEnv := v.RunningPrivateEnvironment()
+	for _, decl := range declarations {
+		boundNames := decl.(StaticSemanticsBoundNames).BoundNames()
+		for _, dn := range boundNames {
+			if IsConstantDeclaration(decl) {
+				env.CreateImmutableBinding(dn, true)
+			} else {
+				if !env.HasBinding(dn) {
+					env.CreateMutableBinding(dn, false)
+				}
+			}
+		}
+		switch decl.(type) {
+		case *FunctionDeclaration, *GeneratorDeclaration, *AsyncFunctionDeclaration, *AsyncGeneratorDeclaration:
+			fn := boundNames[0]
+			fo := decl.(RuntimeSemanticsInstantiateFunctionObject).InstantiateFunctionObject(env, privateEnv)
+			if !env.HasBinding(fn) {
+				env.InitializeBinding(fn, fo.ToValue())
+			} else {
+				_, ok := decl.(*FunctionDeclaration)
+				Assert(ok)
+				env.SetMutableBinding(fn, fo.ToValue(), false)
+			}
+		}
+	}
+}
+
 func CreatePerIterationEnvironment(perIterationBindings []string) {
 	// TODO
 }
