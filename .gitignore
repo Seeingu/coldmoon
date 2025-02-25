@@ -29,3 +29,5 @@ go.work.sum
 main.exe
 
 *.a
+
+.passed.txt

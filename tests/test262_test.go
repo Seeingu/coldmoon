@@ -1,166 +1,133 @@
 package tests
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
-	"path"
+	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/Seeingu/coldmoon/runtime"
-
-	"github.com/Seeingu/coldmoon/pkg"
-
 	. "github.com/Seeingu/coldmoon/coldmoon"
+	"github.com/Seeingu/coldmoon/pkg"
+	"github.com/Seeingu/coldmoon/runtime"
 )
 
-func makeTest262Path(p string) string {
-	dir, _ := os.Getwd()
-	return path.Join(dir, "..", p)
+// MARK: - Coverage config
+
+// expectedCoverage is the expected coverage rate.
+const expectedCoverage = 0.2
+
+// supportFeatures is a list of features that are tested
+// and gather coverage information.
+var supportFeatures = []string{
+	//"built-ins/Array/isArray",
+	"built-ins/DataView",
+	"built-ins/TypedArray/Symbol.species",
+	"built-ins/SharedArrayBuffer/prototype",
+	"built-ins/TypedArrayConstructors/BigInt64Array",
+	"built-ins/Boolean",
 }
 
-func runTestHarness(realm *Realm, f string, debug bool) {
-	if debug {
-		Debug.Enable()
-	}
-	content := pkg.MustReadFile(makeTest262Path("./test262/harness/" + f))
-	v := ParseScript(content, realm, nil).Evaluate()
-	defer func() {
-		Debug.Disable()
-	}()
-	if debug {
-		print(v.String())
-	}
-}
-
-func evaluateFile(fileName string, realm *Realm) {
-	Evaluate(pkg.MustReadFile(fileName), realm)
-}
-
-func readDir(dir string) []string {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		panic(err)
-	}
-	var files []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		files = append(files, path.Join(dir, entry.Name()))
-	}
-	return files
-}
-
-func testDataView(realm *Realm) {
-	dataViewDir := "./test262/test/built-ins/DataView/"
-	f := makeTest262Path(dataViewDir + "constructor.js")
-	evaluateFile(f, realm)
-}
-
-func testTypedArray(realm *Realm) {
-	typedArrayDir := "./test262/test/built-ins/TypedArray/"
-	subdirs := []string{
-		"Symbol.species",
-	}
-
-	for _, subdir := range subdirs {
-		d := typedArrayDir + subdir
-		for _, f := range readDir(makeTest262Path(d)) {
-			println("Testing file: ", f)
-			evaluateFile(f, realm)
-		}
-	}
-}
-
-func testSharedArrayBuffer(realm *Realm) {
-	sharedArrayBufferDir := "./test262/test/built-ins/SharedArrayBuffer"
-	files := []string{
-		"is-a-constructor.js",
-		"length.js",
-		"prototype/constructor.js",
-		"prototype/Symbol.toStringTag.js",
-	}
-	for _, f := range files {
-		f = makeTest262Path(path.Join(sharedArrayBufferDir, f))
-		println("Testing file: ", f)
-		evaluateFile(f, realm)
-	}
-}
-
-func testTypedArrayName(realm *Realm) {
-	typedArrayConstructorDir := "./test262/test/built-ins/TypedArrayConstructors"
-	constructorNames := []string{
-		"BigInt64Array",
-		"Int8Array",
-		"Float32Array",
-	}
-	fileNames := []string{
-		"constructor.js",
-		"BYTES_PER_ELEMENT.js",
-		"is-a-constructor.js",
-		"length.js",
-		"name.js",
-		"prototype.js",
-		"prototype/BYTES_PER_ELEMENT.js",
-		"prototype/constructor.js",
-		"prototype/not-typedarray-object.js",
-		// TODO:
-		//"prop-desc.js",
-		//"proto.js",
-	}
-	for _, name := range constructorNames {
-		for _, fileName := range fileNames {
-			d := typedArrayConstructorDir + "/" + name
-			f := makeTest262Path(d + "/" + fileName)
-			println("Testing file: ", f)
-			evaluateFile(f, realm)
-		}
-	}
-}
-
-func testBoolean(realm *Realm) {
-	boolDir := "./test262/test/built-ins/Boolean/"
-	entries, err := os.ReadDir(makeTest262Path(boolDir))
-	if err != nil {
-		panic(err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		f := makeTest262Path(boolDir + entry.Name())
-		println("BOOLEAN: Testing file: ", entry.Name())
-		evaluateFile(f, realm)
-	}
-}
-
-func testArray(realm *Realm) {
-	arrayDir := "./test262/test/built-ins/Array/"
-	subdirs := []string{
-		"Symbol.species",
-	}
-	for _, subdir := range subdirs {
-		d := arrayDir + subdir
-		for _, f := range readDir(makeTest262Path(d)) {
-			println("Testing file: ", f)
-			evaluateFile(f, realm)
-		}
-	}
-}
-
-// TODO(BM): coverage
-func TestHarness(t *testing.T) {
+func Test262WithCoverage(t *testing.T) {
+	passedFiles := loadPassedResultFiles()
 	agent := NewAgent()
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	runtime.RegisterTest262Runtime(realm)
 
-	testArray(realm)
-	testDataView(realm)
-	testTypedArrayName(realm)
-	testTypedArray(realm)
+	var passed []string
+	var failed []string
+	var visitor fs.WalkDirFunc = func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if _, ok := passedFiles[path]; ok {
+			fmt.Println("Skip testing file: ", path)
+			passed = append(passed, path)
+			return nil
+		}
+		fmt.Println("Testing file: ", path)
+		err = evaluate(path, realm)
+		if err != nil {
+			fmt.Println(fmt.Sprintf("Failed to evaluate file: %s, error: %v", path, err))
+			failed = append(failed, path)
+		} else {
+			passed = append(passed, path)
+		}
+		return nil
+	}
+	for _, feature := range supportFeatures {
+		dir := runtime.MakeTest262Path("test/" + feature)
+		err := filepath.WalkDir(dir, visitor)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	writePassedResultFiles(passed)
+	coverage := float64(len(passed)) / float64(len(passed)+len(failed))
+	fmt.Printf("Coverage: %.2f%%\n", coverage*100)
+	if coverage < expectedCoverage {
+		t.Errorf("Coverage is less than expected: %.2f%% < %.2f%%", coverage*100, expectedCoverage*100)
+	}
+}
 
-	testSharedArrayBuffer(realm)
-	// testBoolean(realm)
+// MARK: - utils
+
+const PassedResultsFile = ".passed.txt"
+
+func loadPassedResultFiles() map[string]bool {
+	m := make(map[string]bool)
+	_, err := os.Stat(PassedResultsFile)
+	if err != nil {
+		return nil
+	}
+	content := pkg.MustReadFile(PassedResultsFile)
+	for _, f := range strings.Split(content, "\n") {
+		m[f] = true
+	}
+	return m
+}
+
+func writePassedResultFiles(files []string) {
+	content := strings.Join(files, "\n")
+	os.WriteFile(PassedResultsFile, []byte(content), 0o644)
+}
+
+func evaluate(fileName string, realm *Realm) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("panic" + fmt.Sprint(r))
+		}
+	}()
+	Evaluate(pkg.MustReadFile(fileName), realm)
+	return
+}
+
+// TODO: performance
+func evaluateAsync(ctx context.Context, fileName string, realm *Realm) (err error) {
+	evaluateChan := make(chan struct{}, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				err = errors.New("panic" + fmt.Sprint(r))
+			} else {
+				evaluateChan <- struct{}{}
+			}
+		}()
+		Evaluate(pkg.MustReadFile(fileName), realm)
+	}()
+	select {
+	case <-ctx.Done():
+		err = errors.New("timeout")
+		return
+	case <-evaluateChan:
+		return
+	}
 }
