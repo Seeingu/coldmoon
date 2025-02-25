@@ -37,6 +37,7 @@ func RegisterTest262Runtime(realm *coldmoon.Realm) {
 		"testAtomics.js",
 	}
 	for _, f := range files {
+		println("Harness file: ", f)
 		content := pkg.MustReadFile(makeTest262Path("./harness/" + f))
 		coldmoon.ParseScript(content, realm, nil).Evaluate()
 	}
