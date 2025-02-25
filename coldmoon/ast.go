@@ -3749,7 +3749,9 @@ func (c *CaseBlock) LexicallyScopedDeclarations() (l []ASTNode) {
 	for _, clause := range c.CaseClauses {
 		l = append(l, clause.LexicallyScopedDeclarations()...)
 	}
-	l = append(l, c.DefaultClause.LexicallyScopedDeclarations()...)
+	if c.astHasDefault() {
+		l = append(l, c.DefaultClause.LexicallyScopedDeclarations()...)
+	}
 	return
 }
 
