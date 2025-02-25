@@ -584,7 +584,15 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 		result := RunNode(agent, s.ECMAScriptCode)
 		// TODO: standardize
 		if result.IsAbrupt() {
-			panic("execute module failed")
+			err := result.err
+			if obj, ok := err.GetObject(); ok {
+				msgKey := CMString("message").ToPropertyKey()
+				if obj.HasProperty(msgKey) {
+					msg := obj.Get(msgKey).String()
+					panic("execute module failed: " + msg)
+				}
+			}
+			panic("execute module failed: " + result.err.String())
 		}
 		agent.ExecutionContextStack.Pop()
 	} else {
