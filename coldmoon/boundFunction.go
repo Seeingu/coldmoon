@@ -29,7 +29,7 @@ func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Val
 		return _target.Call(_boundThis, _args)
 	}
 	boundFunction.InternalMethods().Call = call
-	if IsConstructor((target).ToValue()) {
+	if IsConstructor(target.ToValue()) {
 		boundFunction.InternalMethods().Construct = func(o ObjectType, arguments []Value, newTarget ObjectType) Completion[ObjectType] {
 			b := o.(*BoundFunctionObject)
 			_target := b.BoundTargetFunction
@@ -42,5 +42,6 @@ func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Val
 			return target.Construct(_args, _newTarget)
 		}
 	}
+	boundFunction.ref = boundFunction
 	return boundFunction
 }

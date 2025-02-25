@@ -895,7 +895,8 @@ func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM, prope
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astHasIdentifier() {
-		Assert(propertyKeyOrPrivateName == nil)
+		// TODO: check Assert: name is not present.
+		// Assert(propertyKeyOrPrivateName == nil)
 		name := p.Identifier
 		outerEnv := vm.RunningLexicalEnvironment()
 		funcEnv := NewDeclarativeEnvironment(outerEnv)

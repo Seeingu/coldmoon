@@ -295,14 +295,14 @@ func NewFunctionConstructor(realm *Realm) ObjectType {
 			bodyArg = NewStringValue("")
 		}
 
-		return (CreateDynamicFunction(
+		return CreateDynamicFunction(
 			agent,
 			constructor,
 			newTarget,
 			dynamicFunctionKindNormal,
 			parameters,
 			bodyArg,
-		)).ToValue()
+		).ToValue()
 	}
 	f := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("Function"), builtinFunctionArgs{
 		realm:         realm,
@@ -310,5 +310,6 @@ func NewFunctionConstructor(realm *Realm) ObjectType {
 		prefix:        "",
 		isConstructor: true,
 	})
+	BindPrototypeAndConstructor(realm.Intrinsics.FunctionPrototype, f)
 	return f
 }
