@@ -20,12 +20,16 @@ func initPath() {
 	}
 }
 
-func makeTest262Path(p string) string {
+func MakeTest262Path(p string) string {
 	initPath()
 	return path.Join(test262Path, p)
 }
 
 func RegisterTest262Runtime(realm *coldmoon.Realm) {
+	global := realm.GlobalObject
+	console := CreateConsole(realm)
+	global.CreateDataProperty(coldmoon.CMString("console").ToPropertyKey(), console.ToValue())
+
 	files := []string{
 		"sta.js",
 		"assert.js",
@@ -38,7 +42,7 @@ func RegisterTest262Runtime(realm *coldmoon.Realm) {
 	}
 	for _, f := range files {
 		println("Harness file: ", f)
-		content := pkg.MustReadFile(makeTest262Path("./harness/" + f))
+		content := pkg.MustReadFile(MakeTest262Path("./harness/" + f))
 		coldmoon.ParseScript(content, realm, nil).Evaluate()
 	}
 }
