@@ -236,8 +236,12 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 
 func NewRegExpConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
+	// 22.2.4.1
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, target ObjectType) Value {
-		pattern := argumentsList[0]
+		pattern := pkg.SliceSafeGet(argumentsList, 0)
+		if pattern == nil {
+			pattern = UndefinedValue
+		}
 		flags := pkg.SliceSafeGet(argumentsList, 1)
 		patternIsRegexp := IsRegExp(pattern)
 		var newTarget ObjectType
