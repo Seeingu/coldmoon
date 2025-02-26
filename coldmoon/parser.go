@@ -1303,12 +1303,9 @@ func (p *Parser) forStatement() *ForStatement {
 			LexicalDeclaration: p.lexicalDeclaration(),
 		}
 	} else {
-		init = &ForStatementInitializerExpression{
-			Expression: p.expression(p.acceptContextLowest()),
-		}
+		init = p.expression(p.acceptContextLowest())
+		p.tokenizer.Match(TSemicolon)
 	}
-	// semicolon has been consumed by initializer
-	// p.tokenizer.Match(TSemicolon)
 	var condition Expression
 	if p.tokenizer.CurrentToken.Type != TSemicolon {
 		condition = p.expression(p.acceptContextLowest())
