@@ -83,9 +83,7 @@ func (v *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord
 		return
 	} else {
 		lhs := v.agent.ResolveBinding(name, nil, true)
-		// TODO(BM): return this
-		lhs.PutValue(v.agent, value)
-		return
+		return lhs.PutValue(v.agent, value)
 	}
 }
 

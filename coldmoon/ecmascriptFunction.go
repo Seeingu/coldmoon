@@ -209,7 +209,8 @@ func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, arguments
 	return
 }
 
-// 10.2.11
+// FunctionDeclarationInstantiation
+// spec: 10.2.11
 func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction, argumentsList ArgumentsList) (co Completion[Value]) {
 	calleeContext := agent.RunningExecutionContext()
 	code := function.ECMAScriptCode
@@ -306,7 +307,10 @@ loop:
 				value = node.Data()
 			}
 			if e == nil {
-				ref.PutValue(agent, value)
+				_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(agent, value), co)
+				if isAbrupt {
+					return rt
+				}
 			} else {
 				ref.InitializeReferencedBinding(value)
 			}
@@ -319,7 +323,10 @@ loop:
 				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(JSInt(j)), value)
 			}
 			if e == nil {
-				ref.PutValue(agent, array.ToValue())
+				_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(agent, array.ToValue()), co)
+				if isAbrupt {
+					return rt
+				}
 			} else {
 				ref.InitializeReferencedBinding(array.ToValue())
 			}

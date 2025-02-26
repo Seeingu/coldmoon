@@ -1781,7 +1781,10 @@ func (e *UpdateExpression) Evaluation(vm *VM) (co CompletionValue) {
 		Assert(false)
 	}
 	if r, ok := expr.ReferenceRecord(); ok {
-		r.PutValue(vm.agent, newValue)
+		_, isAbrupt, rt := ReturnIfAbrupt(r.PutValue(vm.agent, newValue), co)
+		if isAbrupt {
+			return rt
+		}
 	} else {
 		panic("unreachable")
 	}
@@ -1960,7 +1963,10 @@ func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 				}
 			}
 			if ref, ok := lref.value.ReferenceRecord(); ok {
-				ref.PutValue(vm.agent, rval)
+				_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(vm.agent, rval), co)
+				if isAbrupt {
+					return rt
+				}
 			} else {
 				panic("unreachable")
 			}
@@ -1985,7 +1991,10 @@ func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 		r := vm.ApplyStringOrNumericBinaryOperator(lval, rval, e.Operator.ToBinaryOperator())
 
 		if ref, ok := lref.ReferenceRecord(); ok {
-			ref.PutValue(vm.agent, r)
+			_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(vm.agent, r), co)
+			if isAbrupt {
+				return rt
+			}
 		} else {
 			panic("unreachable")
 		}
@@ -3005,7 +3014,10 @@ func (v *VariableDeclaration) Evaluation(vm *VM) (co CompletionValue) {
 				return rt
 			}
 		}
-		lhs.PutValue(vm.agent, value)
+		_, isAbrupt, rt := ReturnIfAbrupt(lhs.PutValue(vm.agent, value), co)
+		if isAbrupt {
+			return rt
+		}
 	}
 
 	// return EMPTY

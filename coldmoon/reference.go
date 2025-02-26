@@ -98,11 +98,13 @@ func (r *ReferenceRecord) GetValue(agent *Agent) (co CompletionValue) {
 	}
 }
 
-// 6.2.5.6
-func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
+// PutValue
+// spec: 6.2.5.6
+// returns: UNUSED or abrupt completion
+func (r *ReferenceRecord) PutValue(agent *Agent, value Value) (co CompletionValue) {
 	if r.IsUnresolvableReference() {
 		if r.Strict {
-			agent.ThrowException(ReferenceError, "Unresolvable reference")
+			co.ThrowError(agent, ReferenceError, "Unresolvable reference")
 			return
 		}
 		globalObj := agent.GetGlobalObject()
@@ -141,6 +143,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) {
 	env, _ := r.Base.Env()
 	referencedName := r.ReferencedName.String
 	env.SetMutableBinding(referencedName, value, r.Strict)
+	return
 }
 
 // 6.2.5.7
