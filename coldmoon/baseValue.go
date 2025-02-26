@@ -210,12 +210,14 @@ func (b *BaseValue) GetObject() (object ObjectType, ok bool) {
 	return nil, false
 }
 
+// ToNumber
+// spec: 7.1.4
 func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
 	switch value := b.Value.(type) {
 	case *NumberValue:
 		return value
 	case *undefinedValue:
-		return InfinityValue
+		return NaNValue
 	case *nullValue:
 		return NewNumberValue(0)
 	case *BooleanValue:

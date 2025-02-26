@@ -113,7 +113,7 @@ func NewJSON(realm *Realm) *JSON {
 			} else {
 				isArray := IsArray(replacer)
 				if isArray {
-					length := obj.LengthOfArrayLike()
+					length := ReturnAssertNormal(obj.LengthOfArrayLike())
 					for k := range length {
 						prop := NewIntegerIndexPropertyKey(k)
 						v := obj.Get(prop)
@@ -191,7 +191,7 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 		obj := MustGetObject(value)
 		isArray := IsArray(value)
 		if isArray {
-			length := obj.LengthOfArrayLike()
+			length := ReturnAssertNormal(obj.LengthOfArrayLike())
 			for i := JSInt(0); i < length; i++ {
 				prop := NewIntegerIndexPropertyKey(i)
 				newElement := InternalizeJSONProperty(agent, obj, prop, reviver)
@@ -359,7 +359,7 @@ func SerializeJSONArray(agent *Agent, state *JSONSerializationRecord, value Obje
 	state.Indent = state.Indent + state.Gap
 
 	var partial []string
-	length := value.LengthOfArrayLike()
+	length := ReturnAssertNormal(value.LengthOfArrayLike())
 	for i := JSInt(0); i < length; i++ {
 		strI := SerializeJSONProperty(agent, state, NewIntegerIndexPropertyKey(i), value)
 		if strI == "" {

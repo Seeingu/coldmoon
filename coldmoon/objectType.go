@@ -2,7 +2,7 @@ package coldmoon
 
 type ObjectType interface {
 	IsExtensible() bool
-	LengthOfArrayLike() JSInt
+	LengthOfArrayLike() Completion[JSInt]
 	PropertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	DefineField(field *ClassFieldDefinition)

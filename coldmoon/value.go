@@ -281,15 +281,17 @@ func ToPropertyKey(agent *Agent, value Value) PropertyKey {
 	return NewStringPropertyKey(keyString)
 }
 
-// 7.1.20
-func ToLength(agent *Agent, value Value) JSInt {
+// ToLength
+// spec: 7.1.20
+func ToLength(agent *Agent, value Value) (co Completion[JSInt]) {
 	length := ToIntegerOrInfinity(agent, value)
 
 	if length <= 0 {
-		return 0
+		co.value = 0
+		return
 	}
-
-	return JSInt(math.Min(float64(length), POW_2_53-1))
+	co.value = JSInt(math.Min(float64(length), POW_2_53-1))
+	return
 }
 
 // 7.1.22
@@ -583,15 +585,22 @@ func CreateArrayFromList(agent *Agent, elements []Value) ObjectType {
 	return array
 }
 
-// 7.3.20
+// TODO(BM): returns completion
+// CreateListFromArrayLike
+// spec: 7.3.20
 func CreateListFromArrayLike(agent *Agent, self Value) []Value {
+	var co Completion[[]Value]
 	// TODO: element types
 	objectValue, ok := self.(*ObjectValue)
 	if !ok {
-		panic("TypeError")
+		co.ThrowTypeError(agent, "TypeError")
+		panic(co)
 	}
 
-	length := objectValue.Object.LengthOfArrayLike()
+	length, isAbrupt, rt := ReturnIfAbrupt(objectValue.Object.LengthOfArrayLike(), co)
+	if isAbrupt {
+		panic(rt)
+	}
 
 	var list []Value
 	for i := JSInt(0); i < length; i++ {

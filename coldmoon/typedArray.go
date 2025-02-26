@@ -449,7 +449,12 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 		return targetObj.ToValue()
 	}
 	arrayLike := MustGetObject(source)
-	length := arrayLike.LengthOfArrayLike()
+	var co CompletionValue
+	length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
+	if isAbrupt {
+		panic(rt)
+	}
+
 	targetObj := TypedArrayCreateFromConstructor(agent, MustGetObject(C), []Value{NewNumberValue(length.ToNumber())})
 	k := JSInt(0)
 	for k < length {
@@ -542,7 +547,11 @@ func SetTypedArrayFromArrayLike(agent *Agent, target *TypedArrayObject, targetOf
 	}
 	targetLength := TypedArrayLength(targetRecord)
 	src := source.ToObject(agent).value
-	srcLength := src.LengthOfArrayLike()
+	var co CompletionValue
+	srcLength, isAbrupt, rt := ReturnIfAbrupt(src.LengthOfArrayLike(), co)
+	if isAbrupt {
+		panic(rt)
+	}
 
 	if targetOffset.IsPositiveInf() {
 		panic("RangeError")
@@ -1167,7 +1176,12 @@ func (t *TypedArrayObject) IsTypedArrayFixedLength() bool {
 // 10.4.5.16
 
 func InitializeTypedArrayFromArrayLike(agent *Agent, O *TypedArrayObject, arrayLike ObjectType) {
-	length := arrayLike.LengthOfArrayLike()
+	var co CompletionValue
+	length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
+	if isAbrupt {
+		panic(rt)
+	}
+
 	AllocateTypedArrayBuffer(agent, O, length)
 	k := JSInt(0)
 	for k < length {

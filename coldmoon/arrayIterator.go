@@ -25,7 +25,7 @@ func NewArrayIteratorPrototype(realm *Realm) ObjectType {
 			}
 			length = TypedArrayLength(taRecord)
 		} else {
-			length = array.LengthOfArrayLike()
+			length = ReturnAssertNormal(array.LengthOfArrayLike())
 		}
 		if index >= length {
 			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()

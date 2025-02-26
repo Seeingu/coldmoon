@@ -188,7 +188,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		c := r.SpeciesConstructor(realm.Intrinsics.RegExpConstructor)
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
 		matcher := c.Data().Construct([]Value{this, _flags}, nil).value
-		lastIndex := ToLength(agent, r.Get(NewStringPropertyKey("lastIndex")))
+		lastIndex := ReturnAssertNormal(ToLength(agent, r.Get(NewStringPropertyKey("lastIndex"))))
 		matcher.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(JSNumber(lastIndex)), setThrowTypeThrow)
 		_global := strings.Contains(_flags.Data, "g")
 		_fullUnicode := strings.Contains(_flags.Data, "u") || strings.Contains(_flags.Data, "v")
@@ -376,7 +376,7 @@ func RegExpExec(agent *Agent, regExp *RegExpObject, s string) (co Completion[Val
 // return null, object, or throw
 func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) (co Completion[Value]) {
 	length := len(s)
-	lastIndex := int(ToLength(agent, regExp.Get(NewStringPropertyKey("lastIndex"))))
+	lastIndex := int(ReturnAssertNormal(ToLength(agent, regExp.Get(NewStringPropertyKey("lastIndex")))))
 
 	flags := regExp.OriginalFlags
 	global := strings.Contains(flags, "g")

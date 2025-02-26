@@ -294,7 +294,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		thisArg := args[1]
 
 		array := MustGetObject(this)
-		length := array.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
@@ -315,7 +319,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		array := MustGetObject(this)
-		length := array.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		sep := ","
 		if len(args) > 0 {
 			sep = args[0].String()
@@ -349,7 +357,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		thisArg := args[1]
 
 		array := MustGetObject(this)
-		length := array.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
@@ -370,7 +382,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var push BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		array := MustGetObject(this)
-		length := array.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		argCount := len(args)
 		for i := 0; i < argCount; i++ {
 			array.Set(NewIntegerIndexPropertyKey(length), args[i], setThrowTypeThrow)
@@ -382,7 +398,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var pop BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		array := MustGetObject(this)
-		length := array.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		if length == 0 {
 			array.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow)
 			return UndefinedValue
@@ -398,7 +418,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		array := MustGetObject(this)
-		length := array.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		separator := ", "
 		var elements []string
 		for k := range length {
@@ -416,7 +440,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		searchElement := args[0]
 		fromIndex := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		if length == 0 {
 			return FalseValue
 		}
@@ -448,7 +476,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		searchElement := args[0]
 		fromIndex := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		if length == 0 {
 			return NewNumberValue(-1)
 		}
@@ -483,7 +515,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return findRec.Value
 	}
@@ -491,7 +527,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return NewNumberValue(findRec.Index.ToNumber())
 	}
@@ -499,7 +539,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return findRec.Value
 	}
@@ -507,7 +551,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return NewNumberValue(findRec.Index.ToNumber())
 	}
@@ -515,7 +563,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		searchElement := args[0]
 		fromIndex := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		if length == 0 {
 			return NewNumberValue(-1)
 		}
@@ -546,7 +598,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var at BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		index := args[0]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		relativeIndex := ToIntegerOrInfinity(agent, index)
 		k := relativeIndex
 		if k < 0 {
@@ -558,7 +614,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		callbackFn := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
@@ -583,7 +643,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		callbackFn := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
@@ -608,7 +672,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		index := args[0]
 		value := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		relativeIndex := ToIntegerOrInfinity(agent, index)
 
 		actualIndex := relativeIndex
@@ -675,7 +743,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		}
 		arrayLike := ReturnAssertNormal(items.ToObject(agent))
-		length := arrayLike.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		var a ObjectType
 		if IsConstructor(c) {
 			a = MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil).value
@@ -714,7 +786,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var shift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		if length == 0 {
 			o.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow)
 			return UndefinedValue
@@ -740,10 +816,17 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		argCount := JSInt(len(args))
 		if argCount == 0 {
 			return NewNumberValue(length.ToNumber())
+		}
+		if float64(length)+float64(argCount) > POW_2_32-1 {
+			panic("TypeError")
 		}
 
 		k := length
@@ -771,7 +854,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		callbackFn := args[0]
 		thisArg := args[1]
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
 		}
@@ -799,7 +886,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		callbackFn := args[0]
 		initialValue := args[1]
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
 		}
@@ -843,7 +934,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		callbackFn := args[0]
 		initialValue := args[1]
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
 		}
@@ -898,7 +993,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 			spreadable := IsConcatSpreadable(agent, element)
 			if spreadable {
-				length := MustGetObject(element).LengthOfArrayLike()
+				var co CompletionValue
+				length, isAbrupt, rt := ReturnIfAbrupt(MustGetObject(element).LengthOfArrayLike(), co)
+				if isAbrupt {
+					panic(rt)
+				}
+
 				if float64(n)+float64(length) > POW_2_53-1 {
 					panic("TypeError")
 				}
@@ -925,7 +1025,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		start := args[0]
 		end := args[1]
 
@@ -977,7 +1081,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		start := args[1]
 		end := args[2]
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		relativeStart := ToIntegerOrInfinity(agent, start)
 		k := relativeStart.Max(0)
@@ -1011,7 +1119,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		start := args[1]
 		end := args[2]
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		relativeTarget := ToIntegerOrInfinity(agent, target)
 		var to JSInt
@@ -1078,7 +1190,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var reverse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		middle := length / 2
 		lower := JSInt(0)
 		for lower < middle {
@@ -1112,7 +1228,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 	var toReversed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		A := ArrayCreate(agent, length, nil)
 		for k := JSInt(0); k < length; k++ {
 			from := NewIntegerIndexPropertyKey(length - k - 1)
@@ -1128,7 +1248,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		obj := this.ToObject(agent).value
-		length := obj.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(obj.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		sortCompare := SortCompare{
 			compareFn: MustGetObject(compareFn),
@@ -1153,7 +1277,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		obj := this.ToObject(agent).value
-		length := obj.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(obj.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		sortCompare := SortCompare{
 			compareFn: MustGetObject(compareFn),
@@ -1170,7 +1298,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var flat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
 		depth := args[0]
 		o := this.ToObject(agent).value
-		sourceLen := o.LengthOfArrayLike()
+		var co CompletionValue
+		sourceLen, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+
 		var depthNum JSInt = 1
 		if depth != UndefinedValue {
 			depthNum = ToIntegerOrInfinity(agent, depth)
@@ -1186,7 +1319,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		mapperFunction := args[0]
 		thisArg := args[1]
 		o := this.ToObject(agent).value
-		sourceLen := o.LengthOfArrayLike()
+		var co CompletionValue
+		sourceLen, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+
 		if !IsCallable(mapperFunction) {
 			panic("TypeError")
 		}
@@ -1202,7 +1340,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			items = args[2:]
 		}
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		var relativeStart JSInt = 0
 		if start != nil {
@@ -1290,7 +1432,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			items = args[2:]
 		}
 		o := this.ToObject(agent).value
-		length := o.LengthOfArrayLike()
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
 
 		var relativeStart JSInt = 0
 		if start != nil {
@@ -1552,7 +1698,12 @@ func FlattenIntoArray(
 				} else {
 					newDepth = depth - 1
 				}
-				elementLen := MustGetObject(element).LengthOfArrayLike()
+				var co CompletionValue
+				elementLen, isAbrupt, rt := ReturnIfAbrupt(MustGetObject(element).LengthOfArrayLike(), co)
+				if isAbrupt {
+					panic(rt)
+				}
+
 				targetIndex = FlattenIntoArray(agent, target, MustGetObject(element), elementLen, targetIndex, newDepth, mapperFunction, thisArg)
 			} else {
 				if float64(targetIndex) >= POW_2_53-1 {
@@ -1571,7 +1722,7 @@ func FlattenIntoArray(
 
 func (a *ArrayObject) String() string {
 	s := "ArrayObject ["
-	for i := JSInt(0); i < a.LengthOfArrayLike(); i++ {
+	for i := JSInt(0); i < a.LengthOfArrayLike().value; i++ {
 		if i > 0 {
 			s += ", "
 		}
