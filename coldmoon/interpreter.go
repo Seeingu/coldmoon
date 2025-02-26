@@ -94,8 +94,15 @@ func (v *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord
 func (v *VM) EvaluatePropertyAccessWithExpressionKey(
 	baseValue Value, expression Expression, strict bool,
 ) *ReferenceRecord {
-	propertyNameReference := expression.Evaluation(v)
-	propertyNameValue := propertyNameReference.value.GetValue(v.agent)
+	var co Completion[*ReferenceRecord]
+	propertyNameReference, isAbrupt, rt := ReturnIfAbrupt(expression.Evaluation(v), co)
+	if isAbrupt {
+		panic(rt)
+	}
+	propertyNameValue, isAbrupt, rt := ReturnIfAbrupt(propertyNameReference.GetValue(v.agent), co)
+	if isAbrupt {
+		panic(rt)
+	}
 	propertyKey := ToPropertyKey(v.agent, propertyNameValue)
 	return NewReferenceRecord(NewReferenceRecordBaseValue(baseValue), propertyKey.ToReference(), strict, UndefinedValue)
 }
@@ -331,13 +338,15 @@ type LabelSet = []string
 
 // ForBodyEvaluation
 // spec: 14.7.4.3
-func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIterationBindings []string, labelSet LabelSet) CompletionValue {
+func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIterationBindings []string, labelSet LabelSet) (co CompletionValue) {
 	var V Value = UndefinedValue
 	CreatePerIterationEnvironment(perIterationBindings)
 	for {
 		if test != nil {
-			testRef := test.Evaluation(v).value
-			testValue := testRef.GetValue(v.agent)
+			testValue, _, isAbrupt, rt := v.EvalAndGetValue(test, co)
+			if isAbrupt {
+				return rt
+			}
 			if !testValue.ToBoolean() {
 				return V.ToCompletion()
 			}
@@ -374,9 +383,15 @@ func (v *VM) ForInOfHeadEvaluation(
 		}
 		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = newEnv
 	}
-	exprRef := expr.Evaluation(v)
+	exprRef, isAbrupt, rt := ReturnIfAbrupt(expr.Evaluation(v), co)
+	if isAbrupt {
+		return rt
+	}
 	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
-	exprValue := exprRef.value.GetValue(agent)
+	exprValue, isAbrupt, rt := ReturnIfAbrupt(exprRef.GetValue(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if iterationKind == ForInOfIterationKindEnumerate {
 		if IsUndefinedOrNil(exprValue) || exprValue == NullValue {
 			// TODO: return { [[Type]]: BREAK, [[Value]]: EMPTY, [[Target]]: EMPTY }
@@ -521,6 +536,19 @@ func (v *VM) BlockDeclarationInstantiation(code StaticSemanticsLexicallyScopedDe
 			}
 		}
 	}
+}
+
+// EvalAndGetValue is a helper function to evaluate a node and get the value
+func (v *VM) EvalAndGetValue(node ASTNode, co CompletionValue) (Value, Value, bool, CompletionValue) {
+	ref, isAbrupt, rt := ReturnIfAbrupt(node.Evaluation(v), co)
+	if isAbrupt {
+		return nil, nil, true, rt
+	}
+	value, isAbrupt, rt := ReturnIfAbrupt(ref.GetValue(v.agent), co)
+	if isAbrupt {
+		return nil, nil, true, rt
+	}
+	return value, ref, false, rt
 }
 
 func CreatePerIterationEnvironment(perIterationBindings []string) {

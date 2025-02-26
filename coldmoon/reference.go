@@ -65,10 +65,12 @@ func (r *ReferenceRecord) IsPrivateReference() bool {
 	return r.ReferencedName.PrivateName != nil
 }
 
-// 6.2.5.5
-func (r *ReferenceRecord) GetValue(agent *Agent) Value {
+// GetValue
+// spec: 6.2.5.5
+func (r *ReferenceRecord) GetValue(agent *Agent) (co CompletionValue) {
 	if r.IsUnresolvableReference() {
-		return agent.ThrowException(ReferenceError, "Unresolvable reference")
+		co.ThrowError(agent, ReferenceError, "Unresolvable reference")
+		return
 	}
 	if r.IsPropertyReference() {
 		value, _ := r.Base.Value()
@@ -85,14 +87,14 @@ func (r *ReferenceRecord) GetValue(agent *Agent) Value {
 		} else {
 			propKey = NewStringPropertyKey(r.ReferencedName.String)
 		}
-		return ReturnAssertNormal(
-			baseObj.InternalMethods().Get(baseObj, propKey, r.GetThisValue()),
-		)
+		return baseObj.
+			InternalMethods().
+			Get(baseObj, propKey, r.GetThisValue())
 	} else {
 		base, _ := r.Base.Env()
 		name := r.ReferencedName.String
 		c := base.GetBindingValue(agent, name, r.Strict)
-		return c.Data()
+		return c
 	}
 }
 

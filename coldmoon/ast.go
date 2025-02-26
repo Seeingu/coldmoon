@@ -410,15 +410,27 @@ func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSI
 			return rt
 		}
 		// TODO: check elision
-		initResult := expr.Expression.Evaluation(vm)
-		initValue := initResult.value.GetValue(vm.agent)
+		initResult, isAbrupt, rt := ReturnIfAbrupt(expr.Expression.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		initValue, isAbrupt, rt := ReturnIfAbrupt(initResult.GetValue(vm.agent), co)
+		if isAbrupt {
+			return rt
+		}
 		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
 		co.value = nextIndex + 1
 		return
 	} else if expr, ok = e.astIsOnlyHasAssigmentExpression(); ok {
 		// TODO: check elision
-		initResult := expr.Expression.Evaluation(vm)
-		initValue := initResult.value.GetValue(vm.agent)
+		initResult, isAbrupt, rt := ReturnIfAbrupt(expr.Expression.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		initValue, isAbrupt, rt := ReturnIfAbrupt(initResult.GetValue(vm.agent), co)
+		if isAbrupt {
+			return rt
+		}
 		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
 		co.value = nextIndex + 1
 		return
@@ -524,10 +536,11 @@ type PropertyDefinitionList struct {
 var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionList)(nil)
 
 // 13.2.5.4
-func (p *PropertyDefinitionList) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) {
+func (p *PropertyDefinitionList) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
 	for _, item := range p.Items {
 		item.PropertyDefinitionEvaluation(vm, obj)
 	}
+	return co
 }
 
 func (p *PropertyDefinitionList) String() string {
@@ -560,8 +573,9 @@ type PropertyDefinitionMethodDefinition struct {
 
 var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionMethodDefinition)(nil)
 
-func (p *PropertyDefinitionMethodDefinition) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) {
+func (p *PropertyDefinitionMethodDefinition) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
 	p.MethodDefinition.MethodDefinitionEvaluation(vm, obj, true)
+	return co
 }
 
 type PropertyDefinitionIdentifierReference struct {
@@ -580,7 +594,7 @@ type PropertyDefinitionNameAndExpression struct {
 	Expression Expression
 }
 
-func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *VM, object ObjectType) {
+func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *VM, object ObjectType) (co CompletionValue) {
 	propKey := p.Name.Evaluation(vm)
 	var isProtoSetter bool
 	if vm.IsJSONParse {
@@ -595,19 +609,23 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 	if IsAnonymousFunctionDefinition(p.Expression) {
 		panic("unimplemented")
 	} else {
-		exprValueRef := p.Expression.Evaluation(vm)
-		propValue = exprValueRef.value.GetValue(vm.agent)
+		pv, _, isAbrupt, rt := vm.EvalAndGetValue(p.Expression, co)
+		if isAbrupt {
+			return rt
+		}
+		propValue = pv
 	}
 	if isProtoSetter {
 		if propValue.IsObject() || propValue == NullValue {
 			object.SetPrototype(propValue.ToObject(vm.agent).value)
 		}
-		return
+		return co
 	}
 	// TODO: assert no non-configurable properties
 	Assert(object.IsOrdinary() && object.IsExtensible())
 	object.CreateDataPropertyOrThrow(
 		ToPropertyKey(vm.agent, propKey.value), propValue)
+	return co
 }
 
 func (p *PropertyDefinitionNameAndExpression) String() string {
@@ -860,9 +878,11 @@ func (p *ComputedPropertyName) String() string {
 
 // Evaluation
 // spec: 13.2.5.4
-func (p *ComputedPropertyName) Evaluation(vm *VM) CompletionValue {
-	exprValue := p.Expression.Evaluation(vm)
-	propName := exprValue.value.GetValue(vm.agent)
+func (p *ComputedPropertyName) Evaluation(vm *VM) (co CompletionValue) {
+	propName, _, isAbrupt, rt := vm.EvalAndGetValue(p.Expression, co)
+	if isAbrupt {
+		return rt
+	}
 	return ToPropertyKey(vm.agent, propName).ToValue().ToCompletion()
 }
 
@@ -1117,9 +1137,11 @@ func (m *MemberExpression) astIsPropertyExpression() bool {
 
 // Evaluation
 // spec: 13.3.2.1
-func (m *MemberExpression) Evaluation(vm *VM) CompletionValue {
-	baseReference := m.Member.Evaluation(vm)
-	baseValue := baseReference.value.GetValue(vm.agent)
+func (m *MemberExpression) Evaluation(vm *VM) (co CompletionValue) {
+	baseValue, _, isAbrupt, rt := vm.EvalAndGetValue(m.Member, co)
+	if isAbrupt {
+		return rt
+	}
 	strict := vm.containedInStrictCode
 
 	switch prop := m.Property.(type) {
@@ -1386,12 +1408,14 @@ func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
 // Evaluation
 // spec: 13.3.9.1
 func (o *OptionalExpression) Evaluation(vm *VM) (co CompletionValue) {
-	baseReference := o.Expr.Evaluation(vm)
-	baseValue := baseReference.value.GetValue(vm.agent)
+	baseValue, baseReference, isAbrupt, rt := vm.EvalAndGetValue(o.Expr, co)
+	if isAbrupt {
+		return rt
+	}
 	if IsUndefinedOrNull(baseValue) {
 		return UndefinedValue.ToCompletion()
 	}
-	result, isAbrupt, rt := ReturnIfAbrupt(o.Property.ChainEvaluation(vm, baseValue, baseReference.value), co)
+	result, isAbrupt, rt := ReturnIfAbrupt(o.Property.ChainEvaluation(vm, baseValue, baseReference), co)
 	if isAbrupt {
 		return rt
 	}
@@ -1730,9 +1754,12 @@ func (e *UpdateExpression) isPrefix() bool {
 // Evaluation
 // postfix: 13.4.2.1/13.4.3.1
 // prefix: 13.4.4.1/13.4.5.1
-func (e *UpdateExpression) Evaluation(vm *VM) CompletionValue {
-	expr := e.Operand.Evaluation(vm)
-	oldValue := ToNumeric(vm.agent, expr.value.GetValue(vm.agent))
+func (e *UpdateExpression) Evaluation(vm *VM) (co CompletionValue) {
+	v, expr, isAbrupt, rt := vm.EvalAndGetValue(e.Operand, co)
+	if isAbrupt {
+		return rt
+	}
+	oldValue := ToNumeric(vm.agent, v)
 	var newValue Value
 	if n, bi, ok := oldValue.NumberOrBigInt(); ok {
 		if n != nil {
@@ -1753,7 +1780,7 @@ func (e *UpdateExpression) Evaluation(vm *VM) CompletionValue {
 	} else {
 		Assert(false)
 	}
-	if r, ok := expr.value.ReferenceRecord(); ok {
+	if r, ok := expr.ReferenceRecord(); ok {
 		r.PutValue(vm.agent, newValue)
 	} else {
 		panic("unreachable")
@@ -1915,7 +1942,7 @@ func (e *AssignmentExpression) astIsAssign() bool {
 
 // Evaluation
 // spec: 13.15.2
-func (e *AssignmentExpression) Evaluation(vm *VM) CompletionValue {
+func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if e.astIsAssign() {
 		_, isObjectLiteral := e.Left.(*PrimaryExpressionObjectLiteral)
 		_, isArrayLiteral := e.Left.(*ArrayLiteral)
@@ -1926,8 +1953,11 @@ func (e *AssignmentExpression) Evaluation(vm *VM) CompletionValue {
 				// FIXME: handle named evaluation
 				panic("")
 			} else {
-				rref := e.Right.Evaluation(vm)
-				rval = rref.value.GetValue(vm.agent)
+				_rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+				rval = _rval
+				if isAbrupt {
+					return rt
+				}
 			}
 			if ref, ok := lref.value.ReferenceRecord(); ok {
 				ref.PutValue(vm.agent, rval)
@@ -1944,13 +1974,17 @@ func (e *AssignmentExpression) Evaluation(vm *VM) CompletionValue {
 		}
 	} else {
 		// TODO: handle &&= ||=, ??=
-		lref := e.Left.Evaluation(vm)
-		lval := lref.value.GetValue(vm.agent)
-		rref := e.Right.Evaluation(vm)
-		rval := rref.value.GetValue(vm.agent)
+		lval, lref, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+		if isAbrupt {
+			return rt
+		}
+		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+		if isAbrupt {
+			return rt
+		}
 		r := vm.ApplyStringOrNumericBinaryOperator(lval, rval, e.Operator.ToBinaryOperator())
 
-		if ref, ok := lref.value.ReferenceRecord(); ok {
+		if ref, ok := lref.ReferenceRecord(); ok {
 			ref.PutValue(vm.agent, r)
 		} else {
 			panic("unreachable")
@@ -1985,8 +2019,11 @@ func (e *NewExpression) Evaluation(vm *VM) CompletionValue {
 
 // 13.3.5.1.1
 func (e *NewExpression) EvaluateNew(vm *VM) Value {
-	ref := e.Callee.Evaluation(vm)
-	constructor := ref.value.GetValue(vm.agent)
+	var co CompletionValue
+	constructor, _, isAbrupt, rt := vm.EvalAndGetValue(e.Callee, co)
+	if isAbrupt {
+		panic(rt)
+	}
 	var argList []Value
 	if len(e.Arguments) == 0 {
 		argList = []Value{}
@@ -2089,11 +2126,16 @@ func (b *ExpressionBinaryExpression) AssignmentTargetType() AssignmentTargetType
 
 // 13.15.4
 func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM) Value {
-	lref := b.Left.Evaluation(vm)
-	lval := lref.value.GetValue(vm.agent)
+	var co CompletionValue
+	lval, _, isAbrupt, rt := vm.EvalAndGetValue(b.Left, co)
+	if isAbrupt {
+		panic(rt)
+	}
 
-	rref := b.Right.Evaluation(vm)
-	rval := rref.value.GetValue(vm.agent)
+	rval, _, isAbrupt, rt := vm.EvalAndGetValue(b.Right, co)
+	if isAbrupt {
+		panic(rt)
+	}
 	return vm.ApplyStringOrNumericBinaryOperator(lval, rval, b.Operator)
 }
 
@@ -2139,16 +2181,24 @@ type ConditionalExpression struct {
 
 // Evaluation
 // spec: 13.14.1
-func (e *ConditionalExpression) Evaluation(vm *VM) CompletionValue {
+func (e *ConditionalExpression) Evaluation(vm *VM) (co CompletionValue) {
 	agent := vm.agent
-	lref := e.Test.Evaluation(vm)
-	lval := lref.value.GetValue(agent)
+	lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Test, co)
+	if isAbrupt {
+		return rt
+	}
 	if lval.ToBoolean() {
-		trueRef := e.Consequent.Evaluation(vm)
-		return trueRef.value.GetValue(agent).ToCompletion()
+		trueRef, isAbrupt, rt := ReturnIfAbrupt(e.Consequent.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		return trueRef.GetValue(agent)
 	} else {
-		falseRef := e.Alternate.Evaluation(vm)
-		return falseRef.value.GetValue(agent).ToCompletion()
+		falseRef, isAbrupt, rt := ReturnIfAbrupt(e.Alternate.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		return falseRef.GetValue(agent)
 	}
 }
 
@@ -2225,32 +2275,47 @@ func (e *ExpressionLogicalExpression) astNullishCoalescing() bool {
 
 // Evaluation
 // spec: 13.13.1
-func (e *ExpressionLogicalExpression) Evaluation(vm *VM) CompletionValue {
+func (e *ExpressionLogicalExpression) Evaluation(vm *VM) (co CompletionValue) {
 	switch {
 	case e.astIsOr():
-		lref := e.Left.Evaluation(vm)
-		lval := lref.value.GetValue(vm.agent)
+		lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+		if isAbrupt {
+			return rt
+		}
 		lbool := lval.ToBoolean()
 		if lbool {
 			return lval.ToCompletion()
 		}
-		rref := e.Right.Evaluation(vm)
-		return rref.value.GetValue(vm.agent).ToCompletion()
+		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+		if isAbrupt {
+			return rt
+		}
+		return rval.ToCompletion()
 	case e.astIsAnd():
-		lref := e.Left.Evaluation(vm)
-		lval := lref.value.GetValue(vm.agent)
+		lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+		if isAbrupt {
+			return rt
+		}
 		lbool := lval.ToBoolean()
 		if !lbool {
 			return lval.ToCompletion()
 		}
-		rref := e.Right.Evaluation(vm)
-		return rref.value.GetValue(vm.agent).ToCompletion()
+		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+		if isAbrupt {
+			return rt
+		}
+		return rval.ToCompletion()
 	case e.astNullishCoalescing():
-		lref := e.Left.Evaluation(vm)
-		lval := lref.value.GetValue(vm.agent)
+		lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+		if isAbrupt {
+			return rt
+		}
 		if IsUndefinedOrNil(lval) || lval == NullValue {
-			rref := e.Right.Evaluation(vm)
-			return rref.value.GetValue(vm.agent).ToCompletion()
+			rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+			if isAbrupt {
+				return rt
+			}
+			return rval.ToCompletion()
 		} else {
 			return lval.ToCompletion()
 		}
@@ -2313,12 +2378,12 @@ type EqualityExpression struct {
 
 // Evaluation
 // spec: 13.11.1
-func (e *EqualityExpression) Evaluation(vm *VM) CompletionValue {
-	lref := e.Left.Evaluation(vm)
-	lval := lref.value.GetValue(vm.agent)
-
-	rref := e.Right.Evaluation(vm)
-	rval := rref.value.GetValue(vm.agent)
+func (e *EqualityExpression) Evaluation(vm *VM) (co CompletionValue) {
+	lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+	if isAbrupt {
+		return rt
+	}
+	rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
 
 	switch e.Operator {
 	case EqualityOperatorEqual:
@@ -2396,13 +2461,15 @@ type RelationalExpression struct {
 
 // Evaluation
 // spec: 13.10.1
-func (e *RelationalExpression) Evaluation(vm *VM) CompletionValue {
-	lref := e.Left.Evaluation(vm)
-	lval := lref.value.GetValue(vm.agent)
-
-	rref := e.Right.Evaluation(vm)
-	rval := rref.value.GetValue(vm.agent)
-
+func (e *RelationalExpression) Evaluation(vm *VM) (co CompletionValue) {
+	lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+	if isAbrupt {
+		return rt
+	}
+	rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+	if isAbrupt {
+		return rt
+	}
 	switch e.Operator {
 	case RelationalOperatorLessThan, RelationalOperatorGreaterThan:
 		var order isLessThanOrder
@@ -2512,28 +2579,40 @@ func (u *UnaryExpression) astIsVoid() bool {
 
 // TODO: use Number::[op], BigInt::[op]
 // spec: 13.5.3.1, 13.5.4.1, 13.5.5.1, 13.5.6.1, 13.5.7.1
-func (u *UnaryExpression) Evaluation(vm *VM) CompletionValue {
+func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 	agent := vm.agent
 	switch {
 	case u.astIsTypeof():
 		// 13.5.3.1
-		val := u.Operand.Evaluation(vm).value
+		val, isAbrupt, rt := ReturnIfAbrupt(u.Operand.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
 		if r, ok := val.ReferenceRecord(); ok {
 			if r.IsUnresolvableReference() {
 				return NewStringValue("undefined").ToCompletion()
 			}
 		}
-		val = val.GetValue(agent)
+		val, isAbrupt, rt = ReturnIfAbrupt(val.GetValue(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		// TODO: B.3.6.3 isHTMLDDA
 		return NewStringValue(val.TypeString()).ToCompletion()
 	case u.astIsAdd():
 		// 13.5.4.1
-		expr := u.Operand.Evaluation(vm)
-		return expr.value.GetValue(agent).ToNumber(agent).ToCompletion()
+		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		return expr.ToNumber(agent).ToCompletion()
 	case u.astIsSubtract():
 		// 13.5.5.1
-		expr := u.Operand.Evaluation(vm)
-		oldValue := ToNumeric(agent, expr.value.GetValue(agent))
+		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		oldValue := ToNumeric(agent, expr)
 		if n, b, ok := oldValue.NumberOrBigInt(); ok {
 			if n != nil {
 				return NewNumberValue(-n.Data).ToCompletion()
@@ -2545,8 +2624,11 @@ func (u *UnaryExpression) Evaluation(vm *VM) CompletionValue {
 		}
 	case u.astIsBitwiseNot():
 		// 13.5.6.1
-		expr := u.Operand.Evaluation(vm)
-		oldValue := ToNumeric(agent, expr.value.GetValue(agent))
+		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		oldValue := ToNumeric(agent, expr)
 		if n, b, ok := oldValue.NumberOrBigInt(); ok {
 			if n != nil {
 				return NewNumberValue(JSNumber(^int64(n.Data))).ToCompletion()
@@ -2558,8 +2640,11 @@ func (u *UnaryExpression) Evaluation(vm *VM) CompletionValue {
 		}
 	case u.astIsLogicalNot():
 		// 13.5.7.1
-		expr := u.Operand.Evaluation(vm)
-		oldValue := expr.value.GetValue(agent).ToBoolean()
+		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		oldValue := expr.ToBoolean()
 		if oldValue {
 			return FalseValue.ToCompletion()
 		} else {
@@ -2567,14 +2652,20 @@ func (u *UnaryExpression) Evaluation(vm *VM) CompletionValue {
 		}
 	case u.astIsTypeof():
 		// 13.5.3.1
-		val := u.Operand.Evaluation(vm)
-		if ref, ok := val.value.ReferenceRecord(); ok {
+		val, isAbrupt, rt := ReturnIfAbrupt(u.Operand.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		if ref, ok := val.ReferenceRecord(); ok {
 			if ref.IsUnresolvableReference() {
 				return NewStringValue("undefined").ToCompletion()
 			}
 		}
-		val = val.value.GetValue(agent).ToCompletion()
-		return NewStringValue(val.value.TypeString()).ToCompletion()
+		val, isAbrupt, rt = ReturnIfAbrupt(val.GetValue(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewStringValue(val.TypeString()).ToCompletion()
 	case u.astIsVoid():
 		// 13.5.2.1
 		expr := u.Operand.Evaluation(vm)
@@ -2659,12 +2750,12 @@ func (a Arguments) ArgumentListEvaluation(vm *VM) []Value {
 			panic("unimplemented")
 		}
 		ref := a[0].Evaluation(vm)
-		arg := ref.value.GetValue(vm.agent)
+		arg := ref.value.GetValue(vm.agent).value
 		return []Value{arg}
 	} else {
 		// TODO: handle spread
 		last := a[len(a)-1].Evaluation(vm)
-		return append(a[:len(a)-1].ArgumentListEvaluation(vm), last.value.GetValue(vm.agent))
+		return append(a[:len(a)-1].ArgumentListEvaluation(vm), last.value.GetValue(vm.agent).value)
 	}
 }
 
@@ -2689,13 +2780,13 @@ func (a Arguments) Evaluation(vm *VM) CompletionValue {
 		return NewListValue([]Value{}).ToCompletion()
 	} else if len(a) == 1 {
 		ref := a[0].Evaluation(vm)
-		arg := ref.value.GetValue(vm.agent)
+		arg := ref.value.GetValue(vm.agent).value
 		return NewListValue([]Value{arg}).ToCompletion()
 	} else if len(a) > 1 {
 		precedingArgs := a[:len(a)-1].Evaluation(vm)
 		ref := a[len(a)-1].Evaluation(vm)
 		arg := ref.value.GetValue(vm.agent)
-		return NewListValue(append(precedingArgs.value.(*ListValue).Values, arg)).ToCompletion()
+		return NewListValue(append(precedingArgs.value.(*ListValue).Values, arg.value)).ToCompletion()
 	} else {
 		panic("unimplemented")
 	}
@@ -2740,9 +2831,11 @@ func (c *CallExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if !c.astIsFunctionCall() {
 		panic("unimplemented")
 	}
-	ref := c.Callee.Evaluation(vm)
 	// rename from func
-	f := ref.value.GetValue(vm.agent)
+	f, ref, isAbrupt, rt := vm.EvalAndGetValue(c.Callee, co)
+	if isAbrupt {
+		return rt
+	}
 
 	// TODO: this ref
 	// i.This(c)
@@ -2752,21 +2845,29 @@ func (c *CallExpression) Evaluation(vm *VM) (co CompletionValue) {
 	// i.IsInTailPosition()
 	// i.Let("tailPosition")
 
-	arguments := c.Arguments.Evaluation(vm)
-	return vm.EvaluateCall(f, ref.value, arguments.value.(*ListValue).Values, false)
+	arguments, isAbrupt, rt := ReturnIfAbrupt(c.Arguments.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, false)
 }
 
 // coverCallExpressionAndAsyncArrowHead matches CallExpression : CoverCallExpressionAndAsyncArrowHead
 // spec: 13.3.6.1
-func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) CompletionValue {
+func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) (co CompletionValue) {
 	callee := c.Callee.(*MemberExpression)
 	expr := callee
 	memberExpr := expr
 	// TODO(XXX): is pass Arguments to evaluate directly?
-	arguments := c.Arguments.Evaluation(vm)
-	ref := memberExpr.Evaluation(vm)
-	f := ref.value.GetValue(vm.agent)
-	if r, ok := ref.value.ReferenceRecord(); ok {
+	arguments, isAbrupt, rt := ReturnIfAbrupt(c.Arguments.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	f, ref, isAbrupt, rt := vm.EvalAndGetValue(memberExpr, co)
+	if isAbrupt {
+		return rt
+	}
+	if r, ok := ref.ReferenceRecord(); ok {
 		if !r.IsPropertyReference() && r.ReferencedName.String == "eval" {
 			panic("unimplemented")
 		}
@@ -2775,7 +2876,7 @@ func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) Completion
 	// TODO: check is tailPosition
 	tailCall := false
 
-	return vm.EvaluateCall(f, ref.value, arguments.value.(*ListValue).Values, tailCall)
+	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, tailCall)
 }
 
 func (c *CallExpression) String() string {
@@ -2887,7 +2988,7 @@ func (v *VariableDeclaration) astHasInitializer() bool {
 	return v.Initializer != nil
 }
 
-func (v *VariableDeclaration) Evaluation(vm *VM) CompletionValue {
+func (v *VariableDeclaration) Evaluation(vm *VM) (co CompletionValue) {
 	if !v.astHasInitializer() {
 		return UndefinedValue.ToCompletion()
 	} else {
@@ -2898,8 +2999,11 @@ func (v *VariableDeclaration) Evaluation(vm *VM) CompletionValue {
 			// FIXME: handle named evaluation
 			panic("")
 		} else {
-			rhs := v.Initializer.Evaluation(vm)
-			value = rhs.value.GetValue(vm.agent)
+			v, _, isAbrupt, rt := vm.EvalAndGetValue(v.Initializer, co)
+			value = v
+			if isAbrupt {
+				return rt
+			}
 		}
 		lhs.PutValue(vm.agent, value)
 	}
@@ -3153,11 +3257,10 @@ func (s *ThrowStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 }
 
 func (s *ThrowStatement) Evaluation(vm *VM) (co CompletionValue) {
-	exprRef, isAbrupt, rt := ReturnIfAbrupt(s.Expression.Evaluation(vm), co)
+	exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Expression, co)
 	if isAbrupt {
 		return rt
 	}
-	exprValue := exprRef.GetValue(vm.agent)
 	co.t = CompletionTypeThrow
 	co.err = exprValue
 	return
@@ -3579,10 +3682,12 @@ func (s *IfStatement) astHasElse() bool {
 
 // Evaluation
 // spec: 14.6.2
-func (s *IfStatement) Evaluation(vm *VM) CompletionValue {
+func (s *IfStatement) Evaluation(vm *VM) (co CompletionValue) {
 	if s.astHasElse() {
-		exprRef := s.Condition.Evaluation(vm)
-		exprValue := exprRef.value.GetValue(vm.agent)
+		exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Condition, co)
+		if isAbrupt {
+			return rt
+		}
 		var stmtCompletion CompletionValue
 		if exprValue.ToBoolean() {
 			stmtCompletion = s.Consequent.Evaluation(vm)
@@ -3591,8 +3696,10 @@ func (s *IfStatement) Evaluation(vm *VM) CompletionValue {
 		}
 		return UpdateEmpty(stmtCompletion, UndefinedValue)
 	} else {
-		exprRef := s.Condition.Evaluation(vm)
-		exprValue := exprRef.value.GetValue(vm.agent)
+		exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Condition, co)
+		if isAbrupt {
+			return rt
+		}
 		if !exprValue.ToBoolean() {
 			return UndefinedValue.ToCompletion()
 		} else {
@@ -3630,11 +3737,10 @@ var (
 // Evaluation
 // spec: 14.12.4
 func (s *SwitchStatement) Evaluation(vm *VM) (co CompletionValue) {
-	exprRef, isAbrupt, rt := ReturnIfAbrupt(s.Expression.Evaluation(vm), co)
+	switchValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Expression, co)
 	if isAbrupt {
 		return rt
 	}
-	switchValue := exprRef.GetValue(vm.agent)
 	oldEnv := vm.RunningLexicalEnvironment()
 	blockEnv := NewDeclarativeEnvironment(oldEnv)
 	vm.BlockDeclarationInstantiation(s.CaseBlock, blockEnv)
@@ -3801,7 +3907,10 @@ func (c *CaseClause) CaseClauseIsSelected(vm *VM, input Value) (co Completion[bo
 	if isAbrupt {
 		return rt
 	}
-	clauseSelector := exprRef.GetValue(vm.agent)
+	clauseSelector, isAbrupt, rt := ReturnIfAbrupt(exprRef.GetValue(vm.agent), co)
+	if isAbrupt {
+		return rt
+	}
 	co.value = IsStrictlyEqual(input, clauseSelector)
 	return
 }
@@ -3886,8 +3995,10 @@ func (s *WhileStatement) Evaluation(vm *VM) CompletionValue {
 func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue) {
 	var V Value = UndefinedValue
 	for {
-		exprRef := s.Condition.Evaluation(vm)
-		exprValue := exprRef.value.GetValue(vm.agent)
+		exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Condition, co)
+		if isAbrupt {
+			return rt
+		}
 		if !exprValue.ToBoolean() {
 			return V.ToCompletion()
 		}
@@ -4389,8 +4500,10 @@ func (s *ReturnStatement) Evaluation(vm *VM) (co CompletionValue) {
 		co.t = CompletionTypeReturn
 		return
 	} else {
-		exprRef := s.Expression.Evaluation(vm)
-		exprValue := exprRef.value.GetValue(vm.agent)
+		exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Expression, co)
+		if isAbrupt {
+			return rt
+		}
 		co.value = exprValue
 		co.t = CompletionTypeReturn
 		// TODO: GetGeneratorKind
@@ -4775,7 +4888,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 			},
 		)
 		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
-		superclass := superclassRef.Data().GetValue(agent)
+		superclass := superclassRef.Data().GetValue(agent).value
 		if superclass == nil {
 			protoParent = nil
 			constructorParent = realm.Intrinsics.FunctionPrototype
@@ -5321,11 +5434,10 @@ func (l *LexicalBinding) Evaluation(vm *VM) (co CompletionValue) {
 			// FIXME: handle named evaluation
 			panic("")
 		} else {
-			rhs, isAbrupt, rt := ReturnIfAbrupt(l.Initializer.Evaluation(vm), co)
+			value, _, isAbrupt, rt := vm.EvalAndGetValue(l.Initializer, co)
 			if isAbrupt {
 				return rt
 			}
-			value := rhs.GetValue(vm.agent)
 			lhs.InitializeReferencedBinding(value)
 		}
 		// return EMPTY
@@ -6165,8 +6277,10 @@ func (y *YieldExpression) Evaluation(vm *VM) (co CompletionValue) {
 	} else if y.hasStar {
 		panic("unimplemented")
 	} else {
-		exprRef := y.AssignmentExpression.Evaluation(vm)
-		value := exprRef.value.GetValue(vm.agent)
+		value, _, isAbrupt, rt := vm.EvalAndGetValue(y.AssignmentExpression, co)
+		if isAbrupt {
+			return rt
+		}
 		vm.isYield = true
 		return Yield(vm.agent, value)
 	}

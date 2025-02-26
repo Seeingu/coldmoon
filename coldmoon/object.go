@@ -477,23 +477,26 @@ func (o *Object) PrivateMethodOrAccessorAdd(
 	o.data.privateElements[privateName] = method
 }
 
-// 7.3.30
-func (o *Object) PrivateGet(privateName PrivateName) Value {
+// PrivateGet
+// spec: 7.3.30
+func (o *Object) PrivateGet(privateName PrivateName) (co CompletionValue) {
 	entry := o.PrivateElementFind(privateName)
 	if entry == nil {
-		return o.Agent().ThrowTypeError("PrivateGet failed")
+		co.ThrowTypeError(o.Agent(), "PrivateGet failed")
+		return
 	}
 	switch entry.Kind {
 	case PrivateElementKindField:
-		return entry.Value
+		return entry.Value.ToCompletion()
 	case PrivateElementKindMethod:
-		return entry.Value
+		return entry.Value.ToCompletion()
 	case PrivateElementKindAccessor:
 		getter := entry.Get
 		if getter == nil {
-			return o.Agent().ThrowTypeError("PrivateGet failed: getter is nil")
+			co.ThrowTypeError(o.Agent(), "PrivateGet failed: getter is nil")
+			return
 		}
-		return getter.Call(o.ToValue(), []Value{}).value
+		return getter.Call(o.ToValue(), []Value{})
 	}
 	panic("unreachable")
 }

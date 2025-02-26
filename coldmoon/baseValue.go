@@ -20,11 +20,11 @@ func (b *BaseValue) Hash() string {
 	}
 }
 
-func (b *BaseValue) GetValue(agent *Agent) Value {
+func (b *BaseValue) GetValue(agent *Agent) CompletionValue {
 	if r, ok := b.Value.ReferenceRecord(); ok {
 		return r.GetValue(agent)
 	}
-	return b.Value
+	return b.Value.ToCompletion()
 }
 
 func (b *BaseValue) ToPropertyKey() PropertyKey {

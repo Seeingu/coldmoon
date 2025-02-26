@@ -30,8 +30,8 @@ type RuntimeSemanticsBindingInitialization interface {
 
 // 13.2.5.5
 type RuntimeSemanticsPropertyDefinitionEvaluation interface {
-	// PropertyDefinitionEvaluation returns UNUSED
-	PropertyDefinitionEvaluation(vm *VM, obj ObjectType)
+	// PropertyDefinitionEvaluation returns UNUSED or abrupt
+	PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue)
 }
 
 // 13.3.8.1

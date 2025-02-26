@@ -38,7 +38,7 @@ type ObjectType interface {
 	SpeciesConstructor(defaultConstructor ObjectType) Completion[ObjectType]
 	// PrivateMethodOrAccessorAdd 7.3.28
 	PrivateMethodOrAccessorAdd(method *PrivateElement)
-	PrivateGet(privateName PrivateName) Value
+	PrivateGet(privateName PrivateName) CompletionValue
 	ToCompletion() Completion[ObjectType]
 	ToValue() Value
 	// --- internal methods ---
