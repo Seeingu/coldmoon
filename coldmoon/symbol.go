@@ -1,5 +1,7 @@
 package coldmoon
 
+import "github.com/Seeingu/coldmoon/pkg"
+
 // MARK: - SymbolObject
 
 type SymbolObject struct {
@@ -20,7 +22,7 @@ func NewSymbolObject(agent *Agent, s *SymbolValue, prototype ObjectType) *Symbol
 func NewSymbolConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
-		description := argumentsList[0]
+		description := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget != nil {
 			panic("TypeError")
 		}
