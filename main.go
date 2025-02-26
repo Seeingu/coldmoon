@@ -24,6 +24,7 @@ func main() {
 	} else {
 		runtime.RegisterTerminalRuntime(realm)
 	}
+	Debug.IsReady = true
 
 	// get args, if is a file, read and evaluate
 	// else run as repl
