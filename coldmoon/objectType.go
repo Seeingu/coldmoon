@@ -43,6 +43,9 @@ type ObjectType interface {
 	ToValue() Value
 	// --- internal methods ---
 
+	HasSlot(name string) bool
+	SetSlot(name string, value any)
+	GetSlot(name string) (value any, ok bool)
 	String() string
 	Ref() ObjectType
 	IsOrdinary() bool

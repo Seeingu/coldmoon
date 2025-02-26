@@ -14,12 +14,13 @@ const (
 )
 
 type Data struct {
-	prototype       ObjectType
-	extensible      bool
-	agent           *Agent
-	internalMethods InternalMethods
-	propertyStorage PropertyStorage
-	privateElements map[PrivateName]*PrivateElement
+	prototype         ObjectType
+	extensible        bool
+	internalSlotNames map[string]any
+	agent             *Agent
+	internalMethods   InternalMethods
+	propertyStorage   PropertyStorage
+	privateElements   map[PrivateName]*PrivateElement
 }
 
 type Object struct {
@@ -50,12 +51,21 @@ func NewObject(agent *Agent, prototype ObjectType, typeName string) *Object {
 	o := &Object{
 		typeName: typeName,
 		data: &Data{
-			agent:           agent,
-			prototype:       prototype,
-			extensible:      true,
-			internalMethods: NewInternalMethods(),
-			propertyStorage: NewPropertyStorage(),
+			agent:             agent,
+			prototype:         prototype,
+			extensible:        true,
+			internalSlotNames: map[string]any{},
+			internalMethods:   NewInternalMethods(),
+			propertyStorage:   NewPropertyStorage(),
 		},
+	}
+	return o
+}
+
+func NewObjectV2(agent *Agent, prototype ObjectType, typeName string, additionalInternalSlotsList []string) *Object {
+	o := NewObject(agent, prototype, typeName)
+	for _, slot := range additionalInternalSlotsList {
+		o.data.internalSlotNames[slot] = nil
 	}
 	return o
 }
@@ -64,6 +74,23 @@ var EmptyObject = &Object{}
 
 func (o *Object) Prototype() ObjectType {
 	return o.data.prototype
+}
+
+func (o *Object) SetSlot(name string, value any) {
+	o.data.internalSlotNames[name] = value
+}
+
+func (o *Object) GetSlot(name string) (value any, ok bool) {
+	value, ok = o.data.internalSlotNames[name]
+	return
+}
+
+func (o *Object) HasSlot(name string) bool {
+	v, ok := o.data.internalSlotNames[name]
+	if !ok {
+		return false
+	}
+	return v != nil
 }
 
 // TODO: implement spec

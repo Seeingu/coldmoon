@@ -426,10 +426,10 @@ func ObjectSameValue(x, y ObjectType) bool {
 	return x == y
 }
 
-// 10.1.12
+// OrdinaryObjectCreate
+// spec: 10.1.12
 func OrdinaryObjectCreate(agent *Agent, proto ObjectType, internalSlotsList []string) *Object {
-	obj := NewObject(agent, proto, "OrdinaryObject")
-
+	obj := NewObjectV2(agent, proto, "OrdinaryObject", internalSlotsList)
 	return obj
 }
 

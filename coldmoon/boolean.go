@@ -4,6 +4,9 @@ import "github.com/Seeingu/coldmoon/pkg"
 
 // MARK: - BooleanValue
 
+// SlotBooleanData [[BooleanData]]
+const SlotBooleanData = "BooleanData"
+
 type BooleanValue struct {
 	Value
 	Data bool
@@ -72,12 +75,13 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 			realm.Agent,
 			newTarget,
 			"%Boolean.prototype%",
-			[]string{})
+			[]string{SlotBooleanData})
 		booleanObject := &BooleanObject{
 			Object: o,
 			Data:   b,
 		}
-		return (booleanObject).ToValue()
+		booleanObject.SetSlot(SlotBooleanData, b)
+		return booleanObject.ToValue()
 	}
 	object := CreateBuiltinFunction(
 		realm.Agent,
@@ -105,7 +109,7 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 	object.ref = object
 	agent := realm.Agent
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		b := thisBooleanValue(agent, thisArgument)
+		b := ThisBooleanValue(agent, thisArgument)
 		if b {
 			return NewStringValue("true")
 		} else {
@@ -113,7 +117,7 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 		}
 	}
 	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		return NewBooleanValue(thisBooleanValue(realm.Agent, thisArgument))
+		return NewBooleanValue(ThisBooleanValue(realm.Agent, thisArgument))
 	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
@@ -122,11 +126,16 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 	return object
 }
 
-func thisBooleanValue(agent *Agent, value Value) bool {
+// ThisBooleanValue
+// spec: 20.3.3.3.1
+func ThisBooleanValue(agent *Agent, value Value) bool {
 	switch o := value.(type) {
 	case *BooleanValue:
 		return value.ToBoolean()
 	case *ObjectValue:
+		if b, ok := o.Object.GetSlot(SlotBooleanData); ok {
+			return b.(bool)
+		}
 		if o, ok := o.Object.(*BooleanObject); ok {
 			b := o.getData()
 			return b
