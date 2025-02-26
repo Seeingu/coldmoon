@@ -573,7 +573,7 @@ func LoopContinues(result Value, labelSet LabelSet) bool {
 // UpdateEmpty
 // spec: 6.2.4.3
 func UpdateEmpty(result CompletionValue, V Value) CompletionValue {
-	if result.value != nil {
+	if result.value != nil || result.err != nil {
 		return result
 	}
 	return V.ToCompletion()

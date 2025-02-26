@@ -61,7 +61,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		if !IsCallable(fun) {
 			panic("TypeError")
 		}
-		return ReturnAssertNormal(fun.Call(thisArg, args))
+		return fun.Call(thisArg, args)
 	}
 	bind := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		thisArg := argumentsList[0]

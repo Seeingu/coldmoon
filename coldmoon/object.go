@@ -138,8 +138,7 @@ func (o *Object) IsCallable() bool {
 // argumentsList is optional
 func (o *Object) Call(this Value, argumentsList ArgumentsList) (co CompletionValue) {
 	if !o.IsCallable() {
-		co.ThrowTypeError(o.Agent(), fmt.Sprintf("TypeError: %s is not callable", o.String()))
-		return
+		return co.ThrowTypeError(o.Agent(), fmt.Sprintf("TypeError: %s is not callable", o.String()))
 	}
 	if argumentsList == nil {
 		argumentsList = ArgumentsList{}
@@ -484,8 +483,7 @@ func (o *Object) PrivateMethodOrAccessorAdd(
 func (o *Object) PrivateGet(privateName PrivateName) (co CompletionValue) {
 	entry := o.PrivateElementFind(privateName)
 	if entry == nil {
-		co.ThrowTypeError(o.Agent(), "PrivateGet failed")
-		return
+		return co.ThrowTypeError(o.Agent(), "PrivateGet failed")
 	}
 	switch entry.Kind {
 	case PrivateElementKindField:
@@ -495,8 +493,7 @@ func (o *Object) PrivateGet(privateName PrivateName) (co CompletionValue) {
 	case PrivateElementKindAccessor:
 		getter := entry.Get
 		if getter == nil {
-			co.ThrowTypeError(o.Agent(), "PrivateGet failed: getter is nil")
-			return
+			return co.ThrowTypeError(o.Agent(), "PrivateGet failed: getter is nil")
 		}
 		return getter.Call(o.ToValue(), []Value{})
 	}

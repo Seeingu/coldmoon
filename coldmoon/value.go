@@ -593,8 +593,7 @@ func CreateListFromArrayLike(agent *Agent, self Value) []Value {
 	// TODO: element types
 	objectValue, ok := self.(*ObjectValue)
 	if !ok {
-		co.ThrowTypeError(agent, "TypeError")
-		panic(co)
+		panic(co.ThrowTypeError(agent, "TypeError"))
 	}
 
 	length, isAbrupt, rt := ReturnIfAbrupt(objectValue.Object.LengthOfArrayLike(), co)

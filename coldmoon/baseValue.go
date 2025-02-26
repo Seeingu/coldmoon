@@ -159,7 +159,7 @@ func (b *BaseValue) ToObject(agent *Agent) (co Completion[ObjectType]) {
 	realm := agent.CurrentRealm()
 	switch v := b.Value.(type) {
 	case *undefinedValue, *nullValue:
-		co.ThrowTypeError(agent, "ToObject")
+		return co.ThrowTypeError(agent, "ToObject")
 	case *BooleanValue:
 		co.value = NewBooleanObject(agent, v.Data, realm.Intrinsics.BooleanPrototype)
 	case *ObjectValue:

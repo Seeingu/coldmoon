@@ -815,18 +815,18 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return first
 	}
 	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := this.ToObject(agent).value
 		var co CompletionValue
+		o := this.ToObject(agent).value
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 		argCount := JSInt(len(args))
 		if argCount == 0 {
 			return NewNumberValue(length.ToNumber())
 		}
 		if float64(length)+float64(argCount) > POW_2_32-1 {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "size is too large")
 		}
 
 		k := length

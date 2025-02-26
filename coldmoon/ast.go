@@ -3124,7 +3124,7 @@ func (c *Catch) CatchClauseEvaluation(vm *VM, thrownValue Value) (co CompletionV
 		vm.SetRunningLexicalEnvironment(oldEnv)
 		return status
 	}
-	B := CompletionHandle(c.CatchBlock.Evaluation(vm))
+	B := c.CatchBlock.Evaluation(vm)
 	vm.SetRunningLexicalEnvironment(oldEnv)
 	return B
 }
@@ -3182,10 +3182,10 @@ func (t *TryStatement) Evaluation(vm *VM) CompletionValue {
 		}
 		return UpdateEmpty(F, UndefinedValue)
 	case t.astHasCatch():
-		B := CompletionHandle(t.TryBlock.Evaluation(vm))
+		B := t.TryBlock.Evaluation(vm)
 		var C CompletionValue
-		if B.t == CompletionTypeThrow {
-			C = CompletionHandle(t.Catch.CatchClauseEvaluation(vm, B.value))
+		if B.t == CompletionTypeThrow || B.err != nil {
+			C = CompletionHandle(t.Catch.CatchClauseEvaluation(vm, B.err))
 		} else {
 			C = B
 		}
