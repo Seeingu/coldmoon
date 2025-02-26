@@ -24,7 +24,7 @@ var errorInternalSet SetFn = func(o ObjectType, p PropertyKey, v Value, receiver
 func NewErrorConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		message := argumentsList[0]
 		options := pkg.SliceSafeGet(argumentsList, 1)
 
@@ -90,7 +90,7 @@ func NewErrorPrototype(realm *Realm) ObjectType {
 	object.defineBuiltinProperty(CMString("name"), NewStringValue("Error").ToBuiltinPropertyDescriptor())
 	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToBuiltinPropertyDescriptor())
 
-	var toString BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var toString BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		O, ok := thisValue.(*ObjectValue)
 		if !ok {
 			panic("TypeError")
@@ -139,7 +139,7 @@ func NativeError() ObjectType {
 
 func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		message := pkg.SliceSafeGet(argumentsList, 0)
 		if message == nil {
 			message = UndefinedValue
@@ -196,7 +196,7 @@ func NewNativeErrorPrototype(realm *Realm, name string) ObjectType {
 
 func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		errors := argumentsList[0]
 		message := argumentsList[1]
 		options := argumentsList[2]

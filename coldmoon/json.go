@@ -73,7 +73,7 @@ func NewJSON(realm *Realm) *JSON {
 
 	object.defineToStringTag("JSON")
 
-	var parse BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var parse BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		text := argumentsList[0]
 		var reviver Value
 		if len(argumentsList) > 1 {
@@ -93,7 +93,7 @@ func NewJSON(realm *Realm) *JSON {
 			return unfiltered
 		}
 	}
-	stringify := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	stringify := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := argumentsList[0]
 		var replacer Value = UndefinedValue
 		var space Value = UndefinedValue

@@ -186,7 +186,7 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 
 func NewArrayConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		if newTarget == nil {
 			newTarget = agent.ActiveFunctionObject()
 		}
@@ -195,7 +195,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 
 		numberOfArgs := JSInt(len(args))
 		if numberOfArgs == 0 {
-			return (ArrayCreate(agent, 0, proto)).ToValue()
+			return ArrayCreate(agent, 0, proto).ToValue()
 		} else if numberOfArgs == 1 {
 			length := args[0]
 			array := ArrayCreate(agent, 0, proto)
@@ -229,11 +229,11 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		}
 	}
 
-	var isArray BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var isArray BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		arg := args[0]
 		return NewBooleanValue(IsArray(arg))
 	}
-	var of BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var of BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		length := JSInt(len(args))
 		lenNumber := NewNumberValue(length.ToNumber())
 
@@ -264,7 +264,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("of"), of, 0)
 
 	// 23.1.2.5
-	var getter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return this
 	}
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
@@ -289,7 +289,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		Configurable: false,
 	})
 
-	var arrayMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var arrayMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := args[0]
 		thisArg := args[1]
 
@@ -317,7 +317,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 
-	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		array := MustGetObject(this)
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
@@ -343,16 +343,16 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return NewStringValue(strings.Join(elements, sep))
 	}
 
-	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		array := ReturnAssertNormal(this.ToObject(agent))
 		fun := array.Get(NewStringPropertyKey("join"))
 		if !IsCallable(fun) {
 			fun = realm.Intrinsics.ObjectPrototype.Get(NewStringPropertyKey("toString"))
 		}
-		return ReturnAssertNormal(fun.Call(this, nil))
+		return fun.Call(this, nil)
 	}
 
-	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := args[0]
 		thisArg := args[1]
 
@@ -380,7 +380,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return UndefinedValue
 	}
-	var push BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var push BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		array := MustGetObject(this)
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
@@ -396,7 +396,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
 		return NewNumberValue(length.ToNumber())
 	}
-	var pop BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var pop BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		array := MustGetObject(this)
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
@@ -405,7 +405,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		if length == 0 {
 			array.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow)
-			return UndefinedValue
+			return UndefinedValue.ToCompletion()
 		}
 		length--
 		element := array.Get(NewIntegerIndexPropertyKey(length))
@@ -416,7 +416,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
 		return element
 	}
-	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		array := MustGetObject(this)
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
@@ -436,7 +436,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewStringValue(strings.Join(elements, separator))
 	}
-	var includes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var includes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchElement := args[0]
 		fromIndex := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -472,14 +472,14 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return FalseValue
 	}
-	var indexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var indexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchElement := args[0]
 		fromIndex := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 		if length == 0 {
 			return NewNumberValue(-1)
@@ -511,7 +511,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(-1)
 	}
-	var find BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var find BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -523,7 +523,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return findRec.Value
 	}
-	var findIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var findIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -535,7 +535,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return NewNumberValue(findRec.Index.ToNumber())
 	}
-	var findLast BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var findLast BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -547,7 +547,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return findRec.Value
 	}
-	var findLastIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var findLastIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		predicate := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -559,7 +559,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return NewNumberValue(findRec.Index.ToNumber())
 	}
-	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchElement := args[0]
 		fromIndex := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -595,7 +595,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(-1)
 	}
-	var at BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var at BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		index := args[0]
 		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
@@ -610,7 +610,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return o.Get(NewIntegerIndexPropertyKey(k))
 	}
-	var every BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var every BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -639,7 +639,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return TrueValue
 	}
-	var some BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var some BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := args[0]
 		thisArg := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -668,7 +668,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return FalseValue
 	}
-	var with BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var with BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		index := args[0]
 		value := args[1]
 		o := ReturnAssertNormal(this.ToObject(agent))
@@ -695,7 +695,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return array.ToValue()
 	}
-	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		items := args[0]
 		mapFn := args[1]
 		thisArg := args[2]
@@ -771,20 +771,20 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		a.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
 		return a.ToValue()
 	}
-	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		return CreateArrayIterator(agent, o, objectOwnPropertiesKindKeyAndValue).ToValue()
 	}
-	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		return CreateArrayIterator(agent, o, objectOwnPropertiesKindKey).ToValue()
 	}
-	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		iterator := CreateArrayIterator(agent, o, objectOwnPropertiesKindValue).ToValue()
 		return iterator
 	}
-	var shift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var shift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
@@ -814,7 +814,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		o.Set(NewStringPropertyKey("length"), NewNumberValue((length - 1).ToNumber()), setThrowTypeThrow)
 		return first
 	}
-	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
@@ -850,7 +850,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		o.Set(NewStringPropertyKey("length"), NewNumberValue(newLength), setThrowTypeThrow)
 		return NewNumberValue(newLength)
 	}
-	var filter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var filter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := args[0]
 		thisArg := args[1]
 		o := this.ToObject(agent).value
@@ -882,7 +882,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return A.ToValue()
 	}
-	var reduce BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var reduce BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := args[0]
 		initialValue := args[1]
 		o := this.ToObject(agent).value
@@ -930,7 +930,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return accumulator
 	}
-	var reduceRight BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var reduceRight BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := args[0]
 		initialValue := args[1]
 		o := this.ToObject(agent).value
@@ -978,7 +978,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return accumulator
 	}
-	var concat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var concat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		A := ArraySpeciesCreate(agent, o, 0)
 		n := JSInt(0)
@@ -1023,7 +1023,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow)
 		return A.ToValue()
 	}
-	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
@@ -1076,7 +1076,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow)
 		return A.ToValue()
 	}
-	var fill BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var fill BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := args[0]
 		start := args[1]
 		end := args[2]
@@ -1114,7 +1114,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return o.ToValue()
 	}
-	var copyWithin BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var copyWithin BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		target := args[0]
 		start := args[1]
 		end := args[2]
@@ -1188,7 +1188,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return o.ToValue()
 	}
-	var reverse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var reverse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
@@ -1226,7 +1226,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return o.ToValue()
 	}
-	var toReversed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toReversed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
@@ -1242,7 +1242,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return A.ToValue()
 	}
-	var sort BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var sort BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		compareFn := args[0]
 		if compareFn != UndefinedValue && !IsCallable(compareFn) {
 			panic("TypeError")
@@ -1271,7 +1271,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return obj.ToValue()
 	}
-	var toSorted BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toSorted BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		compareFn := args[0]
 		if compareFn != UndefinedValue && !IsCallable(compareFn) {
 			panic("TypeError")
@@ -1295,7 +1295,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		return A.ToValue()
 	}
-	var flat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var flat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		depth := args[0]
 		o := this.ToObject(agent).value
 		var co CompletionValue
@@ -1315,7 +1315,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		FlattenIntoArray(agent, A, o, sourceLen, 0, depthNum, nil, nil)
 		return A.ToValue()
 	}
-	var flatMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var flatMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		mapperFunction := args[0]
 		thisArg := args[1]
 		o := this.ToObject(agent).value
@@ -1332,7 +1332,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		FlattenIntoArray(agent, A, o, sourceLen, 0, 1, MustGetObject(mapperFunction), thisArg)
 		return A.ToValue()
 	}
-	var splice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var splice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		start := args[0]
 		deleteCount := args[1]
 		var items []Value
@@ -1424,7 +1424,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		o.Set(NewStringPropertyKey("length"), NewNumberValue((length - actualDeleteCount + itemCount).ToNumber()), setThrowTypeThrow)
 		return A.ToValue()
 	}
-	var toSpliced BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toSpliced BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		start := args[0]
 		skipCount := args[1]
 		var items []Value

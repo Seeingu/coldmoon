@@ -16,12 +16,12 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 
 	// 21.4.4.44
-	var valueOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var valueOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		return dateObject.Data.ToValue()
 	}
 	// 21.4.4.45
-	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		hintValue := args[0]
 		if !this.IsObject() {
 			return agent.ThrowTypeError("is not an object")
@@ -41,11 +41,11 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return o.OrdinaryToPrimitive(tryFirst)
 	}
-	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		date := RequireInternalSlot[*DateObject](this)
 		return NewStringValue(ToDateString(date.Data))
 	}
-	var toISOString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toISOString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if !tv.IsInf() {
@@ -69,7 +69,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			t.Format("2006-01-02T15:04:05.999Z"),
 		)
 	}
-	var toJSON BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toJSON BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := MustGetObject(this)
 		tv := o.ToValue().ToPrimitive(agent, PreferredTypeNumber)
 		if n, ok := ValueGet[*NumberValue](tv); ok && !n.IsFinite() {
@@ -77,13 +77,13 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return ValueInvoke(agent, (o).ToValue(), NewStringPropertyKey("toISOString"), nil)
 	}
-	var toUTCString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toUTCString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		t := time.UnixMilli(int64(tv)).UTC()
 		return NewStringValue(t.Format(time.RFC1123))
 	}
-	var toDateString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toDateString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := MustGetObject(this).(*DateObject)
 		tv := dateObject.Data
 		if !tv.IsValidDateTime() {
@@ -91,7 +91,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewStringValue(DateString(LocalTime(tv)))
 	}
-	var toTimeString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toTimeString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := MustGetObject(this).(*DateObject)
 		tv := dateObject.Data
 		if !tv.IsValidDateTime() {
@@ -99,16 +99,16 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewStringValue(TimeString(LocalTime(tv)) + TimeZoneString(tv))
 	}
-	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return ValueInvoke(agent, this, NewStringPropertyKey("toString"), nil)
 	}
-	var toLocaleDateString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toLocaleDateString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return ValueInvoke(agent, this, NewStringPropertyKey("toDateString"), nil)
 	}
-	var toLocaleTimeString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var toLocaleTimeString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return ValueInvoke(agent, this, NewStringPropertyKey("toTimeString"), nil)
 	}
-	var getTimezoneOffset BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getTimezoneOffset BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -116,7 +116,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(tv - LocalTime(tv)/MS_PER_MIN.ToNumber())
 	}
-	var getDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -124,7 +124,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(DateFromTime(tv))
 	}
-	var getDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -132,7 +132,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(WeekDay(tv))
 	}
-	var getFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -140,7 +140,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(YearFromTime(LocalTime(tv)))
 	}
-	var getHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -148,7 +148,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(HourFromTime(LocalTime(tv)))
 	}
-	var getMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -156,7 +156,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(msFromTime(LocalTime(tv)))
 	}
-	var getMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -164,7 +164,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(MinFromTime(LocalTime(tv)))
 	}
-	var getMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -172,7 +172,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(MonthFromTime(LocalTime(tv)))
 	}
-	var getSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -180,12 +180,12 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(SecFromTime(LocalTime(tv)))
 	}
-	var getTime BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getTime BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		return NewNumberValue(tv)
 	}
-	var getUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -193,7 +193,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(DateFromTime(tv))
 	}
-	var getUTCDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getUTCDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -201,7 +201,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(WeekDay(tv))
 	}
-	var getUTCFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getUTCFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -209,7 +209,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(YearFromTime(tv))
 	}
-	var getUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -217,7 +217,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(HourFromTime(tv))
 	}
-	var getUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -225,7 +225,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(msFromTime(tv))
 	}
-	var getUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -233,7 +233,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(MinFromTime(tv))
 	}
-	var getUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -241,7 +241,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(MonthFromTime(tv))
 	}
-	var getUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		if tv.IsNaN() {
@@ -249,7 +249,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(SecFromTime(tv))
 	}
-	var setDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		date := args[0].ToNumber(agent).Data
@@ -262,7 +262,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		year := args[0].ToNumber(agent).Data
@@ -281,7 +281,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		hour := args[0].ToNumber(agent).Data
@@ -304,7 +304,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		ms := args[0].ToNumber(agent).Data
@@ -315,7 +315,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		minute := args[0].ToNumber(agent).Data
@@ -334,7 +334,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		month := args[0].ToNumber(agent).Data
@@ -348,7 +348,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		sec := args[0].ToNumber(agent).Data
@@ -363,13 +363,13 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setTime BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setTime BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		t := args[0].ToNumber(agent).Data
 		dateObject.Data = TimeClip(t)
 		return NewNumberValue(dateObject.Data)
 	}
-	var setUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		date := args[0].ToNumber(agent).Data
@@ -379,7 +379,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		hour := args[0].ToNumber(agent).Data
@@ -402,7 +402,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		ms := args[0].ToNumber(agent).Data
@@ -413,7 +413,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		minute := args[0].ToNumber(agent).Data
@@ -432,7 +432,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		month := args[0].ToNumber(agent).Data
@@ -446,7 +446,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject.Data = u
 		return NewNumberValue(u)
 	}
-	var setUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		sec := args[0].ToNumber(agent).Data
@@ -798,7 +798,7 @@ func TimeClip(time JSNumber) JSNumber {
 
 func NewDateConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		if newTarget == nil {
 			now := time.Now().UTC()
 			return NewStringValue(ToDateString(JSNumber(now.UnixNano())))
@@ -865,7 +865,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
-	var utc BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var utc BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		numberOfArgs := len(args)
 		if numberOfArgs < 1 {
 			return NaNValue
@@ -902,10 +902,10 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		dv := TimeClip(UTC(finalDate))
 		return NewNumberValue(dv)
 	}
-	var now BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var now BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return NewNumberValue(JSNumber(time.Now().UnixNano()))
 	}
-	var parse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var parse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		s := args[0].String()
 		t, err := time.Parse(time.RFC3339, s)
 		if err != nil {

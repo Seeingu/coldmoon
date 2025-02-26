@@ -1,7 +1,7 @@
 package coldmoon
 
 type (
-	BehaviorFn      func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value
+	BehaviorFn      func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value]
 	BuiltinFunction struct {
 		*Object
 		InternalSlotPrivateMethods
@@ -86,11 +86,11 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 
 	a.ExecutionContextStack.Push(calleeContext)
 
-	result := b.Behavior(thisArgument, argumentsList, newTarget)
+	r := b.Behavior(thisArgument, argumentsList, newTarget)
+	result := CompletionHandleV2(r)
 
 	a.ExecutionContextStack.Pop()
-	co.value = result
-	return
+	return result
 }
 
 type builtinFunctionArgs struct {
@@ -103,7 +103,8 @@ type builtinFunctionArgs struct {
 	additionalFieldsV2 any
 }
 
-// 10.3.4
+// CreateBuiltinFunction
+// spec: 10.3.4
 func CreateBuiltinFunction(
 	agent *Agent,
 	behavior BehaviorFn,

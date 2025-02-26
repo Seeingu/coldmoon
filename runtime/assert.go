@@ -8,7 +8,7 @@ import (
 func defineAssert(realm *coldmoon.Realm) {
 	object := realm.GlobalObject
 
-	var assert coldmoon.BehaviorFn = func(thisArgument coldmoon.Value, argumentsList []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.Value {
+	var assert coldmoon.BehaviorFn = func(thisArgument coldmoon.Value, argumentsList []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.CompletionConvertable[coldmoon.Value] {
 		equality := pkg.SliceSafeGet(argumentsList, 0)
 		msg := pkg.SliceSafeGet(argumentsList, 1)
 		if equality == nil {
@@ -24,13 +24,13 @@ func defineAssert(realm *coldmoon.Realm) {
 		panic(txt + ": " + msg.String())
 	}
 
-	var assertEqual coldmoon.BehaviorFn = func(thisArgument coldmoon.Value, argumentsList []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.Value {
+	var assertEqual coldmoon.BehaviorFn = func(thisArgument coldmoon.Value, argumentsList []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.CompletionConvertable[coldmoon.Value] {
 		a := pkg.SliceSafeGet(argumentsList, 0)
 		b := pkg.SliceSafeGet(argumentsList, 1)
 		equality := coldmoon.IsStrictlyEqual(a, b)
 		msg := pkg.SliceSafeGet(argumentsList, 2)
 		if equality {
-			return nil
+			return coldmoon.UndefinedValue
 		}
 		txt := "assertion failed: a is " + a.String() + ", b is " + b.String()
 		if msg == nil {

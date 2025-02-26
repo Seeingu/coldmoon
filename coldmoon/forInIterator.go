@@ -30,7 +30,7 @@ func CreateForInIterator(agent *Agent, obj ObjectType) *ForInIterator {
 func NewForInIteratorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.IteratorPrototype, "ForInIteratorPrototype")
-	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		iterator := MustGetObject(thisValue).(*ForInIterator)
 		if iterator.Done {
 			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()

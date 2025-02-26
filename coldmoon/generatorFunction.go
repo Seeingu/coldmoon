@@ -2,7 +2,7 @@ package coldmoon
 
 func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		parameterArgs := argumentsList[0 : len(argumentsList)-1]
 		bodyArg := argumentsList[len(argumentsList)-1]
 		C := agent.ActiveFunctionObject()

@@ -31,11 +31,11 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 	}
 	g.ref = g
 
-	var next BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	var next BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := pkg.SliceSafeGet(argumentsList, 0)
 		return GeneratorResume(agent, this, value)
 	}
-	var iteratorReturn BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	var iteratorReturn BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := pkg.SliceSafeGet(argumentsList, 0)
 		generator := this
 		C := Completion[Value]{

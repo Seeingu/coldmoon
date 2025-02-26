@@ -480,7 +480,7 @@ var ProxyCreate = NewProxyObject
 func NewProxyConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 
-	var behavior BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		handler := arguments[1]
 		if newTarget == nil {
@@ -495,13 +495,13 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
-	var revocable BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var revocable BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		target := argumentsList[0]
 		handler := argumentsList[1]
 
 		proxy := ProxyCreate(agent, target, handler)
 
-		var revokerClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		var revokerClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			f := agent.ActiveFunctionObject().(*BuiltinFunction)
 			p := f.RevocableProxy.(*ProxyObject)
 			if p == nil {

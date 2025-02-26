@@ -122,7 +122,7 @@ var StringCreate = NewStringObject
 // MARK: - StringConstructor
 
 func NewStringConstructor(realm *Realm) ObjectType {
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := argumentsList[0]
 		var s string
 		if len(argumentsList) > 0 {
@@ -147,14 +147,14 @@ func NewStringConstructor(realm *Realm) ObjectType {
 
 	BindPrototypeAndConstructor(realm.Intrinsics.StringPrototype, object)
 
-	var fromCharCode BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var fromCharCode BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var s string
 		for _, arg := range argumentsList {
 			s += string(rune(int(ToIntegerOrInfinity(realm.Agent, arg))))
 		}
 		return NewStringValue(s)
 	}
-	var fromCodePoint BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var fromCodePoint BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		codePoints := make([]rune, len(argumentsList))
 		for i, arg := range argumentsList {
 			codePoints[i] = rune(ToIntegerOrInfinity(realm.Agent, arg))
@@ -175,38 +175,38 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.ref = stringPrototype
 
 	agent := realm.Agent
-	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		s := thisArgument.ThisStringValue()
 		return NewStringValue(s)
 	}
-	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return NewStringValue(thisArgument.ThisStringValue())
 	}
-	toLowerCase := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	toLowerCase := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		s := this.ThisStringValue()
 		return NewStringValue(strings.ToLower(s))
 	}
-	toUpperCase := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	toUpperCase := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		s := this.ThisStringValue()
 		return NewStringValue(strings.ToUpper(s))
 	}
-	trim := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	trim := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		s := this.ThisStringValue()
 		return NewStringValue(strings.TrimSpace(s))
 	}
-	trimEnd := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	trimEnd := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		s := this.ThisStringValue()
 		return NewStringValue(strings.TrimRightFunc(s, func(r rune) bool {
 			return strings.ContainsRune(" \t\n\v\f\r", r)
 		}))
 	}
-	trimStart := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	trimStart := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		s := this.ThisStringValue()
 		return NewStringValue(strings.TrimLeftFunc(s, func(r rune) bool {
 			return strings.ContainsRune(" \t\n\v\f\r", r)
 		}))
 	}
-	var charAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var charAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		position := int(ToIntegerOrInfinity(agent, argumentsList[0]))
@@ -216,7 +216,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewStringValue(string(s[position]))
 	}
-	var charCodeAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var charCodeAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		position := int(ToIntegerOrInfinity(agent, argumentsList[0]))
@@ -226,7 +226,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewNumberValue(JSNumber(s[position]))
 	}
-	var iterator BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var iterator BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		stringIteratorObject := &StringIteratorObject{
@@ -236,7 +236,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		stringIteratorObject.ref = stringIteratorObject
 		return (stringIteratorObject).ToValue()
 	}
-	var at BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var at BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		index := argumentsList[0]
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
@@ -248,7 +248,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		k := relativeIndex
 		return NewStringValue(string(s[k]))
 	}
-	var slice BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var slice BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		intStart := ToIntegerOrInfinity(agent, argumentsList[0])
 		intEnd := ToIntegerOrInfinity(agent, argumentsList[1])
 
@@ -278,7 +278,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewStringValue(s[int(from):int(to)])
 	}
-	var repeat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var repeat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		n := ToIntegerOrInfinity(agent, argumentsList[0])
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
@@ -290,7 +290,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewStringValue(strings.Repeat(s, int(n)))
 	}
-	var concat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var concat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		for _, arg := range argumentsList {
@@ -298,7 +298,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewStringValue(s)
 	}
-	var search BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var search BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		regexp := argumentsList[0]
 		o := RequireObjectCoercible(agent, thisArgument)
 		if regexp != UndefinedValue && regexp != NullValue {
@@ -312,7 +312,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		rx := RegExpCreate(agent, regexp, UndefinedValue)
 		return ValueInvoke(agent, rx.Data().ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]), []Value{s})
 	}
-	var matchAll BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var matchAll BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		regexp := argumentsList[0]
 		o := RequireObjectCoercible(agent, thisArgument)
 		if regexp != UndefinedValue && regexp != NullValue {
@@ -333,7 +333,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		rx := RegExpCreate(agent, regexp, UndefinedValue)
 		return ValueInvoke(agent, rx.Data().ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatchAll]), []Value{s})
 	}
-	indexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	indexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchString := argumentsList[0]
 		position := ToIntegerOrInfinity(agent, argumentsList[1])
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -344,7 +344,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		start := lo.Clamp(pos, 0, length)
 		return NewNumberValue(JSNumber(StringIndexOf(s, searchStr.Data, start)))
 	}
-	lastIndexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	lastIndexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchString := argumentsList[0]
 		position := ToIntegerOrInfinity(agent, argumentsList[1])
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -358,7 +358,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewNumberValue(JSNumber(strings.LastIndex(s[start:], searchStr)))
 	}
-	startsWith := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	startsWith := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchString := argumentsList[0]
 		var position Value
 		if len(argumentsList) > 1 {
@@ -398,7 +398,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 		return FalseValue
 	}
-	endsWith := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	endsWith := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchString := argumentsList[0]
 		var position Value
 		if len(argumentsList) > 1 {
@@ -438,7 +438,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 		return FalseValue
 	}
-	var includes BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	var includes BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchString := argumentsList[0]
 		var position Value
 		if len(argumentsList) > 1 {
@@ -477,7 +477,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 		return FalseValue
 	}
-	var codePointAt BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	var codePointAt BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		pos := argumentsList[0]
 		o := RequireObjectCoercible(agent, this)
 		s := ToString(agent, o)
@@ -488,7 +488,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewNumberValue(JSNumber(s.Data[int(position)]))
 	}
-	substring := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	substring := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		start := ToIntegerOrInfinity(agent, argumentsList[0])
 		end := ToIntegerOrInfinity(agent, argumentsList[1])
 		o := RequireObjectCoercible(agent, this)

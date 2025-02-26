@@ -5,7 +5,7 @@ type ThrowTypeError struct {
 }
 
 func NewThrowTypeError(realm *Realm) ObjectType {
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return realm.Agent.ThrowException(TypeError, "")
 	}
 

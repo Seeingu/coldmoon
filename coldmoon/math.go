@@ -23,47 +23,47 @@ func NewMathObject(realm *Realm) ObjectType {
 	object.defineToStringTag("Math")
 
 	agent := realm.Agent
-	var random BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var random BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return NewNumberValue(JSNumber(realm.Rng.Float64()))
 	}
-	var abs BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var abs BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Abs(n.Data.ToFloat())))
 	}
-	var ceil BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var ceil BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Ceil(n.Data.ToFloat())))
 	}
-	var floor BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var floor BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Floor(float64(n.Data))))
 	}
-	var pow BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var pow BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		y := argumentsList[1]
 		base := x.ToNumber(agent)
 		exponent := y.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Pow(float64(base.Data), float64(exponent.Data))))
 	}
-	var round BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var round BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Round(float64(n.Data))))
 	}
-	var trunc BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var trunc BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Trunc(float64(n.Data))))
 	}
-	var clz32 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var clz32 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := ToUint32(agent, x)
 		return NewNumberValue(JSNumber(bits.LeadingZeros32(uint32(n))))
 	}
-	var sign BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var sign BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		if n.Data.IsNaN() {
@@ -77,67 +77,67 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(1)
 	}
-	var acos BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var acos BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Acos(float64(n.Data))))
 	}
-	var acosh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var acosh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Acosh(float64(n.Data))))
 	}
-	var asin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var asin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Asin(float64(n.Data))))
 	}
-	var asinh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var asinh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Asinh(float64(n.Data))))
 	}
-	var atan BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var atan BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Atan(float64(n.Data))))
 	}
-	var atanh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var atanh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Atanh(float64(n.Data))))
 	}
-	var cos BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var cos BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Cos(float64(n.Data))))
 	}
-	var cosh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var cosh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Cosh(float64(n.Data))))
 	}
-	var sin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var sin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Sin(float64(n.Data))))
 	}
-	var sinh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var sinh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Sinh(float64(n.Data))))
 	}
-	var tan BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var tan BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Tan(float64(n.Data))))
 	}
-	var tanh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var tanh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Tanh(float64(n.Data))))
 	}
-	var sqrt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var sqrt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		if n.Data < 0 {
@@ -145,7 +145,7 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(JSNumber(math.Sqrt(float64(n.Data))))
 	}
-	var cbrt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var cbrt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		if n.Data < 0 {
@@ -153,17 +153,17 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(JSNumber(math.Cbrt(float64(n.Data))))
 	}
-	var exp BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var exp BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Exp(float64(n.Data))))
 	}
-	var expm1 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var expm1 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Expm1(float64(n.Data))))
 	}
-	var log BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var log BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		if n.Data < 0 {
@@ -171,7 +171,7 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(JSNumber(math.Log(float64(n.Data))))
 	}
-	var log1p BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var log1p BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		if n.Data < -1 {
@@ -179,7 +179,7 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(JSNumber(math.Log1p(float64(n.Data))))
 	}
-	var log10 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var log10 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		if n.Data < 0 {
@@ -187,7 +187,7 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(JSNumber(math.Log10(float64(n.Data))))
 	}
-	var log2 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var log2 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		n := x.ToNumber(agent)
 		if n.Data < 0 {
@@ -195,7 +195,7 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(JSNumber(math.Log2(float64(n.Data))))
 	}
-	var mathMax BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var mathMax BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		coerced := make([]*NumberValue, len(argumentsList))
 		for i, arg := range argumentsList {
 			coerced[i] = arg.ToNumber(agent)
@@ -216,7 +216,7 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return highest
 	}
-	var mathMin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var mathMin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		coerced := make([]*NumberValue, len(argumentsList))
 		for i, arg := range argumentsList {
 			coerced[i] = arg.ToNumber(agent)
@@ -237,16 +237,16 @@ func NewMathObject(realm *Realm) ObjectType {
 		}
 		return lowest
 	}
-	var atan2 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var atan2 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		y := argumentsList[0].ToNumber(agent)
 		x := argumentsList[1].ToNumber(agent)
 		return NewNumberValue(JSNumber(math.Atan2(float64(y.Data), float64(x.Data))))
 	}
-	var fround BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var fround BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0].ToNumber(agent)
 		return NewNumberValue(JSNumber(float32(x.Data)))
 	}
-	var imul BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var imul BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		a := ToUint32(agent, argumentsList[0])
 		b := ToUint32(agent, argumentsList[1])
 		product := a * b

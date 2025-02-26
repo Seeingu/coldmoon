@@ -31,7 +31,7 @@ func NewPromiseCapability(agent *Agent, constructor Value) *PromiseCapability {
 		agent.ThrowTypeError("is not a constructor")
 		return nil
 	}
-	var executorClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var executorClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return executorClosure(agent, thisArgument, argumentsList, newTarget)
 	}
 	resolvingFunctions := &ResolvingFunctions{
@@ -115,15 +115,15 @@ func NewPromisePrototype(realm *Realm) ObjectType {
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "PromisePrototype")
 
 	// 27.2.5.4
-	var then BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var then BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return promiseThen(agent, this, arguments, newTarget)
 	}
-	var catch BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var catch BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		onRejected := arguments[0]
 		promise := this
 		return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{UndefinedValue, onRejected})
 	}
-	var finally BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var finally BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return promiseFinally(agent, this, arguments, newTarget)
 	}
 	object.defineBuiltinFunction(realm, CMString("then"), then, 2)
@@ -173,7 +173,7 @@ func promiseFinally(agent *Agent, this Value, arguments []Value, newTarget Objec
 			OnFinally:   onFinally,
 			Constructor: C.Data(),
 		}
-		thenFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
+		thenFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			return thenFinallyClosure(agent, this, arguments, newTarget)
 		}
 
@@ -181,7 +181,7 @@ func promiseFinally(agent *Agent, this Value, arguments []Value, newTarget Objec
 			additionalFieldsV2: captures,
 		}).ToValue()
 
-		catchFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) Value {
+		catchFinallyClosure := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			return catchFinallyClosure(agent, this, arguments, newTarget)
 		}
 		catchFinally = CreateBuiltinFunction(agent, catchFinallyClosure, 1, CMString(""), builtinFunctionArgs{
@@ -198,7 +198,7 @@ func thenFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget O
 	result := ReturnAssertNormal(onFinally.CallNoArgs(UndefinedValue))
 	p := PromiseResolve(agent, captures.Constructor, result)
 
-	var returnValue BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var returnValue BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		f := agent.ActiveFunctionObject()
 		return f.(*BuiltinFunction).AdditionalFieldsV2.(Value)
 	}
@@ -217,7 +217,7 @@ func catchFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget 
 	p := PromiseResolve(agent, captures.Constructor, result)
 	reason := arguments[0]
 
-	var throwReason BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var throwReason BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		f := agent.ActiveFunctionObject()
 		_reason := f.(*BuiltinFunction).AdditionalFieldsV2.(Value)
 		agent.exception = _reason
@@ -232,7 +232,7 @@ func catchFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget 
 
 func NewPromiseConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		executor := arguments[0]
 		if newTarget == nil {
 			return agent.ThrowTypeError("TypeError")
@@ -259,14 +259,14 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
-	var reject BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var reject BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		reason := arguments[0]
 		C := this
 		capability := NewPromiseCapability(agent, C)
 		capability.Reject.Call(UndefinedValue, []Value{reason})
 		return capability.Promise.ToValue()
 	}
-	var resolve BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var resolve BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		resolution := arguments[0]
 		C := this
 		if !C.IsObject() {
@@ -274,7 +274,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return PromiseResolve(agent, MustGetObject(C), resolution).ToValue()
 	}
-	race := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	race := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		iterable := arguments[0]
 		C := this
 		promiseCapability := NewPromiseCapability(agent, C)
@@ -301,7 +301,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return result.Data()
 	}
-	all := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	all := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		iterable := arguments[0]
 		C := this
 		promiseCapability := NewPromiseCapability(agent, C)
@@ -328,7 +328,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return result.Data()
 	}
-	allSettled := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	allSettled := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		iterable := arguments[0]
 		C := this
 		promiseCapability := NewPromiseCapability(agent, C)
@@ -355,7 +355,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		}
 		return result.Data()
 	}
-	promiseAny := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	promiseAny := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		iterable := arguments[0]
 		C := this
 		promiseCapability := NewPromiseCapability(agent, C)
@@ -390,7 +390,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("any"), promiseAny, 1)
 
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
-		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			return this
 		},
 	})
@@ -496,14 +496,14 @@ func CreateResolvingFunctions(agent *Agent, promise *PromiseObject) *ResolvingFu
 		AlreadyResolved: alreadyResolved,
 	}
 
-	resolve := CreateBuiltinFunction(agent, func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	resolve := CreateBuiltinFunction(agent, func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return stepsResolve(agent, thisArgument, argumentsList, newTarget)
 	}, lengthResolve, CMString(""), builtinFunctionArgs{
 		realm:              realm,
 		additionalFieldsV2: resolveAdditionalFields,
 	})
 
-	var stepsReject BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var stepsReject BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return stepsReject(agent, this, arguments, newTarget)
 	}
 	lengthReject := JSInt(1)
@@ -736,7 +736,7 @@ func PerformPromiseAll(
 		values = append(values, nextValue)
 		nextPromise := promiseResolve.Call(constructor.ToValue(), []Value{nextValue})
 
-		steps := func(this Value, arguments []Value, newTarget ObjectType) Value {
+		steps := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			F := agent.ActiveFunctionObject()
 			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
 			if additionalFields.alreadyCalled {
@@ -798,7 +798,7 @@ func PerformPromiseAllSettled(
 		values = append(values, nextValue)
 		nextPromise := promiseResolve.Call(constructor.ToValue(), []Value{nextValue})
 
-		stepsFulfilled := func(this Value, arguments []Value, newTarget ObjectType) Value {
+		stepsFulfilled := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			F := agent.ActiveFunctionObject()
 			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
 			if additionalFields.alreadyCalled {
@@ -829,7 +829,7 @@ func PerformPromiseAllSettled(
 			},
 		})
 
-		stepsReject := func(this Value, arguments []Value, newTarget ObjectType) Value {
+		stepsReject := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			F := agent.ActiveFunctionObject()
 			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
 			if additionalFields.alreadyCalled {
@@ -900,7 +900,7 @@ func PerformPromiseAny(
 		errors = append(errors, UndefinedValue)
 		nextPromise := promiseResolve.Call(constructor.ToValue(), []Value{nextValue})
 
-		stepsRejected := func(this Value, arguments []Value, newTarget ObjectType) Value {
+		stepsRejected := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			F := agent.ActiveFunctionObject()
 			additionalFields := F.(*BuiltinFunction).AdditionalFieldsV2.(*promiseAdditionalFields)
 			if additionalFields.alreadyCalled {

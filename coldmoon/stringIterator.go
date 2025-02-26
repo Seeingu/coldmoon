@@ -9,7 +9,7 @@ type StringIteratorObject struct {
 func NewStringIteratorPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype, "StringIteratorPrototype")
 	agent := realm.Agent
-	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		stringIterator := MustGetObject(thisValue).(*StringIteratorObject)
 		data := stringIterator.Data
 		length := len(data)

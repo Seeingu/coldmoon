@@ -6,7 +6,7 @@ import (
 	"github.com/Seeingu/coldmoon/coldmoon"
 )
 
-func jsPrint(this coldmoon.Value, arguments []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.Value {
+func jsPrint(this coldmoon.Value, arguments []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.CompletionConvertable[coldmoon.Value] {
 	var sb []string
 	for _, arg := range arguments {
 		sb = append(sb, string(arg.ToString()))
@@ -22,7 +22,7 @@ func CreateConsole(realm *coldmoon.Realm) coldmoon.ObjectType {
 	proto := coldmoon.OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, nil)
 	object := coldmoon.NewObject(agent, proto, "console")
 
-	var consoleLog coldmoon.BehaviorFn = func(thisArgument coldmoon.Value, argumentsList []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.Value {
+	var consoleLog coldmoon.BehaviorFn = func(thisArgument coldmoon.Value, argumentsList []coldmoon.Value, newTarget coldmoon.ObjectType) coldmoon.CompletionConvertable[coldmoon.Value] {
 		jsPrint(thisArgument, argumentsList, newTarget)
 		return coldmoon.UndefinedValue
 	}

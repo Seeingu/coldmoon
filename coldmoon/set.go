@@ -53,7 +53,7 @@ func (s *SetObject) clear() {
 
 func NewSetConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	behavior := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	behavior := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		iterable := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget == nil {
 			return agent.ThrowTypeError("new target is nil")
@@ -88,7 +88,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
-	species := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	species := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return this
 	}
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
@@ -106,43 +106,43 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "SetPrototype")
 
 	// 24.2.3.2
-	var setClear BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var setClear BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		set := RequireInternalSlot[*SetObject](thisValue)
 		set.clear()
 		return UndefinedValue
 	}
 	// 24.2.3.4
-	var setDelete BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var setDelete BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
 		set.delete(value)
 		return TrueValue
 	}
 	// 24.2.3.7
-	var setHas BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var setHas BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
 		return NewBooleanValue(set.has(value))
 	}
-	var setSize BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var setSize BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		set := RequireInternalSlot[*SetObject](thisValue)
 		return NewNumberValue(JSNumber(set.size()))
 	}
-	var setAdd BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var setAdd BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		value := argumentsList[0]
 		set := RequireInternalSlot[*SetObject](thisValue)
 		set.add(value)
 		return thisValue
 	}
-	var setEntries BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var setEntries BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		iterator := CreateSetIterator(agent, thisValue, objectOwnPropertiesKindKeyAndValue)
 		return iterator.ToValue()
 	}
-	var setValues BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var setValues BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		iterator := CreateSetIterator(agent, thisValue, objectOwnPropertiesKindValue)
 		return iterator.ToValue()
 	}
-	var forEach BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var forEach BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := argumentsList[0]
 		thisArg := argumentsList[1]
 		set := RequireInternalSlot[*SetObject](thisValue)

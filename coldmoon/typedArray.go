@@ -106,7 +106,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		Object: object,
 	}
 	typedArray.ref = typedArray
-	taAt := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taAt := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
@@ -122,20 +122,20 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		}
 		return MustGetObject(O).Get(NewIntegerIndexPropertyKey(k))
 	}
-	taBuffer := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taBuffer := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		ta := RequireInternalSlot[*TypedArrayObject](O)
 		buffer := ta.ViewedArrayBuffer
 		return buffer.ToValue()
 	}
-	taByteLength := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taByteLength := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		ta := RequireInternalSlot[*TypedArrayObject](O)
 		taRecord := MakeTypedArrayWithBufferWitnessRecord(ta, SeqCst)
 		size := TypedArrayByteLength(taRecord)
 		return size.ToValue()
 	}
-	taByteOffset := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taByteOffset := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		ta := RequireInternalSlot[*TypedArrayObject](O)
 		taRecord := MakeTypedArrayWithBufferWitnessRecord(ta, SeqCst)
@@ -145,34 +145,34 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		offset := ta.ByteOffset
 		return offset.ToValue()
 	}
-	taCopyWithin := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taCopyWithin := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		start := arguments[1]
 		end := pkg.SliceSafeGet(arguments, 2)
 		return typedArrayCopyWith(agent, this, target, start, end)
 	}
-	taEntries := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taEntries := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		ta := ValidateTypedArray(agent, O, SeqCst)
 		return CreateArrayIterator(agent, ta.TypedArray, objectOwnPropertiesKindKeyAndValue).ToValue()
 	}
-	taEvery := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taEvery := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callback := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayEvery(agent, this, callback, thisArg)
 	}
-	taFill := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taFill := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := arguments[0]
 		start := pkg.SliceSafeGet(arguments, 1)
 		end := pkg.SliceSafeGet(arguments, 2)
 		return typedArrayFill(agent, this, value, start, end)
 	}
-	taFilter := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taFilter := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callback := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayFilter(agent, this, callback, thisArg)
 	}
-	taFind := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taFind := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		predicate := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
@@ -181,7 +181,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		findRec := MustGetObject(O).FindViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return findRec.Value
 	}
-	taFindIndex := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taFindIndex := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		predicate := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
@@ -190,7 +190,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		findRec := MustGetObject(O).FindViaPredicate(length, DirectionAscending, predicate, thisArg)
 		return findRec.Index.ToValue()
 	}
-	taFindLast := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taFindLast := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		predicate := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
@@ -199,7 +199,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		findRec := MustGetObject(O).FindViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return findRec.Value
 	}
-	taFindLastIndex := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taFindLastIndex := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		predicate := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
@@ -208,36 +208,36 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		findRec := MustGetObject(O).FindViaPredicate(length, DirectionDescending, predicate, thisArg)
 		return findRec.Index.ToValue()
 	}
-	taForEach := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taForEach := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callback := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayForEach(agent, this, callback, thisArg)
 	}
-	taIncludes := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taIncludes := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchElement := arguments[0]
 		fromIndex := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayIncludes(agent, this, searchElement, fromIndex)
 	}
-	taIndexOf := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taIndexOf := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchElement := arguments[0]
 		fromIndex := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayIndexOf(agent, this, searchElement, fromIndex)
 	}
-	taJoin := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taJoin := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		separator := pkg.SliceSafeGet(arguments, 0)
 		return typedArrayJoin(agent, this, separator)
 	}
-	taKeys := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taKeys := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		return CreateArrayIterator(agent, taRecord.TypedArray, objectOwnPropertiesKindKey).ToValue()
 	}
-	taLastIndexOf := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taLastIndexOf := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		searchElement := arguments[0]
 		fromIndex := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayLastIndexOf(agent, this, searchElement, fromIndex)
 	}
-	taLength := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taLength := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		if IsTypedArrayOutOfBounds(taRecord) {
@@ -246,22 +246,22 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		length := TypedArrayLength(taRecord)
 		return length.ToValue()
 	}
-	taMap := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taMap := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callback := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayMap(agent, this, callback, thisArg)
 	}
-	taReduce := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taReduce := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callback := arguments[0]
 		initialValue := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayReduce(agent, this, callback, initialValue)
 	}
-	taReduceRight := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taReduceRight := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callback := arguments[0]
 		initialValue := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayReduceRight(agent, this, callback, initialValue)
 	}
-	taReverse := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taReverse := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := MustGetObject(this)
 		taRecord := ValidateTypedArray(agent, O.ToValue(), SeqCst)
 		length := TypedArrayLength(taRecord)
@@ -279,7 +279,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		}
 		return O.ToValue()
 	}
-	taToReversed := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taToReversed := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := MustGetObject(this)
 		taRecord := ValidateTypedArray(agent, O.ToValue(), SeqCst)
 		length := TypedArrayLength(taRecord)
@@ -293,43 +293,43 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		}
 		return A.ToValue()
 	}
-	taSet := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taSet := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		source := arguments[0]
 		offset := pkg.SliceSafeGet(arguments, 1)
 		return typedArraySet(agent, this, source, offset)
 	}
-	taSlice := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taSlice := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		start := arguments[0]
 		end := pkg.SliceSafeGet(arguments, 1)
 		return typedArraySlice(agent, this, start, end)
 	}
-	taSome := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taSome := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callback := arguments[0]
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArraySome(agent, this, callback, thisArg)
 	}
-	taSort := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taSort := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		compareFn := pkg.SliceSafeGet(arguments, 0)
 		return typedArraySort(agent, this, compareFn)
 	}
-	taToSorted := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taToSorted := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		compareFn := arguments[0]
 		return typedArrayToSorted(agent, this, compareFn)
 	}
-	taSubarray := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taSubarray := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		start := arguments[0]
 		end := pkg.SliceSafeGet(arguments, 1)
 		return typedArraySubarray(agent, this, start, end)
 	}
-	taToLocaleString := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taToLocaleString := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		panic("not implemented")
 	}
-	taValues := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taValues := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		return CreateArrayIterator(agent, taRecord.TypedArray, objectOwnPropertiesKindValue).ToValue()
 	}
-	taWith := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	taWith := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		index := arguments[0]
 		value := arguments[1]
 		return typedArrayWith(agent, this, index, value)
@@ -371,7 +371,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 
 	typedArray.defineBuiltinProperty(CMString("toString"), realm.Intrinsics.ArrayPrototype.ToValue().ToBuiltinPropertyDescriptor())
 
-	toStringTag := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toStringTag := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
 			return UndefinedValue
 		}
@@ -664,20 +664,20 @@ func CompareTypedArrayElements(agent *Agent, x, y Value, comparator ObjectType) 
 
 func NewTypedArrayConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		panic("TypeError")
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, CMString("TypedArray"), builtinFunctionArgs{
 		realm:     realm,
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
-	from := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	from := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		source := arguments[0]
 		mapper := pkg.SliceSafeGet(arguments, 1)
 		thisArg := pkg.SliceSafeGet(arguments, 2)
 		return typedArrayFrom(agent, this, source, mapper, thisArg)
 	}
-	of := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	of := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		length := JSInt(len(arguments))
 		C := this
 		if !IsConstructor(C) {
@@ -696,7 +696,7 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 
 	object.defineBuiltinFunction(realm, CMString("from"), from, 1)
 	object.defineBuiltinFunction(realm, CMString("of"), of, 0)
-	species := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	species := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return thisArgument
 	}
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
@@ -710,7 +710,7 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 
 func NewTypedArrayNameConstructor(realm *Realm, name TypedArrayName) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return typedArrayBehavior(agent, name, thisArgument, argumentsList, newTarget)
 	}
 	// TODO: should not use String()

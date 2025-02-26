@@ -56,7 +56,7 @@ func NewBooleanObject(agent *Agent, b bool, prototype ObjectType) *BooleanObject
 
 func NewBooleanConstructor(realm *Realm) ObjectType {
 	// 20.3.1.1
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := pkg.SliceSafeGet(argumentsList, 0)
 		var b bool
 		if value == nil {
@@ -104,7 +104,7 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 	}
 	object.ref = object
 	agent := realm.Agent
-	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		b := thisBooleanValue(agent, thisArgument)
 		if b {
 			return NewStringValue("true")
@@ -112,7 +112,7 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 			return NewStringValue("false")
 		}
 	}
-	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return NewBooleanValue(thisBooleanValue(realm.Agent, thisArgument))
 	}
 

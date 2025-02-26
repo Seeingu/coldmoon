@@ -68,19 +68,19 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 	module := moduleCompletion.Data().(*SourceTextModule)
 	loadPromise := module.LoadRequestedModules(module.HostDefined)
 
-	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		capability.Reject.Call(UndefinedValue, []Value{argumentsList[0]})
 		return nil
 	}
 	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, CMString("onRejected"), builtinFunctionArgs{})
-	var linkAndEvaluateClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var linkAndEvaluateClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		err := module.Link()
 		if err != nil {
 			capability.Reject.Call(UndefinedValue, []Value{err})
 			return nil
 		}
 		evaluatePromise := module.Evaluate()
-		var fulfilledClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+		var fulfilledClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			namespace := GetModuleNamespace(agent, module)
 			capability.Resolve.Call(UndefinedValue, []Value{(namespace).ToValue()})
 			return nil

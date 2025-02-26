@@ -41,7 +41,7 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 
 func NewMapConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		iterable := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget == nil {
 			panic("TypeError")
@@ -68,7 +68,7 @@ func NewMapConstructor(realm *Realm) ObjectType {
 	})
 
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
-		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			return this
 		},
 	})
@@ -82,12 +82,12 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "MapPrototype")
 
-	var mapClear BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapClear BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
 		m.MapValue.Data = make(map[string]Value)
 		return UndefinedValue
 	}
-	var mapDelete BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapDelete BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
 		key := arguments[0].Hash()
 		if _, ok := m.MapValue.Data[key]; !ok {
@@ -96,7 +96,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		delete(m.MapValue.Data, key)
 		return TrueValue
 	}
-	var mapGet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapGet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
 		key := arguments[0].Hash()
 		if v, ok := m.MapValue.Data[key]; ok {
@@ -104,33 +104,33 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		}
 		return UndefinedValue
 	}
-	var mapHas BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapHas BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
 		key := arguments[0].Hash()
 		_, ok := m.MapValue.Data[key]
 		return NewBooleanValue(ok)
 	}
-	var mapSet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapSet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
 		key := arguments[0].Hash()
 		value := arguments[1]
 		m.MapValue.Data[key] = value
 		return this
 	}
-	var size BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var size BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
 		return NewNumberValue(JSNumber(len(m.MapValue.Data)))
 	}
-	var mapEntries BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapEntries BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return CreateMapIterator(agent, this, objectOwnPropertiesKindKeyAndValue).ToValue()
 	}
-	var mapKeys BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapKeys BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return CreateMapIterator(agent, this, objectOwnPropertiesKindKey).ToValue()
 	}
-	var mapValues BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var mapValues BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return CreateMapIterator(agent, this, objectOwnPropertiesKindValue).ToValue()
 	}
-	var forEach BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var forEach BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
 		callbackFn := arguments[0]
 		thisArg := arguments[1]

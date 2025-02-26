@@ -89,7 +89,7 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 }
 
 func NewIsFinite(realm *Realm) ObjectType {
-	var isFinite BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var isFinite BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		number := args[0].ToNumber(realm.Agent)
 		return NewBooleanValue(number.IsFinite())
 	}
@@ -100,7 +100,7 @@ func NewIsFinite(realm *Realm) ObjectType {
 }
 
 func NewIsNaN(realm *Realm) ObjectType {
-	var isNaN BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var isNaN BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		number := args[0].ToNumber(realm.Agent)
 		return NewBooleanValue(number.IsNaN())
 	}
@@ -111,7 +111,7 @@ func NewIsNaN(realm *Realm) ObjectType {
 }
 
 func NewEval(realm *Realm) ObjectType {
-	var eval BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var eval BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		if len(args) == 0 {
 			return nil
 		}
@@ -151,7 +151,7 @@ func ToString(agent *Agent, v Value) *StringValue {
 // 19.2.5
 func NewParseInt(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var parseInt BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var parseInt BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		stringValue := arguments[0]
 		radix := arguments[1]
 		inputString := ToString(agent, stringValue)
@@ -208,7 +208,7 @@ func NewParseInt(realm *Realm) ObjectType {
 
 func NewParseFloat(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var parseFloat BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var parseFloat BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		stringValue := arguments[0]
 		inputString := ToString(agent, stringValue)
 		trimmedString := inputString.TrimString()
@@ -226,7 +226,7 @@ func NewParseFloat(realm *Realm) ObjectType {
 
 func NewDecodeURI(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var decodeURI BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var decodeURI BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		uriString := ToString(agent, arguments[0]).String()
 		preserveEscapeSet := ";/?:@&=+$,#"
 		return NewStringValue(decode(agent, uriString, preserveEscapeSet))
@@ -238,7 +238,7 @@ func NewDecodeURI(realm *Realm) ObjectType {
 
 func NewDecodeURIComponent(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var decodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var decodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		uriString := ToString(agent, arguments[0]).String()
 		preserveEscapeSet := ""
 		return NewStringValue(decode(agent, uriString, preserveEscapeSet))
@@ -250,7 +250,7 @@ func NewDecodeURIComponent(realm *Realm) ObjectType {
 
 func NewEncodeURI(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var encodeURI BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var encodeURI BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		uriString := ToString(agent, arguments[0]).String()
 		extraUnescaped := ";/?:@&=+$,#"
 		return NewStringValue(encode(agent, uriString, extraUnescaped))
@@ -262,7 +262,7 @@ func NewEncodeURI(realm *Realm) ObjectType {
 
 func NewEncodeURIComponent(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var encodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var encodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		uriString := ToString(agent, arguments[0]).String()
 		extraUnescaped := ""
 		return NewStringValue(encode(agent, uriString, extraUnescaped))

@@ -16,7 +16,7 @@ const (
 func NewIteratorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "IteratorPrototype")
-	var iterator BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var iterator BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		return thisValue
 	}
 

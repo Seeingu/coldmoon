@@ -23,7 +23,7 @@ func CreateMapIterator(agent *Agent, value Value, kind objectOwnPropertiesKind) 
 func NewMapIteratorPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.IteratorPrototype, "MapIteratorPrototype")
 	agent := realm.Agent
-	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		mapIterator := MustGetObject(thisValue).(*MapIteratorObject)
 		m := mapIterator.Map
 		index := mapIterator.Index

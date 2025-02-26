@@ -25,7 +25,7 @@ func CreateRegExpStringIterator(agent *Agent, R *RegExpObject, S string, global 
 func NewRegExpStringIteratorPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.IteratorPrototype, "RegExpStringIteratorPrototype")
-	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) Value {
+	var next BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		iterator := MustGetObject(thisValue).(*RegExpStringIteratorObject)
 		if iterator.Completed {
 			return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()

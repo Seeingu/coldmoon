@@ -363,7 +363,7 @@ func (n *NumberValue) IsZero() bool {
 
 func NewNumberConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := argumentsList[0]
 		n := NewNumberValue(0)
 		if len(argumentsList) > 0 {
@@ -398,7 +398,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
 
-	var isFinite BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var isFinite BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := arguments[0]
 		numberValue, ok := value.(*NumberValue)
 		if !ok {
@@ -409,11 +409,11 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		}
 		return NewBooleanValue(true)
 	}
-	var isInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var isInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := arguments[0]
 		return NewBooleanValue(IsIntegralNumber(value))
 	}
-	var isNaN BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var isNaN BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := arguments[0]
 		numberValue, ok := value.(*NumberValue)
 		if !ok {
@@ -421,7 +421,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		}
 		return NewBooleanValue(numberValue.IsNaN())
 	}
-	var isSafeInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var isSafeInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		numberValue := arguments[0]
 
 		if IsIntegralNumber(numberValue) {
@@ -476,7 +476,7 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 	object.ref = object
 
 	agent := realm.Agent
-	var toString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var toString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		radix := pkg.SliceSafeGet(arguments, 0)
 
 		x := thisNumberValue(agent, this)
@@ -492,11 +492,11 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		return x.ToString().ToValue()
 	}
 
-	var valueOf BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var valueOf BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := thisNumberValue(agent, this)
 		return x
 	}
-	var toLocaleString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var toLocaleString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return toString(thisNumberValue(agent, this), nil, nil)
 	}
 

@@ -30,39 +30,39 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "RegExp")
 
-	dotAll := func(this Value, arguments []Value, _ ObjectType) Value {
+	dotAll := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		flag := RegExpHasFlag(agent, this, "s")
 		return flag.Data()
 	}
-	global := func(this Value, arguments []Value, _ ObjectType) Value {
+	global := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		flag := RegExpHasFlag(agent, this, "g")
 		return flag.Data()
 	}
-	hasIndices := func(this Value, arguments []Value, _ ObjectType) Value {
+	hasIndices := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		flag := RegExpHasFlag(agent, this, "d")
 		return flag.Data()
 	}
-	ignoreCase := func(this Value, arguments []Value, _ ObjectType) Value {
+	ignoreCase := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		flag := RegExpHasFlag(agent, this, "i")
 		return flag.Data()
 	}
-	multiline := func(this Value, arguments []Value, _ ObjectType) Value {
+	multiline := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		flag := RegExpHasFlag(agent, this, "m")
 		return flag.Data()
 	}
-	sticky := func(this Value, arguments []Value, _ ObjectType) Value {
+	sticky := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		flag := RegExpHasFlag(agent, this, "y")
 		return flag.Data()
 	}
-	unicode := func(this Value, arguments []Value, _ ObjectType) Value {
+	unicode := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		flag := RegExpHasFlag(agent, this, "u")
 		return flag.Data()
 	}
-	unicodeSets := func(this Value, arguments []Value, _ ObjectType) Value {
+	unicodeSets := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		flag := RegExpHasFlag(agent, this, "v")
 		return flag.Data()
 	}
-	flags := func(this Value, arguments []Value, _ ObjectType) Value {
+	flags := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.flags: 'this' is not an object")
 		}
@@ -97,7 +97,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return NewStringValue(f)
 	}
-	source := func(this Value, arguments []Value, _ ObjectType) Value {
+	source := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.source: 'this' is not an object")
 		}
@@ -109,7 +109,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		_flags := r.OriginalFlags
 		return NewStringValue(EscapeRegExpPattern(src, _flags))
 	}
-	toString := func(this Value, arguments []Value, _ ObjectType) Value {
+	toString := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.toString: 'this' is not an object")
 		}
@@ -121,7 +121,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
 		return NewStringValue("/" + EscapeRegExpPattern(src.String(), _flags.String()) + "/")
 	}
-	exec := func(this Value, arguments []Value, _ ObjectType) Value {
+	exec := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.exec: 'this' is not an object")
 		}
@@ -139,7 +139,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 			return result.Data()
 		}
 	}
-	test := func(this Value, arguments []Value, _ ObjectType) Value {
+	test := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
 			return agent.ThrowException(TypeError, "RegExp.prototype.test: 'this' is not an object")
 		}
@@ -154,7 +154,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return TrueValue
 	}
-	search := func(this Value, arguments []Value, _ ObjectType) Value {
+	search := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		rx := this
 		if !rx.IsObject() {
 			panic("TypeError")
@@ -175,7 +175,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return MustGetObject(result.Data()).Get(NewStringPropertyKey("index"))
 	}
-	matchAll := func(this Value, arguments []Value, _ ObjectType) Value {
+	matchAll := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
 			panic("TypeError")
 		}
@@ -237,7 +237,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 func NewRegExpConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	// 22.2.4.1
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, target ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, target ObjectType) CompletionConvertable[Value] {
 		pattern := pkg.SliceSafeGet(argumentsList, 0)
 		if pattern == nil {
 			pattern = UndefinedValue
@@ -289,7 +289,7 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 	})
 
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
-		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			return this
 		},
 	})

@@ -4952,7 +4952,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 
 	var function ObjectType
 	if constructor == nil {
-		var defaultConstructor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+		var defaultConstructor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			args := arguments
 			if newTarget == nil {
 				return agent.ThrowTypeError("class must be invoked with 'new'")

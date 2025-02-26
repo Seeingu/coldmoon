@@ -44,12 +44,22 @@ func (v *VM) panic(err Value) {
 }
 
 // TODO(BM): rename completion
+// Deprecated
 // Completion
 // spec: 5.2.3.1
 func CompletionHandle[T any](completion Completion[T]) Completion[T] {
 	// do nothing
 	// - received `completion` is already a completion record
 	return completion
+}
+
+// CompletionHandleV2
+// spec: 5.2.3.1
+func CompletionHandleV2[T any](c CompletionConvertable[T]) Completion[T] {
+	if c == nil {
+		panic("Completion: c is nil")
+	}
+	return c.ToCompletion()
 }
 
 // ReturnIfAbrupt

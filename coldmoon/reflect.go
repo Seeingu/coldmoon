@@ -10,7 +10,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "Reflect")
 	agent := realm.Agent
 
-	var apply BehaviorFn = func(_ Value, arguments []Value, newTarget ObjectType) Value {
+	var apply BehaviorFn = func(_ Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		thisArgument := arguments[1]
 		argumentsList := arguments[2]
@@ -23,7 +23,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return ReturnAssertNormal(target.Call(thisArgument, args))
 	}
-	var construct BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var construct BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		argumentsList := arguments[1]
 		newTarget := arguments[2]
@@ -42,7 +42,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object).value.ToValue()
 	}
-	var defineProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var defineProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		propertyKey := arguments[1]
 		attributes := arguments[2]
@@ -62,7 +62,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		)
 		return NewBooleanValue(ret)
 	}
-	var deleteProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var deleteProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		propertyKey := arguments[1]
 
@@ -77,7 +77,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		ret := targetObject.InternalMethods().Delete(targetObject, key)
 		return NewBooleanValue(ret)
 	}
-	var get BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var get BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		propertyKey := arguments[1]
 		receiver := pkg.SliceSafeGet(arguments, 2)
@@ -94,7 +94,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 			targetObject.InternalMethods().Get(targetObject, key, receiver),
 		)
 	}
-	var getOwnPropertyDescriptor BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var getOwnPropertyDescriptor BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		propertyKey := arguments[1]
 
@@ -113,7 +113,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return UndefinedValue
 	}
-	var getPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var getPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 
 		if !target.IsObject() {
@@ -124,7 +124,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return targetObject.InternalMethods().GetPrototypeOf(targetObject).ToValue()
 	}
-	var has BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var has BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		propertyKey := arguments[1]
 
@@ -138,7 +138,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return NewBooleanValue(targetObject.InternalMethods().HasProperty(targetObject, key))
 	}
-	var isExtensible BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var isExtensible BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 
 		if !target.IsObject() {
@@ -149,7 +149,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return NewBooleanValue(targetObject.InternalMethods().IsExtensible(targetObject))
 	}
-	var ownKeys BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var ownKeys BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 
 		if !target.IsObject() {
@@ -165,7 +165,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		return (CreateArrayFromList(agent, keys)).ToValue()
 	}
-	var preventExtensions BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var preventExtensions BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 
 		if !target.IsObject() {
@@ -178,7 +178,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return NewBooleanValue(ret)
 	}
 	// 28.1.12
-	var set BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var set BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		propertyKey := arguments[1]
 		value := arguments[2]
@@ -199,7 +199,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		ret := targetObject.InternalMethods().Set(targetObject, key, value, receiver)
 		return NewBooleanValue(ret)
 	}
-	var setPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) Value {
+	var setPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		proto := arguments[1]
 

@@ -27,7 +27,7 @@ type Value interface {
 	// also 13.5.3.1 typeof
 	TypeString() string
 	String() string
-	ToCompletion() CompletionValue
+	CompletionConvertable[Value]
 	ToBuiltinPropertyDescriptor() *PropertyDescriptor
 	ToPropertyKey() PropertyKey
 	Hash() string

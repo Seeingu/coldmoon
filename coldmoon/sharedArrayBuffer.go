@@ -55,7 +55,7 @@ func AllocateSharedArrayBuffer(
 func NewSharedArrayBufferConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		length := argumentsList[0]
 		options := pkg.SliceSafeGet(argumentsList, 1)
 		if options == nil {
@@ -75,7 +75,7 @@ func NewSharedArrayBufferConstructor(realm *Realm) ObjectType {
 	})
 
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
-		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			return this
 		},
 	})
@@ -87,23 +87,23 @@ func NewSharedArrayBufferPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "SharedArrayBuffer")
 
-	var byteLength BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	var byteLength BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := RequireInternalSlot[*SharedArrayBufferObject](this)
 		length := ArrayBufferByteLength(NewArrayBufferLike(O), SeqCst)
 		return length.ToValue()
 	}
-	grow := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	grow := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		newLength := argumentsList[0]
 		return sharedArrayBufferGrow(agent, this, newLength)
 	}
-	growable := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	growable := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := RequireInternalSlot[*SharedArrayBufferObject](this)
 		if IsFixedLengthArrayBuffer(NewArrayBufferLike(O)) {
 			return FalseValue
 		}
 		return TrueValue
 	}
-	maxByteLength := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	maxByteLength := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := RequireInternalSlot[*SharedArrayBufferObject](this)
 		var length JSInt
 		if IsFixedLengthArrayBuffer(NewArrayBufferLike(O)) {
@@ -113,7 +113,7 @@ func NewSharedArrayBufferPrototype(realm *Realm) ObjectType {
 		}
 		return length.ToValue()
 	}
-	slice := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	slice := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		start := argumentsList[0]
 		end := argumentsList[1]
 		return sharedArrayBufferSlice(agent, this, start, end)

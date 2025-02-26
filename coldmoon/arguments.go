@@ -205,11 +205,11 @@ func MakeArgGetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 		Name: name,
 		Env:  env,
 	}
-	var getterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var getterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		function := agent.ActiveFunctionObject()
 		_captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*ArgGetterSetterCaptures)
 		bindingValue := _captures.Env.GetBindingValue(agent, _captures.Name, false)
-		return bindingValue.Data()
+		return bindingValue
 	}
 	getter := CreateBuiltinFunction(agent, getterClosure, 1, CMString(""), builtinFunctionArgs{
 		additionalFieldsV2: captures,
@@ -223,11 +223,11 @@ func MakeArgSetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 		Name: name,
 		Env:  env,
 	}
-	var setterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var setterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		function := agent.ActiveFunctionObject()
 		_captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*ArgGetterSetterCaptures)
 		_captures.Env.SetMutableBinding(_captures.Name, arguments[0], false)
-		return UndefinedValue
+		return UndefinedValue.ToCompletion()
 	}
 
 	setter := CreateBuiltinFunction(agent, setterClosure, 1, CMString(""), builtinFunctionArgs{

@@ -522,7 +522,7 @@ func (o *Object) InitializeInstanceElements(constructor ObjectType) {
 // 20.1.1
 func NewObjectConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := argumentsList[0]
 		if newTarget != nil && newTarget != agent.ActiveFunctionObject() {
 			return OrdinaryCreateFromConstructor(
@@ -549,7 +549,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		},
 	)
 
-	var create BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var create BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := arguments[0]
 		properties := arguments[1]
 		if !o.IsObject() {
@@ -565,7 +565,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return (obj).ToValue()
 	}
 
-	var defineProperties BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var defineProperties BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := arguments[0]
 		properties := arguments[1]
 		if !o.IsObject() {
@@ -574,7 +574,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return (objectDefineProperties(agent, MustGetObject(o), properties)).ToValue()
 	}
 
-	defineProperty := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	defineProperty := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := arguments[0]
 		property := arguments[1]
 		attributes := arguments[2]
@@ -590,7 +590,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.6
-	var freeze BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var freeze BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj, ok := objectValue.(*ObjectValue)
 		if !ok {
@@ -605,7 +605,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.8
-	var getOwnPropertyDescriptor BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getOwnPropertyDescriptor BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := args[0]
 		p := args[1]
 		obj := ReturnAssertNormal(o.ToObject(agent))
@@ -618,7 +618,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return (desc.FromPropertyDescriptor(agent, desc)).ToValue()
 	}
 	// 20.1.2.9
-	var getOwnPropertyDescriptors BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getOwnPropertyDescriptors BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := args[0]
 		obj := ReturnAssertNormal(o.ToObject(agent))
 
@@ -636,7 +636,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.12
-	var getPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := args[0]
 
 		obj := ReturnAssertNormal(o.ToObject(agent))
@@ -645,14 +645,14 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.15
-	var objectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var objectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		arg1 := args[0]
 		arg2 := args[1]
 		return NewBooleanValue(SameValue(arg1, arg2))
 	}
 
 	// 20.1.2.16
-	var isExtensible BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var isExtensible BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj, ok := objectValue.(*ObjectValue)
 		if !ok {
@@ -662,7 +662,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.17
-	var isFrozen BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var isFrozen BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj, ok := objectValue.(*ObjectValue)
 		if !ok {
@@ -672,7 +672,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.18
-	var isSealed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var isSealed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj, ok := objectValue.(*ObjectValue)
 		if !ok {
@@ -682,7 +682,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.20
-	var preventExtensions BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var preventExtensions BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj, ok := objectValue.(*ObjectValue)
 		if !ok {
@@ -697,7 +697,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.22
-	var seal BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var seal BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj, ok := objectValue.(*ObjectValue)
 		if !ok {
@@ -712,7 +712,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	// 20.1.2.23
-	var setPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var setPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		proto := args[1]
 
@@ -738,7 +738,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return obj
 	}
 
-	var hasOwn BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var hasOwn BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		key := args[1]
 
@@ -747,25 +747,25 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return NewBooleanValue(ObjectHasOwnProperty(obj, p))
 	}
 
-	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		entryList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKeyAndValue)
 		return (CreateArrayFromList(agent, entryList)).ToValue()
 	}
-	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		keyList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKey)
 		return (CreateArrayFromList(agent, keyList)).ToValue()
 	}
-	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		valueList := obj.EnumerableOwnProperties(objectOwnPropertiesKindValue)
 		return (CreateArrayFromList(agent, valueList)).ToValue()
 	}
-	var assign BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var assign BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		target := args[0]
 		to := ReturnAssertNormal(target.ToObject(agent))
 		sources := args[1:]
@@ -787,7 +787,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		return (to).ToValue()
 	}
-	var getOwnPropertyNames BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getOwnPropertyNames BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		keys := obj.InternalMethods().OwnPropertyKeys(obj)
@@ -800,7 +800,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		})
 		return CreateArrayFromList(agent, keyValues).ToValue()
 	}
-	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
 		obj := ReturnAssertNormal(objectValue.ToObject(agent))
 		keys := obj.InternalMethods().OwnPropertyKeys(obj)
@@ -813,14 +813,14 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		})
 		return (CreateArrayFromList(agent, symbolValues)).ToValue()
 	}
-	fromEntries := func(this Value, args []Value, newTarget ObjectType) Value {
+	fromEntries := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		iterable := args[0]
 		RequireObjectCoercible(agent, iterable)
 		obj := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
 		type Captures struct {
 			object ObjectType
 		}
-		var closure BehaviorFn = func(this Value, args []Value, newTarget ObjectType) Value {
+		var closure BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			f := agent.ActiveFunctionObject()
 			captures := f.(*BuiltinFunction).AdditionalFieldsV2.(*Captures)
 			k := args[0]
@@ -875,12 +875,12 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	object.InternalMethods().SetPrototypeOf = ImmutableSetPrototypeOf
 	realm.Intrinsics.ObjectPrototype = object
 
-	valueOf := func(this Value, args []Value, newTarget ObjectType) Value {
+	valueOf := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return ReturnAssertNormal(this.ToObject(agent)).ToValue()
 	}
 
 	// 20.1.3.6 toString
-	toString := func(this Value, args []Value, newTarget ObjectType) Value {
+	toString := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		if this == UndefinedValue {
 			return NewStringValue("[object Undefined]")
 		}
@@ -921,12 +921,12 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 		return NewStringValue("[object " + tag + "]")
 	}
-	hasOwnProperty := func(this Value, args []Value, newTarget ObjectType) Value {
+	hasOwnProperty := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := ReturnAssertNormal(this.ToObject(agent))
 		p := ToPropertyKey(agent, args[0])
 		return NewBooleanValue(ObjectHasOwnProperty(o, p))
 	}
-	isPrototypeOf := func(this Value, args []Value, newTarget ObjectType) Value {
+	isPrototypeOf := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		v := args[0]
 		if !v.IsObject() {
 			return NewBooleanValue(false)
@@ -943,7 +943,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 			}
 		}
 	}
-	propertyIsEnumerable := func(this Value, args []Value, newTarget ObjectType) Value {
+	propertyIsEnumerable := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := ReturnAssertNormal(this.ToObject(agent))
 		p := ToPropertyKey(agent, args[0])
 		desc := o.InternalMethods().GetOwnProperty(o, p)
@@ -952,7 +952,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 		return NewBooleanValue(desc.Enumerable)
 	}
-	toLocaleString := func(this Value, args []Value, newTarget ObjectType) Value {
+	toLocaleString := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := ReturnAssertNormal(this.ToObject(agent))
 		return ValueInvoke(agent, o.ToValue(), NewStringPropertyKey("toString"), []Value{})
 	}

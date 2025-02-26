@@ -256,7 +256,7 @@ func RawBytesToNumeric(size JSInt, rawBytes []byte, isLittleEndian bool) uint64 
 
 func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		length := argumentsList[0]
 		options := argumentsList[1]
 		if newTarget == nil {
@@ -276,7 +276,7 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	BindPrototypeAndConstructor(realm.Intrinsics.ArrayBufferPrototype, object)
 
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
-		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+		Getter: func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			return this
 		},
 	})
@@ -287,7 +287,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "ArrayBufferPrototype")
 
-	var isView BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var isView BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		arg := arguments[0]
 		if !arg.IsObject() {
 			return FalseValue
@@ -299,7 +299,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 
 		return FalseValue
 	}
-	byteLength := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	byteLength := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireInternalSlot[*ArrayBufferLike](this)
 		if IsDetachedBuffer(o) {
 			return NewNumberValue(0)
@@ -307,7 +307,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		length := o.ByteLength()
 		return NewNumberValue(length.ToNumber())
 	}
-	slice := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	slice := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		start := arguments[0]
 		end := arguments[1]
 		o := RequireInternalSlot[*ArrayBufferLike](this)
@@ -360,7 +360,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		}
 		return (_new).ToValue()
 	}
-	maxByteLength := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	maxByteLength := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireInternalSlot[*ArrayBufferLike](this)
 		if IsDetachedBuffer(o) {
 			return NewNumberValue(0)
@@ -373,11 +373,11 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		}
 		return NewNumberValue(length.ToNumber())
 	}
-	resizable := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	resizable := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireInternalSlot[*ArrayBufferLike](this)
 		return NewBooleanValue(IsFixedLengthArrayBuffer(o))
 	}
-	resize := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	resize := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		newByteLength := ToIndex(agent, arguments[0])
 		o := RequireInternalSlot[*ArrayBufferLike](this)
 		if o.MaxByteLength() == 0 {

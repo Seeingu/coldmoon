@@ -7,7 +7,7 @@ import (
 )
 
 func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return UndefinedValue
 	}
 	f := CreateBuiltinFunction(realm.Agent, behavior, 0, CMString(""), builtinFunctionArgs{
@@ -27,7 +27,7 @@ func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
 func initFunctionMethods(f ObjectType, realm *Realm) {
 	agent := realm.Agent
 	// 20.2.3.5 toString
-	toString := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	toString := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o, ok := this.(*ObjectValue)
 		if ok {
 			ecmascriptFunction, ok := o.Object.(*ECMAScriptFunction)
@@ -51,7 +51,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 	f.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
 
 	// 20.2.3.3
-	call := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	call := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		if len(argumentsList) == 0 {
 			panic("")
 		}
@@ -63,7 +63,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		}
 		return ReturnAssertNormal(fun.Call(thisArg, args))
 	}
-	bind := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	bind := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		thisArg := argumentsList[0]
 		args := argumentsList[1:]
 		target := this
@@ -102,7 +102,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 	f.defineBuiltinFunction(realm, CMString("call"), call, 1)
 	f.defineBuiltinFunction(realm, CMString("bind"), bind, 1)
 
-	apply := func(this Value, argumentsList []Value, newTarget ObjectType) Value {
+	apply := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		thisArg := argumentsList[0]
 		argArray := argumentsList[1]
 		fun := this
@@ -284,7 +284,7 @@ func CreateDynamicFunction(
 
 func NewFunctionConstructor(realm *Realm) ObjectType {
 	// 20.2.1.1
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		parameters := argumentsList[0 : len(argumentsList)-1]
 		agent := realm.Agent
 

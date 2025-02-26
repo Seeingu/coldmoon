@@ -136,7 +136,7 @@ func NewBigIntObject(agent *Agent, v *BigIntValue, prototype ObjectType) *BigInt
 
 func NewBigIntConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		value := argumentsList[0]
 
 		if newTarget != nil {
@@ -168,7 +168,7 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "BigIntPrototype")
 
 	// 21.2.3.3
-	toString := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toString := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		radix := pkg.SliceSafeGet(arguments, 0)
 
 		x := thisBigIntValue(this)
@@ -186,10 +186,10 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 
 		return x.ToString().ToValue()
 	}
-	valueOf := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	valueOf := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return thisBigIntValue(this)
 	}
-	toLocaleString := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toLocaleString := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return toString(thisBigIntValue(this), nil, nil)
 	}
 

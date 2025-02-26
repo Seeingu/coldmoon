@@ -21,7 +21,7 @@ func NewSymbolObject(agent *Agent, s *SymbolValue, prototype ObjectType) *Symbol
 
 func NewSymbolConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
-	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		description := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget != nil {
 			panic("TypeError")
@@ -122,7 +122,7 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 		Configurable: false,
 	})
 
-	var symbolFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var symbolFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		key := arguments[0]
 		stringKey := key.String()
 		if agent.GlobalSymbolRegistry[stringKey] != nil {
@@ -134,7 +134,7 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 
 		return newSymbol
 	}
-	var keyFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) Value {
+	var keyFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		symbol := arguments[0]
 		s, ok := symbol.(*SymbolValue)
 		if !ok {
@@ -153,16 +153,16 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 func NewSymbolPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "SymbolPrototype")
 
-	toString := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toString := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		symbol := ThisSymbolValue(this)
 
 		return NewStringValue(symbol.SymbolDescriptiveString())
 	}
-	valueOf := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	valueOf := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		symbol := ThisSymbolValue(this)
 		return symbol
 	}
-	toPrimitive := func(this Value, arguments []Value, newTarget ObjectType) Value {
+	toPrimitive := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return this
 	}
 
