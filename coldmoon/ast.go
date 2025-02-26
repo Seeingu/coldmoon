@@ -818,10 +818,16 @@ type FieldDefinition struct {
 type PropertyName interface {
 	ASTNode
 }
+
+// LiteralPropertyName :
+// - IdentifierName
+// - StringLiteral
+// - NumericLiteral
 type LiteralPropertyName interface {
 	PropertyName
 	LiteralString() string
 }
+
 type PropertyNameLiteralIdentifier struct {
 	LiteralPropertyName
 	Identifier IdentifierName
@@ -854,7 +860,13 @@ func (p *PropertyNameLiteralString) String() string {
 
 type PropertyNameLiteralNumeric struct {
 	LiteralPropertyName
-	NumericLiteral *LiteralNumeric
+	NumericLiteral *NumericLiteral
+}
+
+var _ RuntimeSemanticsEvaluation = (*PropertyNameLiteralNumeric)(nil)
+
+func (p *PropertyNameLiteralNumeric) Evaluation(vm *VM) (co CompletionValue) {
+	return p.NumericLiteral.Evaluation(vm)
 }
 
 func (p *PropertyNameLiteralNumeric) String() string {
@@ -1233,7 +1245,7 @@ func (l *LiteralBoolean) String() string {
 	return "false"
 }
 
-// MARK: - LiteralNumeric
+// MARK: - NumericLiteral
 
 type NumericSystem int
 
@@ -1259,16 +1271,22 @@ const (
 	NumericTypeBigInt
 )
 
-type LiteralNumeric struct {
+// NumericLiteral ::
+// - DecimalLiteral
+// - DecimalBigIntegerLiteral
+// - NonDecimalIntegerLiteral[+Sep]
+// - NonDecimalIntegerLiteral[+Sep] BigIntLiteralSuffix
+// - LegacyOctalIntegerLiteral
+type NumericLiteral struct {
 	Literal
 	Value string
 	Type  NumericType
 }
 
-var _ Literal = (*LiteralNumeric)(nil)
+var _ Literal = (*NumericLiteral)(nil)
 
 // 12.9.3.3
-func (l *LiteralNumeric) NumericValue() (Value, error) {
+func (l *NumericLiteral) NumericValue() (Value, error) {
 	if l.Type == NumericTypeBigInt {
 		bi := big.NewInt(0)
 		bi.SetString(l.Value, 10)
@@ -1281,7 +1299,7 @@ func (l *LiteralNumeric) NumericValue() (Value, error) {
 	return NewNumberValue(JSNumber(num)), nil
 }
 
-func (l *LiteralNumeric) Evaluation(vm *VM) CompletionValue {
+func (l *NumericLiteral) Evaluation(vm *VM) CompletionValue {
 	v, err := l.NumericValue()
 	if err != nil {
 		panic(err)
@@ -1289,7 +1307,7 @@ func (l *LiteralNumeric) Evaluation(vm *VM) CompletionValue {
 	return v.ToCompletion()
 }
 
-func (l *LiteralNumeric) String() string {
+func (l *NumericLiteral) String() string {
 	return l.Value
 }
 

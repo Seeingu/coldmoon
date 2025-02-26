@@ -2339,28 +2339,31 @@ func (p *Parser) arrayLiteral() *ArrayLiteral {
 
 func (p *Parser) literal() Literal {
 	t := p.tokenizer.CurrentToken
-	defer p.tokenizer.Next()
 	switch t.Type {
 	case TTrue, TFalse:
+		defer p.tokenizer.Next()
 		return &LiteralBoolean{
 			Bool: t.Type == TTrue,
 		}
 	case TNull:
+		defer p.tokenizer.Next()
 		return &LiteralNull{}
 	case TUndefined:
+		defer p.tokenizer.Next()
 		return &LiteralUndefined{}
 	case TNumber, TBigInt:
 		return p.numericLiteral()
 	case TString:
 		return p.stringLiteral()
 	case TComment:
+		defer p.tokenizer.Next()
 		return &LiteralUndefined{}
 	default:
 		panic("literal: unhandled token")
 	}
 }
 
-func (p *Parser) numericLiteral() *LiteralNumeric {
+func (p *Parser) numericLiteral() *NumericLiteral {
 	t := p.tokenizer.CurrentToken
 	var numericType NumericType
 	if t.Type == TBigInt {
@@ -2368,7 +2371,8 @@ func (p *Parser) numericLiteral() *LiteralNumeric {
 	} else {
 		numericType = NumericTypeNumber
 	}
-	return &LiteralNumeric{
+	p.tokenizer.Next()
+	return &NumericLiteral{
 		Value: t.Value,
 		Type:  numericType,
 	}
@@ -2379,6 +2383,7 @@ func (p *Parser) stringLiteral() *StringLiteral {
 	if t.Type != TString {
 		panic("stringLiteral: expected string")
 	}
+	p.tokenizer.Next()
 	return &StringLiteral{
 		Value: t.Value,
 	}
