@@ -1511,7 +1511,16 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumb
 	return 0
 }
 
-func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen JSInt, start, depth JSInt, mapperFunction ObjectType, thisArg Value) JSInt {
+// FlattenIntoArray
+// spec: 23.1.3.13.1
+func FlattenIntoArray(
+	agent *Agent,
+	target, source ObjectType,
+	sourceLen JSInt,
+	start, depth JSInt,
+	mapperFunction ObjectType,
+	thisArg Value,
+) JSInt {
 	if mapperFunction != nil {
 		Assert(IsCallable((mapperFunction).ToValue()))
 		Assert(thisArg != nil)
@@ -1553,6 +1562,7 @@ func FlattenIntoArray(agent *Agent, target, source ObjectType, sourceLen JSInt, 
 				targetIndex++
 			}
 		}
+		sourceIndex++
 	}
 	return targetIndex
 }
