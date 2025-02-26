@@ -18,17 +18,25 @@ import (
 // MARK: - Coverage config
 
 // expectedCoverage is the expected coverage rate.
-const expectedCoverage = 0.2
+const expectedCoverage = 0.3
 
 // supportFeatures is a list of features that are tested
 // and gather coverage information.
 var supportFeatures = []string{
-	//"built-ins/Array/isArray",
+	"built-ins/Array",
+	"built-ins/Boolean",
+	"built-ins/String",
+	"built-ins/Symbol",
+	"built-ins/Number",
+	"built-ins/BigInt",
+	"built-ins/Date",
+	"built-ins/Function",
+	"built-ins/Object",
+	"built-ins/RegExp",
 	"built-ins/DataView",
 	"built-ins/TypedArray/Symbol.species",
 	"built-ins/SharedArrayBuffer/prototype",
 	"built-ins/TypedArrayConstructors/BigInt64Array",
-	"built-ins/Boolean",
 }
 
 func Test262WithCoverage(t *testing.T) {
@@ -71,6 +79,7 @@ func Test262WithCoverage(t *testing.T) {
 		}
 	}
 	writePassedResultFiles(passed)
+	writeFailedResultFiles(failed)
 	coverage := float64(len(passed)) / float64(len(passed)+len(failed))
 	fmt.Printf("Coverage: %.2f%%\n", coverage*100)
 	if coverage < expectedCoverage {
@@ -80,24 +89,40 @@ func Test262WithCoverage(t *testing.T) {
 
 // MARK: - utils
 
-const PassedResultsFile = ".passed.txt"
+const (
+	PassedResultsFile = ".passed.txt"
+	FailedResultsFile = ".failed.txt"
+)
 
-func loadPassedResultFiles() map[string]bool {
+func loadResultFile(fileName string) map[string]bool {
 	m := make(map[string]bool)
-	_, err := os.Stat(PassedResultsFile)
+	_, err := os.Stat(fileName)
 	if err != nil {
 		return nil
 	}
-	content := pkg.MustReadFile(PassedResultsFile)
+	content := pkg.MustReadFile(fileName)
 	for _, f := range strings.Split(content, "\n") {
 		m[f] = true
 	}
 	return m
 }
 
+func loadPassedResultFiles() map[string]bool {
+	return loadResultFile(PassedResultsFile)
+}
+
+func loadFailedResultFiles() map[string]bool {
+	return loadResultFile(FailedResultsFile)
+}
+
 func writePassedResultFiles(files []string) {
 	content := strings.Join(files, "\n")
 	os.WriteFile(PassedResultsFile, []byte(content), 0o644)
+}
+
+func writeFailedResultFiles(files []string) {
+	content := strings.Join(files, "\n")
+	os.WriteFile(FailedResultsFile, []byte(content), 0o644)
 }
 
 func evaluate(fileName string, realm *Realm) (err error) {

@@ -31,3 +31,4 @@ main.exe
 *.a
 
 .passed.txt
+.failed.txt

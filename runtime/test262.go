@@ -39,6 +39,7 @@ func RegisterTest262Runtime(realm *coldmoon.Realm) {
 		"propertyHelper.js",
 		"testTypedArray.js",
 		"testAtomics.js",
+		"compareArray.js",
 	}
 	for _, f := range files {
 		println("Harness file: ", f)
