@@ -2026,17 +2026,16 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 	}
 }
 
-func (p *Parser) templateLiteral() *PrimaryExpressionTemplateLiteral {
+func (p *Parser) templateLiteral() *TemplateLiteral {
 	if p.tokenizer.CurrentToken.Type == TNoSubstitutionTemplate {
 		text := p.tokenizer.CurrentToken.Value
 		p.tokenizer.Next()
-		return &PrimaryExpressionTemplateLiteral{
-			TemplateLiteral: &TemplateLiteral{
-				Spans: []*TemplateSpan{
-					{
-						Text:       text,
-						Expression: nil,
-					},
+		return &TemplateLiteral{
+			SourceText: text,
+			Spans: []*TemplateSpan{
+				{
+					Text:       text,
+					Expression: nil,
 				},
 			},
 		}
@@ -2067,13 +2066,11 @@ func (p *Parser) templateLiteral() *PrimaryExpressionTemplateLiteral {
 		expr = p.expression(p.acceptContextLowest())
 	}
 	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
-	return &PrimaryExpressionTemplateLiteral{
-		TemplateLiteral: &TemplateLiteral{
-			TemplateHead: &TemplateSpan{
-				Text: templateHead.Value,
-			},
-			Spans: spans,
+	return &TemplateLiteral{
+		TemplateHead: &TemplateSpan{
+			Text: templateHead.Value,
 		},
+		Spans:      spans,
 		SourceText: sourceText,
 	}
 }

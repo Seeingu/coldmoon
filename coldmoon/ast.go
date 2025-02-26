@@ -1649,34 +1649,6 @@ func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
 
 // MARK: - TemplateLiteral
 
-// TODO(BM): rename
-type PrimaryExpressionTemplateLiteral struct {
-	PrimaryExpression
-	TemplateLiteral *TemplateLiteral
-	SourceText      string
-}
-
-func (t *PrimaryExpressionTemplateLiteral) astNoSubstitution() bool {
-	return t.TemplateLiteral.TemplateHead == nil
-}
-
-// Evaluation
-// spec: 13.2.8.6
-func (t *PrimaryExpressionTemplateLiteral) Evaluation(vm *VM) CompletionValue {
-	if t.astNoSubstitution() {
-		// NoSubstitutionTemplate
-		span := t.TemplateLiteral.Spans[0]
-		return span.TV().ToValue().ToCompletion()
-	} else {
-		// TODO(BM): after remove old vm
-	}
-	panic("unimplemented")
-}
-
-func (t *PrimaryExpressionTemplateLiteral) String() string {
-	return t.SourceText
-}
-
 type TemplateSpan struct {
 	Text       string
 	Expression Expression
@@ -1701,10 +1673,49 @@ func (t *TemplateSpan) TV() CMString {
 	return CMString(t.Text[start:end])
 }
 
+// TemplateLiteral [Yield, Await, Tagged] :
+// - NoSubstitutionTemplate
+// - SubstitutionTemplate[?Yield, ?Await, ?Tagged]
 type TemplateLiteral struct {
+	PrimaryExpression
 	// TemplateHead is string only
 	TemplateHead *TemplateSpan
 	Spans        []*TemplateSpan
+	SourceText   string
+}
+
+var _ ASTNode = (*TemplateLiteral)(nil)
+
+func (t *TemplateLiteral) astNoSubstitution() bool {
+	return t.TemplateHead == nil
+}
+
+// Evaluation
+// spec: 13.2.8.6
+func (t *TemplateLiteral) Evaluation(vm *VM) (co CompletionValue) {
+	if t.astNoSubstitution() {
+		// NoSubstitutionTemplate
+		span := t.Spans[0]
+		return span.TV().ToValue().ToCompletion()
+	} else {
+		var sb CMString
+		head := t.TemplateHead.TV()
+		sb += head
+		for _, span := range t.Spans {
+			sub, _, isAbrupt, rt := vm.EvalAndGetValue(span.Expression, co)
+			if isAbrupt {
+				return rt
+			}
+			middle := sub.ToString()
+			tail := span.TV()
+			sb += middle + tail
+		}
+		return sb.ToValue().ToCompletion()
+	}
+}
+
+func (t *TemplateLiteral) String() string {
+	return t.SourceText
 }
 
 // MARK: - UpdateExpression
