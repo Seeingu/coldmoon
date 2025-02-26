@@ -55,6 +55,8 @@ func (c Completion[T]) ThrowError(agent *Agent, errorType ExceptionType, msg str
 // CompletionFrom returns a new Completion with the error from `other`.
 func CompletionFrom[T any, U any](a Completion[T], other Completion[U]) Completion[T] {
 	a.err = other.err
+	// FIXME: type conversion
+	// a.t = other.t
 	return a
 }
 

@@ -346,7 +346,12 @@ type LabelSet = []string
 
 // ForBodyEvaluation
 // spec: 14.7.4.3
-func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIterationBindings []string, labelSet LabelSet) (co CompletionValue) {
+func (v *VM) ForBodyEvaluation(
+	test, increment Expression,
+	stmt Statement,
+	perIterationBindings []string,
+	labelSet LabelSet,
+) (co CompletionValue) {
 	var V Value = UndefinedValue
 	CreatePerIterationEnvironment(perIterationBindings)
 	for {
@@ -359,8 +364,8 @@ func (v *VM) ForBodyEvaluation(test, increment Expression, stmt Statement, perIt
 				return V.ToCompletion()
 			}
 		}
-		result := CompletionHandle(stmt.Evaluation(v))
-		if !LoopContinues(result.value, labelSet) {
+		result := stmt.Evaluation(v)
+		if !LoopContinues(result, labelSet) {
 			return UpdateEmpty(result, V)
 		}
 		if !IsUndefinedOrNil(result.value) {
@@ -494,7 +499,7 @@ func (v *VM) ForInOfBodyEvaluation(
 		// TODO: handle status
 		result := stmt.Evaluation(v)
 		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
-		if !LoopContinues(result.value, labelSet) {
+		if !LoopContinues(result, labelSet) {
 			if iterationKind == ForInOfIterationKindEnumerate {
 				return UpdateEmpty(result, V)
 			} else {
@@ -565,9 +570,12 @@ func CreatePerIterationEnvironment(perIterationBindings []string) {
 
 // LoopContinues
 // spec: 14.7.1.1
-func LoopContinues(result Value, labelSet LabelSet) bool {
-	// TODO
-	return true
+func LoopContinues(result CompletionValue, labelSet LabelSet) bool {
+	if result.t == CompletionTypeNormal && result.err == nil {
+		return true
+	}
+	// TODO: check target
+	return false
 }
 
 // UpdateEmpty

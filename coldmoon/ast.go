@@ -2162,19 +2162,20 @@ func (b *ExpressionBinaryExpression) AssignmentTargetType() AssignmentTargetType
 	return AssignmentTargetTypeInvalid
 }
 
-// 13.15.4
-func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM) Value {
+// EvaluateStringOrNumericBinaryExpression
+// spec: 13.15.4
+func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM) CompletionValue {
 	var co CompletionValue
 	lval, _, isAbrupt, rt := vm.EvalAndGetValue(b.Left, co)
 	if isAbrupt {
-		panic(rt)
+		return rt
 	}
 
 	rval, _, isAbrupt, rt := vm.EvalAndGetValue(b.Right, co)
 	if isAbrupt {
-		panic(rt)
+		return rt
 	}
-	return vm.ApplyStringOrNumericBinaryOperator(lval, rval, b.Operator)
+	return vm.ApplyStringOrNumericBinaryOperator(lval, rval, b.Operator).ToCompletion()
 }
 
 func (b *ExpressionBinaryExpression) Evaluation(vm *VM) CompletionValue {
@@ -4047,7 +4048,7 @@ func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (co Comp
 		if vm.isYield {
 			return stmtResult
 		}
-		if !LoopContinues(stmtResult.value, labelSet) {
+		if !LoopContinues(stmtResult, labelSet) {
 			return UpdateEmpty(stmtResult, V)
 		}
 		if !IsUndefinedOrNil(stmtResult.value) {
@@ -4086,14 +4087,6 @@ func (s *StatementDoWhile) String() string {
 
 type ForStatementInitializer interface {
 	ASTNode
-}
-type ForStatementInitializerExpression struct {
-	ForStatementInitializer
-	Expression Expression
-}
-
-func (f *ForStatementInitializerExpression) String() string {
-	return f.Expression.String()
 }
 
 type ForStatementInitializerVariable struct {
@@ -4148,8 +4141,14 @@ func (s *ForStatement) isVariableDeclarationList() bool {
 	return ok
 }
 
-// ForLoopEvaluation 14.7.4.2
-func (s *ForStatement) ForLoopEvaluation(vm *VM) CompletionValue {
+func (s *ForStatement) isLexicalDeclaration() bool {
+	_, ok := s.Initializer.(*ForStatementInitializerLexicalDeclaration)
+	return ok
+}
+
+// ForLoopEvaluation
+// spec: 14.7.4.2
+func (s *ForStatement) ForLoopEvaluation(vm *VM) (co CompletionValue) {
 	// TODO: label set
 	if s.isVariableDeclarationList() {
 		s.Initializer.Evaluation(vm)
@@ -4163,8 +4162,25 @@ func (s *ForStatement) ForLoopEvaluation(vm *VM) CompletionValue {
 		}
 		var perIterationBindings []string
 		return vm.ForBodyEvaluation(test, increment, s.Body, perIterationBindings, nil)
+	} else if s.isLexicalDeclaration() {
+		panic("unimplemented")
+	} else {
+		if s.Initializer != nil {
+			_, _, isAbrupt, rt := vm.EvalAndGetValue(s.Initializer, co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		var test Expression
+		if s.Condition != nil {
+			test = s.Condition
+		}
+		var increment Expression
+		if s.Increment != nil {
+			increment = s.Increment
+		}
+		return vm.ForBodyEvaluation(test, increment, s.Body, []string{}, nil)
 	}
-	panic("unimplemented")
 }
 
 func (s *ForStatement) Evaluation(vm *VM) CompletionValue {
