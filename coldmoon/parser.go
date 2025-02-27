@@ -1298,13 +1298,14 @@ func (p *Parser) forStatement() *ForStatement {
 		init = &ForStatementInitializerVariable{
 			VariableStatement: p.variableStatement(),
 		}
+		p.tokenizer.MustMatch(TSemicolon)
 	} else if t.Type == TLet || t.Type == TConst {
 		init = &ForStatementInitializerLexicalDeclaration{
 			LexicalDeclaration: p.lexicalDeclaration(),
 		}
 	} else {
 		init = p.expression(p.acceptContextLowest())
-		p.tokenizer.Match(TSemicolon)
+		p.tokenizer.MustMatch(TSemicolon)
 	}
 	var condition Expression
 	if p.tokenizer.CurrentToken.Type != TSemicolon {
@@ -1728,7 +1729,7 @@ func (p *Parser) assignmentExpression(left Expression, accept *acceptContext) *A
 	right := p.expression(accept)
 	return &AssignmentExpression{
 		Operator: operatorAssignmentMap[t.Type],
-		Left:     left,
+		Left:     &LeftHandSideExpression{left},
 		Right:    right,
 	}
 }
@@ -2402,12 +2403,7 @@ func (p *Parser) variableDeclarationList() *VariableDeclarationList {
 		if p.tokenizer.CurrentToken.Type == TComma {
 			p.tokenizer.Next()
 			continue
-		}
-		if p.tokenizer.CurrentToken.Type == TSemicolon {
-			p.tokenizer.Next()
-			break
-		}
-		if p.tokenizer.CurrentToken.Type == TEOF {
+		} else {
 			break
 		}
 	}
