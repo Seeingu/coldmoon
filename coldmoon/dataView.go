@@ -300,6 +300,8 @@ func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, size JSInt)
 	return
 }
 
+// SetViewValue
+// spec: 25.3.1.6
 func SetViewValue(
 	agent *Agent,
 	viewValue Value,
@@ -313,7 +315,11 @@ func SetViewValue(
 	viewRecord := MakeDataViewWithBufferWitnessRecord(view, SeqCst)
 	var numberValue JSNumber
 	if IsBigIntElementType(size) {
-		numberValue = JSNumber(ToBigInt(agent, value).Data.Uint64())
+		bi, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+		numberValue = JSNumber(bi.Data.Uint64())
 	} else {
 		numberValue = value.ToNumber(agent).Data
 	}

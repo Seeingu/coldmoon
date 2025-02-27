@@ -42,17 +42,18 @@ func NewValueFromObject(object ObjectType) Value {
 	return ov
 }
 
-// 7.1.3
-func ToNumeric(agent *Agent, value Value) Value {
-	var co CompletionValue
+// ToNumeric
+// spec: 7.1.3
+func ToNumeric(agent *Agent, value Value) (co CompletionValue) {
 	primValue, isAbrupt, rt := ReturnIfAbrupt(value.ToPrimitive(agent, PreferredTypeNumber), co)
 	if isAbrupt {
-		panic(rt)
+		return rt
 	}
 	if bigInt, ok := primValue.(*BigIntValue); ok {
-		return bigInt
+		return bigInt.ToCompletion()
 	}
-	return primValue.ToNumber(agent)
+	co.value = primValue.ToNumber(agent)
+	return
 }
 
 func ToIntegerOrInfinity(agent *Agent, value Value) JSInt {
@@ -187,46 +188,62 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 	return fInt
 }
 
-func ToBigInt(agent *Agent, value Value) *BigIntValue {
+// ToBigInt
+// spec: 7.1.13
+func ToBigInt(agent *Agent, value Value) (co Completion[*BigIntValue]) {
 	prim := ReturnAssertNormal(value.ToPrimitive(agent, PreferredTypeNumber))
 	switch p := prim.(type) {
 	case *undefinedValue, *nullValue, *NumberValue, *SymbolValue:
 		panic("TypeError")
 	case *BooleanValue:
-		return NewBigIntFromBoolean(p.Data)
+		co.value = NewBigIntFromBoolean(p.Data)
+		return
 	case *BigIntValue:
-		return p
+		co.value = p
+		return
 	case *StringValue:
 		n, ok := StringToBigInt(p)
 		Assert(ok)
-		return n
+		co.value = n
+		return
 	default:
 		panic("unreachable")
 	}
 }
 
-// 7.1.15
-func ToBigInt64(value Value, agent *Agent) int64 {
-	n := ToBigInt(agent, value)
+// ToBigInt64
+// spec: 7.1.15
+func ToBigInt64(value Value, agent *Agent) (co Completion[int64]) {
+	n, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+	if isAbrupt {
+		return rt
+	}
 
 	twoPow64 := uint128.New(0, 1)
 	twoPow63 := uint128.New(1<<63, 0)
 
 	int64bit := uint128.FromBig(n.Data).Mod(twoPow64)
 	if int64bit.Cmp(twoPow63) >= 0 {
-		return int64(int64bit.Sub(twoPow64).Lo)
+		co.value = int64(int64bit.Sub(twoPow64).Lo)
+		return
 	} else {
-		return int64(int64bit.Lo)
+		co.value = int64(int64bit.Lo)
+		return
 	}
 }
 
-// 7.1.16
-func ToBigUint64(agent *Agent, value Value) uint64 {
-	n := ToBigInt(agent, value)
+// ToBigUint64
+// spec: 7.1.16
+func ToBigUint64(agent *Agent, value Value) (co Completion[uint64]) {
+	n, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+	if isAbrupt {
+		return rt
+	}
 
 	twoPow64 := uint128.New(0, 1)
 	int64bit := uint128.FromBig(n.Data).Mod(twoPow64)
-	return int64bit.Lo
+	co.value = int64bit.Lo
+	return
 }
 
 // 7.1.4.1.1
@@ -439,9 +456,10 @@ const (
 	IsLessThanOrderRightFirst
 )
 
-// TODO: standardalize
-// 7.2.13
-func IsLessThanV2(agent *Agent, x, y Value, order isLessThanOrder) Value {
+// IsLessThan
+// spec: 7.2.13
+// returns either a Boolean or undefined, or throw
+func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) CompletionValue {
 	var px, py Value
 	if order == IsLessThanOrderLeftFirst {
 		px = ReturnAssertNormal(x.ToPrimitive(agent, PreferredTypeNumber))
@@ -453,20 +471,15 @@ func IsLessThanV2(agent *Agent, x, y Value, order isLessThanOrder) Value {
 	pxString, isPxString := px.(*StringValue)
 	pyString, isPyString := px.(*StringValue)
 	if isPxString && isPyString {
-		return NewBooleanValue(pxString.Data < pyString.Data)
+		return NewBooleanValue(pxString.Data < pyString.Data).ToCompletion()
 	} else {
 		nx := px.ToNumber(agent)
 		ny := py.ToNumber(agent)
 		if nx.IsNaN() || ny.IsNaN() {
-			return FalseValue
+			return FalseValue.ToCompletion()
 		}
-		return NewBooleanValue(nx.Data < ny.Data)
+		return NewBooleanValue(nx.Data < ny.Data).ToCompletion()
 	}
-}
-
-// 7.2.13
-func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) bool {
-	return IsLessThanV2(agent, x, y, order).ToBoolean()
 }
 
 // 7.2.14

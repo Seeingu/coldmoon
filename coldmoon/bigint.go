@@ -153,7 +153,11 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 			return NumberToBigInt(agent, num)
 		}
 
-		return ToBigInt(agent, prim)
+		v, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, prim), co)
+		if isAbrupt {
+			return rt
+		}
+		return v
 	}
 
 	object := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("BigInt"), builtinFunctionArgs{

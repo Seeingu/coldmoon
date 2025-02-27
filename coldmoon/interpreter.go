@@ -197,8 +197,9 @@ func (v *VM) OrdinaryHasInstance(c Value, value Value) (co Completion[bool]) {
 	}
 }
 
+// ApplyStringOrNumericBinaryOperator
 // spec: 13.15.3
-func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOperator) Value {
+func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOperator) (co CompletionValue) {
 	agent := v.agent
 	lhs := left
 	rhs := right
@@ -212,17 +213,23 @@ func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOper
 		if lprimIsString || rprimIsString {
 			lstr := lprim.String()
 			rstr := rprim.String()
-			return NewStringValue(lstr + rstr)
+			return NewStringValue(lstr + rstr).ToCompletion()
 		}
 
 		finalLval = lprim
 		finalRval = rprim
 	}
 
-	lnum := ToNumeric(agent, finalLval)
-	rnum := ToNumeric(agent, finalRval)
+	lnum, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, finalLval), co)
+	if isAbrupt {
+		return rt
+	}
+	rnum, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, finalRval), co)
+	if isAbrupt {
+		return rt
+	}
 	if reflect.TypeOf(lnum) != reflect.TypeOf(rnum) {
-		panic("TypeError: lnum and rnum are not the same type")
+		return co.ThrowTypeError(agent, "TypeError: lnum and rnum are not the same type")
 	}
 
 	lNumber, isNumber := lnum.(*NumberValue)
@@ -233,75 +240,75 @@ func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOper
 	switch op {
 	case BinaryOperatorExponentiation:
 		if isNumber {
-			return lNumber.Exponentiate(rNumber)
+			return lNumber.Exponentiate(rNumber).ToCompletion()
 		} else {
-			return lBigInt.Exponentiate(rBigInt)
+			return lBigInt.Exponentiate(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorMultiplication:
 		if isNumber {
-			return lNumber.Multiply(rNumber)
+			return lNumber.Multiply(rNumber).ToCompletion()
 		} else {
-			return lBigInt.Multiply(rBigInt)
+			return lBigInt.Multiply(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorAddition:
 		if isNumber {
-			return lNumber.Add(rNumber)
+			return lNumber.Add(rNumber).ToCompletion()
 		} else {
-			return lBigInt.Add(rBigInt)
+			return lBigInt.Add(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorSubtraction:
 		if isNumber {
-			return lNumber.Subtract(rNumber)
+			return lNumber.Subtract(rNumber).ToCompletion()
 		} else {
-			return lBigInt.Subtract(rBigInt)
+			return lBigInt.Subtract(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorDivision:
 		if isNumber {
-			return lNumber.Divide(rNumber)
+			return lNumber.Divide(rNumber).ToCompletion()
 		} else {
-			return lBigInt.Divide(rBigInt)
+			return lBigInt.Divide(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorRemainder:
 		if isNumber {
-			return lNumber.Remainder(rNumber)
+			return lNumber.Remainder(rNumber).ToCompletion()
 		} else {
-			return lBigInt.Remainder(rBigInt)
+			return lBigInt.Remainder(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorLeftShift:
 		if isNumber {
-			return lNumber.LeftShift(rNumber)
+			return lNumber.LeftShift(rNumber).ToCompletion()
 		} else {
-			return lBigInt.LeftShift(rBigInt)
+			return lBigInt.LeftShift(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorRightShift:
 		if isNumber {
-			return lNumber.SignedRightShift(rNumber)
+			return lNumber.SignedRightShift(rNumber).ToCompletion()
 		} else {
-			return lBigInt.SignedRightShift(rBigInt)
+			return lBigInt.SignedRightShift(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorUnsignedRightShift:
 		if isNumber {
-			return lNumber.UnsignedRightShift(rNumber)
+			return lNumber.UnsignedRightShift(rNumber).ToCompletion()
 		} else {
-			return lBigInt.UnsignedRightShift(rBigInt)
+			return lBigInt.UnsignedRightShift(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorBitwiseAnd:
 		if isNumber {
-			return lNumber.BitwiseAnd(rNumber)
+			return lNumber.BitwiseAnd(rNumber).ToCompletion()
 		} else {
-			return lBigInt.BitwiseAnd(rBigInt)
+			return lBigInt.BitwiseAnd(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorBitwiseOr:
 		if isNumber {
-			return lNumber.BitwiseOr(rNumber)
+			return lNumber.BitwiseOr(rNumber).ToCompletion()
 		} else {
-			return lBigInt.BitwiseOr(rBigInt)
+			return lBigInt.BitwiseOr(rBigInt).ToCompletion()
 		}
 	case BinaryOperatorBitwiseXor:
 		if isNumber {
-			return lNumber.BitwiseXor(rNumber)
+			return lNumber.BitwiseXor(rNumber).ToCompletion()
 		} else {
-			return lBigInt.BitwiseXor(rBigInt)
+			return lBigInt.BitwiseXor(rBigInt).ToCompletion()
 		}
 	}
 	panic("unreachable")

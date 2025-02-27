@@ -1572,7 +1572,7 @@ func IsConcatSpreadable(agent *Agent, value Value) bool {
 
 type SortCompare struct {
 	compareFn ObjectType
-	impl      func(*Agent, Value, Value, ObjectType) JSNumber
+	impl      func(*Agent, Value, Value, ObjectType) Completion[JSNumber]
 }
 
 type sortHolesType int
@@ -1591,7 +1591,8 @@ func InsertionSort(agent *Agent, items []Value, sortCompare SortCompare) {
 		j := i
 		for j > 0 {
 			y := items[j-1]
-			if sortCompare.impl(agent, x, y, sortCompare.compareFn) >= 0 {
+			c := ReturnAssertNormal(sortCompare.impl(agent, x, y, sortCompare.compareFn))
+			if c >= 0 {
 				break
 			}
 			items[j] = y
@@ -1623,16 +1624,20 @@ func SortIndexedProperties(agent *Agent, obj ObjectType, length JSInt, sortCompa
 	return
 }
 
-// 23.1.3.30.2
-func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumber {
+// CompareArrayElements
+// spec: 23.1.3.30.2
+func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) (co Completion[JSNumber]) {
 	if x == UndefinedValue && y == UndefinedValue {
-		return 0
+		co.value = 0
+		return
 	}
 	if x == UndefinedValue {
-		return 1
+		co.value = 1
+		return
 	}
 	if y == UndefinedValue {
-		return -1
+		co.value = -1
+		return
 	}
 	if compareFn != nil {
 		v := compareFn.
@@ -1641,23 +1646,39 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumb
 			value.
 			ToNumber(agent)
 		if v.IsNaN() {
-			return 0
+			co.value = 0
+			return
 		}
-		return v.Data
+		co.value = v.Data
+		return
 	}
 
 	xString := x.String()
 	yString := y.String()
-	xSmaller := IsLessThan(agent, NewStringValue(xString), NewStringValue(yString), IsLessThanOrderLeftFirst)
-	if xSmaller {
-		return -1
+	xSmaller, isAbrupt, rt := ReturnIfAbrupt(
+		IsLessThan(agent, NewStringValue(xString), NewStringValue(yString), IsLessThanOrderLeftFirst),
+		co)
+	if isAbrupt {
+		return rt
+	}
+	if xSmaller.ToBoolean() {
+		co.value = -1
+		return
 	}
 
-	ySmaller := IsLessThan(agent, NewStringValue(yString), NewStringValue(xString), IsLessThanOrderLeftFirst)
-	if ySmaller {
-		return 1
+	ySmaller, isAbrupt, rt := ReturnIfAbrupt(
+		IsLessThan(agent, NewStringValue(yString), NewStringValue(xString), IsLessThanOrderLeftFirst),
+		co,
+	)
+	if isAbrupt {
+		return rt
 	}
-	return 0
+	if ySmaller.ToBoolean() {
+		co.value = 1
+		return
+	}
+	co.value = 0
+	return
 }
 
 // FlattenIntoArray

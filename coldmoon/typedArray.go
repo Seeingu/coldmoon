@@ -626,8 +626,9 @@ func ValidateTypedArray(agent *Agent, O Value, order MemoryOrder) *TypedArrayWit
 	return taRecord
 }
 
-// 23.2.4.7
-func CompareTypedArrayElements(agent *Agent, x, y Value, comparator ObjectType) JSNumber {
+// CompareTypedArrayElements
+// spec: 23.2.4.7
+func CompareTypedArrayElements(agent *Agent, x, y Value, comparator ObjectType) (co Completion[JSNumber]) {
 	xNumber, xIsNumber := x.(*NumberValue)
 	yNumber, yIsNumber := y.(*NumberValue)
 	xBigInt, xIsBigInt := x.(*BigIntValue)
@@ -636,28 +637,36 @@ func CompareTypedArrayElements(agent *Agent, x, y Value, comparator ObjectType) 
 	if comparator != nil {
 		v := comparator.Call(UndefinedValue, []Value{x, y}).value.ToNumber(agent)
 		if v.IsNaN() {
-			return 0
+			co.value = 0
+			return
 		}
-		return v.Data
+		co.value = v.Data
+		return
 	}
 	if xIsNumber && yIsNumber {
 		if xNumber.Data < yNumber.Data {
-			return -1
+			co.value = -1
+			return
 		}
 		if xNumber.Data > yNumber.Data {
-			return 1
+			co.value = 1
+			return
 		}
-		return 0
+		co.value = 0
+		return
 	} else {
 		xn := xBigInt.Data
 		yn := yBigInt.Data
 		if xn.Cmp(yn) < 0 {
-			return -1
+			co.value = -1
+			return
 		}
 		if xn.Cmp(yn) > 0 {
-			return 1
+			co.value = 1
+			return
 		}
-		return 0
+		co.value = 0
+		return
 	}
 }
 
@@ -888,14 +897,20 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 	return object
 }
 
-// 10.4.5.18
-func TypedArraySetElement(agent *Agent, O *TypedArrayObject, index JSInt, value Value) {
+// TypedArraySetElement
+// spec: 10.4.5.18
+// returns UNUSED or throw
+func TypedArraySetElement(agent *Agent, O *TypedArrayObject, index JSInt, value Value) (co CompletionValue) {
 	if !O.IsValidIntegerIndex(agent, index) {
 		return
 	}
 	var numValue Value
 	if O.ContentType == TypedArrayContentTypeBigInt {
-		numValue = ToBigInt(agent, value)
+		n, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+		numValue = n
 	} else {
 		numValue = value.ToNumber(agent)
 	}
@@ -912,6 +927,7 @@ func TypedArraySetElement(agent *Agent, O *TypedArrayObject, index JSInt, value 
 		true,
 		Relaxed,
 	)
+	return
 }
 
 // 10.4.5.14
@@ -1314,7 +1330,7 @@ func typedArrayEvery(agent *Agent, this Value, callback Value, thisArg Value) Va
 	return TrueValue
 }
 
-func typedArrayFill(agent *Agent, this Value, _value, start, end Value) Value {
+func typedArrayFill(agent *Agent, this Value, _value, start, end Value) (co CompletionValue) {
 	O := this
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
@@ -1322,7 +1338,11 @@ func typedArrayFill(agent *Agent, this Value, _value, start, end Value) Value {
 
 	var value Value
 	if ta.ContentType == TypedArrayContentTypeBigInt {
-		value = ToBigInt(agent, _value)
+		v, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, _value), co)
+		if isAbrupt {
+			return rt
+		}
+		value = v
 	} else {
 		value = _value.ToNumber(agent)
 	}
@@ -1354,7 +1374,7 @@ func typedArrayFill(agent *Agent, this Value, _value, start, end Value) Value {
 
 	taRecord = MakeTypedArrayWithBufferWitnessRecord(ta, SeqCst)
 	if IsTypedArrayOutOfBounds(taRecord) {
-		return agent.ThrowException(RangeError, "out of bounds")
+		return co.ThrowError(agent, RangeError, "out of bounds")
 	}
 	length = TypedArrayLength(taRecord)
 	endIndex = endIndex.Min(length)
@@ -1365,7 +1385,8 @@ func typedArrayFill(agent *Agent, this Value, _value, start, end Value) Value {
 		k++
 	}
 
-	return ta.ToValue()
+	co.value = ta.ToValue()
+	return
 }
 
 func typedArrayFilter(agent *Agent, this Value, callback Value, thisArg Value) Value {
@@ -1856,7 +1877,7 @@ func typedArraySubarray(agent *Agent, this Value, begin, end Value) Value {
 	return TypedArraySpeciesCreate(agent, ta, argumentsList).ToValue()
 }
 
-func typedArrayWith(agent *Agent, this Value, index, value Value) Value {
+func typedArrayWith(agent *Agent, this Value, index, value Value) (co CompletionValue) {
 	O := this
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
@@ -1871,12 +1892,16 @@ func typedArrayWith(agent *Agent, this Value, index, value Value) Value {
 
 	var numericValue Value
 	if ta.ContentType == TypedArrayContentTypeBigInt {
-		numericValue = ToBigInt(agent, value)
+		n, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+		numericValue = n
 	} else {
 		numericValue = value.ToNumber(agent)
 	}
 	if !ta.IsValidIntegerIndex(agent, actualIndex) {
-		return agent.ThrowException(RangeError, "invalid index")
+		return co.ThrowError(agent, RangeError, "invalid index")
 	}
 	A := TypedArrayCreateSameType(agent, ta, []Value{length.ToValue()})
 	k := JSInt(0)
@@ -1889,5 +1914,6 @@ func typedArrayWith(agent *Agent, this Value, index, value Value) Value {
 		}
 		k++
 	}
-	return A.ToValue()
+	co.value = A.ToValue()
+	return
 }

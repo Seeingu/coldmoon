@@ -68,34 +68,39 @@ func ValidateAtomicAccess(agent *Agent, taRecord *TypedArrayWithBufferWitnessRec
 	return
 }
 
-// 25.4.3.17
+// AtomicReadModifyWrite
+// spec: 25.4.3.17
 func AtomicReadModifyWrite(
 	agent *Agent,
 	typedArrayValue, index, value Value,
 	op AtomicOp,
-) Value {
-	byteIndexInBuffer := ValidateAtomicAccessOnIntegerTypedArray(
+) (co CompletionValue) {
+	byteIndexInBuffer, isAbrupt, rt := ReturnIfAbrupt(ValidateAtomicAccessOnIntegerTypedArray(
 		agent,
 		typedArrayValue,
 		index,
-		false)
-	if byteIndexInBuffer.IsError() {
-		return byteIndexInBuffer.Error()
+		false), co)
+	if isAbrupt {
+		return rt
 	}
 	typedArray := MustGetObject(typedArrayValue).(*TypedArrayObject)
 	var numericValue Value
 	if typedArray.ContentType == TypedArrayContentTypeBigInt {
-		numericValue = ToBigInt(agent, value)
+		n, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+		numericValue = n
 	} else {
 		numericValue = ToIntegerOrInfinity(agent, value).ToValue()
 	}
 
-	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer.Data())
+	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
 
 	buffer := typedArray.ViewedArrayBuffer
 	elementType := TypedArrayElementType(typedArray)
 
-	return GetModifySetValueInBuffer(agent, buffer, byteIndexInBuffer.Data(), elementType, numericValue, op)
+	return GetModifySetValueInBuffer(agent, buffer, byteIndexInBuffer, elementType, numericValue, op)
 }
 
 // 25.1.3.19
@@ -106,7 +111,7 @@ func GetModifySetValueInBuffer(
 	elementType TypedArrayName,
 	value Value,
 	op AtomicOp,
-) Value {
+) (co CompletionValue) {
 	Assert(!IsDetachedBuffer(arrayBuffer))
 	size := getTypedArraySizeFromName(elementType)
 	Assert(arrayBuffer.Data().Size() >= byteIndex+size)
@@ -144,7 +149,8 @@ func GetModifySetValueInBuffer(
 	}
 	block.Set(byteIndex, NumericToRawBytes(JSNumber(target).ToValue(), size, isLittleEndian))
 	// return previous
-	return JSNumber(previous).ToValue()
+	co.value = JSNumber(previous).ToValue()
+	return
 }
 
 // 25.4.3.4
@@ -274,14 +280,14 @@ func NewAtomics(realm *Realm) ObjectType {
 func atomicsCompareExchange(
 	agent *Agent,
 	typedArrayValue, index, expectedValue, replacementValue Value,
-) Value {
-	byteIndexInBuffer := ValidateAtomicAccessOnIntegerTypedArray(
+) (co CompletionValue) {
+	byteIndexInBuffer, isAbrupt, rt := ReturnIfAbrupt(ValidateAtomicAccessOnIntegerTypedArray(
 		agent,
 		typedArrayValue,
 		index,
-		false)
-	if byteIndexInBuffer.IsError() {
-		return byteIndexInBuffer.Error()
+		false), co)
+	if isAbrupt {
+		return rt
 	}
 	typedArray := MustGetObject(typedArrayValue).(*TypedArrayObject)
 	buffer := typedArray.ViewedArrayBuffer
@@ -289,14 +295,22 @@ func atomicsCompareExchange(
 	var expected Value
 	var replacement Value
 	if typedArray.ContentType == TypedArrayContentTypeBigInt {
-		expected = ToBigInt(agent, expectedValue)
-		replacement = ToBigInt(agent, replacementValue)
+		_expected, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, expectedValue), co)
+		if isAbrupt {
+			return rt
+		}
+		expected = _expected
+		_replacement, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, replacementValue), co)
+		if isAbrupt {
+			return rt
+		}
+		replacement = _replacement
 	} else {
 		expected = ToIntegerOrInfinity(agent, expectedValue).ToValue()
 		replacement = ToIntegerOrInfinity(agent, replacementValue).ToValue()
 	}
 
-	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer.Data())
+	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
 	isLittleEndian := agent.IsLittleEndian
 	elementType := TypedArrayElementType(typedArray)
 	size := getTypedArraySizeFromName(elementType)
@@ -306,39 +320,44 @@ func atomicsCompareExchange(
 
 	var rawBytesRead []byte
 	if IsSharedArrayBuffer(buffer) {
-		rawBytesRead = GetRawBytesFromSharedBlock(block, byteIndexInBuffer.Data(), size, false, Relaxed)
+		rawBytesRead = GetRawBytesFromSharedBlock(block, byteIndexInBuffer, size, false, Relaxed)
 	} else {
-		rawBytesRead = block.Slice(byteIndexInBuffer.Data(), byteIndexInBuffer.Data()+size)
+		rawBytesRead = block.Slice(byteIndexInBuffer, byteIndexInBuffer+size)
 	}
 	previous := RawBytesToNumeric(size, rawBytesRead, isLittleEndian)
 	expectedUint := RawBytesToNumeric(size, expectedBytes, isLittleEndian)
 	if previous == expectedUint {
-		block.Set(byteIndexInBuffer.Data(), replacementBytes)
+		block.Set(byteIndexInBuffer, replacementBytes)
 	}
 
-	return JSNumber(previous).ToValue()
+	co.value = JSNumber(previous).ToValue()
+	return
 }
 
 func atomicStore(
 	agent *Agent,
 	typedArrayValue, index, value Value,
-) Value {
-	byteIndexInBuffer := ValidateAtomicAccessOnIntegerTypedArray(
+) (co CompletionValue) {
+	byteIndexInBuffer, isAbrupt, rt := ReturnIfAbrupt(ValidateAtomicAccessOnIntegerTypedArray(
 		agent,
 		typedArrayValue,
 		index,
-		false)
-	if byteIndexInBuffer.IsError() {
-		return byteIndexInBuffer.Error()
+		false), co)
+	if isAbrupt {
+		return rt
 	}
 	typedArray := MustGetObject(typedArrayValue).(*TypedArrayObject)
 	var v Value
 	if typedArray.ContentType == TypedArrayContentTypeBigInt {
-		v = ToBigInt(agent, value)
+		vv, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+		v = vv
 	} else {
 		v = ToIntegerOrInfinity(agent, value).ToValue()
 	}
-	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer.Data())
+	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
 	elementType := TypedArrayElementType(typedArray)
 	size := getTypedArraySizeFromName(elementType)
 	buffer := typedArray.ViewedArrayBuffer
@@ -346,11 +365,12 @@ func atomicStore(
 	SetValueInBuffer(
 		agent,
 		buffer,
-		byteIndexInBuffer.Data(),
+		byteIndexInBuffer,
 		v,
 		size,
 		true,
 		SeqCst,
 	)
-	return v
+	co.value = v
+	return
 }

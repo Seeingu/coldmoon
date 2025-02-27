@@ -255,7 +255,11 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 		} else if ObjectIs[*BooleanObject](obj) {
 			value = NewBooleanValue(value.ToBoolean())
 		} else if ObjectIs[*BigIntObject](obj) {
-			value = ToBigInt(agent, value)
+			v, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+			if isAbrupt {
+				return rt
+			}
+			value = v
 		}
 	}
 

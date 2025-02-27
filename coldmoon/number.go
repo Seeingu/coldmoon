@@ -364,10 +364,14 @@ func (n *NumberValue) IsZero() bool {
 func NewNumberConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		value := argumentsList[0]
 		n := NewNumberValue(0)
 		if len(argumentsList) > 0 {
-			prim := ToNumeric(agent, value)
+			prim, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, value), co)
+			if isAbrupt {
+				return rt
+			}
 
 			bigintPrim, isBigInt := prim.(*BigIntValue)
 			if isBigInt {

@@ -1854,7 +1854,10 @@ func (e *UpdateExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if isAbrupt {
 		return rt
 	}
-	oldValue := ToNumeric(vm.agent, v)
+	oldValue, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(vm.agent, v), co)
+	if isAbrupt {
+		return rt
+	}
 	var newValue Value
 	if n, bi, ok := oldValue.NumberOrBigInt(); ok {
 		if n != nil {
@@ -2138,7 +2141,12 @@ func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		r := vm.ApplyStringOrNumericBinaryOperator(lval, rval, e.Operator.ToBinaryOperator())
+		r, isAbrupt, rt := ReturnIfAbrupt(
+			vm.ApplyStringOrNumericBinaryOperator(lval, rval, e.Operator.ToBinaryOperator()), co,
+		)
+		if isAbrupt {
+			return rt
+		}
 
 		if ref, ok := lref.ReferenceRecord(); ok {
 			_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(vm.agent, r), co)
@@ -2646,7 +2654,11 @@ func (e *RelationalExpression) Evaluation(vm *VM) (co CompletionValue) {
 		} else {
 			order = IsLessThanOrderRightFirst
 		}
-		return NewBooleanValue(IsLessThan(vm.agent, lval, rval, order)).ToCompletion()
+		isLessThan, isAbrupt, rt := ReturnIfAbrupt(IsLessThan(vm.agent, lval, rval, order), co)
+		if isAbrupt {
+			return rt
+		}
+		return isLessThan.ToCompletion()
 	case RelationalOperatorLessThanOrEqual, RelationalOperatorGreaterThanOrEqual:
 		var order isLessThanOrder
 		if e.Operator == RelationalOperatorLessThanOrEqual {
@@ -2654,7 +2666,11 @@ func (e *RelationalExpression) Evaluation(vm *VM) (co CompletionValue) {
 		} else {
 			order = IsLessThanOrderLeftFirst
 		}
-		return NewBooleanValue(!IsLessThan(vm.agent, rval, lval, order)).ToCompletion()
+		isLessThan, isAbrupt, rt := ReturnIfAbrupt(IsLessThan(vm.agent, rval, lval, order), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(!isLessThan.ToBoolean()).ToCompletion()
 	case RelationalOperatorInstanceof:
 		return NewBooleanValue(vm.InstanceOfOperator(lval, rval)).ToCompletion()
 	case RelationalOperatorIn:
@@ -2781,7 +2797,10 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		oldValue := ToNumeric(agent, expr)
+		oldValue, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, expr), co)
+		if isAbrupt {
+			return rt
+		}
 		if n, b, ok := oldValue.NumberOrBigInt(); ok {
 			if n != nil {
 				return NewNumberValue(-n.Data).ToCompletion()
@@ -2797,7 +2816,10 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		oldValue := ToNumeric(agent, expr)
+		oldValue, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, expr), co)
+		if isAbrupt {
+			return rt
+		}
 		if n, b, ok := oldValue.NumberOrBigInt(); ok {
 			if n != nil {
 				return NewNumberValue(JSNumber(^int64(n.Data))).ToCompletion()
