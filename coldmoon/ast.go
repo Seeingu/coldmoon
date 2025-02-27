@@ -358,16 +358,68 @@ func (p *ParenthesizedExpression) String() string {
 // MARK: - ArrayLiteral
 
 type (
-	ArrayElement        any
-	ArrayElementElision struct {
-		ArrayElement
+	ArrayElement interface {
+		ASTNode
 	}
 )
+
+type ArrayElementElision struct {
+	ArrayElement
+}
+
+var _ RuntimeSemanticsIteratorDestructuringAssignmentEvaluation = (*ArrayElementElision)(nil)
+
+func (a *ArrayElementElision) IteratorDestructuringAssignmentEvaluation(vm *VM, iteratorRecord *IteratorRecord) (co CompletionValue) {
+	if !iteratorRecord.Done {
+		next := iteratorRecord.IteratorStep()
+		// TODO(BM): if isabrupt set done to true
+		// next is false
+		if next == nil {
+			iteratorRecord.Done = true
+		}
+	}
+	return
+}
 
 type ArrayElementExpression struct {
 	ArrayElement
 	Expression Expression
 }
+
+var _ RuntimeSemanticsIteratorDestructuringAssignmentEvaluation = (*ArrayElementExpression)(nil)
+
+func (a *ArrayElementExpression) IteratorDestructuringAssignmentEvaluation(vm *VM, iteratorRecord *IteratorRecord) (co CompletionValue) {
+	// AssignmentElement : DestructuringAssignmentTarget Initializeropt
+
+	_, isObjectLiteral := a.Expression.(*PrimaryExpressionObjectLiteral)
+	_, isArrayLiteral := a.Expression.(*ArrayLiteral)
+	var lref Value
+	if !isObjectLiteral && !isArrayLiteral {
+		l, isAbrupt, rt := ReturnIfAbrupt(a.Expression.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		lref = l
+	}
+	var value Value = UndefinedValue
+	if !iteratorRecord.Done {
+		next := iteratorRecord.IteratorStepValue()
+		if next.value != DoneValue {
+			value = next.value
+		}
+	}
+	// TODO: check initializer
+	v := value
+	if isObjectLiteral || isArrayLiteral {
+		nextedAssignmentPattern := a.Expression
+		return nextedAssignmentPattern.(RuntimeSemanticsDestructuringAssignmentEvaluation).DestructuringAssignmentEvaluation(vm, v)
+	}
+	if ref, ok := lref.ReferenceRecord(); ok {
+		return ref.PutValue(vm.agent, v)
+	}
+	return
+}
+
 type ArrayElementSpread struct {
 	ArrayElement
 	Spread Expression
@@ -1938,23 +1990,74 @@ var operatorAssignmentMap = map[TokenType]AssignmentOperator{
 	TQuestionQuestionEquals:   AssignmentOperatorNullishCoalescing,
 }
 
+type LeftHandSideExpression struct {
+	Expression
+}
+
+var _ RuntimeSemanticsDestructuringAssignmentEvaluation = (*LeftHandSideExpression)(nil)
+
+func (l *LeftHandSideExpression) astIsArrayAssignmentPattern() bool {
+	_, ok := l.Expression.(*ArrayLiteral)
+	return ok
+}
+
+func (l *LeftHandSideExpression) DestructuringAssignmentEvaluation(vm *VM, value Value) (co CompletionValue) {
+	if l.astIsArrayAssignmentPattern() {
+		iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(vm.agent, value, IteratorKindSync), co)
+		if isAbrupt {
+			return rt
+		}
+		var result CompletionValue
+		for _, elem := range l.Expression.(*ArrayLiteral).ElementList {
+			switch e := elem.(type) {
+			case *ArrayElementExpression:
+				result = e.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
+				if !iteratorRecord.Done {
+					// TODO(BM): return this
+					iteratorRecord.IteratorClose()
+					return
+				}
+				if result.IsAbrupt() {
+					return result
+				}
+			case *ArrayElementElision:
+				result = e.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
+				if !iteratorRecord.Done {
+					// TODO(BM): return this
+					iteratorRecord.IteratorClose()
+					return
+				}
+				if result.IsAbrupt() {
+					return result
+				}
+			default:
+				panic("unimplemented")
+
+			}
+		}
+	} else {
+		panic("unimplemented")
+	}
+	panic("unreachable")
+}
+
 // AssignmentExpression [In, Yield, Await] :
-// ConditionalExpression[?In, ?Yield, ?Await]
-// [+Yield] YieldExpression[?In, ?Await]
-// ArrowFunction[?In, ?Yield, ?Await]
-// AsyncArrowFunction[?In, ?Yield, ?Await]
-// LeftHandSideExpression[?Yield, ?Await] = AssignmentExpression[?In, ?Yield, ?Await]
-// LeftHandSideExpression[?Yield, ?Await] AssignmentOperator
-// AssignmentExpression[?In, ?Yield, ?Await]
-// LeftHandSideExpression[?Yield, ?Await] &&=
-// AssignmentExpression[?In, ?Yield, ?Await]
-// LeftHandSideExpression[?Yield, ?Await] ||=
-// AssignmentExpression[?In, ?Yield, ?Await]
-// LeftHandSideExpression[?Yield, ?Await] ??=
-// AssignmentExpression[?In, ?Yield, ?Await]
+// - ConditionalExpression[?In, ?Yield, ?Await]
+// - [+Yield] YieldExpression[?In, ?Await]
+// - ArrowFunction[?In, ?Yield, ?Await]
+// - AsyncArrowFunction[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] = AssignmentExpression[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] AssignmentOperator
+// - AssignmentExpression[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] &&=
+// - AssignmentExpression[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] ||=
+// - AssignmentExpression[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] ??=
+// - AssignmentExpression[?In, ?Yield, ?Await]
 type AssignmentExpression struct {
 	Expression
-	Left     Expression
+	Left     *LeftHandSideExpression
 	Operator AssignmentOperator
 	Right    Expression
 }
@@ -1971,8 +2074,8 @@ func (e *AssignmentExpression) astIsAssign() bool {
 // spec: 13.15.2
 func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if e.astIsAssign() {
-		_, isObjectLiteral := e.Left.(*PrimaryExpressionObjectLiteral)
-		_, isArrayLiteral := e.Left.(*ArrayLiteral)
+		_, isObjectLiteral := e.Left.Expression.(*PrimaryExpressionObjectLiteral)
+		_, isArrayLiteral := e.Left.Expression.(*ArrayLiteral)
 		if !isObjectLiteral && !isArrayLiteral {
 			lref := e.Left.Evaluation(vm)
 			var rval Value
@@ -1995,13 +2098,17 @@ func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 				panic("unreachable")
 			}
 			return rval.ToCompletion()
-		} else {
-			// TODO(BM): DestructuringAssignmentEvaluation
-			// assignmentPattern := e.Left
-			// rref := e.Right.Evaluation(vm)
-			// rval := rref.GetValue(vm.agent)
-			panic("unimplemented")
 		}
+		assignmentPattern := e.Left
+		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+		if isAbrupt {
+			return rt
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(assignmentPattern.DestructuringAssignmentEvaluation(vm, rval), co)
+		if isAbrupt {
+			return rt
+		}
+		return rval.ToCompletion()
 	} else {
 		// TODO: handle &&= ||=, ??=
 		lval, lref, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
@@ -3062,6 +3169,10 @@ var _ Statement = (*StatementEmpty)(nil)
 
 func (s *StatementEmpty) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return l
+}
+
+func (s *StatementEmpty) Evaluation(vm *VM) (co CompletionValue) {
+	return
 }
 
 func (s *StatementEmpty) String() string {

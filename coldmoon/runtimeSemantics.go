@@ -39,6 +39,34 @@ type RuntimeSemanticsArgumentListEvaluation interface {
 	ArgumentListEvaluation(vm *VM) []Value
 }
 
+// RuntimeSemanticsDestructuringAssignmentEvaluation
+// spec: 13.15.5.2
+type RuntimeSemanticsDestructuringAssignmentEvaluation interface {
+	DestructuringAssignmentEvaluation(vm *VM, value Value) (co CompletionValue)
+}
+
+// RuntimeSemanticsPropertyDestructuringAssignmentEvaluation
+// spec: 13.15.5.3
+type RuntimeSemanticsPropertyDestructuringAssignmentEvaluation interface {
+	PropertyDestructuringAssignmentEvaluation(vm *VM, value Value) Completion[[]PropertyKey]
+}
+
+// RuntimeSemanticsRestDestructuringAssignmentEvaluation
+// spec: 13.15.5.4
+type RuntimeSemanticsRestDestructuringAssignmentEvaluation interface {
+	// RestDestructuringAssignmentEvaluation
+	// returns UNUSED or abrupt
+	RestDestructuringAssignmentEvaluation(vm *VM, value Value, excludedNames []PropertyKey) CompletionValue
+}
+
+// RuntimeSemanticsIteratorDestructuringAssignmentEvaluation
+// spec: 13.15.5.5
+type RuntimeSemanticsIteratorDestructuringAssignmentEvaluation interface {
+	// IteratorDestructuringAssignmentEvaluation
+	// returns UNUSED or abrupt
+	IteratorDestructuringAssignmentEvaluation(vm *VM, iteratorRecord *IteratorRecord) CompletionValue
+}
+
 // 15.3.4
 type RuntimeSemanticsInstantiateArrowFunctionExpression interface {
 	InstantiateArrowFunctionExpression(vm *VM, name string) Value

@@ -105,6 +105,27 @@ func (i *IteratorRecord) IteratorStep() ObjectType {
 	return result
 }
 
+var DoneValue = NewStringValue("done")
+
+// IteratorStepValue
+// spec: 7.4.8
+// returns Value or DONE, abrupt
+func (i *IteratorRecord) IteratorStepValue() (co CompletionValue) {
+	result := i.IteratorNext(nil)
+	// TODO(BM): is throw
+	done := IteratorComplete(result)
+	// TODO(BM): done is throw
+	if done {
+		i.Done = true
+		co.value = DoneValue
+		return
+	}
+	value := result.Get(CMString("value").ToPropertyKey())
+	// TODO(BM): value is throw
+	co.value = value
+	return
+}
+
 // 7.4.9
 func (i *IteratorRecord) IteratorClose() {
 	iterator := i.Iterator
