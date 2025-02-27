@@ -79,7 +79,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 				return s.ToValue()
 			}
 			nextItem := IteratorValue(next)
-			adder.Call(s.ToValue(), []Value{nextItem})
+			adder.Call(agent, s.ToValue(), []Value{nextItem})
 		}
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, CMString("SetObject"), builtinFunctionArgs{
@@ -151,7 +151,7 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		}
 		entries := set.items()
 		for _, item := range entries {
-			callbackFn.Call(thisArg, []Value{item, item, thisValue})
+			callbackFn.Call(agent, thisArg, []Value{item, item, thisValue})
 		}
 		return UndefinedValue
 	}

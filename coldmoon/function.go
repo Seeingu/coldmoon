@@ -61,7 +61,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		if !IsCallable(fun) {
 			panic("TypeError")
 		}
-		return fun.Call(thisArg, args)
+		return fun.Call(agent, thisArg, args)
 	}
 	bind := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		thisArg := argumentsList[0]
@@ -111,11 +111,11 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		}
 
 		if argArray == UndefinedValue || argArray == NullValue {
-			return ReturnAssertNormal(fun.Call(thisArg, []Value{}))
+			return ReturnAssertNormal(fun.Call(agent, thisArg, []Value{}))
 		}
 
 		argList := CreateListFromArrayLike(realm.Agent, argArray)
-		return ReturnAssertNormal(fun.Call(thisArg, argList))
+		return ReturnAssertNormal(fun.Call(agent, thisArg, argList))
 	}
 	f.defineBuiltinFunction(realm, CMString("apply"), apply, 2)
 }

@@ -7,12 +7,12 @@ type ObjectValue struct {
 
 var _ Value = (*ObjectValue)(nil)
 
-func (o *ObjectValue) Call(this Value, argumentsList ArgumentsList) (co CompletionValue) {
+func (o *ObjectValue) Call(agent *Agent, this Value, argumentsList ArgumentsList) (co CompletionValue) {
 	return o.Object.Call(this, argumentsList)
 }
 
 func (o *ObjectValue) CallNoArgs(this Value) CompletionValue {
-	return o.Call(this, nil)
+	return o.Call(o.Object.Agent(), this, nil)
 }
 
 func (o *ObjectValue) ToCompletion() (co Completion[Value]) {

@@ -75,7 +75,7 @@ func (i *IteratorRecord) IteratorNext(value Value) ObjectType {
 	if value == nil {
 		result = i.NextMethod.CallNoArgs(i.Iterator.ToValue())
 	} else {
-		result = i.NextMethod.Call((i.Iterator).ToValue(), []Value{value})
+		result = i.NextMethod.Call(i.Iterator.Agent(), i.Iterator.ToValue(), []Value{value})
 	}
 
 	resultObject, ok := result.value.(*ObjectValue)

@@ -612,10 +612,13 @@ func CreateListFromArrayLike(agent *Agent, self Value) []Value {
 }
 
 // ValueInvoke Invoke
-// 7.3.20
-func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsList []Value) Value {
-	fun := ReturnAssertNormal(GetV(agent, self, propertyKey))
-	return ReturnAssertNormal(fun.Call(self, argumentsList))
+// spec: 7.3.20
+func ValueInvoke(agent *Agent, self Value, propertyKey PropertyKey, argumentsList []Value) (co CompletionValue) {
+	fun, isAbrupt, rt := ReturnIfAbrupt(GetV(agent, self, propertyKey), co)
+	if isAbrupt {
+		return rt
+	}
+	return fun.Call(agent, self, argumentsList)
 }
 
 // 7.2.8

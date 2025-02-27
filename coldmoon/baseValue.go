@@ -105,6 +105,15 @@ func (b *BaseValue) ToPropertyDescriptor(agent *Agent) *PropertyDescriptor {
 	return desc
 }
 
+// Call
+// spec: 7.3.13
+func (b *BaseValue) Call(agent *Agent, this Value, argumentsList ArgumentsList) (co CompletionValue) {
+	if !IsCallable(b.Value) {
+		return co.ThrowTypeError(agent, "value is not callable")
+	}
+	panic("internal error: call should not be called directly on BaseValue")
+}
+
 // ToPrimitive
 // spec: 7.1.1
 func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) Value {
@@ -311,6 +320,7 @@ func (b *BaseValue) String() string {
 	return b.Value.String()
 }
 
+// FIXME: will have recursive call
 func NewBaseValue(v Value) Value {
 	b := &BaseValue{
 		Value: v,

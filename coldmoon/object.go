@@ -1059,7 +1059,7 @@ func (o *Object) FindViaPredicate(
 		}
 		pk := NewIntegerIndexPropertyKey(k)
 		kValue := o.Ref().Get(pk)
-		testResult := predicate.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()}).value
+		testResult := predicate.Call(o.Agent(), thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()}).value
 
 		if testResult.ToBoolean() {
 			return FoundResult{

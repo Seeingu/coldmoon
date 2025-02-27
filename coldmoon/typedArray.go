@@ -437,7 +437,7 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 			var mappedValue Value
 			if mapping {
 				mappedValue = ReturnAssertNormal(
-					mapper.Call(thisArg, []Value{kValue, k.ToValue(), source}),
+					mapper.Call(agent, thisArg, []Value{kValue, k.ToValue(), source}),
 				)
 			} else {
 				mappedValue = kValue
@@ -462,7 +462,7 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 		var mappedValue Value
 		if mapping {
 			mappedValue = ReturnAssertNormal(
-				mapper.Call(thisArg, []Value{kValue, k.ToValue(), source}),
+				mapper.Call(agent, thisArg, []Value{kValue, k.ToValue(), source}),
 			)
 		} else {
 			mappedValue = kValue
@@ -1304,7 +1304,7 @@ func typedArrayEvery(agent *Agent, this Value, callback Value, thisArg Value) Va
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
 		testResult := ReturnAssertNormal(
-			callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
+			callback.Call(agent, thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
 		)
 		if !testResult.ToBoolean() {
 			return FalseValue
@@ -1383,7 +1383,7 @@ func typedArrayFilter(agent *Agent, this Value, callback Value, thisArg Value) V
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
 		selected := ReturnAssertNormal(
-			callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
+			callback.Call(agent, thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
 		)
 		if selected.ToBoolean() {
 			kept = append(kept, kValue)
@@ -1413,7 +1413,7 @@ func typedArrayForEach(agent *Agent, this Value, callback Value, thisArg Value) 
 	for k < length {
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
-		callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()})
+		callback.Call(agent, thisArg, []Value{kValue, k.ToValue(), ta.ToValue()})
 		k++
 	}
 	return UndefinedValue
@@ -1570,7 +1570,7 @@ func typedArrayMap(agent *Agent, this Value, callback Value, thisArg Value) Valu
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
 		mappedValue := ReturnAssertNormal(
-			callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
+			callback.Call(agent, thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
 		)
 		A.Set(Pk, mappedValue, setThrowTypeThrow)
 		k++
@@ -1602,7 +1602,7 @@ func typedArrayReduce(agent *Agent, this Value, callback Value, initialValue Val
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
 		accumulator = ReturnAssertNormal(
-			callback.Call(UndefinedValue, []Value{accumulator, kValue, k.ToValue(), ta.ToValue()}),
+			callback.Call(agent, UndefinedValue, []Value{accumulator, kValue, k.ToValue(), ta.ToValue()}),
 		)
 		k++
 	}
@@ -1633,7 +1633,7 @@ func typedArrayReduceRight(agent *Agent, this Value, callback Value, initialValu
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
 		accumulator = ReturnAssertNormal(
-			callback.Call(UndefinedValue, []Value{accumulator, kValue, k.ToValue(), ta.ToValue()}),
+			callback.Call(agent, UndefinedValue, []Value{accumulator, kValue, k.ToValue(), ta.ToValue()}),
 		)
 		k--
 	}
@@ -1748,7 +1748,7 @@ func typedArraySome(agent *Agent, this Value, callback Value, thisArg Value) Val
 		Pk := NewIntegerIndexPropertyKey(k)
 		kValue := ta.Get(Pk)
 		testResult := ReturnAssertNormal(
-			callback.Call(thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
+			callback.Call(agent, thisArg, []Value{kValue, k.ToValue(), ta.ToValue()}),
 		)
 		if testResult.ToBoolean() {
 			return TrueValue

@@ -142,7 +142,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		index := 0
 		for ; index < numEntries; index++ {
 			if v, ok := entries[NewNumberValue(JSNumber(index)).Hash()]; ok {
-				callbackFn.Call(thisArg, []Value{v, NewNumberValue(JSNumber(index)), this})
+				callbackFn.Call(agent, thisArg, []Value{v, NewNumberValue(JSNumber(index)), this})
 			}
 			numEntries = len(m.MapValue.Data)
 		}

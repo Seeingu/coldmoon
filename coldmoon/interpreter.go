@@ -333,7 +333,7 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 		return
 	}
 	// TODO: WIP: tailPosition
-	value, isAbrupt, rt := ReturnIfAbrupt(fun.Call(thisValue, arguments), co)
+	value, isAbrupt, rt := ReturnIfAbrupt(fun.Call(agent, thisValue, arguments), co)
 	if isAbrupt {
 		rt.value = value
 		return rt
@@ -456,7 +456,7 @@ func (v *VM) ForInOfBodyEvaluation(
 	if destructuring {
 	}
 	for {
-		nextResultValue := ReturnAssertNormal(iteratorRecord.NextMethod.Call(iteratorRecord.Iterator.ToValue(), nil))
+		nextResultValue := ReturnAssertNormal(iteratorRecord.NextMethod.Call(agent, iteratorRecord.Iterator.ToValue(), nil))
 		if iteratorKind == IteratorKindAsync {
 			// TODO: Await
 		}

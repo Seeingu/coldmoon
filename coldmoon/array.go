@@ -309,7 +309,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 				var mappedValue Value
 				if mapping {
 					mappedValue = ReturnAssertNormal(
-						mapFn.Call(thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())}),
+						mapFn.Call(agent, thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())}),
 					)
 				} else {
 					mappedValue = nextValue
@@ -337,7 +337,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 			var mappedValue Value
 			if mapping {
 				mappedValue = ReturnAssertNormal(
-					mapFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber())}),
+					mapFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber())}),
 				)
 			} else {
 				mappedValue = kValue
@@ -386,6 +386,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		for k := range length {
 			pk := NewIntegerIndexPropertyKey(k)
 			mappedValue := ReturnAssertNormal(callbackFn.Call(
+				agent,
 				thisArg,
 				[]Value{array.Get(pk), NewNumberValue(k.ToNumber()), this},
 			))
@@ -427,7 +428,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if !IsCallable(fun) {
 			fun = realm.Intrinsics.ObjectPrototype.Get(NewStringPropertyKey("toString"))
 		}
-		return fun.Call(this, nil)
+		return fun.Call(agent, this, nil)
 	}
 
 	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -451,6 +452,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if kPresent {
 				kValue := array.Get(pk)
 				callbackFn.Call(
+					agent,
 					thisArg,
 					[]Value{kValue, NewNumberValue(k.ToNumber()), this},
 				)
@@ -508,7 +510,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if nextElement == nil || nextElement == UndefinedValue {
 				elements = append(elements, "")
 			} else {
-				s := ValueInvoke(agent, nextElement, NewStringPropertyKey("toLocaleString"), nil).String()
+				s := ReturnAssertNormal(ValueInvoke(agent, nextElement, NewStringPropertyKey("toLocaleString"), nil)).String()
 				elements = append(elements, s)
 			}
 		}
@@ -708,7 +710,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if kPresent {
 				kValue := o.Get(pk)
 				testResult := ReturnAssertNormal(
-					callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
 				)
 				if !testResult.ToBoolean() {
 					return FalseValue
@@ -737,7 +739,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if kPresent {
 				kValue := o.Get(pk)
 				testResult := ReturnAssertNormal(
-					callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
 				)
 				if testResult.ToBoolean() {
 					return TrueValue
@@ -873,7 +875,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if kPresent {
 				kValue := o.Get(pk)
 				selected := ReturnAssertNormal(
-					callbackFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
 				)
 				if selected.ToBoolean() {
 					A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(to), kValue)
@@ -925,7 +927,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if kPresent {
 				kValue := o.Get(pk)
 				accumulator = ReturnAssertNormal(
-					callbackFn.Call(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
+					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
 				)
 			}
 			k++
@@ -973,7 +975,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if kPresent {
 				kValue := o.Get(pk)
 				accumulator = ReturnAssertNormal(
-					callbackFn.Call(UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
+					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
 				)
 			}
 			k--
@@ -1635,7 +1637,7 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) JSNumb
 	if compareFn != nil {
 		v := compareFn.
 			ToValue().
-			Call(UndefinedValue, []Value{x, y}).
+			Call(agent, UndefinedValue, []Value{x, y}).
 			value.
 			ToNumber(agent)
 		if v.IsNaN() {

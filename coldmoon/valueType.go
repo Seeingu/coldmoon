@@ -4,7 +4,7 @@ type Value interface {
 	ToBoolean() bool
 	ToNumber(agent *Agent) *NumberValue
 
-	Call(this Value, argumentsList ArgumentsList) CompletionValue
+	Call(agent *Agent, this Value, argumentsList ArgumentsList) CompletionValue
 	CallNoArgs(this Value) CompletionValue
 	ToString() CMString
 	// ToPropertyDescriptor

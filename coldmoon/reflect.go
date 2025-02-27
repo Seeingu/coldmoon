@@ -21,7 +21,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		args := CreateListFromArrayLike(agent, argumentsList)
 
-		return ReturnAssertNormal(target.Call(thisArgument, args))
+		return ReturnAssertNormal(target.Call(agent, thisArgument, args))
 	}
 	var construct BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]

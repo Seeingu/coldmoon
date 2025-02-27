@@ -152,12 +152,13 @@ func promiseThen(agent *Agent, this Value, arguments []Value, newTarget ObjectTy
 	return PerformPromiseThen(agent, promiseObject, onFulfilled, onRejected, resultCapability)
 }
 
-func promiseFinally(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
+// spec: 27.2.5.3
+func promiseFinally(agent *Agent, this Value, arguments []Value, newTarget ObjectType) (co CompletionValue) {
 	promise := this
 	realm := agent.CurrentRealm()
 	onFinally := arguments[0]
 	if !promise.IsObject() {
-		return agent.ThrowTypeError("Promise.prototype.finally called on incompatible receiver")
+		return co.ThrowTypeError(agent, "Promise.prototype.finally called on incompatible receiver")
 	}
 	C := MustGetObject(promise).SpeciesConstructor(realm.Intrinsics.Promise)
 	Assert(IsConstructor(C.Data().ToValue()))
@@ -188,10 +189,10 @@ func promiseFinally(agent *Agent, this Value, arguments []Value, newTarget Objec
 			additionalFieldsV2: captures,
 		}).ToValue()
 	}
-	return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{thenFinally, catchFinally})
+	return ValueInvoke(agent, promise, NewStringPropertyKey("then"), []Value{thenFinally, catchFinally}).ToCompletion()
 }
 
-func thenFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
+func thenFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget ObjectType) CompletionValue {
 	function := agent.ActiveFunctionObject()
 	captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*PromiseThenFinallyCaptures)
 	onFinally := captures.OnFinally
@@ -209,7 +210,7 @@ func thenFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget O
 	return ValueInvoke(agent, p.ToValue(), NewStringPropertyKey("then"), []Value{(valueThunk).ToValue()})
 }
 
-func catchFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget ObjectType) Value {
+func catchFinallyClosure(agent *Agent, this Value, arguments []Value, newTarget ObjectType) CompletionValue {
 	function := agent.ActiveFunctionObject()
 	captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*PromiseThenFinallyCaptures)
 	onFinally := captures.OnFinally
@@ -250,7 +251,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		promise.ref = promise
 
 		resolvingFunctions := CreateResolvingFunctions(agent, promise)
-		executor.Call(UndefinedValue, []Value{resolvingFunctions.Resolve, resolvingFunctions.Reject})
+		executor.Call(agent, UndefinedValue, []Value{resolvingFunctions.Resolve, resolvingFunctions.Reject})
 		return promise.ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, CMString("Promise"), builtinFunctionArgs{

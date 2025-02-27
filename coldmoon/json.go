@@ -215,7 +215,7 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 		}
 	}
 	return ReturnAssertNormal(
-		reviver.Call(holder.ToValue(), []Value{name.ToValue(), value}),
+		reviver.Call(agent, holder.ToValue(), []Value{name.ToValue(), value}),
 	)
 }
 
@@ -225,7 +225,7 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 		toJSON := ReturnAssertNormal(GetV(agent, value, NewStringPropertyKey("toJSON")))
 		if IsCallable(toJSON) {
 			value = ReturnAssertNormal(
-				toJSON.Call(value, []Value{key.ToValue()}),
+				toJSON.Call(agent, value, []Value{key.ToValue()}),
 			)
 		}
 	}

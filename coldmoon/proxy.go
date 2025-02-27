@@ -310,6 +310,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		booleanTrapResult := trap.
 			ToValue().
 			Call(
+				agent,
 				h.ToValue(),
 				[]Value{t.ToValue(), pk.ToValue()},
 			).value.ToBoolean()
