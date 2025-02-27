@@ -404,39 +404,34 @@ func (e ElementList) astHasElementListAndAssignmentExpression() (list ElementLis
 // ArrayAccumulation
 // spec: 13.2.4.1
 func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSInt) (co Completion[JSInt]) {
-	if list, expr, ok := e.astHasElementListAndAssignmentExpression(); ok {
-		nextIndex, isAbrupt, rt := ReturnIfAbrupt(list.ArrayAccumulation(vm, array, nextIndex), co)
-		if isAbrupt {
-			return rt
+	for _, elem := range e {
+		switch elem := elem.(type) {
+		// Elision : ,
+		case *ArrayElementElision:
+			length := nextIndex + 1
+			array.Set(NewStringPropertyKey("length"), NewNumberValue(JSNumber(length)), setThrowTypeThrow)
+			nextIndex = length
+		case *ArrayElementExpression:
+			initResult, isAbrupt, rt := ReturnIfAbrupt(elem.Expression.Evaluation(vm), co)
+			if isAbrupt {
+				return rt
+			}
+			initValue, isAbrupt, rt := ReturnIfAbrupt(initResult.GetValue(vm.agent), co)
+			if isAbrupt {
+				return rt
+			}
+
+			ok := array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
+			Assert(ok)
+			nextIndex++
+		case *ArrayElementSpread:
+			panic("unimplemented")
+		default:
+			panic("unreachable")
 		}
-		// TODO: check elision
-		initResult, isAbrupt, rt := ReturnIfAbrupt(expr.Expression.Evaluation(vm), co)
-		if isAbrupt {
-			return rt
-		}
-		initValue, isAbrupt, rt := ReturnIfAbrupt(initResult.GetValue(vm.agent), co)
-		if isAbrupt {
-			return rt
-		}
-		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
-		co.value = nextIndex + 1
-		return
-	} else if expr, ok = e.astIsOnlyHasAssigmentExpression(); ok {
-		// TODO: check elision
-		initResult, isAbrupt, rt := ReturnIfAbrupt(expr.Expression.Evaluation(vm), co)
-		if isAbrupt {
-			return rt
-		}
-		initValue, isAbrupt, rt := ReturnIfAbrupt(initResult.GetValue(vm.agent), co)
-		if isAbrupt {
-			return rt
-		}
-		array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
-		co.value = nextIndex + 1
-		return
-	} else {
-		panic("unimplemented")
 	}
+	co.value = nextIndex
+	return
 }
 
 // ArrayLiteral [Yield, Await] :
@@ -2812,23 +2807,17 @@ func (a Arguments) String() string {
 // TODO(WIP): Spread, Template
 // Evaluation 13.3.8.1
 // ArgumentListEvaluation
-// TODO(XXX): can we split it out based on different types of arguments?
-func (a Arguments) Evaluation(vm *VM) CompletionValue {
-	// Assigment
-	if len(a) == 0 {
-		return NewListValue([]Value{}).ToCompletion()
-	} else if len(a) == 1 {
-		ref := a[0].Evaluation(vm)
-		arg := ref.value.GetValue(vm.agent).value
-		return NewListValue([]Value{arg}).ToCompletion()
-	} else if len(a) > 1 {
-		precedingArgs := a[:len(a)-1].Evaluation(vm)
-		ref := a[len(a)-1].Evaluation(vm)
-		arg := ref.value.GetValue(vm.agent)
-		return NewListValue(append(precedingArgs.value.(*ListValue).Values, arg.value)).ToCompletion()
-	} else {
-		panic("unimplemented")
+func (a Arguments) Evaluation(vm *VM) (co CompletionValue) {
+	var values []Value
+	for _, elem := range a {
+		arg, _, isAbrupt, rt := vm.EvalAndGetValue(elem, co)
+		if isAbrupt {
+			return rt
+		}
+		values = append(values, arg)
 	}
+	co.value = NewListValue(values)
+	return
 }
 
 // CallExpression [Yield, Await] :
