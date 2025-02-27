@@ -81,7 +81,8 @@ func (e *ECMAScriptFunction) GetFunctionRealm() *Realm {
 
 // Call
 // spec: 10.2.1
-func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) CompletionValue {
+// returns either normal completion or throw
+func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) (co CompletionValue) {
 	agent := e.Agent()
 	function := e
 
@@ -89,7 +90,7 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Com
 	Assert(calleeContext == agent.RunningExecutionContext())
 
 	if function.IsClassConstructor {
-		panic("TypeError")
+		return co.ThrowTypeError(e.Agent(), "IsClassConstructor")
 	}
 
 	OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
@@ -99,6 +100,9 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) Com
 	agent.ExecutionContextStack.Pop()
 
 	if result.IsAbrupt() {
+		if result.t != CompletionTypeThrow {
+			result.t = CompletionTypeNormal
+		}
 		return result
 	}
 	return UndefinedValue.ToCompletion()

@@ -94,6 +94,7 @@ func NewJSON(realm *Realm) *JSON {
 		}
 	}
 	stringify := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		value := argumentsList[0]
 		var replacer Value = UndefinedValue
 		var space Value = UndefinedValue
@@ -171,7 +172,11 @@ func NewJSON(realm *Realm) *JSON {
 			Stack:            stack,
 			Indent:           indent,
 		}
-		return NewStringValue(SerializeJSONProperty(agent, state, NewStringPropertyKey(""), wrapper))
+		s, isAbrupt, rt := ReturnIfAbrupt(SerializeJSONProperty(agent, state, NewStringPropertyKey(""), wrapper), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewStringValue(s)
 	}
 
 	object.defineBuiltinFunction(realm, CMString("parse"), parse, 2)
@@ -185,7 +190,8 @@ func NewJSON(realm *Realm) *JSON {
 }
 
 // InternalizeJSONProperty
-func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, reviver Value) Value {
+// spec: 25.5.1.1
+func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, reviver Value) (co CompletionValue) {
 	value := holder.Get(name)
 	if value.IsObject() {
 		obj := MustGetObject(value)
@@ -194,7 +200,10 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 			length := ReturnAssertNormal(obj.LengthOfArrayLike())
 			for i := JSInt(0); i < length; i++ {
 				prop := NewIntegerIndexPropertyKey(i)
-				newElement := InternalizeJSONProperty(agent, obj, prop, reviver)
+				newElement, isAbrupt, rt := ReturnIfAbrupt(InternalizeJSONProperty(agent, obj, prop, reviver), co)
+				if isAbrupt {
+					return rt
+				}
 				if newElement == UndefinedValue {
 					obj.InternalMethods().Delete(obj, prop)
 				} else {
@@ -204,8 +213,14 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 		} else {
 			keys := obj.EnumerableOwnProperties(objectOwnPropertiesKindKey)
 			for _, key := range keys {
-				prop := ToPropertyKey(agent, key)
-				newElement := InternalizeJSONProperty(agent, obj, prop, reviver)
+				prop, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, key), co)
+				if isAbrupt {
+					return rt
+				}
+				newElement, isAbrupt, rt := ReturnIfAbrupt(InternalizeJSONProperty(agent, obj, prop, reviver), co)
+				if isAbrupt {
+					return rt
+				}
 				if newElement == UndefinedValue {
 					obj.InternalMethods().Delete(obj, prop)
 				} else {
@@ -214,12 +229,10 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 			}
 		}
 	}
-	return ReturnAssertNormal(
-		reviver.Call(agent, holder.ToValue(), []Value{name.ToValue(), value}),
-	)
+	return reviver.Call(agent, holder.ToValue(), []Value{name.ToValue(), value})
 }
 
-func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key PropertyKey, holder ObjectType) string {
+func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key PropertyKey, holder ObjectType) (co Completion[string]) {
 	value := holder.Get(key)
 	if value.IsObject() || ValueIs[*BigIntValue](value) {
 		toJSON := ReturnAssertNormal(GetV(agent, value, NewStringPropertyKey("toJSON")))
@@ -248,15 +261,18 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 
 	switch v := value.(type) {
 	case *nullValue:
-		return "null"
+		co.value = "null"
+		return
 	case *BooleanValue:
-		return value.String()
+		co.value = value.String()
+		return
 	case *NumberValue:
-		return value.String()
+		co.value = value.String()
+		return
 	case *StringValue:
-		return value.String()
+		co.value = value.String()
 	case *BigIntValue:
-		panic("TypeError")
+		return co.ThrowTypeError(agent, "TypeError")
 	case *ObjectValue:
 		if !IsCallable(value) {
 			isArray := IsArray(value)
@@ -266,7 +282,8 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 			return SerializeJSONObject(agent, state, v.Object)
 		}
 	}
-	return ""
+	co.value = ""
+	return
 }
 
 func QuoteJSONString(agent *Agent, value string) string {
@@ -299,7 +316,7 @@ func UnicodeEscape(c uint16) string {
 	return ""
 }
 
-func SerializeJSONObject(agent *Agent, state *JSONSerializationRecord, value ObjectType) string {
+func SerializeJSONObject(agent *Agent, state *JSONSerializationRecord, value ObjectType) (co Completion[string]) {
 	if lo.Contains(state.Stack.Data(), value) {
 		panic("TypeError")
 	}
@@ -317,7 +334,11 @@ func SerializeJSONObject(agent *Agent, state *JSONSerializationRecord, value Obj
 		keys := value.EnumerableOwnProperties(objectOwnPropertiesKindKey)
 		converted := make([]PropertyKey, len(keys))
 		for i, key := range keys {
-			converted[i] = ToPropertyKey(agent, key)
+			v, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, key), co)
+			if isAbrupt {
+				return rt
+			}
+			converted[i] = v
 		}
 		K = converted
 	} else {
@@ -326,7 +347,10 @@ func SerializeJSONObject(agent *Agent, state *JSONSerializationRecord, value Obj
 
 	var partial []string
 	for _, P := range K {
-		strP := SerializeJSONProperty(agent, state, P, value)
+		strP, isAbrupt, rt := ReturnIfAbrupt(SerializeJSONProperty(agent, state, P, value), co)
+		if isAbrupt {
+			return rt
+		}
 		if strP != "" {
 			member := QuoteJSONString(agent, P.ToValue().String()) + ": " + strP
 			partial = append(partial, member)
@@ -342,10 +366,11 @@ func SerializeJSONObject(agent *Agent, state *JSONSerializationRecord, value Obj
 		final = "{\n" + state.Indent + properties + "\n" + stepBack + "}"
 	}
 
-	return final
+	co.value = final
+	return
 }
 
-func SerializeJSONArray(agent *Agent, state *JSONSerializationRecord, value ObjectType) string {
+func SerializeJSONArray(agent *Agent, state *JSONSerializationRecord, value ObjectType) (co Completion[string]) {
 	if lo.Contains(state.Stack.Data(), value) {
 		panic("TypeError")
 	}
@@ -361,7 +386,10 @@ func SerializeJSONArray(agent *Agent, state *JSONSerializationRecord, value Obje
 	var partial []string
 	length := ReturnAssertNormal(value.LengthOfArrayLike())
 	for i := JSInt(0); i < length; i++ {
-		strI := SerializeJSONProperty(agent, state, NewIntegerIndexPropertyKey(i), value)
+		strI, isAbrupt, rt := ReturnIfAbrupt(SerializeJSONProperty(agent, state, NewIntegerIndexPropertyKey(i), value), co)
+		if isAbrupt {
+			return rt
+		}
 		if strI == "" {
 			strI = "null"
 		}
@@ -377,5 +405,6 @@ func SerializeJSONArray(agent *Agent, state *JSONSerializationRecord, value Obje
 		final = "[\n" + state.Indent + elements + "\n" + stepBack + "]"
 	}
 
-	return final
+	co.value = final
+	return
 }

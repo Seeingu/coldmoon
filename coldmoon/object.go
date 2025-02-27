@@ -128,8 +128,9 @@ func (o *Object) IsOrdinary() bool {
 	return o.Prototype() != nil
 }
 
-// 7.1.1.1
-func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
+// OrdinaryToPrimitive
+// spec: 7.1.1.1
+func (o *Object) OrdinaryToPrimitive(hint PreferredType) (co CompletionValue) {
 	var methodNames []string
 	switch hint {
 	case PreferredTypeString:
@@ -141,15 +142,18 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) Value {
 	for _, name := range methodNames {
 		method := o.Get(NewStringPropertyKey(name))
 		if IsCallable(method) {
-			result := method.CallNoArgs(o.ToValue()).value
+			r := method.CallNoArgs(o.ToValue())
+			result, isAbrupt, rt := ReturnIfAbrupt(r, co)
+			if isAbrupt {
+				return rt
+			}
 			if _, isObject := result.(*ObjectValue); !isObject {
-				return result
+				return result.ToCompletion()
 			}
 		}
 	}
-
 	message := "Could not convert object to primitive"
-	return o.Agent().ThrowException(TypeError, message)
+	return co.ThrowTypeError(o.Agent(), message)
 }
 
 func (o *Object) IsCallable() bool {
@@ -603,11 +607,15 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		o := arguments[0]
 		property := arguments[1]
 		attributes := arguments[2]
+		var co CompletionValue
 		if !o.IsObject() {
-			return agent.ThrowTypeError("is not an object")
+			return co.ThrowTypeError(agent, "is not an object")
 		}
 
-		key := ToPropertyKey(agent, property)
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, property), co)
+		if isAbrupt {
+			return rt
+		}
 		desc := attributes.ToPropertyDescriptor(agent)
 		MustGetObject(o).DefinePropertyOrThrow(key, desc)
 
@@ -633,8 +641,15 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var getOwnPropertyDescriptor BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := args[0]
 		p := args[1]
-		obj := ReturnAssertNormal(o.ToObject(agent))
-		key := ToPropertyKey(agent, p)
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, p), co)
+		if isAbrupt {
+			return rt
+		}
 		desc := obj.InternalMethods().GetOwnProperty(obj, key)
 
 		if desc == nil {
@@ -645,7 +660,11 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	// 20.1.2.9
 	var getOwnPropertyDescriptors BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := args[0]
-		obj := ReturnAssertNormal(o.ToObject(agent))
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 
 		ownKeys := obj.InternalMethods().OwnPropertyKeys(obj)
 
@@ -664,7 +683,11 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var getPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := args[0]
 
-		obj := ReturnAssertNormal(o.ToObject(agent))
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		proto := obj.InternalMethods().GetPrototypeOf(obj)
 		return proto.ToValue()
 	}
@@ -767,39 +790,65 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		objectValue := args[0]
 		key := args[1]
 
-		obj := ReturnAssertNormal(objectValue.ToObject(agent))
-		p := ToPropertyKey(agent, key)
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, key), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewBooleanValue(ObjectHasOwnProperty(obj, p))
 	}
 
 	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
-		obj := ReturnAssertNormal(objectValue.ToObject(agent))
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		entryList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKeyAndValue)
-		return (CreateArrayFromList(agent, entryList)).ToValue()
+		return CreateArrayFromList(agent, entryList).ToValue()
 	}
 	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
-		obj := ReturnAssertNormal(objectValue.ToObject(agent))
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		keyList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKey)
-		return (CreateArrayFromList(agent, keyList)).ToValue()
+		return CreateArrayFromList(agent, keyList).ToValue()
 	}
 	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		objectValue := args[0]
-		obj := ReturnAssertNormal(objectValue.ToObject(agent))
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		valueList := obj.EnumerableOwnProperties(objectOwnPropertiesKindValue)
-		return (CreateArrayFromList(agent, valueList)).ToValue()
+		return CreateArrayFromList(agent, valueList).ToValue()
 	}
 	var assign BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		target := args[0]
-		to := ReturnAssertNormal(target.ToObject(agent))
+		to, isAbrupt, rt := ReturnIfAbrupt(target.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		sources := args[1:]
 		if len(sources) == 0 {
 			return to.ToValue()
 		}
 		for _, nextSource := range sources {
 			if nextSource != UndefinedValue && nextSource != NullValue {
-				from := ReturnAssertNormal(this.ToObject(agent))
+				from, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+				if isAbrupt {
+					return rt
+				}
 				pKeys := from.InternalMethods().OwnPropertyKeys(from)
 				for _, nextKey := range pKeys {
 					desc := from.InternalMethods().GetOwnProperty(from, nextKey)
@@ -814,7 +863,11 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 	var getOwnPropertyNames BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
-		obj := ReturnAssertNormal(objectValue.ToObject(agent))
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		keys := obj.InternalMethods().OwnPropertyKeys(obj)
 		keyNames := lo.Filter(keys, func(key PropertyKey, _ int) bool {
 			_, ok := key.(SymbolPropertyKey)
@@ -827,7 +880,11 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		objectValue := args[0]
-		obj := ReturnAssertNormal(objectValue.ToObject(agent))
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		keys := obj.InternalMethods().OwnPropertyKeys(obj)
 		symbols := lo.Filter(keys, func(key PropertyKey, _ int) bool {
 			_, ok := key.(SymbolPropertyKey)
@@ -850,7 +907,11 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			captures := f.(*BuiltinFunction).AdditionalFieldsV2.(*Captures)
 			k := args[0]
 			v := args[1]
-			propertyKey := ToPropertyKey(agent, k)
+			var co CompletionValue
+			propertyKey, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, k), co)
+			if isAbrupt {
+				return rt
+			}
 			captures.object.CreateDataPropertyOrThrow(propertyKey, v)
 			return UndefinedValue
 		}
@@ -901,18 +962,27 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	realm.Intrinsics.ObjectPrototype = object
 
 	valueOf := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		return ReturnAssertNormal(this.ToObject(agent)).ToValue()
+		var co CompletionValue
+		v, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return v.ToValue()
 	}
 
 	// 20.1.3.6 toString
 	toString := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		if this == UndefinedValue {
 			return NewStringValue("[object Undefined]")
 		}
 		if this == NullValue {
 			return NewStringValue("[object Null]")
 		}
-		o := ReturnAssertNormal(this.ToObject(agent))
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		_isArray := IsArray(this)
 		var builtInTag string
 		if _isArray {
@@ -947,17 +1017,31 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		return NewStringValue("[object " + tag + "]")
 	}
 	hasOwnProperty := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := ReturnAssertNormal(this.ToObject(agent))
-		p := ToPropertyKey(agent, args[0])
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, args[0]), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewBooleanValue(ObjectHasOwnProperty(o, p))
 	}
 	isPrototypeOf := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		v := args[0]
+		var co CompletionValue
 		if !v.IsObject() {
 			return NewBooleanValue(false)
 		}
-		o := ReturnAssertNormal(this.ToObject(agent))
-		target := ReturnAssertNormal(this.ToObject(agent))
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		target, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		for {
 			target = target.InternalMethods().GetPrototypeOf(target)
 			if target == nil {
@@ -969,8 +1053,15 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 	}
 	propertyIsEnumerable := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := ReturnAssertNormal(this.ToObject(agent))
-		p := ToPropertyKey(agent, args[0])
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, args[0]), co)
+		if isAbrupt {
+			return rt
+		}
 		desc := o.InternalMethods().GetOwnProperty(o, p)
 		if desc == nil {
 			return NewBooleanValue(false)
@@ -978,7 +1069,11 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		return NewBooleanValue(desc.Enumerable)
 	}
 	toLocaleString := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := ReturnAssertNormal(this.ToObject(agent))
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		return ValueInvoke(agent, o.ToValue(), NewStringPropertyKey("toString"), []Value{})
 	}
 

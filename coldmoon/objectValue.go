@@ -8,7 +8,12 @@ type ObjectValue struct {
 var _ Value = (*ObjectValue)(nil)
 
 func (o *ObjectValue) Call(agent *Agent, this Value, argumentsList ArgumentsList) (co CompletionValue) {
-	return o.Object.Call(this, argumentsList)
+	result := o.Object.Call(this, argumentsList)
+	// only returns normal or throw completion
+	if result.t != CompletionTypeThrow {
+		result.t = CompletionTypeNormal
+	}
+	return result
 }
 
 func (o *ObjectValue) CallNoArgs(this Value) CompletionValue {

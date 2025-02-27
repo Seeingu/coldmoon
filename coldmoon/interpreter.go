@@ -104,13 +104,16 @@ func (v *VM) EvaluatePropertyAccessWithExpressionKey(
 ) (co Completion[*ReferenceRecord]) {
 	propertyNameReference, isAbrupt, rt := ReturnIfAbrupt(expression.Evaluation(v), co)
 	if isAbrupt {
-		panic(rt)
+		return rt
 	}
 	propertyNameValue, isAbrupt, rt := ReturnIfAbrupt(propertyNameReference.GetValue(v.agent), co)
 	if isAbrupt {
-		panic(rt)
+		return rt
 	}
-	propertyKey := ToPropertyKey(v.agent, propertyNameValue)
+	propertyKey, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(v.agent, propertyNameValue), co)
+	if isAbrupt {
+		return rt
+	}
 	co.value = NewReferenceRecord(NewReferenceRecordBaseValue(baseValue), propertyKey.ToReference(), strict, UndefinedValue)
 	return
 }
@@ -202,8 +205,8 @@ func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOper
 	finalLval := lhs
 	finalRval := rhs
 	if op == BinaryOperatorAddition {
-		lprim := lhs.ToPrimitive(agent, PreferredTypeDefault)
-		rprim := rhs.ToPrimitive(agent, PreferredTypeDefault)
+		lprim := ReturnAssertNormal(lhs.ToPrimitive(agent, PreferredTypeDefault))
+		rprim := ReturnAssertNormal(rhs.ToPrimitive(agent, PreferredTypeDefault))
 		_, lprimIsString := lprim.(*StringValue)
 		_, rprimIsString := rprim.(*StringValue)
 		if lprimIsString || rprimIsString {
@@ -335,7 +338,6 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 	// TODO: WIP: tailPosition
 	value, isAbrupt, rt := ReturnIfAbrupt(fun.Call(agent, thisValue, arguments), co)
 	if isAbrupt {
-		rt.value = value
 		return rt
 	}
 	co.value = value

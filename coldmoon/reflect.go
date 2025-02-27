@@ -50,6 +50,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object).value.ToValue()
 	}
 	var defineProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		target := arguments[0]
 		propertyKey := arguments[1]
 		attributes := arguments[2]
@@ -58,7 +59,10 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return agent.ThrowTypeError("Reflect.defineProperty called on non-object")
 		}
 
-		key := ToPropertyKey(agent, propertyKey)
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propertyKey), co)
+		if isAbrupt {
+			return rt
+		}
 
 		desc := attributes.ToPropertyDescriptor(agent)
 
@@ -70,6 +74,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return NewBooleanValue(ret)
 	}
 	var deleteProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		target := arguments[0]
 		propertyKey := arguments[1]
 
@@ -77,7 +82,10 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return agent.ThrowTypeError("Reflect.deleteProperty called on non-object")
 		}
 
-		key := ToPropertyKey(agent, propertyKey)
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propertyKey), co)
+		if isAbrupt {
+			return rt
+		}
 
 		targetObject := MustGetObject(target)
 
@@ -85,6 +93,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return NewBooleanValue(ret)
 	}
 	var get BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		target := arguments[0]
 		propertyKey := arguments[1]
 		receiver := pkg.SliceSafeGet(arguments, 2)
@@ -93,7 +102,10 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return agent.ThrowTypeError("Reflect.get called on non-object")
 		}
 
-		key := ToPropertyKey(agent, propertyKey)
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propertyKey), co)
+		if isAbrupt {
+			return rt
+		}
 
 		targetObject := MustGetObject(target)
 
@@ -102,6 +114,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		)
 	}
 	var getOwnPropertyDescriptor BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		target := arguments[0]
 		propertyKey := arguments[1]
 
@@ -109,7 +122,10 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return agent.ThrowTypeError("Reflect.getOwnPropertyDescriptor called on non-object")
 		}
 
-		key := ToPropertyKey(agent, propertyKey)
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propertyKey), co)
+		if isAbrupt {
+			return rt
+		}
 
 		targetObject := MustGetObject(target)
 		desc := targetObject.InternalMethods().GetOwnProperty(targetObject, key)
@@ -132,6 +148,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return targetObject.InternalMethods().GetPrototypeOf(targetObject).ToValue()
 	}
 	var has BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		target := arguments[0]
 		propertyKey := arguments[1]
 
@@ -139,7 +156,10 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return agent.ThrowTypeError("Reflect.has called on non-object")
 		}
 
-		key := ToPropertyKey(agent, propertyKey)
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propertyKey), co)
+		if isAbrupt {
+			return rt
+		}
 
 		targetObject := MustGetObject(target)
 
@@ -186,6 +206,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 	}
 	// 28.1.12
 	var set BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		target := arguments[0]
 		propertyKey := arguments[1]
 		value := arguments[2]
@@ -195,7 +216,10 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return agent.ThrowTypeError("Reflect.set called on non-object")
 		}
 
-		key := ToPropertyKey(agent, propertyKey)
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propertyKey), co)
+		if isAbrupt {
+			return rt
+		}
 
 		targetObject := MustGetObject(target)
 

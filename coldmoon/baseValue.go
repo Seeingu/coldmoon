@@ -116,7 +116,7 @@ func (b *BaseValue) Call(agent *Agent, this Value, argumentsList ArgumentsList) 
 
 // ToPrimitive
 // spec: 7.1.1
-func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) Value {
+func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) (co CompletionValue) {
 	value := b.Value
 	if objectValue, isObject := value.(*ObjectValue); isObject {
 		symbol := WellKnownSymbols[WellKnownSymbolsToPrimitive]
@@ -124,14 +124,18 @@ func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) Value {
 		if exoticToPrim != nil {
 			hintString := hint.String()
 
-			result := exoticToPrim.Call(value, []Value{
+			r := exoticToPrim.Call(value, []Value{
 				NewStringValue(hintString),
-			}).value
+			})
+			result, isAbrupt, rt := ReturnIfAbrupt(r, co)
+			if isAbrupt {
+				return rt
+			}
 			if _, isObject = result.(*ObjectValue); !isObject {
-				return result
+				return result.ToCompletion()
 			}
 
-			return agent.ThrowTypeError("could not convert object to primitive")
+			return co.ThrowTypeError(agent, "could not convert object to primitive")
 		}
 		preferredType := hint
 		if preferredType == PreferredTypeDefault {
@@ -140,7 +144,7 @@ func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) Value {
 		return objectValue.Object.OrdinaryToPrimitive(preferredType)
 	}
 
-	return value
+	return value.ToCompletion()
 }
 
 // TODO(BM): return a string completion or abrupt completion
@@ -222,6 +226,7 @@ func (b *BaseValue) GetObject() (object ObjectType, ok bool) {
 // ToNumber
 // spec: 7.1.4
 func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
+	var co Completion[*NumberValue]
 	switch value := b.Value.(type) {
 	case *NumberValue:
 		return value
@@ -237,10 +242,13 @@ func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
 	case *StringValue:
 		return StringToNumber(value)
 	case *ObjectValue:
-		primValue := value.ToPrimitive(agent, PreferredTypeNumber)
+		primValue, isAbrupt, rt := ReturnIfAbrupt(value.ToPrimitive(agent, PreferredTypeNumber), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		return primValue.ToNumber(agent)
 	}
-	agent.ThrowTypeError("TypeError")
+	co.ThrowTypeError(agent, "TypeError")
 	return nil
 }
 

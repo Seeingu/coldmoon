@@ -12,8 +12,7 @@ type Value interface {
 	ToPropertyDescriptor(agent *Agent) *PropertyDescriptor
 	// ToPrimitive
 	// spec: 7.1.1
-	// TODO(BM): throw completion handling
-	ToPrimitive(agent *Agent, hint PreferredType) Value
+	ToPrimitive(agent *Agent, hint PreferredType) CompletionValue
 	// ToObject
 	// spec: 7.1.18
 	ToObject(agent *Agent) Completion[ObjectType]

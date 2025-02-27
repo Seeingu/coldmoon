@@ -670,8 +670,13 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 	}
 	// TODO: assert no non-configurable properties
 	Assert(object.IsOrdinary() && object.IsExtensible())
+	pk, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, propKey.value), co)
+	if isAbrupt {
+		return rt
+	}
 	object.CreateDataPropertyOrThrow(
-		ToPropertyKey(vm.agent, propKey.value), propValue)
+		pk,
+		propValue)
 	return co
 }
 
@@ -762,7 +767,7 @@ func (p *MethodDefinition) astIsGet() bool {
 
 // DefineMethod
 // spec: 15.4.4
-func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (c Completion[*DefineMethodRecord]) {
+func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (co Completion[*DefineMethodRecord]) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astIsClassElementName() {
@@ -787,8 +792,12 @@ func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType
 			privateEnv,
 		)
 		MakeMethod(closure, obj)
-		c.value = &DefineMethodRecord{
-			Key:     ToPropertyKey(agent, propKey.value),
+		pk, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propKey.value), co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = &DefineMethodRecord{
+			Key:     pk,
 			Closure: closure,
 		}
 		return
@@ -942,7 +951,11 @@ func (p *ComputedPropertyName) Evaluation(vm *VM) (co CompletionValue) {
 	if isAbrupt {
 		return rt
 	}
-	return ToPropertyKey(vm.agent, propName).ToValue().ToCompletion()
+	k, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, propName), co)
+	if isAbrupt {
+		return rt
+	}
+	return k.ToValue().ToCompletion()
 }
 
 // MARK: - FunctionExpression
@@ -2760,7 +2773,8 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		return expr.ToNumber(agent).ToCompletion()
+		co.value = expr.ToNumber(agent)
+		return
 	case u.astIsSubtract():
 		// 13.5.5.1
 		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
@@ -5403,9 +5417,13 @@ func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM, hom
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	var name PropertyKeyOrPrivateName
-	value := RunNode(agent, c.FieldDefinition.PropertyName)
-	if value.Data() != nil {
-		name = ToPropertyKey(agent, value.Data())
+	value, isAbrupt, rt := ReturnIfAbrupt(RunNode(agent, c.FieldDefinition.PropertyName), co)
+	if isAbrupt {
+		return rt
+	}
+	name, isAbrupt, rt = ReturnIfAbrupt(ToPropertyKey(agent, value), co)
+	if isAbrupt {
+		return rt
 	}
 	var initializer ObjectType
 	if c.FieldDefinition.Initializer != nil {

@@ -44,7 +44,11 @@ func NewValueFromObject(object ObjectType) Value {
 
 // 7.1.3
 func ToNumeric(agent *Agent, value Value) Value {
-	primValue := value.ToPrimitive(agent, PreferredTypeNumber)
+	var co CompletionValue
+	primValue, isAbrupt, rt := ReturnIfAbrupt(value.ToPrimitive(agent, PreferredTypeNumber), co)
+	if isAbrupt {
+		panic(rt)
+	}
 	if bigInt, ok := primValue.(*BigIntValue); ok {
 		return bigInt
 	}
@@ -184,7 +188,7 @@ func ToUint8Clamp(value Value, agent *Agent) uint8 {
 }
 
 func ToBigInt(agent *Agent, value Value) *BigIntValue {
-	prim := value.ToPrimitive(agent, PreferredTypeNumber)
+	prim := ReturnAssertNormal(value.ToPrimitive(agent, PreferredTypeNumber))
 	switch p := prim.(type) {
 	case *undefinedValue, *nullValue, *NumberValue, *SymbolValue:
 		panic("TypeError")
@@ -270,15 +274,22 @@ func GetPrivateName(agent *Agent, value Value) (*PrivateName, bool) {
 	return nil, false
 }
 
-// 7.1.19
-func ToPropertyKey(agent *Agent, value Value) PropertyKey {
-	key := value.ToPrimitive(agent, PreferredTypeString)
+// ToPropertyKey
+// spec: 7.1.19
+func ToPropertyKey(agent *Agent, value Value) (co Completion[PropertyKey]) {
+	key, isAbrupt, rt := ReturnIfAbrupt(value.ToPrimitive(agent, PreferredTypeString), co)
+	if isAbrupt {
+		return rt
+	}
+	Assert(key != nil)
 	if symbolKey, ok := key.(*SymbolValue); ok {
-		return NewSymbolPropertyKey(symbolKey)
+		co.value = NewSymbolPropertyKey(symbolKey)
+		return
 	}
 
 	keyString := key.String()
-	return NewStringPropertyKey(keyString)
+	co.value = NewStringPropertyKey(keyString)
+	return
 }
 
 // ToLength
@@ -433,11 +444,11 @@ const (
 func IsLessThanV2(agent *Agent, x, y Value, order isLessThanOrder) Value {
 	var px, py Value
 	if order == IsLessThanOrderLeftFirst {
-		px = x.ToPrimitive(agent, PreferredTypeNumber)
-		py = y.ToPrimitive(agent, PreferredTypeNumber)
+		px = ReturnAssertNormal(x.ToPrimitive(agent, PreferredTypeNumber))
+		py = ReturnAssertNormal(y.ToPrimitive(agent, PreferredTypeNumber))
 	} else {
-		px = y.ToPrimitive(agent, PreferredTypeNumber)
-		py = x.ToPrimitive(agent, PreferredTypeNumber)
+		px = ReturnAssertNormal(y.ToPrimitive(agent, PreferredTypeNumber))
+		py = ReturnAssertNormal(x.ToPrimitive(agent, PreferredTypeNumber))
 	}
 	pxString, isPxString := px.(*StringValue)
 	pyString, isPyString := px.(*StringValue)
@@ -520,11 +531,11 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
 	}
 
 	if (xIsString || xIsNumber || xIsBigInt || xIsSymbol) && yIsObject {
-		return IsLooselyEqual(agent, x, y.ToPrimitive(agent, PreferredTypeDefault))
+		return IsLooselyEqual(agent, x, ReturnAssertNormal(y.ToPrimitive(agent, PreferredTypeDefault)))
 	}
 
 	if xIsObject && (yIsString || yIsNumber || yIsBigInt || yIsSymbol) {
-		return IsLooselyEqual(agent, x.ToPrimitive(agent, PreferredTypeDefault), y)
+		return IsLooselyEqual(agent, ReturnAssertNormal(x.ToPrimitive(agent, PreferredTypeDefault)), y)
 	}
 
 	if (xIsBigInt && yIsNumber) || (xIsNumber && yIsBigInt) {

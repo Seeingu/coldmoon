@@ -142,7 +142,7 @@ func ToString(agent *Agent, v Value) *StringValue {
 		return NewStringValue("null")
 	default:
 		Assert(v.IsObject())
-		primValue := v.ToPrimitive(agent, PreferredTypeString)
+		primValue := ReturnAssertNormal(v.ToPrimitive(agent, PreferredTypeString))
 		Assert(!primValue.IsObject())
 		return ToString(agent, primValue)
 	}

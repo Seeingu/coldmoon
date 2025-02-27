@@ -442,6 +442,7 @@ assert(a === 3);
 
 func testNewSources(t *testing.T, sourceTexts []string) {
 	for _, sourceText := range sourceTexts {
+		fmt.Println("Testing source:" + sourceText)
 		testSource(t, sourceText)
 	}
 }

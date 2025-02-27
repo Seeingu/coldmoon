@@ -15,7 +15,7 @@ type ObjectType interface {
 	DeletePropertyOrThrow(key PropertyKey) bool
 	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
 	EnumerableOwnProperties(kind objectOwnPropertiesKind) []Value
-	OrdinaryToPrimitive(hint PreferredType) Value
+	OrdinaryToPrimitive(hint PreferredType) (co CompletionValue)
 	CopyDataProperties(source Value, excludedItems []PropertyKey)
 	FindViaPredicate(
 		len JSInt,

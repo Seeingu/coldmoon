@@ -71,7 +71,11 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	}
 	var toJSON BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := MustGetObject(this)
-		tv := o.ToValue().ToPrimitive(agent, PreferredTypeNumber)
+		var co CompletionValue
+		tv, isAbrupt, rt := ReturnIfAbrupt(o.ToValue().ToPrimitive(agent, PreferredTypeNumber), co)
+		if isAbrupt {
+			return rt
+		}
 		if n, ok := ValueGet[*NumberValue](tv); ok && !n.IsFinite() {
 			return NullValue
 		}
@@ -817,7 +821,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 				} else {
 				}
 			} else {
-				v := value.ToPrimitive(agent, PreferredTypeNumber)
+				v := ReturnAssertNormal(value.ToPrimitive(agent, PreferredTypeNumber))
 				if sv, ok := ValueGet[*StringValue](v); ok {
 					tv = DateTimeStringFormat(sv.Data)
 				} else {
