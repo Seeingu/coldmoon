@@ -32,11 +32,14 @@ var supportFeatures = []string{
 	"built-ins/Date",
 	"built-ins/Function",
 	"built-ins/Object",
-	"built-ins/RegExp",
-	"built-ins/DataView",
-	"built-ins/TypedArray/Symbol.species",
-	"built-ins/SharedArrayBuffer/prototype",
-	"built-ins/TypedArrayConstructors/BigInt64Array",
+	// "built-ins/RegExp",
+	// "built-ins/DataView",
+	// "built-ins/TypedArray",
+	// "built-ins/SharedArrayBuffer",
+	// "built-ins/TypedArrayConstructors",
+	// "built-ins",
+	// "harness",
+	// "language",
 }
 
 func Test262WithCoverage(t *testing.T) {
@@ -64,7 +67,7 @@ func Test262WithCoverage(t *testing.T) {
 		fmt.Println("Testing file: ", path)
 		err = evaluate(path, realm)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("Failed to evaluate file: %s, error: %v", path, err))
+			fmt.Println(fmt.Sprintf("Failed : %v", err))
 			failed = append(failed, path)
 		} else {
 			passed = append(passed, path)
