@@ -2563,9 +2563,17 @@ func (e *EqualityExpression) Evaluation(vm *VM) (co CompletionValue) {
 
 	switch e.Operator {
 	case EqualityOperatorEqual:
-		return NewBooleanValue(IsLooselyEqual(vm.agent, lval, rval)).ToCompletion()
+		if b, isAbrupt, rt := ReturnIfAbrupt(IsLooselyEqual(vm.agent, lval, rval), co); isAbrupt {
+			return rt
+		} else {
+			return NewBooleanValue(b).ToCompletion()
+		}
 	case EqualityOperatorNotEqual:
-		return NewBooleanValue(!IsLooselyEqual(vm.agent, lval, rval)).ToCompletion()
+		if b, isAbrupt, rt := ReturnIfAbrupt(IsLooselyEqual(vm.agent, lval, rval), co); isAbrupt {
+			return rt
+		} else {
+			return NewBooleanValue(!b).ToCompletion()
+		}
 	case EqualityOperatorStrictEqual:
 		return NewBooleanValue(IsStrictlyEqual(lval, rval)).ToCompletion()
 	case EqualityOperatorStrictNotEqual:
@@ -2789,7 +2797,11 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		co.value = expr.ToNumber(agent)
+		v, isAbrupt, rt := ReturnIfAbrupt(expr.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = v
 		return
 	case u.astIsSubtract():
 		// 13.5.5.1

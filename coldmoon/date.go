@@ -254,9 +254,15 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(SecFromTime(tv))
 	}
 	var setDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		date := args[0].ToNumber(agent).Data
+		var date JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			date = n.Data
+		}
 		if tv.IsNaN() {
 			return NaNValue
 		}
@@ -267,16 +273,31 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		year := args[0].ToNumber(agent).Data
+		var year JSNumber
+
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			year = n.Data
+		}
 		month := JSNumber(0.0)
 		date := JSNumber(1.0)
 		if len(args) >= 2 {
-			month = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			month = n.Data
 		}
 		if len(args) >= 3 {
-			date = args[2].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			date = n.Data
 		}
 		year = MakeFullYear(year)
 		day := MakeDay(year, month, date)
@@ -286,20 +307,38 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		hour := args[0].ToNumber(agent).Data
+		var hour JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			hour = n.Data
+		}
 		minute := JSNumber(0.0)
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			minute = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			minute = n.Data
 		}
 		if len(args) >= 3 {
-			sec = args[2].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			sec = n.Data
 		}
 		if len(args) >= 4 {
-			ms = args[3].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			ms = n.Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(hour, minute, sec, ms)
@@ -311,7 +350,12 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		ms := args[0].ToNumber(agent).Data
+		var ms JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), CompletionValue{}); isAbrupt {
+			return rt
+		} else {
+			ms = n.Data
+		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms)
 		newDate := MakeDate(day, newTime)
@@ -320,16 +364,31 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		minute := args[0].ToNumber(agent).Data
+		var minute JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			minute = n.Data
+		}
+
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			sec = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			sec = n.Data
 		}
 		if len(args) >= 3 {
-			ms = args[2].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			ms = n.Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), minute, sec, ms)
@@ -339,12 +398,22 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		month := args[0].ToNumber(agent).Data
+		var month JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			month = n.Data
+		}
 		date := JSNumber(1.0)
 		if len(args) >= 2 {
-			date = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			date = n.Data
 		}
 		day := MakeDay(YearFromTime(tv), month, date)
 		newDate := MakeDate(day, TimeWithinDay(tv))
@@ -353,12 +422,22 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		sec := args[0].ToNumber(agent).Data
+		var sec JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			sec = n.Data
+		}
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			ms = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			ms = n.Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), sec, ms)
@@ -369,14 +448,25 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	}
 	var setTime BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
-		t := args[0].ToNumber(agent).Data
+		var co CompletionValue
+		var t JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			t = n.Data
+		}
 		dateObject.Data = TimeClip(t)
 		return NewNumberValue(dateObject.Data)
 	}
 	var setUTCDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		date := args[0].ToNumber(agent).Data
+		var date JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), CompletionValue{}); isAbrupt {
+			return rt
+		} else {
+			date = n.Data
+		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), date)
 		newDate := MakeDate(day, TimeWithinDay(tv))
 		u := TimeClip(UTC(newDate))
@@ -384,20 +474,38 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setUTCHours BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		hour := args[0].ToNumber(agent).Data
+		var hour JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			hour = n.Data
+		}
 		minute := JSNumber(0.0)
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			minute = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			minute = n.Data
 		}
 		if len(args) >= 3 {
-			sec = args[2].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			sec = n.Data
 		}
 		if len(args) >= 4 {
-			ms = args[3].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			ms = n.Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(hour, minute, sec, ms)
@@ -409,7 +517,12 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setUTCMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		ms := args[0].ToNumber(agent).Data
+		var ms JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), CompletionValue{}); isAbrupt {
+			return rt
+		} else {
+			ms = n.Data
+		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms)
 		newDate := MakeDate(day, newTime)
@@ -418,16 +531,30 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setUTCMinutes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		minute := args[0].ToNumber(agent).Data
+		var minute JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			minute = n.Data
+		}
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			sec = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			sec = n.Data
 		}
 		if len(args) >= 3 {
-			ms = args[2].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			ms = n.Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), minute, sec, ms)
@@ -437,12 +564,22 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setUTCMonth BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		month := args[0].ToNumber(agent).Data
+		var month JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			month = n.Data
+		}
 		date := JSNumber(1.0)
 		if len(args) >= 2 {
-			date = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			date = n.Data
 		}
 		day := MakeDay(YearFromTime(tv), month, date)
 		newDate := MakeDate(day, TimeWithinDay(tv))
@@ -451,12 +588,22 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewNumberValue(u)
 	}
 	var setUTCSeconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		sec := args[0].ToNumber(agent).Data
+		var sec JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			sec = n.Data
+		}
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			ms = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			ms = n.Data
 		}
 		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
 		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), sec, ms)
@@ -803,6 +950,7 @@ func TimeClip(time JSNumber) JSNumber {
 func NewDateConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		if newTarget == nil {
 			now := time.Now().UTC()
 			return NewStringValue(ToDateString(JSNumber(now.UnixNano())))
@@ -825,29 +973,64 @@ func NewDateConstructor(realm *Realm) ObjectType {
 				if sv, ok := ValueGet[*StringValue](v); ok {
 					tv = DateTimeStringFormat(sv.Data)
 				} else {
-					tv = v.ToNumber(agent).Data
+					n, isAbrupt, rt := ReturnIfAbrupt(v.ToNumber(agent), co)
+					if isAbrupt {
+						return rt
+					}
+					tv = n.Data
 				}
 			}
 			dv = TimeClip(tv)
 		} else {
-			year := args[0].ToNumber(agent).Data
-			month := args[1].ToNumber(agent).Data
-			date := args[2].ToNumber(agent).Data
+			var year JSNumber
+			if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+				return rt
+			} else {
+				year = n.Data
+			}
+			var month JSNumber
+			if n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co); isAbrupt {
+				return rt
+			} else {
+				month = n.Data
+			}
+			var date JSNumber
+			if n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co); isAbrupt {
+				return rt
+			} else {
+				date = n.Data
+			}
 			hour := JSNumber(0.0)
 			minute := JSNumber(0.0)
 			sec := JSNumber(0.0)
 			ms := JSNumber(0.0)
 			if numberOfArgs >= 3 {
-				hour = args[3].ToNumber(agent).Data
+				n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
+				if isAbrupt {
+					return rt
+				}
+				hour = n.Data
 			}
 			if numberOfArgs >= 4 {
-				minute = args[4].ToNumber(agent).Data
+				n, isAbrupt, rt := ReturnIfAbrupt(args[4].ToNumber(agent), co)
+				if isAbrupt {
+					return rt
+				}
+				minute = n.Data
 			}
 			if numberOfArgs >= 5 {
-				sec = args[5].ToNumber(agent).Data
+				n, isAbrupt, rt := ReturnIfAbrupt(args[5].ToNumber(agent), co)
+				if isAbrupt {
+					return rt
+				}
+				sec = n.Data
 			}
 			if numberOfArgs >= 6 {
-				ms = args[6].ToNumber(agent).Data
+				n, isAbrupt, rt := ReturnIfAbrupt(args[6].ToNumber(agent), co)
+				if isAbrupt {
+					return rt
+				}
+				ms = n.Data
 			}
 			year = MakeFullYear(year)
 			day := MakeDay(year, month, date)
@@ -870,11 +1053,17 @@ func NewDateConstructor(realm *Realm) ObjectType {
 	})
 
 	var utc BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		numberOfArgs := len(args)
 		if numberOfArgs < 1 {
 			return NaNValue
 		}
-		year := args[0].ToNumber(agent).Data
+		var year JSNumber
+		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			return rt
+		} else {
+			year = n.Data
+		}
 		month := JSNumber(0.0)
 		date := JSNumber(1.0)
 		hour := JSNumber(0.0)
@@ -882,22 +1071,46 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if numberOfArgs >= 2 {
-			month = args[1].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			month = n.Data
 		}
 		if numberOfArgs >= 3 {
-			date = args[2].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			date = n.Data
 		}
 		if numberOfArgs >= 4 {
-			hour = args[3].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			hour = n.Data
 		}
 		if numberOfArgs >= 5 {
-			minute = args[4].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[4].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			minute = n.Data
 		}
 		if numberOfArgs >= 6 {
-			sec = args[5].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[5].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			sec = n.Data
 		}
 		if numberOfArgs >= 7 {
-			ms = args[6].ToNumber(agent).Data
+			n, isAbrupt, rt := ReturnIfAbrupt(args[6].ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			ms = n.Data
 		}
 		year = MakeFullYear(year)
 		day := MakeDay(year, month, date)

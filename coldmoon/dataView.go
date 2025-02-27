@@ -321,7 +321,11 @@ func SetViewValue(
 		}
 		numberValue = JSNumber(bi.Data.Uint64())
 	} else {
-		numberValue = value.ToNumber(agent).Data
+		n, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		numberValue = n.Data
 	}
 	if IsViewOutOfBounds(viewRecord) {
 		co.err = agent.ThrowException(RangeError, "DataView is out of bounds")

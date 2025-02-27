@@ -2,7 +2,7 @@ package coldmoon
 
 type Value interface {
 	ToBoolean() bool
-	ToNumber(agent *Agent) *NumberValue
+	ToNumber(agent *Agent) Completion[*NumberValue]
 
 	Call(agent *Agent, this Value, argumentsList ArgumentsList) CompletionValue
 	CallNoArgs(this Value) CompletionValue

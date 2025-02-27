@@ -90,7 +90,10 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 
 func NewIsFinite(realm *Realm) ObjectType {
 	var isFinite BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		number := args[0].ToNumber(realm.Agent)
+		number, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(realm.Agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewBooleanValue(number.IsFinite())
 	}
 
@@ -101,7 +104,10 @@ func NewIsFinite(realm *Realm) ObjectType {
 
 func NewIsNaN(realm *Realm) ObjectType {
 	var isNaN BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		number := args[0].ToNumber(realm.Agent)
+		number, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(realm.Agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewBooleanValue(number.IsNaN())
 	}
 
@@ -152,6 +158,7 @@ func ToString(agent *Agent, v Value) *StringValue {
 func NewParseInt(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var parseInt BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		stringValue := arguments[0]
 		radix := arguments[1]
 		inputString := ToString(agent, stringValue)
@@ -163,7 +170,10 @@ func NewParseInt(realm *Realm) ObjectType {
 		if S[0] == '+' || S[0] == '-' {
 			S = S[1:]
 		}
-		R := ToInt32(agent, radix)
+		R, isAbrupt, rt := ReturnIfAbrupt(ToInt32(agent, radix), co)
+		if isAbrupt {
+			return rt
+		}
 		stripPrefix := true
 		if R != 0 {
 			if R < 2 || R > 36 {

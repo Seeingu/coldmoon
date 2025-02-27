@@ -92,7 +92,11 @@ func AtomicReadModifyWrite(
 		}
 		numericValue = n
 	} else {
-		numericValue = ToIntegerOrInfinity(agent, value).ToValue()
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+		numericValue = n.ToValue()
 	}
 
 	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
@@ -199,8 +203,12 @@ func NewAtomics(realm *Realm) ObjectType {
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpExchange)
 	}
 	atomicsIsLockFree := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		size := argumentsList[0]
-		n := ToIntegerOrInfinity(agent, size)
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, size), co)
+		if isAbrupt {
+			return rt
+		}
 		if n == 1 || n == 2 || n == 4 || n == 8 {
 			return TrueValue
 		}
@@ -306,8 +314,16 @@ func atomicsCompareExchange(
 		}
 		replacement = _replacement
 	} else {
-		expected = ToIntegerOrInfinity(agent, expectedValue).ToValue()
-		replacement = ToIntegerOrInfinity(agent, replacementValue).ToValue()
+		_expected, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, expectedValue), co)
+		if isAbrupt {
+			return rt
+		}
+		expected = _expected.ToValue()
+		_replacement, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, replacementValue), co)
+		if isAbrupt {
+			return rt
+		}
+		replacement = _replacement.ToValue()
 	}
 
 	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
@@ -355,7 +371,11 @@ func atomicStore(
 		}
 		v = vv
 	} else {
-		v = ToIntegerOrInfinity(agent, value).ToValue()
+		_v, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+		v = _v.ToValue()
 	}
 	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
 	elementType := TypedArrayElementType(typedArray)

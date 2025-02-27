@@ -64,6 +64,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		return fun.Call(agent, thisArg, args)
 	}
 	bind := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		thisArg := argumentsList[0]
 		args := argumentsList[1:]
 		target := this
@@ -82,7 +83,10 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 				} else if n.IsNegativeInf() {
 					L = 0
 				} else {
-					targetLenAsInt := ToIntegerOrInfinity(agent, targetLen)
+					targetLenAsInt, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, targetLen), co)
+					if isAbrupt {
+						return rt
+					}
 					Assert(!targetLenAsInt.IsInf())
 					argCount := JSInt(len(args))
 					L = (targetLenAsInt - argCount).Max(0)

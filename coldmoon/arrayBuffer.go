@@ -315,7 +315,10 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		length := o.ByteLength()
-		relativeStart := ToIntegerOrInfinity(agent, start)
+		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		var first JSInt
 		if relativeStart.IsNegInf() {
 			first = 0
@@ -325,7 +328,10 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 			first = JSInt(math.Min(float64(relativeStart), float64(length)))
 		}
 
-		relativeEnd := ToIntegerOrInfinity(agent, end)
+		relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		var final JSInt
 		if math.IsInf(float64(relativeEnd), -1) {
 			final = 0

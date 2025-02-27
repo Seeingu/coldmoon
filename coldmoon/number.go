@@ -378,7 +378,11 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 				data, _ := strconv.ParseFloat(bigintPrim.String(), 64)
 				n.Data = JSNumber(data)
 			} else {
-				n = prim.ToNumber(agent)
+				_n, isAbrupt, rt := ReturnIfAbrupt(prim.ToNumber(agent), co)
+				if isAbrupt {
+					return rt
+				}
+				n = _n
 			}
 		}
 
@@ -481,12 +485,17 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 
 	agent := realm.Agent
 	var toString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		radix := pkg.SliceSafeGet(arguments, 0)
 
 		x := thisNumberValue(agent, this)
 		var radixMV JSInt = 10
 		if radix != nil {
-			radixMV = ToIntegerOrInfinity(agent, radix)
+			_radixMV, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, radix), co)
+			if isAbrupt {
+				return rt
+			}
+			radixMV = _radixMV
 		}
 
 		if radixMV < 2 || radixMV > 36 {

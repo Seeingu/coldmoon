@@ -139,7 +139,11 @@ func NewJSON(realm *Realm) *JSON {
 
 		if obj, ok := space.GetObject(); ok {
 			if ObjectIs[*NumberObject](obj) {
-				space = space.ToNumber(agent)
+				_space, isAbrupt, rt := ReturnIfAbrupt(space.ToNumber(agent), co)
+				if isAbrupt {
+					return rt
+				}
+				space = _space
 			} else if ObjectIs[*StringObject](obj) {
 				space = ToString(agent, space)
 			}
@@ -147,7 +151,10 @@ func NewJSON(realm *Realm) *JSON {
 
 		var gap string
 		if ValueIs[*NumberValue](space) {
-			spaceMV := ToIntegerOrInfinity(agent, space)
+			spaceMV, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, space), co)
+			if isAbrupt {
+				return rt
+			}
 			if spaceMV < 1 {
 				gap = ""
 			} else {
@@ -249,7 +256,11 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 
 	if obj, ok := value.GetObject(); ok {
 		if ObjectIs[*NumberObject](obj) {
-			value = value.ToNumber(agent)
+			_value, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			value = _value
 		} else if ObjectIs[*StringObject](obj) {
 			value = ToString(agent, value)
 		} else if ObjectIs[*BooleanObject](obj) {

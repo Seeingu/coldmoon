@@ -52,22 +52,35 @@ func ToNumeric(agent *Agent, value Value) (co CompletionValue) {
 	if bigInt, ok := primValue.(*BigIntValue); ok {
 		return bigInt.ToCompletion()
 	}
-	co.value = primValue.ToNumber(agent)
+	if n, isAbrupt, rt := ReturnIfAbrupt(primValue.ToNumber(agent), co); isAbrupt {
+		return rt
+	} else {
+		co.value = n
+	}
 	return
 }
 
-func ToIntegerOrInfinity(agent *Agent, value Value) JSInt {
-	number := value.ToNumber(agent)
+// ToIntegerOrInfinity
+// spec: 7.1.5
+func ToIntegerOrInfinity(agent *Agent, value Value) (co Completion[JSInt]) {
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if number.IsNaN() {
-		return 0
+		co.value = 0
+		return
 	}
 	if number.IsPositiveInf() {
-		return JSInt(math.Inf(1))
+		co.value = JSInt(math.Inf(1))
+		return
 	}
 	if number.IsNegativeInf() {
-		return JSInt(math.Inf(-1))
+		co.value = JSInt(math.Inf(-1))
+		return
 	}
-	return JSInt(number.Truncate())
+	co.value = JSInt(number.Truncate())
+	return
 }
 
 var (
@@ -80,38 +93,53 @@ var (
 	POW_2_7  = math.Pow(2, 7)
 )
 
-func ToInt32(agent *Agent, value Value) JSInt {
-	number := value.ToNumber(agent)
+func ToInt32(agent *Agent, value Value) (co Completion[JSInt]) {
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if !number.IsFinite() || number.Data == 0 {
-		return 0
+		co.value = 0
+		return
 	}
 
 	intData := number.Truncate()
 
 	int32bit := math.Mod(float64(intData), POW_2_32)
 	if int32bit >= POW_2_31 {
-		return JSInt(int32(int32bit - POW_2_32))
+		co.value = JSInt(int32(int32bit - POW_2_32))
+		return
 	} else {
-		return JSInt(int32(int32bit))
+		co.value = JSInt(int32(int32bit))
+		return
 	}
 }
 
-func ToUint32(agent *Agent, value Value) JSInt {
-	number := value.ToNumber(agent)
+func ToUint32(agent *Agent, value Value) (co Completion[JSInt]) {
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if !number.IsFinite() || number.Data == 0 {
-		return 0
+		co.value = 0
+		return
 	}
 
 	intData := number.Truncate()
 
 	int32bit := math.Mod(float64(intData), POW_2_32)
-	return JSInt(uint32(int32bit))
+	co.value = JSInt(uint32(int32bit))
+	return
 }
 
-func ToInt16(value Value, agent *Agent) int16 {
-	number := value.ToNumber(agent)
+func ToInt16(value Value, agent *Agent) (co Completion[int16]) {
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if !number.IsFinite() || number.Data == 0 {
-		return 0
+		co.value = 0
+		return
 	}
 
 	intData := number.Truncate()
@@ -119,73 +147,101 @@ func ToInt16(value Value, agent *Agent) int16 {
 	int16bit := math.Mod(float64(intData), POW_2_16)
 
 	if int16bit >= POW_2_15 {
-		return int16(int16bit - POW_2_16)
+		co.value = int16(int16bit - POW_2_16)
+		return
 	} else {
-		return int16(int16bit)
+		co.value = int16(int16bit)
+		return
 	}
 }
 
-func ToUint16(value Value, agent *Agent) uint16 {
-	number := value.ToNumber(agent)
+func ToUint16(value Value, agent *Agent) (co Completion[uint16]) {
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if !number.IsFinite() || number.Data == 0 {
-		return 0
+		co.value = 0
+		return
 	}
 	intData := number.Truncate()
 	int16bit := math.Mod(float64(intData), POW_2_16)
-	return uint16(int16bit)
+	co.value = uint16(int16bit)
+	return
 }
 
-func ToInt8(value Value, agent *Agent) int8 {
-	number := value.ToNumber(agent)
+func ToInt8(value Value, agent *Agent) (co Completion[int8]) {
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if !number.IsFinite() || number.Data == 0 {
-		return 0
+		co.value = 0
+		return
 	}
 	intData := number.Truncate()
 	int8bit := math.Mod(float64(intData), POW_2_8)
 	if int8bit >= POW_2_7 {
-		return int8(int8bit - POW_2_8)
+		co.value = int8(int8bit - POW_2_8)
+		return
 	} else {
-		return int8(int8bit)
+		co.value = int8(int8bit)
+		return
 	}
 }
 
-func ToUint8(value Value, agent *Agent) uint8 {
-	number := value.ToNumber(agent)
+func ToUint8(value Value, agent *Agent) (co Completion[uint8]) {
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if !number.IsFinite() || number.Data == 0 {
-		return 0
+		co.value = 0
+		return
 	}
 	intData := number.Truncate()
 	int8bit := math.Mod(float64(intData), POW_2_8)
-	return uint8(int8bit)
+	co.value = uint8(int8bit)
+	return
 }
 
-func ToUint8Clamp(value Value, agent *Agent) uint8 {
-	number := value.ToNumber(agent)
+func ToUint8Clamp(value Value, agent *Agent) (co Completion[uint8]) {
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	if number.IsNaN() {
-		return 0
+		co.value = 0
+		return
 	}
 	if number.Data <= 0 {
-		return 0
+		co.value = 0
+		return
 	}
 	if number.Data >= 255 {
-		return 255
+		co.value = 255
+		return
 	}
 
 	f := math.Floor(number.Data.ToFloat())
 	fInt := uint8(f)
 
 	if f+0.5 < number.Data.ToFloat() {
-		return fInt + 1
+		co.value = fInt + 1
+		return
 	}
 	if number.Data.ToFloat() < f+0.5 {
-		return fInt
+		co.value = fInt
+		return
 	}
 
 	if fInt%2 != 0 {
-		return fInt + 1
+		co.value = fInt + 1
+		return
 	}
 
-	return fInt
+	co.value = fInt
+	return
 }
 
 // ToBigInt
@@ -312,7 +368,10 @@ func ToPropertyKey(agent *Agent, value Value) (co Completion[PropertyKey]) {
 // ToLength
 // spec: 7.1.20
 func ToLength(agent *Agent, value Value) (co Completion[JSInt]) {
-	length := ToIntegerOrInfinity(agent, value)
+	length, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
+	if isAbrupt {
+		return rt
+	}
 
 	if length <= 0 {
 		co.value = 0
@@ -328,7 +387,7 @@ func ToIndex(agent *Agent, value Value) JSInt {
 		return 0
 	}
 
-	integer := ToIntegerOrInfinity(agent, value)
+	integer := ReturnAssertNormal(ToIntegerOrInfinity(agent, value))
 	if integer < 0 || float64(integer) >= POW_2_53 {
 		panic("RangeError")
 	}
@@ -459,22 +518,44 @@ const (
 // IsLessThan
 // spec: 7.2.13
 // returns either a Boolean or undefined, or throw
-func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) CompletionValue {
+func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) (co CompletionValue) {
 	var px, py Value
 	if order == IsLessThanOrderLeftFirst {
-		px = ReturnAssertNormal(x.ToPrimitive(agent, PreferredTypeNumber))
-		py = ReturnAssertNormal(y.ToPrimitive(agent, PreferredTypeNumber))
+		_px, isAbrupt, rt := ReturnIfAbrupt(x.ToPrimitive(agent, PreferredTypeNumber), co)
+		if isAbrupt {
+			return rt
+		}
+		px = _px
+		_py, isAbrupt, rt := ReturnIfAbrupt(y.ToPrimitive(agent, PreferredTypeNumber), co)
+		if isAbrupt {
+			return rt
+		}
+		py = _py
 	} else {
-		px = ReturnAssertNormal(y.ToPrimitive(agent, PreferredTypeNumber))
-		py = ReturnAssertNormal(x.ToPrimitive(agent, PreferredTypeNumber))
+		_px, isAbrupt, rt := ReturnIfAbrupt(y.ToPrimitive(agent, PreferredTypeNumber), co)
+		if isAbrupt {
+			return rt
+		}
+		px = _px
+		_py, isAbrupt, rt := ReturnIfAbrupt(x.ToPrimitive(agent, PreferredTypeNumber), co)
+		if isAbrupt {
+			return rt
+		}
+		py = _py
 	}
 	pxString, isPxString := px.(*StringValue)
 	pyString, isPyString := px.(*StringValue)
 	if isPxString && isPyString {
 		return NewBooleanValue(pxString.Data < pyString.Data).ToCompletion()
 	} else {
-		nx := px.ToNumber(agent)
-		ny := py.ToNumber(agent)
+		nx, isAbrupt, rt := ReturnIfAbrupt(px.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		ny, isAbrupt, rt := ReturnIfAbrupt(py.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		if nx.IsNaN() || ny.IsNaN() {
 			return FalseValue.ToCompletion()
 		}
@@ -483,24 +564,30 @@ func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) CompletionValue
 }
 
 // 7.2.14
-func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
+func IsLooselyEqual(agent *Agent, x Value, y Value) (co Completion[bool]) {
 	if reflect.TypeOf(x) == reflect.TypeOf(y) {
-		return IsStrictlyEqual(x, y)
+		co.value = IsStrictlyEqual(x, y)
+		return
 	}
 	if x == NullValue && y == UndefinedValue {
-		return true
+		co.value = true
+		return
 	}
 	if x == UndefinedValue && y == NullValue {
-		return true
+		co.value = true
+		return
 	}
 	if x == NullValue || y == UndefinedValue {
-		return false
+		co.value = false
+		return
 	}
 	if x == UndefinedValue || y == NullValue {
-		return false
+		co.value = false
+		return
 	}
 	if x == NaNValue && y == NaNValue {
-		return true
+		co.value = true
+		return
 	}
 
 	_, xIsString := x.(*StringValue)
@@ -518,11 +605,19 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
 	_, yIsSymbol := y.(*SymbolValue)
 
 	if xIsNumber && yIsString {
-		return IsLooselyEqual(agent, x, y.ToNumber(agent))
+		yn, isAbrupt, rt := ReturnIfAbrupt(y.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return IsLooselyEqual(agent, x, yn)
 	}
 	if xIsString {
 		if yIsNumber {
-			return IsLooselyEqual(agent, x.ToNumber(agent), y)
+			xn, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			return IsLooselyEqual(agent, xn, y)
 		}
 		if yIsBigInt {
 			return IsLooselyEqual(agent, y, x)
@@ -531,16 +626,25 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
 	if xIsBigInt && yIsString {
 		n, ok := StringToBigInt(yString)
 		if !ok {
-			return false
+			co.value = false
+			return
 		}
 		return IsLooselyEqual(agent, x, n)
 	}
 	if xIsBoolean {
-		return IsLooselyEqual(agent, x.ToNumber(agent), y)
+		xn, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return IsLooselyEqual(agent, xn, y)
 	}
 
 	if yIsBoolean {
-		return IsLooselyEqual(agent, x, y.ToNumber(agent))
+		yn, isAbrupt, rt := ReturnIfAbrupt(y.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return IsLooselyEqual(agent, x, yn)
 	}
 
 	if (xIsString || xIsNumber || xIsBigInt || xIsSymbol) && yIsObject {
@@ -554,7 +658,8 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) bool {
 	if (xIsBigInt && yIsNumber) || (xIsNumber && yIsBigInt) {
 	}
 
-	return false
+	co.value = false
+	return
 }
 
 // 7.2.15
@@ -566,7 +671,6 @@ func IsStrictlyEqual(x Value, y Value) bool {
 	if xNumber, xIsNumber := x.(*NumberValue); xIsNumber {
 		return xNumber.SameValue(y.(*NumberValue))
 	}
-
 	return SameValueNonNumber(x, y)
 }
 

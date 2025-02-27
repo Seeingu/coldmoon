@@ -154,11 +154,14 @@ func sharedArrayBufferGrow(agent *Agent, this Value, newLength Value) Value {
 	return UndefinedValue
 }
 
-func sharedArrayBufferSlice(agent *Agent, this Value, start Value, end Value) Value {
+func sharedArrayBufferSlice(agent *Agent, this Value, start Value, end Value) (co CompletionValue) {
 	realm := agent.CurrentRealm()
 	O := RequireInternalSlot[*SharedArrayBufferObject](this)
 	length := ArrayBufferByteLength(NewArrayBufferLike(O), SeqCst)
-	relativeStart := ToIntegerOrInfinity(agent, start)
+	relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+	if isAbrupt {
+		return rt
+	}
 	var first JSInt
 	if relativeStart.IsNegInf() {
 		first = 0
@@ -172,7 +175,11 @@ func sharedArrayBufferSlice(agent *Agent, this Value, start Value, end Value) Va
 	if IsUndefinedOrNil(end) {
 		relativeEnd = length
 	} else {
-		relativeEnd = ToIntegerOrInfinity(agent, end)
+		_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+		if isAbrupt {
+			return rt
+		}
+		relativeEnd = _relativeEnd
 	}
 	var final JSInt
 	if relativeEnd.IsNegInf() {
@@ -188,15 +195,16 @@ func sharedArrayBufferSlice(agent *Agent, this Value, start Value, end Value) Va
 	newObject := ctor.Data().Construct([]Value{newLen.ToValue()}, nil).value
 	sharedArrayBuffer := RequireInternalSlot[*SharedArrayBufferObject](newObject.ToValue())
 	if sharedArrayBuffer.ArrayBufferData.Equal(O.ArrayBufferData) {
-		return agent.ThrowTypeError("should return a new ArrayBuffer instance")
+		return co.ThrowTypeError(agent, "should return a new ArrayBuffer instance")
 	}
 
 	if ArrayBufferByteLength(NewArrayBufferLike(sharedArrayBuffer), SeqCst) < newLen {
-		return agent.ThrowTypeError("size of new ArrayBuffer is less than newLen")
+		return co.ThrowTypeError(agent, "size of new ArrayBuffer is less than newLen")
 	}
 
 	fromBuf := O.ArrayBufferData
 	toBuf := sharedArrayBuffer.ArrayBufferData
 	CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLen)
-	return newObject.ToValue()
+	co.value = newObject.ToValue()
+	return
 }

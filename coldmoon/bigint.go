@@ -177,6 +177,7 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 
 	// 21.2.3.3
 	toString := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		radix := pkg.SliceSafeGet(arguments, 0)
 
 		x := thisBigIntValue(this)
@@ -185,7 +186,11 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 		if radix == nil {
 			radixMV = 10
 		} else {
-			radixMV = ToIntegerOrInfinity(agent, radix)
+			_radixMV, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, radix), co)
+			if isAbrupt {
+				return rt
+			}
+			radixMV = _radixMV
 		}
 
 		if radixMV < 2 || radixMV > 36 {

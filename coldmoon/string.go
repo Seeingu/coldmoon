@@ -148,16 +148,26 @@ func NewStringConstructor(realm *Realm) ObjectType {
 	BindPrototypeAndConstructor(realm.Intrinsics.StringPrototype, object)
 
 	var fromCharCode BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		var s string
 		for _, arg := range argumentsList {
-			s += string(rune(int(ToIntegerOrInfinity(realm.Agent, arg))))
+			n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(realm.Agent, arg), co)
+			if isAbrupt {
+				return rt
+			}
+			s += string(rune(int(n)))
 		}
 		return NewStringValue(s)
 	}
 	var fromCodePoint BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		codePoints := make([]rune, len(argumentsList))
 		for i, arg := range argumentsList {
-			codePoints[i] = rune(ToIntegerOrInfinity(realm.Agent, arg))
+			n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(realm.Agent, arg), co)
+			if isAbrupt {
+				return rt
+			}
+			codePoints[i] = rune(n)
 		}
 		return NewStringValue(string(codePoints))
 	}
@@ -207,9 +217,14 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}))
 	}
 	var charAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
-		position := int(ToIntegerOrInfinity(agent, argumentsList[0]))
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if isAbrupt {
+			return rt
+		}
+		position := int(n)
 		size := len(s)
 		if position < 0 || position >= size {
 			return NewStringValue("")
@@ -217,9 +232,14 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewStringValue(string(s[position]))
 	}
 	var charCodeAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
-		position := int(ToIntegerOrInfinity(agent, argumentsList[0]))
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if isAbrupt {
+			return rt
+		}
+		position := int(n)
 		size := len(s)
 		if position < 0 || position >= size {
 			return NaNValue
@@ -237,11 +257,16 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return (stringIteratorObject).ToValue()
 	}
 	var at BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		index := argumentsList[0]
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		length := len(s)
-		relativeIndex := int(ToIntegerOrInfinity(agent, index))
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, index), co)
+		if isAbrupt {
+			return rt
+		}
+		relativeIndex := int(n)
 		if relativeIndex < 0 || relativeIndex >= length {
 			return UndefinedValue
 		}
@@ -249,8 +274,15 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewStringValue(string(s[k]))
 	}
 	var slice BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		intStart := ToIntegerOrInfinity(agent, argumentsList[0])
-		intEnd := ToIntegerOrInfinity(agent, argumentsList[1])
+		var co CompletionValue
+		intStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if isAbrupt {
+			return rt
+		}
+		intEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[1]), co)
+		if isAbrupt {
+			return rt
+		}
 
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
@@ -279,7 +311,11 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewStringValue(s[int(from):int(to)])
 	}
 	var repeat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		n := ToIntegerOrInfinity(agent, argumentsList[0])
+		var co CompletionValue
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if isAbrupt {
+			return rt
+		}
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		if n < 0 || n.IsInf() {
@@ -334,8 +370,12 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return ValueInvoke(agent, rx.Data().ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatchAll]), []Value{s})
 	}
 	indexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		searchString := argumentsList[0]
-		position := ToIntegerOrInfinity(agent, argumentsList[1])
+		position, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[1]), co)
+		if isAbrupt {
+			return rt
+		}
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		searchStr := ToString(agent, searchString)
@@ -345,8 +385,12 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewNumberValue(JSNumber(StringIndexOf(s, searchStr.Data, start)))
 	}
 	lastIndexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		searchString := argumentsList[0]
-		position := ToIntegerOrInfinity(agent, argumentsList[1])
+		position, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[1]), co)
+		if isAbrupt {
+			return rt
+		}
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		searchStr := ToString(agent, searchString).Data
@@ -359,6 +403,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewNumberValue(JSNumber(strings.LastIndex(s[start:], searchStr)))
 	}
 	startsWith := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		searchString := argumentsList[0]
 		var position Value
 		if len(argumentsList) > 1 {
@@ -376,7 +421,11 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		if position == nil {
 			pos = 0
 		} else {
-			pos = int(ToIntegerOrInfinity(agent, position))
+			n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, position), co)
+			if isAbrupt {
+				return rt
+			}
+			pos = int(n)
 		}
 
 		start := lo.Clamp(pos, 0, length)
@@ -399,6 +448,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return FalseValue
 	}
 	endsWith := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		searchString := argumentsList[0]
 		var position Value
 		if len(argumentsList) > 1 {
@@ -416,7 +466,11 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		if position == nil {
 			pos = length
 		} else {
-			pos = int(ToIntegerOrInfinity(agent, position))
+			n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, position), co)
+			if isAbrupt {
+				return rt
+			}
+			pos = int(n)
 		}
 
 		end := lo.Clamp(pos, 0, length)
@@ -439,6 +493,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return FalseValue
 	}
 	var includes BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		searchString := argumentsList[0]
 		var position Value
 		if len(argumentsList) > 1 {
@@ -456,7 +511,11 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		if position == nil {
 			pos = 0
 		} else {
-			pos = int(ToIntegerOrInfinity(agent, position))
+			n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, position), co)
+			if isAbrupt {
+				return rt
+			}
+			pos = int(n)
 		}
 
 		start := lo.Clamp(pos, 0, length)
@@ -478,10 +537,14 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return FalseValue
 	}
 	var codePointAt BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		pos := argumentsList[0]
 		o := RequireObjectCoercible(agent, this)
 		s := ToString(agent, o)
-		position := ToIntegerOrInfinity(agent, pos)
+		position, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, pos), co)
+		if isAbrupt {
+			return rt
+		}
 		size := len(s.Data)
 		if position < 0 || int(position) >= size {
 			return UndefinedValue
@@ -489,8 +552,15 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewNumberValue(JSNumber(s.Data[int(position)]))
 	}
 	substring := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		start := ToIntegerOrInfinity(agent, argumentsList[0])
-		end := ToIntegerOrInfinity(agent, argumentsList[1])
+		var co CompletionValue
+		start, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if isAbrupt {
+			return rt
+		}
+		end, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[1]), co)
+		if isAbrupt {
+			return rt
+		}
 		o := RequireObjectCoercible(agent, this)
 		s := ToString(agent, o)
 		length := JSInt(len(s.Data))

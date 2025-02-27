@@ -107,10 +107,14 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	}
 	typedArray.ref = typedArray
 	taAt := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		O := this
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
-		relativeIndex := ToIntegerOrInfinity(agent, arguments[0])
+		relativeIndex, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, arguments[0]), co)
+		if isAbrupt {
+			return rt
+		}
 		var k JSInt
 		if relativeIndex >= 0 {
 			k = relativeIndex
@@ -635,7 +639,13 @@ func CompareTypedArrayElements(agent *Agent, x, y Value, comparator ObjectType) 
 	yBigInt, yIsBigInt := y.(*BigIntValue)
 	Assert((xIsNumber && yIsNumber) || (xIsBigInt && yIsBigInt))
 	if comparator != nil {
-		v := comparator.Call(UndefinedValue, []Value{x, y}).value.ToNumber(agent)
+		v, isAbrupt, rt := ReturnIfAbrupt(
+			comparator.Call(UndefinedValue, []Value{x, y}).value.ToNumber(agent),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if v.IsNaN() {
 			co.value = 0
 			return
@@ -912,7 +922,11 @@ func TypedArraySetElement(agent *Agent, O *TypedArrayObject, index JSInt, value 
 		}
 		numValue = n
 	} else {
-		numValue = value.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		numValue = n
 	}
 
 	offset := O.ByteOffset
@@ -1223,13 +1237,16 @@ func TypedArrayLength(taRecord *TypedArrayWithBufferWitnessRecord) JSInt {
 
 // MARK: - Internal
 
-func typedArrayCopyWith(agent *Agent, this Value, target, start, end Value) Value {
+func typedArrayCopyWith(agent *Agent, this Value, target, start, end Value) (co CompletionValue) {
 	O := this
 
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
 	length := TypedArrayLength(taRecord)
-	relativeTarget := ToIntegerOrInfinity(agent, target)
+	relativeTarget, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, target), co)
+	if isAbrupt {
+		return rt
+	}
 
 	var targetIndex JSInt
 	if relativeTarget.IsNegInf() {
@@ -1240,7 +1257,10 @@ func typedArrayCopyWith(agent *Agent, this Value, target, start, end Value) Valu
 		targetIndex = relativeTarget.Min(length)
 	}
 
-	relativeStart := ToIntegerOrInfinity(agent, start)
+	relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+	if isAbrupt {
+		return rt
+	}
 	var startIndex JSInt
 	if relativeStart.IsNegInf() {
 		startIndex = 0
@@ -1254,7 +1274,11 @@ func typedArrayCopyWith(agent *Agent, this Value, target, start, end Value) Valu
 	if IsUndefinedOrNil(end) {
 		relativeEnd = length
 	} else {
-		relativeEnd = ToIntegerOrInfinity(agent, end)
+		_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+		if isAbrupt {
+			return rt
+		}
+		relativeEnd = _relativeEnd
 	}
 	var endIndex JSInt
 	if relativeEnd.IsNegInf() {
@@ -1270,7 +1294,7 @@ func typedArrayCopyWith(agent *Agent, this Value, target, start, end Value) Valu
 		buffer := ta.ViewedArrayBuffer
 		taRecord = MakeTypedArrayWithBufferWitnessRecord(ta, SeqCst)
 		if IsTypedArrayOutOfBounds(taRecord) {
-			return agent.ThrowException(RangeError, "out of bounds")
+			return co.ThrowError(agent, RangeError, "out of bounds")
 		}
 		length = TypedArrayLength(taRecord)
 		elementSize := TypedArrayElementSize(ta)
@@ -1301,7 +1325,8 @@ func typedArrayCopyWith(agent *Agent, this Value, target, start, end Value) Valu
 			}
 		}
 	}
-	return ta.ToValue()
+	co.value = ta.ToValue()
+	return
 }
 
 func typedArrayEvery(agent *Agent, this Value, callback Value, thisArg Value) Value {
@@ -1344,10 +1369,17 @@ func typedArrayFill(agent *Agent, this Value, _value, start, end Value) (co Comp
 		}
 		value = v
 	} else {
-		value = _value.ToNumber(agent)
+		v, isAbrupt, rt := ReturnIfAbrupt(_value.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		value = v
 	}
 
-	relativeStart := ToIntegerOrInfinity(agent, start)
+	relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+	if isAbrupt {
+		return rt
+	}
 	var startIndex JSInt
 	if relativeStart.IsNegInf() {
 		startIndex = 0
@@ -1361,7 +1393,11 @@ func typedArrayFill(agent *Agent, this Value, _value, start, end Value) (co Comp
 	if IsUndefinedOrNil(end) {
 		relativeEnd = length
 	} else {
-		relativeEnd = ToIntegerOrInfinity(agent, end)
+		_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+		if isAbrupt {
+			return rt
+		}
+		relativeEnd = _relativeEnd
 	}
 	var endIndex JSInt
 	if relativeEnd.IsNegInf() {
@@ -1440,20 +1476,25 @@ func typedArrayForEach(agent *Agent, this Value, callback Value, thisArg Value) 
 	return UndefinedValue
 }
 
-func typedArrayIncludes(agent *Agent, this Value, searchElement, fromIndex Value) Value {
+func typedArrayIncludes(agent *Agent, this Value, searchElement, fromIndex Value) (co CompletionValue) {
 	O := this
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
 	length := TypedArrayLength(taRecord)
 	if length == 0 {
-		return FalseValue
+		co.value = FalseValue
+		return
 	}
-	n := ToIntegerOrInfinity(agent, fromIndex)
+	n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+	if isAbrupt {
+		return rt
+	}
 	if IsUndefinedOrNil(fromIndex) {
 		Assert(n == 0)
 	}
 	if n.IsPositiveInf() {
-		return FalseValue
+		co.value = FalseValue
+		return
 	}
 	if n.IsNegInf() {
 		n = 0
@@ -1469,27 +1510,34 @@ func typedArrayIncludes(agent *Agent, this Value, searchElement, fromIndex Value
 		Pk := NewIntegerIndexPropertyKey(k)
 		elementK := ta.Get(Pk)
 		if SameValueZero(searchElement, elementK) {
-			return TrueValue
+			co.value = TrueValue
+			return
 		}
 		k++
 	}
-	return FalseValue
+	co.value = FalseValue
+	return
 }
 
-func typedArrayIndexOf(agent *Agent, this Value, searchElement, fromIndex Value) Value {
+func typedArrayIndexOf(agent *Agent, this Value, searchElement, fromIndex Value) (co CompletionValue) {
 	O := this
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
 	length := TypedArrayLength(taRecord)
 	if length == 0 {
-		return NewNumberValue(-1)
+		co.value = NewNumberValue(-1)
+		return
 	}
-	n := ToIntegerOrInfinity(agent, fromIndex)
+	n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+	if isAbrupt {
+		return rt
+	}
 	if IsUndefinedOrNil(fromIndex) {
 		Assert(n == 0)
 	}
 	if n.IsPositiveInf() {
-		return NewNumberValue(-1)
+		co.value = NewNumberValue(-1)
+		return
 	}
 	if n.IsNegInf() {
 		n = 0
@@ -1507,12 +1555,14 @@ func typedArrayIndexOf(agent *Agent, this Value, searchElement, fromIndex Value)
 		if kPresent {
 			elementK := ta.Get(Pk)
 			if IsStrictlyEqual(searchElement, elementK) {
-				return k.ToValue()
+				co.value = k.ToValue()
+				return
 			}
 		}
 		k++
 	}
-	return NewNumberValue(-1)
+	co.value = NewNumberValue(-1)
+	return
 }
 
 func typedArrayJoin(agent *Agent, this Value, separator Value) Value {
@@ -1543,19 +1593,24 @@ func typedArrayJoin(agent *Agent, this Value, separator Value) Value {
 	return NewStringValue(R)
 }
 
-func typedArrayLastIndexOf(agent *Agent, this Value, searchElement, fromIndex Value) Value {
+func typedArrayLastIndexOf(agent *Agent, this Value, searchElement, fromIndex Value) (co CompletionValue) {
 	O := this
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
 	length := TypedArrayLength(taRecord)
 	if length == 0 {
-		return NewNumberValue(-1)
+		co.value = NewNumberValue(-1)
+		return
 	}
 	var n JSInt
 	if IsUndefinedOrNil(fromIndex) {
 		n = length - 1
 	} else {
-		n = ToIntegerOrInfinity(agent, fromIndex)
+		_n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+		if isAbrupt {
+			return rt
+		}
+		n = _n
 	}
 	var k JSInt
 	if n >= 0 {
@@ -1569,12 +1624,14 @@ func typedArrayLastIndexOf(agent *Agent, this Value, searchElement, fromIndex Va
 		if kPresent {
 			elementK := ta.Get(Pk)
 			if IsStrictlyEqual(searchElement, elementK) {
-				return k.ToValue()
+				co.value = k.ToValue()
+				return
 			}
 		}
 		k--
 	}
-	return NewNumberValue(-1)
+	co.value = NewNumberValue(-1)
+	return
 }
 
 func typedArrayMap(agent *Agent, this Value, callback Value, thisArg Value) Value {
@@ -1661,11 +1718,14 @@ func typedArrayReduceRight(agent *Agent, this Value, callback Value, initialValu
 	return accumulator
 }
 
-func typedArraySet(agent *Agent, this Value, source, offset Value) Value {
+func typedArraySet(agent *Agent, this Value, source, offset Value) (co CompletionValue) {
 	target := RequireInternalSlot[*TypedArrayObject](this)
-	targetOffset := ToIntegerOrInfinity(agent, offset)
+	targetOffset, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, offset), co)
+	if isAbrupt {
+		return rt
+	}
 	if targetOffset < 0 {
-		return agent.ThrowException(RangeError, "negative offset")
+		return co.ThrowError(agent, RangeError, "negative offset")
 	}
 	var sourceIsTypedArray bool
 	if s, ok := source.GetObject(); ok {
@@ -1678,16 +1738,20 @@ func typedArraySet(agent *Agent, this Value, source, offset Value) Value {
 		SetTypedArrayFromArrayLike(agent, target, targetOffset, source)
 	}
 
-	return UndefinedValue
+	co.value = UndefinedValue
+	return
 }
 
-func typedArraySlice(agent *Agent, this Value, start, end Value) Value {
+func typedArraySlice(agent *Agent, this Value, start, end Value) (co CompletionValue) {
 	O := this
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
 
 	srcArrayLength := TypedArrayLength(taRecord)
-	relativeStart := ToIntegerOrInfinity(agent, start)
+	relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+	if isAbrupt {
+		return rt
+	}
 	var startIndex JSInt
 	if relativeStart.IsNegInf() {
 		startIndex = 0
@@ -1700,7 +1764,11 @@ func typedArraySlice(agent *Agent, this Value, start, end Value) Value {
 	if IsUndefinedOrNil(end) {
 		relativeEnd = srcArrayLength
 	} else {
-		relativeEnd = ToIntegerOrInfinity(agent, end)
+		_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+		if isAbrupt {
+			return rt
+		}
+		relativeEnd = _relativeEnd
 	}
 	var endIndex JSInt
 	if relativeEnd.IsNegInf() {
@@ -1717,7 +1785,7 @@ func typedArraySlice(agent *Agent, this Value, start, end Value) Value {
 	if countBytes > 0 {
 		taRecord = MakeTypedArrayWithBufferWitnessRecord(ta, SeqCst)
 		if IsTypedArrayOutOfBounds(taRecord) {
-			return agent.ThrowException(RangeError, "out of bounds")
+			return co.ThrowError(agent, RangeError, "out of bounds")
 		}
 
 		endIndex = endIndex.Min(TypedArrayLength(taRecord))
@@ -1750,7 +1818,8 @@ func typedArraySlice(agent *Agent, this Value, start, end Value) Value {
 			}
 		}
 	}
-	return A.ToValue()
+	co.value = A.ToValue()
+	return
 }
 
 func typedArraySome(agent *Agent, this Value, callback Value, thisArg Value) Value {
@@ -1827,7 +1896,7 @@ func typedArrayToSorted(agent *Agent, this Value, compareFn Value) Value {
 	return A.ToValue()
 }
 
-func typedArraySubarray(agent *Agent, this Value, begin, end Value) Value {
+func typedArraySubarray(agent *Agent, this Value, begin, end Value) (co CompletionValue) {
 	O := this
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
@@ -1839,7 +1908,10 @@ func typedArraySubarray(agent *Agent, this Value, begin, end Value) Value {
 	} else {
 		srcLength = TypedArrayLength(srcRecord)
 	}
-	relativeStart := ToIntegerOrInfinity(agent, begin)
+	relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, begin), co)
+	if isAbrupt {
+		return rt
+	}
 	var startIndex JSInt
 	if relativeStart.IsNegInf() {
 		startIndex = 0
@@ -1860,7 +1932,11 @@ func typedArraySubarray(agent *Agent, this Value, begin, end Value) Value {
 		if IsUndefinedOrNil(end) {
 			relativeEnd = srcLength
 		} else {
-			relativeEnd = ToIntegerOrInfinity(agent, end)
+			_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeEnd = _relativeEnd
 		}
 		var endIndex JSInt
 		if relativeEnd.IsNegInf() {
@@ -1874,7 +1950,7 @@ func typedArraySubarray(agent *Agent, this Value, begin, end Value) Value {
 		newLength := (endIndex - startIndex).Max(0)
 		argumentsList = []Value{buffer.ToValue(), beginByteOffset.ToValue(), newLength.ToValue()}
 	}
-	return TypedArraySpeciesCreate(agent, ta, argumentsList).ToValue()
+	return TypedArraySpeciesCreate(agent, ta, argumentsList).ToValue().ToCompletion()
 }
 
 func typedArrayWith(agent *Agent, this Value, index, value Value) (co CompletionValue) {
@@ -1882,7 +1958,10 @@ func typedArrayWith(agent *Agent, this Value, index, value Value) (co Completion
 	taRecord := ValidateTypedArray(agent, O, SeqCst)
 	ta := taRecord.TypedArray
 	length := TypedArrayLength(taRecord)
-	relativeIndex := ToIntegerOrInfinity(agent, index)
+	relativeIndex, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, index), co)
+	if isAbrupt {
+		return rt
+	}
 	var actualIndex JSInt
 	if relativeIndex >= 0 {
 		actualIndex = relativeIndex
@@ -1898,7 +1977,11 @@ func typedArrayWith(agent *Agent, this Value, index, value Value) (co Completion
 		}
 		numericValue = n
 	} else {
-		numericValue = value.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		numericValue = n
 	}
 	if !ta.IsValidIntegerIndex(agent, actualIndex) {
 		return co.ThrowError(agent, RangeError, "invalid index")

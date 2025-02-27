@@ -225,22 +225,27 @@ func (b *BaseValue) GetObject() (object ObjectType, ok bool) {
 
 // ToNumber
 // spec: 7.1.4
-func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
-	var co Completion[*NumberValue]
+func (b *BaseValue) ToNumber(agent *Agent) (co Completion[*NumberValue]) {
 	switch value := b.Value.(type) {
 	case *NumberValue:
-		return value
+		co.value = value
+		return
 	case *undefinedValue:
-		return NaNValue
+		co.value = NaNValue
+		return
 	case *nullValue:
-		return NewNumberValue(0)
+		co.value = NewNumberValue(0)
+		return
 	case *BooleanValue:
 		if value.Data {
-			return NewNumberValue(1)
+			co.value = NewNumberValue(1)
+			return
 		}
-		return NewNumberValue(0)
+		co.value = NewNumberValue(0)
+		return
 	case *StringValue:
-		return StringToNumber(value)
+		co.value = StringToNumber(value)
+		return
 	case *ObjectValue:
 		primValue, isAbrupt, rt := ReturnIfAbrupt(value.ToPrimitive(agent, PreferredTypeNumber), co)
 		if isAbrupt {
@@ -248,8 +253,7 @@ func (b *BaseValue) ToNumber(agent *Agent) *NumberValue {
 		}
 		return primValue.ToNumber(agent)
 	}
-	co.ThrowTypeError(agent, "TypeError")
-	return nil
+	return co.ThrowTypeError(agent, "TypeError")
 }
 
 func (b *BaseValue) TypeString() string {

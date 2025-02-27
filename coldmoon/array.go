@@ -27,7 +27,7 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
 	defineOwnProperty := func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
 		propertyKeyString, ok := p.(StringPropertyKey)
 		if ok && propertyKeyString.Value == "length" {
-			return ArraySetLength(agent, array, desc)
+			return ReturnAssertNormal(ArraySetLength(agent, array, desc))
 		}
 		index, err := p.GetIndex()
 		if err != nil {
@@ -117,19 +117,24 @@ func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) Ob
 	return constructorObject.Object.Construct([]Value{NewNumberValue(length.ToNumber())}, nil).value
 }
 
-// 10.4.2.4
-func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bool {
+// ArraySetLength
+// spec: 10.4.2.4
+func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) (co Completion[bool]) {
 	if desc.Value == nil {
-		return OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), desc)
+		co.value = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), desc)
+		return
 	}
 	newLenDesc := desc
 
 	newLenValue := desc.Value
 	newLen := JSInt(newLenValue.(*NumberValue).Data)
-	numberLen := newLenValue.ToNumber(agent)
+	numberLen, isAbrupt, rt := ReturnIfAbrupt(newLenValue.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
 
 	if JSInt(numberLen.Data) != newLen {
-		panic("RangeError")
+		return co.ThrowError(agent, RangeError, "Invalid array length")
 	}
 
 	newLenDesc.Value = NewNumberValue(newLen.ToNumber())
@@ -140,11 +145,13 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 	oldLen := JSInt(oldLenDesc.Value.(*NumberValue).Data)
 
 	if newLen >= oldLen {
-		return OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), newLenDesc)
+		co.value = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), newLenDesc)
+		return
 	}
 
 	if !desc.Writable {
-		return false
+		co.value = false
+		return
 	}
 
 	newWritable := false
@@ -157,7 +164,8 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 
 	succeeded := OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), newLenDesc)
 	if !succeeded {
-		return false
+		co.value = false
+		return
 	}
 
 	for k := oldLen - 1; k >= newLen; k-- {
@@ -170,7 +178,8 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 				})
 				Assert(succeeded)
 			}
-			return false
+			co.value = false
+			return
 		}
 	}
 
@@ -181,12 +190,14 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) bo
 		Assert(succeeded)
 	}
 
-	return true
+	co.value = true
+	return
 }
 
 func NewArrayConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		if newTarget == nil {
 			newTarget = agent.ActiveFunctionObject()
 		}
@@ -205,7 +216,11 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(0), length)
 				intLen = 1
 			} else {
-				intLen = ToUint32(agent, length).ToNumber()
+				n, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, length), co)
+				if isAbrupt {
+					return rt
+				}
+				intLen = n.ToNumber()
 			}
 
 			array.Set(
@@ -528,7 +543,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if length == 0 {
 			return FalseValue
 		}
-		n := ToIntegerOrInfinity(agent, fromIndex)
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+		if isAbrupt {
+			return rt
+		}
 		if fromIndex == UndefinedValue {
 			Assert(n == 0)
 		}
@@ -564,7 +582,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if length == 0 {
 			return NewNumberValue(-1)
 		}
-		n := ToIntegerOrInfinity(agent, fromIndex)
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+		if isAbrupt {
+			return rt
+		}
 		if fromIndex == UndefinedValue {
 			Assert(n == 0)
 		}
@@ -653,7 +674,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		var n JSInt
 		if len(args) > 1 {
-			n = ToIntegerOrInfinity(agent, fromIndex)
+			_n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+			if isAbrupt {
+				return rt
+			}
+			n = _n
 		} else {
 			n = length - 1
 		}
@@ -683,7 +708,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if isAbrupt {
 			panic(rt)
 		}
-		relativeIndex := ToIntegerOrInfinity(agent, index)
+		relativeIndex, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, index), co)
+		if isAbrupt {
+			return rt
+		}
 		k := relativeIndex
 		if k < 0 {
 			k += length
@@ -757,7 +785,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if isAbrupt {
 			panic(rt)
 		}
-		relativeIndex := ToIntegerOrInfinity(agent, index)
+		relativeIndex, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, index), co)
+		if isAbrupt {
+			return rt
+		}
 
 		actualIndex := relativeIndex
 		if actualIndex < 0 {
@@ -1037,7 +1068,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		start := args[0]
 		end := args[1]
 
-		relativeStart := ToIntegerOrInfinity(agent, start)
+		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+		if isAbrupt {
+			return rt
+		}
 
 		var k JSInt
 		if relativeStart.IsNegInf() {
@@ -1052,7 +1086,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if end == UndefinedValue {
 			relativeEnd = length
 		} else {
-			relativeEnd = ToIntegerOrInfinity(agent, end)
+			_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeEnd = _relativeEnd
 		}
 
 		var final JSInt
@@ -1091,7 +1129,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic(rt)
 		}
 
-		relativeStart := ToIntegerOrInfinity(agent, start)
+		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+		if isAbrupt {
+			return rt
+		}
 		k := relativeStart.Max(0)
 		if end == UndefinedValue {
 			end = NewNumberValue(length.ToNumber())
@@ -1100,7 +1141,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if end == UndefinedValue {
 			relativeEnd = length
 		} else {
-			relativeEnd = ToIntegerOrInfinity(agent, end)
+			_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeEnd = _relativeEnd
+
 		}
 
 		var final JSInt
@@ -1129,7 +1175,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic(rt)
 		}
 
-		relativeTarget := ToIntegerOrInfinity(agent, target)
+		relativeTarget, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, target), co)
+		if isAbrupt {
+			return rt
+		}
 		var to JSInt
 		if relativeTarget.IsNegInf() {
 			to = 0
@@ -1139,7 +1188,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			to = relativeTarget.Min(length)
 		}
 
-		relativeStart := ToIntegerOrInfinity(agent, start)
+		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+		if isAbrupt {
+			return rt
+		}
 		var from JSInt
 		if relativeStart.IsNegInf() {
 			from = 0
@@ -1153,7 +1205,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if end == UndefinedValue {
 			relativeEnd = length
 		} else {
-			relativeEnd = ToIntegerOrInfinity(agent, end)
+			_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeEnd = _relativeEnd
 		}
 
 		var final JSInt
@@ -1310,7 +1366,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		var depthNum JSInt = 1
 		if depth != UndefinedValue {
-			depthNum = ToIntegerOrInfinity(agent, depth)
+			_depthNum, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, depth), co)
+			if isAbrupt {
+				return rt
+			}
+			depthNum = _depthNum
 			if depthNum < 0 {
 				depthNum = 0
 			}
@@ -1352,7 +1412,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		var relativeStart JSInt = 0
 		if start != nil {
-			relativeStart = ToIntegerOrInfinity(agent, start)
+			_relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeStart = _relativeStart
 		}
 		var actualStart JSInt
 		if relativeStart.IsNegInf() {
@@ -1369,7 +1433,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		} else if deleteCount == nil {
 			actualDeleteCount = length - actualStart
 		} else {
-			actualDeleteCount = ToIntegerOrInfinity(agent, deleteCount)
+			_actualDeleteCount, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, deleteCount), co)
+			if isAbrupt {
+				return rt
+			}
+			actualDeleteCount = _actualDeleteCount
 		}
 
 		if float64(length+itemCount-actualDeleteCount) > POW_2_53-1 {
@@ -1444,7 +1512,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		var relativeStart JSInt = 0
 		if start != nil {
-			relativeStart = ToIntegerOrInfinity(agent, start)
+			_relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeStart = _relativeStart
 		}
 		var actualStart JSInt
 		if relativeStart.IsNegInf() {
@@ -1461,7 +1533,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		} else if skipCount == nil {
 			actualSkipCount = length - actualStart
 		} else {
-			sc := ToIntegerOrInfinity(agent, skipCount)
+			sc, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, skipCount), co)
+			if isAbrupt {
+				return rt
+			}
 			actualSkipCount = lo.Clamp(sc, 0, length-actualStart)
 		}
 
@@ -1640,11 +1715,14 @@ func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) (co Co
 		return
 	}
 	if compareFn != nil {
-		v := compareFn.
+		v, isAbrupt, rt := ReturnIfAbrupt(compareFn.
 			ToValue().
 			Call(agent, UndefinedValue, []Value{x, y}).
 			value.
-			ToNumber(agent)
+			ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		if v.IsNaN() {
 			co.value = 0
 			return

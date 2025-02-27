@@ -28,44 +28,72 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var abs BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Abs(n.Data.ToFloat())))
 	}
 	var ceil BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Ceil(n.Data.ToFloat())))
 	}
 	var floor BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Floor(float64(n.Data))))
 	}
 	var pow BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
 		y := argumentsList[1]
-		base := x.ToNumber(agent)
-		exponent := y.ToNumber(agent)
+		base, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
+		exponent, isAbrupt, rt := ReturnIfAbrupt(y.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Pow(float64(base.Data), float64(exponent.Data))))
 	}
 	var round BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Round(float64(n.Data))))
 	}
 	var trunc BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Trunc(float64(n.Data))))
 	}
 	var clz32 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		x := argumentsList[0]
-		n := ToUint32(agent, x)
+		n, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, x), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(bits.LeadingZeros32(uint32(n))))
 	}
 	var sign BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		if n.Data.IsNaN() {
 			return NewNumberValue(n.Data)
 		}
@@ -79,67 +107,106 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var acos BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Acos(float64(n.Data))))
 	}
 	var acosh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Acosh(float64(n.Data))))
 	}
 	var asin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Asin(float64(n.Data))))
 	}
 	var asinh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Asinh(float64(n.Data))))
 	}
 	var atan BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Atan(float64(n.Data))))
 	}
 	var atanh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Atanh(float64(n.Data))))
 	}
 	var cos BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Cos(float64(n.Data))))
 	}
 	var cosh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Cosh(float64(n.Data))))
 	}
 	var sin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Sin(float64(n.Data))))
 	}
 	var sinh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Sinh(float64(n.Data))))
 	}
 	var tan BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Tan(float64(n.Data))))
 	}
 	var tanh BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Tanh(float64(n.Data))))
 	}
 	var sqrt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		if n.Data < 0 {
 			return NaNValue
 		}
@@ -147,7 +214,10 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var cbrt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		if n.Data < 0 {
 			return NewNumberValue(JSNumber(-math.Cbrt(float64(-n.Data))))
 		}
@@ -155,17 +225,26 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var exp BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Exp(float64(n.Data))))
 	}
 	var expm1 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Expm1(float64(n.Data))))
 	}
 	var log BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		if n.Data < 0 {
 			return NaNValue
 		}
@@ -173,7 +252,10 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var log1p BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		if n.Data < -1 {
 			return NaNValue
 		}
@@ -181,7 +263,10 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var log10 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		if n.Data < 0 {
 			return NaNValue
 		}
@@ -189,7 +274,10 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var log2 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		x := argumentsList[0]
-		n := x.ToNumber(agent)
+		n, isAbrupt, rt := ReturnIfAbrupt(x.ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		if n.Data < 0 {
 			return NaNValue
 		}
@@ -197,8 +285,13 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var mathMax BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		coerced := make([]*NumberValue, len(argumentsList))
+		var co CompletionValue
 		for i, arg := range argumentsList {
-			coerced[i] = arg.ToNumber(agent)
+			n, isAbrupt, rt := ReturnIfAbrupt(arg.ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			coerced[i] = n
 		}
 
 		highest := NewNumberValue(JSNumber(math.Inf(-1)))
@@ -218,8 +311,13 @@ func NewMathObject(realm *Realm) ObjectType {
 	}
 	var mathMin BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		coerced := make([]*NumberValue, len(argumentsList))
+		var co CompletionValue
 		for i, arg := range argumentsList {
-			coerced[i] = arg.ToNumber(agent)
+			n, isAbrupt, rt := ReturnIfAbrupt(arg.ToNumber(agent), co)
+			if isAbrupt {
+				return rt
+			}
+			coerced[i] = n
 		}
 
 		lowest := NewNumberValue(JSNumber(math.Inf(1)))
@@ -238,17 +336,34 @@ func NewMathObject(realm *Realm) ObjectType {
 		return lowest
 	}
 	var atan2 BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		y := argumentsList[0].ToNumber(agent)
-		x := argumentsList[1].ToNumber(agent)
+		var co CompletionValue
+		y, isAbrupt, rt := ReturnIfAbrupt(argumentsList[0].ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		x, isAbrupt, rt := ReturnIfAbrupt(argumentsList[1].ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(math.Atan2(float64(y.Data), float64(x.Data))))
 	}
 	var fround BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		x := argumentsList[0].ToNumber(agent)
+		x, isAbrupt, rt := ReturnIfAbrupt(argumentsList[0].ToNumber(agent), CompletionValue{})
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(JSNumber(float32(x.Data)))
 	}
 	var imul BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		a := ToUint32(agent, argumentsList[0])
-		b := ToUint32(agent, argumentsList[1])
+		var co CompletionValue
+		a, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, argumentsList[0]), co)
+		if isAbrupt {
+			return rt
+		}
+		b, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, argumentsList[1]), co)
+		if isAbrupt {
+			return rt
+		}
 		product := a * b
 		return NewNumberValue(JSNumber(int32(product)))
 	}
