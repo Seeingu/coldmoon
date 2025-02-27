@@ -270,6 +270,84 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
 		Getter: getter,
 	})
+	// 23.1.2.1
+	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		items := args[0]
+		mapFn := pkg.SliceSafeGet(args, 1)
+		thisArg := pkg.SliceSafeGet(args, 2)
+
+		c := this
+		var mapping bool
+		if mapFn == nil || mapFn == UndefinedValue {
+			mapping = false
+		} else {
+			if !IsCallable(mapFn) {
+				panic("TypeError")
+			}
+			mapping = true
+		}
+		usingIterator := GetMethod(agent, items, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
+		if usingIterator != nil {
+			var a ObjectType
+			if IsConstructor(c) {
+				a = MustGetObject(c).Construct([]Value{NewNumberValue(0)}, nil).value
+			} else {
+				a = ArrayCreate(agent, 0, nil)
+			}
+
+			iteratorRecord := GetIteratorFromMethod(agent, items, usingIterator)
+
+			for k := JSInt(0); ; k++ {
+				pk := NewIntegerIndexPropertyKey(k)
+				next := iteratorRecord.IteratorStep()
+				if next == nil {
+					a.Set(NewStringPropertyKey("length"), NewNumberValue(k.ToNumber()), setThrowTypeThrow)
+					return a.ToValue()
+				}
+
+				nextValue := IteratorValue(next)
+				var mappedValue Value
+				if mapping {
+					mappedValue = ReturnAssertNormal(
+						mapFn.Call(thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())}),
+					)
+				} else {
+					mappedValue = nextValue
+				}
+				a.CreateDataPropertyOrThrow(pk, mappedValue)
+			}
+
+		}
+		arrayLike := ReturnAssertNormal(items.ToObject(agent))
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		var a ObjectType
+		if IsConstructor(c) {
+			a = MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil).value
+		} else {
+			a = ArrayCreate(agent, length, nil)
+		}
+
+		for k := JSInt(0); k < length; k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			kValue := arrayLike.Get(pk)
+			var mappedValue Value
+			if mapping {
+				mappedValue = ReturnAssertNormal(
+					mapFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber())}),
+				)
+			} else {
+				mappedValue = kValue
+			}
+			a.CreateDataPropertyOrThrow(pk, mappedValue)
+		}
+		a.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
+		return a.ToValue()
+	}
+	object.defineBuiltinFunction(realm, CMString("from"), from, 1)
 	BindPrototypeAndConstructor(realm.Intrinsics.ArrayPrototype, object)
 
 	return object
@@ -694,82 +772,6 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 		}
 		return array.ToValue()
-	}
-	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		items := args[0]
-		mapFn := args[1]
-		thisArg := args[2]
-
-		c := this
-		var mapping bool
-		if mapFn == nil || mapFn == UndefinedValue {
-			mapping = false
-		} else {
-			if !IsCallable(mapFn) {
-				panic("TypeError")
-			}
-			mapping = true
-		}
-		usingIterator := GetMethod(agent, items, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
-		if usingIterator != nil {
-			var a ObjectType
-			if IsConstructor(c) {
-				a = MustGetObject(c).Construct([]Value{NewNumberValue(0)}, nil).value
-			} else {
-				a = ArrayCreate(agent, 0, nil)
-			}
-
-			iteratorRecord := GetIteratorFromMethod(agent, items, usingIterator)
-
-			for k := JSInt(0); ; k++ {
-				pk := NewIntegerIndexPropertyKey(k)
-				next := iteratorRecord.IteratorStep()
-				if next == nil {
-					a.Set(NewStringPropertyKey("length"), NewNumberValue(k.ToNumber()), setThrowTypeThrow)
-					return a.ToValue()
-				}
-
-				nextValue := IteratorValue(next)
-				var mappedValue Value
-				if mapping {
-					mappedValue = ReturnAssertNormal(
-						mapFn.Call(thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())}),
-					)
-				} else {
-					mappedValue = nextValue
-				}
-				a.CreateDataPropertyOrThrow(pk, mappedValue)
-			}
-
-		}
-		arrayLike := ReturnAssertNormal(items.ToObject(agent))
-		var co CompletionValue
-		length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
-		if isAbrupt {
-			panic(rt)
-		}
-		var a ObjectType
-		if IsConstructor(c) {
-			a = MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil).value
-		} else {
-			a = ArrayCreate(agent, length, nil)
-		}
-
-		for k := JSInt(0); k < length; k++ {
-			pk := NewIntegerIndexPropertyKey(k)
-			kValue := arrayLike.Get(pk)
-			var mappedValue Value
-			if mapping {
-				mappedValue = ReturnAssertNormal(
-					mapFn.Call(thisArg, []Value{kValue, NewNumberValue(k.ToNumber())}),
-				)
-			} else {
-				mappedValue = kValue
-			}
-			a.CreateDataPropertyOrThrow(pk, mappedValue)
-		}
-		a.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
-		return a.ToValue()
 	}
 	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := this.ToObject(agent).value
@@ -1503,7 +1505,6 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("every"), every, 1)
 	object.defineBuiltinFunction(realm, CMString("some"), some, 1)
 	object.defineBuiltinFunction(realm, CMString("with"), with, 2)
-	object.defineBuiltinFunction(realm, CMString("from"), from, 1)
 	object.defineBuiltinFunction(realm, CMString("entries"), entries, 0)
 	object.defineBuiltinFunction(realm, CMString("keys"), keys, 0)
 	object.defineBuiltinFunction(realm, CMString("values"), values, 0)
