@@ -101,8 +101,7 @@ func (v *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord
 // spec: 13.3.3
 func (v *VM) EvaluatePropertyAccessWithExpressionKey(
 	baseValue Value, expression Expression, strict bool,
-) *ReferenceRecord {
-	var co Completion[*ReferenceRecord]
+) (co Completion[*ReferenceRecord]) {
 	propertyNameReference, isAbrupt, rt := ReturnIfAbrupt(expression.Evaluation(v), co)
 	if isAbrupt {
 		panic(rt)
@@ -112,7 +111,8 @@ func (v *VM) EvaluatePropertyAccessWithExpressionKey(
 		panic(rt)
 	}
 	propertyKey := ToPropertyKey(v.agent, propertyNameValue)
-	return NewReferenceRecord(NewReferenceRecordBaseValue(baseValue), propertyKey.ToReference(), strict, UndefinedValue)
+	co.value = NewReferenceRecord(NewReferenceRecordBaseValue(baseValue), propertyKey.ToReference(), strict, UndefinedValue)
+	return
 }
 
 // EvaluatePropertyAccessWithIdentifierKey

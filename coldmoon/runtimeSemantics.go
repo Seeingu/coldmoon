@@ -34,9 +34,10 @@ type RuntimeSemanticsPropertyDefinitionEvaluation interface {
 	PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue)
 }
 
-// 13.3.8.1
+// RuntimeSemanticsArgumentListEvaluation
+// spec: 13.3.8.1
 type RuntimeSemanticsArgumentListEvaluation interface {
-	ArgumentListEvaluation(vm *VM) []Value
+	ArgumentListEvaluation(vm *VM) (co Completion[[]Value])
 }
 
 // RuntimeSemanticsDestructuringAssignmentEvaluation

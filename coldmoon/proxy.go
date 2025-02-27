@@ -335,7 +335,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("ownKeys"))
+		trap := GetMethod(agent, h.ToValue(), NewStringPropertyKey("ownKeys"))
 		if trap == nil {
 			return t.InternalMethods().OwnPropertyKeys(t)
 		}
@@ -345,7 +345,11 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			[]Value{(t).ToValue()},
 		).value
 
-		elements := CreateListFromArrayLike(agent, trapResultArray)
+		var co CompletionValue
+		elements, isAbrupt, rt := ReturnIfAbrupt(CreateListFromArrayLike(agent, trapResultArray), co)
+		if isAbrupt {
+			panic(rt)
+		}
 		var trapResult []PropertyKey
 		uniquePropertyKeys := make(map[PropertyKey]struct{})
 		for _, element := range elements {

@@ -1206,9 +1206,11 @@ func (m *MemberExpression) Evaluation(vm *VM) (co CompletionValue) {
 	switch prop := m.Property.(type) {
 	case *ASTPropertyExpression:
 		// TODO: check source text is strict
-		return NewReferenceRecordValue(
-			vm.EvaluatePropertyAccessWithExpressionKey(baseValue, prop.Expression, strict),
-		).ToCompletion()
+		r, isAbrupt, rt := ReturnIfAbrupt(vm.EvaluatePropertyAccessWithExpressionKey(baseValue, prop.Expression, strict), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewReferenceRecordValue(r).ToCompletion()
 	case *ASTPropertyIdentifier:
 		return NewReferenceRecordValue(
 			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, prop.Identifier, strict),
@@ -1529,9 +1531,11 @@ func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM, baseValue Value, ba
 		return vm.EvaluateCall(baseValue, baseReference, arguments.value.(*ListValue).Values, tailCall)
 	} else if o.astIsExpression() {
 		strict := o.isStrict()
-		return NewReferenceRecordValue(
-			vm.EvaluatePropertyAccessWithExpressionKey(baseValue, o.Expression, strict),
-		).ToCompletion()
+		r, isAbrupt, rt := ReturnIfAbrupt(vm.EvaluatePropertyAccessWithExpressionKey(baseValue, o.Expression, strict), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewReferenceRecordValue(r).ToCompletion()
 	} else if o.astIsIdentifier() {
 		strict := o.isStrict()
 		return NewReferenceRecordValue(
@@ -1638,10 +1642,12 @@ func (e *SuperCall) Evaluation(vm *VM) (co CompletionValue) {
 	newTarget := agent.GetNewTarget()
 	// alias of func
 	f := agent.GetSuperConstructor()
-	argList := e.Arguments.ArgumentListEvaluation(vm)
+	argList, isAbrupt, rt := ReturnIfAbrupt(e.Arguments.ArgumentListEvaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
 	if !IsConstructor(f) {
-		co.err = agent.ThrowTypeError("SuperCall: not a constructor")
-		return
+		return co.ThrowTypeError(agent, "SuperCall: not a constructor")
 	}
 	result := MustGetObject(f).Construct(argList, newTarget).value
 	thisER := agent.GetThisEnvironment().(*FunctionEnvironment)
@@ -2152,29 +2158,38 @@ func (e *NewExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-// 13.3.5.1
+// Evaluation
+// spec: 13.3.5.1
 func (e *NewExpression) Evaluation(vm *VM) CompletionValue {
-	return e.EvaluateNew(vm).ToCompletion()
+	return e.EvaluateNew(vm)
 }
 
-// 13.3.5.1.1
-func (e *NewExpression) EvaluateNew(vm *VM) Value {
-	var co CompletionValue
+// EvaluateNew
+// spec: 13.3.5.1.1
+func (e *NewExpression) EvaluateNew(vm *VM) (co CompletionValue) {
 	constructor, _, isAbrupt, rt := vm.EvalAndGetValue(e.Callee, co)
 	if isAbrupt {
-		panic(rt)
+		return rt
 	}
 	var argList []Value
 	if len(e.Arguments) == 0 {
 		argList = []Value{}
 	} else {
-		argList = e.Arguments.ArgumentListEvaluation(vm)
+		list, isAbrupt, rt := ReturnIfAbrupt(e.Arguments.ArgumentListEvaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		argList = list
 	}
 	if !IsConstructor(constructor) {
-		return vm.agent.ThrowTypeError("constructor is not a constructor")
+		return co.ThrowTypeError(vm.agent, "constructor is not a constructor")
 	}
 	o := MustGetObject(constructor)
-	return o.Construct(argList, nil).value.ToValue()
+	v, isAbrupt, rt := ReturnIfAbrupt(o.Construct(argList, nil), co)
+	if isAbrupt {
+		return rt
+	}
+	return v.ToValue().ToCompletion()
 }
 
 func (e *NewExpression) String() string {
@@ -2266,8 +2281,7 @@ func (b *ExpressionBinaryExpression) AssignmentTargetType() AssignmentTargetType
 
 // EvaluateStringOrNumericBinaryExpression
 // spec: 13.15.4
-func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM) CompletionValue {
-	var co CompletionValue
+func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM) (co CompletionValue) {
 	lval, _, isAbrupt, rt := vm.EvalAndGetValue(b.Left, co)
 	if isAbrupt {
 		return rt
@@ -2281,7 +2295,7 @@ func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm 
 }
 
 func (b *ExpressionBinaryExpression) Evaluation(vm *VM) CompletionValue {
-	return b.EvaluateStringOrNumericBinaryExpression(vm).ToCompletion()
+	return b.EvaluateStringOrNumericBinaryExpression(vm)
 }
 
 func (b *ExpressionBinaryExpression) String() string {
@@ -2881,9 +2895,9 @@ func (a Arguments) isEmpty() bool {
 	return len(a) == 0
 }
 
-func (a Arguments) ArgumentListEvaluation(vm *VM) []Value {
+func (a Arguments) ArgumentListEvaluation(vm *VM) (co Completion[[]Value]) {
 	if a.isEmpty() {
-		return []Value{}
+		return
 	}
 	if a.astIsAssignmentExpression() {
 		// TODO: handle spread
@@ -2892,11 +2906,24 @@ func (a Arguments) ArgumentListEvaluation(vm *VM) []Value {
 		}
 		ref := a[0].Evaluation(vm)
 		arg := ref.value.GetValue(vm.agent).value
-		return []Value{arg}
+		co.value = []Value{arg}
+		return
 	} else {
 		// TODO: handle spread
-		last := a[len(a)-1].Evaluation(vm)
-		return append(a[:len(a)-1].ArgumentListEvaluation(vm), last.value.GetValue(vm.agent).value)
+		last, isAbrupt, rt := ReturnIfAbrupt(a[len(a)-1].Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		v, isAbrupt, rt := ReturnIfAbrupt(last.GetValue(vm.agent), co)
+		if isAbrupt {
+			return rt
+		}
+		list, isAbrupt, rt := ReturnIfAbrupt(a[:len(a)-1].ArgumentListEvaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = append(list, v)
+		return
 	}
 }
 

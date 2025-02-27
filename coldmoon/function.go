@@ -111,11 +111,15 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		}
 
 		if argArray == UndefinedValue || argArray == NullValue {
-			return ReturnAssertNormal(fun.Call(agent, thisArg, []Value{}))
+			return fun.Call(agent, thisArg, []Value{})
 		}
 
-		argList := CreateListFromArrayLike(realm.Agent, argArray)
-		return ReturnAssertNormal(fun.Call(agent, thisArg, argList))
+		var co CompletionValue
+		argList, isAbrupt, rt := ReturnIfAbrupt(CreateListFromArrayLike(realm.Agent, argArray), co)
+		if isAbrupt {
+			return rt
+		}
+		return fun.Call(agent, thisArg, argList)
 	}
 	f.defineBuiltinFunction(realm, CMString("apply"), apply, 2)
 }

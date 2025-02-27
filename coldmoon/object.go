@@ -190,7 +190,8 @@ func (o *Object) Get(key PropertyKey) Value {
 	return ReturnAssertNormal(r)
 }
 
-// 7.3.4
+// Set
+// spec: 7.3.4
 func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) {
 	success := o.InternalMethods().Set(o.Ref(), key, value, (o).ToValue())
 	if !success && throw == setThrowTypeThrow {

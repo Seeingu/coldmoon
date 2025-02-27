@@ -585,30 +585,32 @@ func CreateArrayFromList(agent *Agent, elements []Value) ObjectType {
 	return array
 }
 
-// TODO(BM): returns completion
 // CreateListFromArrayLike
 // spec: 7.3.20
-func CreateListFromArrayLike(agent *Agent, self Value) []Value {
-	var co Completion[[]Value]
+func CreateListFromArrayLike(agent *Agent, self Value) (co Completion[[]Value]) {
 	// TODO: element types
 	objectValue, ok := self.(*ObjectValue)
 	if !ok {
-		panic(co.ThrowTypeError(agent, "TypeError"))
+		return co.ThrowTypeError(agent, "TypeError")
 	}
 
 	length, isAbrupt, rt := ReturnIfAbrupt(objectValue.Object.LengthOfArrayLike(), co)
 	if isAbrupt {
-		panic(rt)
+		return rt
 	}
 
 	var list []Value
 	for i := JSInt(0); i < length; i++ {
 		index := NewIntegerIndexPropertyKey(i)
-		next := ReturnAssertNormal(GetV(agent, self, index))
+		next, isAbrupt, rt := ReturnIfAbrupt(GetV(agent, self, index), co)
+		if isAbrupt {
+			return rt
+		}
 		list = append(list, next)
 	}
 
-	return list
+	co.value = list
+	return
 }
 
 // ValueInvoke Invoke

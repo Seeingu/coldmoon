@@ -15,31 +15,38 @@ func NewReflectObject(realm *Realm) ObjectType {
 		thisArgument := arguments[1]
 		argumentsList := arguments[2]
 
+		var co CompletionValue
 		if !IsCallable(target) {
-			return agent.ThrowTypeError("Reflect.apply called on non-callable")
+			return co.ThrowTypeError(agent, "Reflect.apply called on non-callable")
 		}
 
-		args := CreateListFromArrayLike(agent, argumentsList)
+		args, isAbrupt, rt := ReturnIfAbrupt(CreateListFromArrayLike(agent, argumentsList), co)
+		if isAbrupt {
+			return rt
+		}
 
-		return ReturnAssertNormal(target.Call(agent, thisArgument, args))
+		return target.Call(agent, thisArgument, args)
 	}
 	var construct BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]
 		argumentsList := arguments[1]
 		newTarget := arguments[2]
 
+		var co CompletionValue
 		if !IsConstructor(target) {
-			return agent.ThrowTypeError("Reflect.construct called on non-constructor")
+			return co.ThrowTypeError(agent, "Reflect.construct called on non-constructor")
 		}
 
 		if len(arguments) <= 2 {
 			newTarget = target
 		} else if !IsConstructor(newTarget) {
-			return agent.ThrowTypeError("Reflect.construct second argument is not a constructor")
+			return co.ThrowTypeError(agent, "Reflect.construct second argument is not a constructor")
 		}
 
-		args := CreateListFromArrayLike(agent, argumentsList)
-
+		args, isAbrupt, rt := ReturnIfAbrupt(CreateListFromArrayLike(agent, argumentsList), co)
+		if isAbrupt {
+			return rt
+		}
 		return ObjectConstruct(target.(*ObjectValue).Object, args, newTarget.(*ObjectValue).Object).value.ToValue()
 	}
 	var defineProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
