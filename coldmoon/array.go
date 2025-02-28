@@ -324,9 +324,14 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 				nextValue := IteratorValue(next)
 				var mappedValue Value
 				if mapping {
-					mappedValue = ReturnAssertNormal(
+					_mappedValue, isAbrupt, rt := ReturnIfAbrupt(
 						mapFn.Call(agent, thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())}),
+						co,
 					)
+					if isAbrupt {
+						return rt
+					}
+					mappedValue = _mappedValue
 				} else {
 					mappedValue = nextValue
 				}
@@ -358,9 +363,14 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 			kValue := arrayLike.Get(pk)
 			var mappedValue Value
 			if mapping {
-				mappedValue = ReturnAssertNormal(
+				_mappedValue, isAbrupt, rt := ReturnIfAbrupt(
 					mapFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber())}),
+					co,
 				)
+				if isAbrupt {
+					return rt
+				}
+				mappedValue = _mappedValue
 			} else {
 				mappedValue = kValue
 			}

@@ -69,7 +69,7 @@ func (r *ReferenceRecord) IsPrivateReference() bool {
 // spec: 6.2.5.5
 func (r *ReferenceRecord) GetValue(agent *Agent) (co CompletionValue) {
 	if r.IsUnresolvableReference() {
-		return co.ThrowError(agent, ReferenceError, "Unresolvable reference")
+		return co.ThrowError(agent, ReferenceError, "Unresolvable reference: "+r.ReferencedName.String)
 	}
 	if r.IsPropertyReference() {
 		value, _ := r.Base.Value()

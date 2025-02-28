@@ -108,12 +108,12 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) (co
 	return UndefinedValue.ToCompletion()
 }
 
-// 10.2.1.1
+// PrepareForOrdinaryCall
+// spec: 10.2.1.1
 func PrepareForOrdinaryCall(agent *Agent, function *ECMAScriptFunction, newTarget ObjectType) *ExecutionContext {
 	localEnv := NewFunctionEnvironment(function, newTarget)
-
 	calleeContext := &ExecutionContext{
-		Function:       function.Object,
+		Function:       function,
 		Realm:          function.Realm,
 		ScriptOrModule: function.ScriptOrModule,
 		ECMAScriptCode: &ExecutionContextAdditionalState{
@@ -122,6 +122,7 @@ func PrepareForOrdinaryCall(agent *Agent, function *ECMAScriptFunction, newTarge
 			PrivateEnvironment:  function.PrivateEnvironment,
 		},
 	}
+
 	agent.ExecutionContextStack.Push(calleeContext)
 	return calleeContext
 }

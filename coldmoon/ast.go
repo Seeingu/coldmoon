@@ -918,6 +918,10 @@ type PropertyNameLiteralString struct {
 	StringLiteral *StringLiteral
 }
 
+func (p *PropertyNameLiteralString) Evaluation(vm *VM) (co CompletionValue) {
+	return p.StringLiteral.Evaluation(vm)
+}
+
 func (p *PropertyNameLiteralString) LiteralString() string {
 	return p.StringLiteral.Value
 }
@@ -3175,10 +3179,14 @@ func (v *VariableDeclarationList) VarScopedDeclarations() (l []*VariableDeclarat
 	return v.Items
 }
 
-func (v *VariableDeclarationList) Evaluation(vm *VM) CompletionValue {
+func (v *VariableDeclarationList) Evaluation(vm *VM) (co CompletionValue) {
 	var lastValue Value
 	for _, item := range v.Items {
-		lastValue = item.Evaluation(vm).value
+		_lastValue, isAbrupt, rt := ReturnIfAbrupt(item.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		lastValue = _lastValue
 	}
 	if lastValue == nil {
 		return UndefinedValue.ToCompletion()
@@ -5756,7 +5764,8 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 func (f *FunctionDeclaration) Evaluation(vm *VM) CompletionValue {
 	// TODO(BM): match spec
 	realm := vm.agent.CurrentRealm()
-	env := realm.GlobalEnv
+	// TODO(XXX): is it lexical env?
+	env := vm.RunningLexicalEnvironment()
 	function := f.instantiateOrdinaryFunctionObject(vm.agent, env, nil)
 	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), function.ToValue(), setThrowTypeIgnore)
 	// return EMPTY
