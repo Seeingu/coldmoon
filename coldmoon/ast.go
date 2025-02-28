@@ -630,6 +630,18 @@ type PropertyDefinitionIdentifierReference struct {
 	IdentifierReference *IdentifierReference
 }
 
+var _ PropertyDefinition = (*PropertyDefinitionIdentifierReference)(nil)
+
+func (p *PropertyDefinitionIdentifierReference) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
+	propName := p.IdentifierReference.Identifier
+	propValue, _, isAbrupt, rt := vm.EvalAndGetValue(p.IdentifierReference, co)
+	if isAbrupt {
+		return rt
+	}
+	Assert(obj.CreateDataPropertyOrThrow(NewStringPropertyKey(propName), propValue))
+	return
+}
+
 func (p *PropertyDefinitionIdentifierReference) String() string {
 	return p.IdentifierReference.String()
 }

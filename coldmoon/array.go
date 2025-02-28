@@ -390,18 +390,18 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	})
 
 	var arrayMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		callbackFn := args[0]
-		thisArg := args[1]
+		thisArg := pkg.SliceSafeGet(args, 1)
 
 		array := MustGetObject(this)
-		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		if !IsCallable(callbackFn) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "map: callback is not callable")
 		}
 
 		A := ArraySpeciesCreate(agent, array, length)
