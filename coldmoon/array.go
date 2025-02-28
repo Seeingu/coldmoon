@@ -287,6 +287,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	})
 	// 23.1.2.1
 	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		items := args[0]
 		mapFn := pkg.SliceSafeGet(args, 1)
 		thisArg := pkg.SliceSafeGet(args, 2)
@@ -297,7 +298,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 			mapping = false
 		} else {
 			if !IsCallable(mapFn) {
-				panic("TypeError")
+				return co.ThrowTypeError(agent, "mapFn is not callable")
 			}
 			mapping = true
 		}
@@ -334,14 +335,20 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 
 		}
 		arrayLike := ReturnAssertNormal(items.ToObject(agent))
-		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
 		if isAbrupt {
 			return rt
 		}
 		var a ObjectType
 		if IsConstructor(c) {
-			a = MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil).value
+			_a, isAbrupt, rt := ReturnIfAbrupt(
+				MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			a = _a
 		} else {
 			a = ArrayCreate(agent, length, nil)
 		}

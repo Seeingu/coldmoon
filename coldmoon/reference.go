@@ -73,7 +73,10 @@ func (r *ReferenceRecord) GetValue(agent *Agent) (co CompletionValue) {
 	}
 	if r.IsPropertyReference() {
 		value, _ := r.Base.Value()
-		baseObj := value.ToObject(agent).value
+		baseObj, isAbrupt, rt := ReturnIfAbrupt(value.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		if r.IsPrivateReference() {
 			return baseObj.PrivateGet(*r.ReferencedName.PrivateName)
 		}
