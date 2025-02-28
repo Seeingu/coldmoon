@@ -1919,9 +1919,23 @@ func (p *Parser) arguments() Arguments {
 
 func (p *Parser) arrowFunction() *ArrowFunction {
 	startOffset := p.tokenizer.Index
-	p.tokenizer.Match(TLeftParen)
-	params := p.formalParameters()
-	p.tokenizer.MustMatch(TRightParen)
+	var params *FormalParameters
+	if p.tokenizer.Match(TLeftParen) {
+		params = p.formalParameters()
+		p.tokenizer.MustMatch(TRightParen)
+	} else {
+		var items []FormalParametersItem
+		bindingElement, ok := p.bindingElement()
+		if !ok {
+			panic("arrowFunction: expected bindingElement")
+		}
+		items = append(items, &FormalParameter{
+			BindingElement: bindingElement,
+		})
+		params = &FormalParameters{
+			Items: items,
+		}
+	}
 	p.tokenizer.MustMatch(TArrow)
 	p.noLineTerminatorHere()
 	var body *FunctionBody
@@ -1992,6 +2006,11 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 	case TLeftBrace:
 		return p.objectLiteral()
 	case TIdentifier:
+		if p.tokenizer.NextToken.Type == TArrow {
+			if e, ok := parserRecoverOk(p, p.arrowFunction); ok {
+				return e
+			}
+		}
 		return p.identifierReference()
 	case TLeftParen:
 		if e, ok := parserRecoverOk(p, p.arrowFunction); ok {
