@@ -46,12 +46,7 @@ func EvaluateModule(filePath string, realm *Realm) {
 		result = p.PromiseResult
 	}
 	fatalOnError(result)
-	for _, job := range agent.QueuedPromiseJobs.Data() {
-		previousRealm := agent.RunningExecutionContext().Realm
-		agent.RunningExecutionContext().Realm = job.realm
-		job.job.Fun(job.job.Captures)
-		agent.RunningExecutionContext().Realm = previousRealm
-	}
+	agent.RunJobs()
 }
 
 func Evaluate(source string, realm *Realm) {
@@ -63,10 +58,5 @@ func Evaluate(source string, realm *Realm) {
 			panic(e)
 		}
 	}
-	for _, job := range agent.QueuedPromiseJobs.Data() {
-		previousRealm := agent.RunningExecutionContext().Realm
-		agent.RunningExecutionContext().Realm = job.realm
-		job.job.Fun(job.job.Captures)
-		agent.RunningExecutionContext().Realm = previousRealm
-	}
+	agent.RunJobs()
 }

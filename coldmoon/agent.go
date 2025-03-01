@@ -57,6 +57,15 @@ func (a *Agent) RunningExecutionContext() *ExecutionContext {
 	return a.ExecutionContextStack.Peek()
 }
 
+func (a *Agent) RunJobs() {
+	for _, job := range a.QueuedPromiseJobs.Data() {
+		previousRealm := a.RunningExecutionContext().Realm
+		a.RunningExecutionContext().Realm = job.realm
+		job.job.Fun(job.job.Captures)
+		a.RunningExecutionContext().Realm = previousRealm
+	}
+}
+
 func (a *Agent) CurrentRealm() *Realm {
 	return a.RunningExecutionContext().Realm
 }
