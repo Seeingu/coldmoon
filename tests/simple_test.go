@@ -32,8 +32,7 @@ func testModule(t *testing.T, f string) {
 }
 
 func TestBaselineNew(t *testing.T) {
-	skipped := []string{
-		// After refactor template literal
+	sourceTexts := []string{
 		fmt.Sprintf(
 			`
 const a = 5;
@@ -41,16 +40,12 @@ const b = 10;
 assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 'Fifteen is 15 and\nnot 20.');
 `, "`"),
-	}
-	_ = skipped
-
-	sourceTexts := []string{
 		`
 let a = 1
 setTimeout(() => {
     a = 2
     assert(a === 2)
-}, 1000);
+}, 0);
 a=3`,
 		`2 == 1;
 2 > 1;
