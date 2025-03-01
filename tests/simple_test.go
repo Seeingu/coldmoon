@@ -14,9 +14,10 @@ import (
 func testSource(t *testing.T, source string) {
 	agent := NewAgent()
 	InitializeConstants()
+	el := cr.NewEventLoop(agent)
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	cr.RegisterTerminalRuntime(realm)
+	cr.RegisterTerminalRuntime(el, realm)
 	Evaluate(source, realm)
 }
 
@@ -25,7 +26,8 @@ func testModule(t *testing.T, f string) {
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	cr.RegisterTerminalRuntime(realm)
+	el := cr.NewEventLoop(agent)
+	cr.RegisterTerminalRuntime(el, realm)
 	EvaluateModule(resolveTestdataPath(f), realm)
 }
 
@@ -43,6 +45,13 @@ assertEqual(%[1]sFifteen is ${a + b} and\nnot ${2 * a + b}.%[1]s,
 	_ = skipped
 
 	sourceTexts := []string{
+		`
+let a = 1
+setTimeout(() => {
+    a = 2
+    assert(a === 2)
+}, 1000);
+a=3`,
 		`2 == 1;
 2 > 1;
 false || 1;
