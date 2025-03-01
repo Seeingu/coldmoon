@@ -1178,7 +1178,13 @@ func SameObject(o1, o2 ObjectType) bool {
 // MARK: - Internal
 
 func (o *Object) String() string {
-	return fmt.Sprintf("Object[%s]", o.typeName)
+	var sb string = "keys: "
+	for key := range o.data.propertyStorage.Properties {
+		if k, ok := key.(StringPropertyKey); ok {
+			sb += fmt.Sprintf("%s,", k.Value)
+		}
+	}
+	return fmt.Sprintf("Object[%s]{%s}", o.typeName, sb)
 }
 
 func (o *Object) defineBuiltinProperty(name PropertyConvertable, desc *PropertyDescriptor) {
