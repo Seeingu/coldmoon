@@ -25,6 +25,11 @@ func MakeTest262Path(p string) string {
 	return path.Join(test262Path, p)
 }
 
+func GetTest262Path() string {
+	initPath()
+	return test262Path
+}
+
 func RegisterTest262Runtime(realm *coldmoon.Realm) {
 	global := realm.GlobalObject
 	console := CreateConsole(realm)

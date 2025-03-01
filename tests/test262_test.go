@@ -44,6 +44,7 @@ var supportFeatures = []string{
 
 func Test262WithCoverage(t *testing.T) {
 	passedFiles := loadPassedResultFiles()
+	skipped := getSkippedFiles()
 	agent := NewAgent()
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
@@ -51,7 +52,9 @@ func Test262WithCoverage(t *testing.T) {
 	runtime.RegisterTest262Runtime(realm)
 
 	var passed []string
-	var failed []string
+	var failedLog strings.Builder
+	var failedCount int
+	var skippedCount int
 	var visitor fs.WalkDirFunc = func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -59,16 +62,25 @@ func Test262WithCoverage(t *testing.T) {
 		if d.IsDir() {
 			return nil
 		}
+		if _, ok := skipped[path]; ok {
+			// fmt.Println("Skip testing file: ", path)
+			skippedCount++
+			return nil
+		}
 		if _, ok := passedFiles[path]; ok {
-			fmt.Println("Skip testing file: ", path)
+			// fmt.Println("Skip testing passed file: ", path)
 			passed = append(passed, path)
+			skippedCount++
 			return nil
 		}
 		fmt.Println("Testing file: ", path)
 		err = evaluate(path, realm)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("Failed : %v", err))
-			failed = append(failed, path)
+			failedCount++
+			msg := fmt.Sprintf("Failed : %v", err)
+			fmt.Println(msg)
+			failedLog.WriteString(
+				fmt.Sprintf(`%s, %s`, path, msg) + "\n")
 		} else {
 			passed = append(passed, path)
 		}
@@ -82,8 +94,8 @@ func Test262WithCoverage(t *testing.T) {
 		}
 	}
 	writePassedResultFiles(passed)
-	writeFailedResultFiles(failed)
-	coverage := float64(len(passed)) / float64(len(passed)+len(failed))
+	writeFailedLog(failedLog)
+	coverage := float64(len(passed)) / float64(len(passed)+failedCount)
 	fmt.Printf("Coverage: %.2f%%\n", coverage*100)
 	if coverage < expectedCoverage {
 		t.Errorf("Coverage is less than expected: %.2f%% < %.2f%%", coverage*100, expectedCoverage*100)
@@ -97,6 +109,11 @@ const (
 	FailedResultsFile = ".failed.txt"
 )
 
+var skippedFiles = []string{
+	// global this reference is not supported
+	runtime.MakeTest262Path("test/built-ins/Array/from/elements-deleted-after.js"),
+}
+
 func loadResultFile(fileName string) map[string]bool {
 	m := make(map[string]bool)
 	_, err := os.Stat(fileName)
@@ -105,6 +122,14 @@ func loadResultFile(fileName string) map[string]bool {
 	}
 	content := pkg.MustReadFile(fileName)
 	for _, f := range strings.Split(content, "\n") {
+		m[f] = true
+	}
+	return m
+}
+
+func getSkippedFiles() map[string]bool {
+	m := make(map[string]bool)
+	for _, f := range skippedFiles {
 		m[f] = true
 	}
 	return m
@@ -123,9 +148,8 @@ func writePassedResultFiles(files []string) {
 	os.WriteFile(PassedResultsFile, []byte(content), 0o644)
 }
 
-func writeFailedResultFiles(files []string) {
-	content := strings.Join(files, "\n")
-	os.WriteFile(FailedResultsFile, []byte(content), 0o644)
+func writeFailedLog(log strings.Builder) {
+	os.WriteFile(FailedResultsFile, []byte(log.String()), 0o644)
 }
 
 func evaluate(fileName string, realm *Realm) (err error) {
