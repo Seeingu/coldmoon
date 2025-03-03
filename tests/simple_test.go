@@ -33,6 +33,33 @@ func testModule(t *testing.T, f string) {
 
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
+		`
+const p = new Promise((res, rej) => {
+    res(1);
+});
+
+async function asyncReturn() {
+    return p;
+}
+
+function basicReturn() {
+    return Promise.resolve(p);
+}
+
+assertEqual(p === basicReturn(), true); // true
+assertEqual(p === asyncReturn(), false); // false
+`,
+		`
+async function b() {
+    return 'b'
+}
+
+async function asyncCall() {
+    const result = await b()
+    assertEqual(result, 'b')
+}
+asyncCall();
+`,
 		fmt.Sprintf(
 			`
 const a = 5;
@@ -64,8 +91,6 @@ const B = class {}`,
 function* b() {
 }
 async function* c() {
-}
-async function d() {
 }
 const e = async () => {
 }`,
