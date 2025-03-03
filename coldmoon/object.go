@@ -14,6 +14,7 @@ const (
 )
 
 type Data struct {
+	id                uint64
 	prototype         ObjectType
 	extensible        bool
 	internalSlotNames map[string]any
@@ -37,6 +38,10 @@ func (o *Object) ToValue() Value {
 	return NewValueFromObject(o.Ref())
 }
 
+func (o *Object) GetId() uint64 {
+	return o.data.id
+}
+
 // Ref returns the reference of the object
 // If the object does not have a reference, it returns itself
 func (o *Object) Ref() ObjectType {
@@ -51,6 +56,7 @@ func NewObject(agent *Agent, prototype ObjectType, typeName string) *Object {
 	o := &Object{
 		typeName: typeName,
 		data: &Data{
+			id:                agent.UniqueObjectId(),
 			agent:             agent,
 			prototype:         prototype,
 			extensible:        true,

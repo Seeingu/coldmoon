@@ -49,6 +49,7 @@ type ObjectType interface {
 	String() string
 	Ref() ObjectType
 	IsOrdinary() bool
+	GetId() uint64
 	Call(this Value, argumentsList ArgumentsList) CompletionValue
 	// defineBuiltinProperty is an alias of DefinePropertyOrThrow
 	// used to define internal property

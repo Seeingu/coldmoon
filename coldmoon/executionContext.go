@@ -18,4 +18,17 @@ type ExecutionContext struct {
 	Function       ObjectType
 	ECMAScriptCode *ExecutionContextAdditionalState
 	Generator      *GeneratorObject
+	VM             *VM
+	ch             chan struct{}
+	yieldCh        chan struct{}
+	isSuspended    bool
+	Result         CompletionValue
+}
+
+func (e *ExecutionContext) Resume() {
+	e.ch <- struct{}{}
+}
+
+func (e *ExecutionContext) Suspend() {
+	<-e.ch
 }

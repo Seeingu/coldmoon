@@ -1,6 +1,8 @@
 package coldmoon
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ScriptRecord struct {
 	ScriptOrModule
@@ -45,6 +47,7 @@ func (s *ScriptRecord) Evaluate() Value {
 		Function:       nil,
 		Realm:          s.Realm,
 		ScriptOrModule: s,
+		ch:             make(chan struct{}),
 		ECMAScriptCode: &ExecutionContextAdditionalState{
 			VariableEnvironment: globalEnv,
 			LexicalEnvironment:  globalEnv,

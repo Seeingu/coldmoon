@@ -4240,9 +4240,6 @@ func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (co Comp
 			return V.ToCompletion()
 		}
 		stmtResult := s.Body.Evaluation(vm)
-		if vm.isYield {
-			return stmtResult
-		}
 		if !LoopContinues(stmtResult, labelSet) {
 			return UpdateEmpty(stmtResult, V)
 		}
@@ -5881,28 +5878,9 @@ func (s StatementList) ContainsDirective(directive string) bool {
 
 func (s StatementList) Evaluation(vm *VM) CompletionValue {
 	var lastValue CompletionValue
-	for i, item := range s {
+	for _, item := range s {
 		lastValue = item.Evaluation(vm)
 		if lastValue.IsAbrupt() {
-			return lastValue
-		}
-		if vm.isYield {
-			// TODO(XXX): simplify?
-			if len(s) == i+1 && !vm.loopNodeStack.IsEmpty() {
-				// let loop node handle execution flow
-				vm.suspendedGeneratorBody = StatementList{&StatementListItemStatement{
-					Statement: vm.loopNodeStack.Peek(),
-				}}
-				vm.isInLoop = true
-			} else {
-				// when in loop, and we are at the end of current block
-				// should continue from start of loop
-				if vm.isInLoop && len(s) == i+1 {
-					return lastValue
-				}
-				vm.isInLoop = false
-				vm.suspendedGeneratorBody = s[i+1:]
-			}
 			return lastValue
 		}
 	}
@@ -6538,7 +6516,6 @@ func (y *YieldExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		vm.isYield = true
 		return Yield(vm.agent, value)
 	}
 }

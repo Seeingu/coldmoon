@@ -11,13 +11,8 @@ type VM struct {
 	containedInStrictCode bool
 	// IsJSONParse handle is parsed from JSON.parse
 	// 25.5.1: Step 7
-	IsJSONParse bool
-	// isYield indicates the current execution context is a yield statement
-	isYield bool
-	// visitedNodesMap is used to store visited nodes
-	suspendedGeneratorBody GeneratorBody
-	loopNodeStack          pkg.Stack[IterationStatement]
-	isInLoop               bool
+	IsJSONParse   bool
+	loopNodeStack pkg.Stack[IterationStatement]
 }
 
 func NewVM2(agent *Agent) *VM {

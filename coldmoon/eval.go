@@ -44,6 +44,7 @@ func PerformEval(agent *Agent, x Value, strictCaller bool, direct bool) Value {
 		Realm:          evalRealm,
 		ScriptOrModule: runningContext.ScriptOrModule,
 		Function:       nil,
+		ch:             make(chan struct{}),
 		ECMAScriptCode: &ExecutionContextAdditionalState{
 			LexicalEnvironment:  lexEnv,
 			VariableEnvironment: varEnv,

@@ -536,6 +536,7 @@ func (s *SourceTextModule) InitializeEnvironment() (co CompletionValue) {
 		Realm:          realm,
 		Function:       nil,
 		ScriptOrModule: s,
+		ch:             make(chan struct{}),
 		ECMAScriptCode: &ExecutionContextAdditionalState{
 			LexicalEnvironment:  env,
 			VariableEnvironment: env,
@@ -573,6 +574,7 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 	moduleContext := &ExecutionContext{
 		Realm:          s.Realm,
 		ScriptOrModule: s,
+		ch:             make(chan struct{}),
 		ECMAScriptCode: &ExecutionContextAdditionalState{
 			LexicalEnvironment:  s.Environment,
 			VariableEnvironment: s.Environment,

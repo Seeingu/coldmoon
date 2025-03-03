@@ -10,6 +10,7 @@ type Agent struct {
 	symbolId              uint64
 	exception             Value
 	ExecutionContextStack pkg.Stack[*ExecutionContext]
+	ExecutionContextMap   map[uint64]*ExecutionContext
 	HostHooks             *HostHooks
 	GlobalSymbolRegistry  map[string]*SymbolValue
 	QueuedPromiseJobs     pkg.Stack[*QueuedPromiseJob]
@@ -32,7 +33,10 @@ type HostHooks struct {
 }
 
 func NewAgent() *Agent {
-	a := &Agent{}
+	a := &Agent{
+		ExecutionContextMap:  make(map[uint64]*ExecutionContext),
+		GlobalSymbolRegistry: make(map[string]*SymbolValue),
+	}
 	initWellKnownSymbols(a)
 	a.HostHooks = &HostHooks{
 		HostEnsureCanCompileStrings: HostEnsureCanCompileStrings,
@@ -55,6 +59,15 @@ func NewAgent() *Agent {
 func (a *Agent) RunningExecutionContext() *ExecutionContext {
 	Assert(a.ExecutionContextStack.Len() > 0)
 	return a.ExecutionContextStack.Peek()
+}
+
+func (a *Agent) UniqueObjectId() uint64 {
+	a.symbolId++
+	return a.symbolId
+}
+
+func (a *Agent) FindExecutionContextById(id uint64) *ExecutionContext {
+	return a.ExecutionContextMap[id]
 }
 
 func (a *Agent) RunJobs() {

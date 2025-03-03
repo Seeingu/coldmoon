@@ -81,6 +81,7 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 	calleeContext := &ExecutionContext{
 		Function:       b.Object,
 		Realm:          b.Realm,
+		ch:             make(chan struct{}),
 		ScriptOrModule: nil,
 	}
 

@@ -188,6 +188,7 @@ func InitializeHostDefinedRealm(
 	newContext := &ExecutionContext{
 		Function:       nil,
 		Realm:          realm,
+		ch:             make(chan struct{}),
 		ScriptOrModule: nil,
 	}
 

@@ -16,11 +16,11 @@ type GeneratorObject struct {
 	// [[GeneratorState]]
 	GeneratorState GeneratorState
 	// [[GeneratorContext]]
+	// Deprecated: get from agent
 	GeneratorContext *ExecutionContext
 	// [[GeneratorBrand]]
 	GeneratorBrand string
-	closure        func() Value
-	result         Value
+	closure        func()
 }
 
 func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
@@ -69,33 +69,39 @@ type GeneratorBody interface{}
 func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody GeneratorBody) {
 	Assert(generator.GeneratorState == GeneratorStateSuspendedStart)
 	genContext := agent.RunningExecutionContext()
+	agent.ExecutionContextMap[generator.GetId()] = genContext
+	genVM := genContext.VM
 	genContext.Generator = generator
-
-	genVM := NewVM2(agent)
-	genVM.suspendedGeneratorBody = generatorBody
-	closure := func() Value {
-		a := agent
-		acGenContext := a.RunningExecutionContext()
-		acGenerator := acGenContext.Generator
-		// TODO: result should be a completion
-		var result Value
-		if body, ok := genVM.suspendedGeneratorBody.(RuntimeSemanticsEvaluation); ok {
-			result = body.Evaluation(genVM).value
-		} else {
-			result = generatorBody.(AbstractClosure)()
+	genContext.yieldCh = make(chan struct{})
+	closure := func() {
+		if genContext.isSuspended {
+			genContext.yieldCh <- struct{}{}
+			return
 		}
-		// TODO: not standard
-		if acGenerator.GeneratorState == GeneratorStateSuspendedYield {
-			return CreateIterResultObject(a, result, false).ToValue()
+		a := agent
+		var result CompletionValue
+		if body, ok := generatorBody.(RuntimeSemanticsEvaluation); ok {
+			result = body.Evaluation(genVM)
+		} else {
+			panic("unreachable")
 		}
 		// TODO: Assert generator status
 		a.ExecutionContextStack.Pop()
-		acGenerator.GeneratorState = GeneratorStateCompleted
-		var resultValue Value = result
-		return CreateIterResultObject(a, resultValue, true).ToValue()
+		generator.GeneratorState = GeneratorStateCompleted
+
+		var resultValue Value
+		if result.t == CompletionTypeNormal {
+			resultValue = UndefinedValue
+		} else if result.t == CompletionTypeReturn {
+			resultValue = result.value
+		} else {
+			genContext.Result = result
+			return
+		}
+		genContext.Result = CreateIterResultObject(a, resultValue, true).ToValue().ToCompletion()
+		go genContext.Resume()
 	}
 	generator.closure = closure
-	generator.GeneratorContext = genContext
 }
 
 // 27.5.3.2
@@ -110,23 +116,26 @@ func GeneratorValidate(agent *Agent, generator Value) GeneratorState {
 
 // GeneratorResume
 // spec: 27.5.3.3
-func GeneratorResume(agent *Agent, generator Value, value Value) Value {
+func GeneratorResume(agent *Agent, generator Value, value Value) CompletionValue {
 	state := GeneratorValidate(agent, generator)
 	if state == GeneratorStateCompleted {
-		return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
+		return CreateIterResultObject(agent, UndefinedValue, true).ToValue().ToCompletion()
 	}
 	Assert(state == GeneratorStateSuspendedStart || state == GeneratorStateSuspendedYield)
 	g := RequireInternalSlot[*GeneratorObject](generator)
-	genContext := g.GeneratorContext
+	genContext := agent.FindExecutionContextById(g.GetId())
 	methodContext := agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
 	agent.ExecutionContextStack.Push(genContext)
-	result := g.closure()
+	go g.closure()
+	genContext.Suspend()
 	Assert(methodContext == agent.RunningExecutionContext())
-	return result
+	return genContext.Result
 }
 
-func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion CompletionValue) Value {
+// GeneratorResumeAbrupt
+// spec: 27.5.3.4
+func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion CompletionValue) CompletionValue {
 	state := GeneratorValidate(agent, generator)
 	g := RequireInternalSlot[*GeneratorObject](generator)
 	if state == GeneratorStateSuspendedStart {
@@ -135,18 +144,20 @@ func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion Compl
 	}
 	if state == GeneratorStateCompleted {
 		if abruptCompletion.t == CompletionTypeReturn {
-			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
+			return CreateIterResultObject(agent, UndefinedValue, true).ToValue().ToCompletion()
 		}
 		agent.exception = abruptCompletion.Error()
-		return abruptCompletion.Error()
+		return abruptCompletion
 	}
 
-	genContext := g.GeneratorContext
-	// methodContext:= agent.RunningExecutionContext()
+	genContext := agent.FindExecutionContextById(g.GetId())
+	methodContext := agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
 	agent.ExecutionContextStack.Push(genContext)
-	result := g.closure()
-	return result
+	go g.closure()
+	genContext.Suspend()
+	Assert(methodContext == agent.RunningExecutionContext())
+	return genContext.Result
 }
 
 // 27.5.3.5
@@ -176,8 +187,12 @@ func GeneratorYield(agent *Agent, iterNextObj ObjectType) (co CompletionValue) {
 	Assert(GetGeneratorKind(agent) == GeneratorKindSync)
 	generator.GeneratorState = GeneratorStateSuspendedYield
 	agent.ExecutionContextStack.Pop()
-	generator.result = iterNextObj.ToValue()
-	co.value = iterNextObj.Get(CMString("value").ToPropertyKey())
+	co.value = iterNextObj.ToValue()
+
+	genContext.Result = co
+	genContext.isSuspended = true
+	go genContext.Resume()
+	<-genContext.yieldCh
 	return
 }
 

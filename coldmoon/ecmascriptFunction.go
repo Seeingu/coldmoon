@@ -115,6 +115,8 @@ func PrepareForOrdinaryCall(agent *Agent, function *ECMAScriptFunction, newTarge
 	calleeContext := &ExecutionContext{
 		Function:       function,
 		Realm:          function.Realm,
+		VM:             NewVM2(agent),
+		ch:             make(chan struct{}),
 		ScriptOrModule: function.ScriptOrModule,
 		ECMAScriptCode: &ExecutionContextAdditionalState{
 			LexicalEnvironment:  localEnv,
