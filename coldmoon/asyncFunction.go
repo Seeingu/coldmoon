@@ -39,25 +39,44 @@ func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
 func AsyncFunctionStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction) {
 	runningContext := agent.RunningExecutionContext()
 	asyncContext := runningContext
-	AsyncBlockStart(agent, promiseCapability, asyncFunction, asyncContext)
+	go AsyncBlockStart(agent, promiseCapability, asyncFunction, asyncContext)
+	asyncContext.Suspend()
 }
 
+// AsyncBlockStart
+// spec: 27.7.5.2
 func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction, asyncContext *ExecutionContext) {
+	asyncContext.awaitCh = make(chan struct{})
 	runningContext := agent.RunningExecutionContext()
 
 	closure := func() {
+		agent.WG.Add(1)
+		defer func() {
+			agent.WG.Done()
+		}()
 		result := asyncFunction.EvaluateBody()
 		agent.ExecutionContextStack.Pop()
 
 		if result.t == CompletionTypeNormal {
-			promiseCapability.Resolve.Call(
-				UndefinedValue, []Value{result.Data()})
+			ReturnAssertNormal(
+				promiseCapability.Resolve.Call(
+					UndefinedValue, []Value{UndefinedValue}),
+			)
+		} else if result.t == CompletionTypeReturn {
+			ReturnAssertNormal(
+				promiseCapability.Resolve.Call(
+					UndefinedValue, []Value{result.value}),
+			)
 		} else {
-			panic("AsyncBlockStart: completion type not normal")
+			ReturnAssertNormal(
+				promiseCapability.Reject.Call(
+					UndefinedValue, []Value{result.Error()}),
+			)
 		}
 	}
 
 	agent.ExecutionContextStack.Push(asyncContext)
 	closure()
+	asyncContext.Resume()
 	Assert(runningContext == agent.RunningExecutionContext())
 }

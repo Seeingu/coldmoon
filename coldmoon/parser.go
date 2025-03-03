@@ -1459,6 +1459,16 @@ func (p *Parser) yieldExpression() (*YieldExpression, bool) {
 	}, true
 }
 
+func (p *Parser) awaitExpression() (*AwaitExpression, bool) {
+	if !p.tokenizer.Match(TAwait) {
+		return nil, false
+	}
+	e := p.expression(p.acceptContextLowest())
+	return &AwaitExpression{
+		Expression: e,
+	}, true
+}
+
 func (p *Parser) newExpression() (*NewExpression, bool) {
 	t := p.tokenizer.CurrentToken
 
@@ -1604,6 +1614,8 @@ func (p *Parser) expression(accept *acceptContext) Expression {
 		expr = newExpression
 	} else if yieldExpression, ok := p.yieldExpression(); ok {
 		expr = yieldExpression
+	} else if awaitExpression, ok := p.awaitExpression(); ok {
+		expr = awaitExpression
 	} else {
 		expr = p.primaryExpression()
 	}

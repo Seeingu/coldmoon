@@ -193,6 +193,7 @@ func GeneratorYield(agent *Agent, iterNextObj ObjectType) (co CompletionValue) {
 	genContext.isSuspended = true
 	go genContext.Resume()
 	<-genContext.yieldCh
+	// TODO(BM): is return value unused?
 	return
 }
 

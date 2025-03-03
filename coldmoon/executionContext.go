@@ -21,8 +21,10 @@ type ExecutionContext struct {
 	VM             *VM
 	ch             chan struct{}
 	yieldCh        chan struct{}
-	isSuspended    bool
-	Result         CompletionValue
+	// TODO: unify with yieldCh
+	awaitCh     chan struct{}
+	isSuspended bool
+	Result      CompletionValue
 }
 
 func (e *ExecutionContext) Resume() {

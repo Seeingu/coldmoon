@@ -2,8 +2,6 @@ package coldmoon
 
 import (
 	"reflect"
-
-	"github.com/Seeingu/coldmoon/pkg"
 )
 
 type VM struct {
@@ -11,8 +9,7 @@ type VM struct {
 	containedInStrictCode bool
 	// IsJSONParse handle is parsed from JSON.parse
 	// 25.5.1: Step 7
-	IsJSONParse   bool
-	loopNodeStack pkg.Stack[IterationStatement]
+	IsJSONParse bool
 }
 
 func NewVM2(agent *Agent) *VM {
@@ -561,6 +558,7 @@ func (v *VM) EvalAndGetValue(node ASTNode, co CompletionValue) (Value, Value, bo
 	if isAbrupt {
 		return nil, nil, true, rt
 	}
+	Assert(ref != nil)
 	value, isAbrupt, rt := ReturnIfAbrupt(ref.GetValue(v.agent), co)
 	if isAbrupt {
 		return nil, nil, true, rt

@@ -34,6 +34,7 @@ func main() {
 	if len(args) > 0 {
 		EvaluateModule(args[0], realm)
 		eventLoop.Poll()
+		agent.WG.Wait()
 		return
 	}
 
@@ -46,6 +47,7 @@ func main() {
 		input := scanner.Text()
 		Evaluate(input, realm)
 		eventLoop.Poll()
+		agent.WG.Wait()
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "error reading input:", err)

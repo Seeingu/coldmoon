@@ -179,7 +179,7 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 		)
 		agent.exception = nil
 	} else {
-		panic("unimplemented")
+		AsyncFunctionStart(agent, promiseCapability, function)
 	}
 	co.t = CompletionTypeReturn
 	co.value = promiseCapability.Promise.ToValue()

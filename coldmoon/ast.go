@@ -4218,12 +4218,7 @@ func (s *WhileStatement) VarScopedDeclarations() []*VariableDeclaration {
 }
 
 func (s *WhileStatement) Evaluation(vm *VM) CompletionValue {
-	// TODO
 	var labelSet []string
-	vm.loopNodeStack.Push(s)
-	defer func() {
-		vm.loopNodeStack.Pop()
-	}()
 	return s.WhileLoopEvaluation(vm, labelSet)
 }
 
@@ -6478,6 +6473,62 @@ func (i *ImportSpecifier) String() string {
 		return i.ModuleExportName.String() + " as " + string(i.ImportedBinding)
 	}
 	return string(i.ImportedBinding)
+}
+
+// MARK: - AwaitExpression
+
+// AwaitExpression [Yield] :
+// - await UnaryExpression[?Yield, +Await]
+type AwaitExpression struct {
+	Expression
+}
+
+var _ ASTNode = (*AwaitExpression)(nil)
+
+func (a *AwaitExpression) String() string {
+	return "AwaitExpression " + a.Expression.String()
+}
+
+func (a *AwaitExpression) Evaluation(vm *VM) (co CompletionValue) {
+	agent := vm.agent
+	value, _, isAbrupt, rt := vm.EvalAndGetValue(a.Expression, co)
+	if isAbrupt {
+		return rt
+	}
+	return Await(agent, value)
+}
+
+// Await
+// spec: 27.7.5.3
+func Await(agent *Agent, value Value) (co CompletionValue) {
+	realm := agent.CurrentRealm()
+	asyncContext := agent.RunningExecutionContext()
+	promise := PromiseResolve(agent, realm.Intrinsics.Promise, value)
+	var fulfilledClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		v := pkg.SliceSafeGet(argumentsList, 0)
+		asyncContext.Result = v.ToCompletion()
+		asyncContext.awaitCh <- struct{}{}
+		return UndefinedValue
+	}
+	onFulfilled := CreateBuiltinFunction(agent, fulfilledClosure, 1, CMString(""), builtinFunctionArgs{})
+	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		panic("unimplemented")
+		//prevContext := agent.RunningExecutionContext()
+		//agent.ExecutionContextStack.Push(asyncContext)
+		//
+		//// TODO: Resume
+		//asyncContext.Suspend()
+		//Assert(prevContext == agent.RunningExecutionContext())
+		//return UndefinedValue
+	}
+	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, CMString(""), builtinFunctionArgs{})
+	PerformPromiseThen(agent, promise, onFulfilled.ToValue(), onRejected.ToValue(), nil)
+
+	go asyncContext.Resume()
+	<-asyncContext.awaitCh
+	agent.ExecutionContextStack.Push(asyncContext)
+	Assert(asyncContext == agent.RunningExecutionContext())
+	return asyncContext.Result
 }
 
 // MARK: - YieldExpression

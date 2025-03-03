@@ -1,6 +1,10 @@
 package coldmoon
 
-import "github.com/Seeingu/coldmoon/pkg"
+import (
+	"sync"
+
+	"github.com/Seeingu/coldmoon/pkg"
+)
 
 type QueuedPromiseJob struct {
 	job   *Job
@@ -16,6 +20,8 @@ type Agent struct {
 	QueuedPromiseJobs     pkg.Stack[*QueuedPromiseJob]
 	// [[IsLittleEndian]]
 	IsLittleEndian bool
+	// WG is used to wait for all async functions to finish
+	WG sync.WaitGroup
 }
 
 type HostHooks struct {

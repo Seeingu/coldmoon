@@ -585,6 +585,7 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 		Argument: argument,
 	}
 
+	// TODO(BM): use outer env directly
 	fun := func(_captures any) Value {
 		captures := _captures.(*PromiseJobReactionCaptures)
 		agent := captures.Agent
@@ -647,7 +648,7 @@ func PromiseResolve(agent *Agent, constructor ObjectType, x Value) ObjectType {
 		}
 	}
 
-	promiseCapability := NewPromiseCapability(agent, (constructor).ToValue())
+	promiseCapability := NewPromiseCapability(agent, constructor.ToValue())
 	promiseCapability.Resolve.Call(UndefinedValue, []Value{x})
 	return promiseCapability.Promise
 }
@@ -696,7 +697,7 @@ func PerformPromiseThen(agent *Agent, promise ObjectType, onFulfilled Value, onR
 	if resultCapability == nil {
 		return UndefinedValue
 	} else {
-		return (resultCapability.Promise).ToValue()
+		return resultCapability.Promise.ToValue()
 	}
 }
 
