@@ -87,8 +87,9 @@ func CloneArrayBuffer(agent *Agent, srcBuffer *ArrayBufferLike, srcByteOffset JS
 	return targetBuffer
 }
 
-// 25.1.3.7
-func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (l JSInt) {
+// GetArrayBufferMaxByteLengthOption
+// spec: 25.1.3.7
+func GetArrayBufferMaxByteLengthOption(agent *Agent, options Value) (co Completion[JSInt]) {
 	if !options.IsObject() {
 		return
 	}
@@ -257,13 +258,20 @@ func RawBytesToNumeric(size JSInt, rawBytes []byte, isLittleEndian bool) uint64 
 func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		length := argumentsList[0]
 		options := argumentsList[1]
 		if newTarget == nil {
-			panic("TypeError")
+			return agent.ThrowTypeError("TypeError")
 		}
-		byteLength := ToIndex(agent, length)
-		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
+		byteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, length), co)
+		if isAbrupt {
+			return rt
+		}
+		requestedMaxByteLength, isAbrupt, rt := ReturnIfAbrupt(GetArrayBufferMaxByteLengthOption(agent, options), co)
+		if isAbrupt {
+			return rt
+		}
 		arrayBuffer := AllocateArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength)
 		return arrayBuffer.Data().ToValue()
 	}
@@ -384,16 +392,17 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		return NewBooleanValue(IsFixedLengthArrayBuffer(o))
 	}
 	resize := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		newByteLength := ToIndex(agent, arguments[0])
-		o := RequireInternalSlot[*ArrayBufferLike](this)
-		if o.MaxByteLength() == 0 {
-			panic("TypeError")
+		var co CompletionValue
+		newByteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, arguments[0]), co)
+		if isAbrupt {
+			return rt
 		}
+		o := RequireInternalSlot[*ArrayBufferLike](this)
 		if IsDetachedBuffer(o) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "is detached")
 		}
 		if newByteLength > o.MaxByteLength() {
-			panic("TypeError")
+			return co.ThrowError(agent, RangeError, "newByteLength > maxByteLength")
 		}
 		hostHandled := HostResizeArrayBuffer(o, newByteLength)
 		if hostHandled == ResizeArrayBufferHandledHandled {

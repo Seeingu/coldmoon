@@ -46,6 +46,10 @@ func (c Completion[T]) ThrowTypeError(agent *Agent, msg string) Completion[T] {
 	return c.ThrowError(agent, TypeError, msg)
 }
 
+func (c Completion[T]) ThrowRangeError(agent *Agent, msg string) Completion[T] {
+	return c.ThrowError(agent, RangeError, msg)
+}
+
 func (c Completion[T]) ThrowError(agent *Agent, errorType ExceptionType, msg string) Completion[T] {
 	c.t = CompletionTypeThrow
 	c.err = agent.ThrowException(errorType, msg)

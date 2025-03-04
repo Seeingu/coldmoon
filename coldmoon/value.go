@@ -381,17 +381,23 @@ func ToLength(agent *Agent, value Value) (co Completion[JSInt]) {
 	return
 }
 
-// 7.1.22
-func ToIndex(agent *Agent, value Value) JSInt {
+// ToIndex
+// spec: 7.1.22
+func ToIndex(agent *Agent, value Value) (co Completion[JSInt]) {
 	if IsUndefinedOrNil(value) {
-		return 0
+		co.value = 0
+		return
 	}
 
-	integer := ReturnAssertNormal(ToIntegerOrInfinity(agent, value))
-	if integer < 0 || float64(integer) >= POW_2_53 {
-		panic("RangeError")
+	integer, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
+	if isAbrupt {
+		return rt
 	}
-	return integer
+	if integer < 0 || float64(integer) >= POW_2_53 {
+		return co.ThrowError(agent, RangeError, "ToIndex: value is out of range")
+	}
+	co.value = integer
+	return
 }
 
 // 7.2.1

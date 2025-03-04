@@ -753,15 +753,15 @@ func NewTypedArrayNameConstructor(realm *Realm, name TypedArrayName) ObjectType 
 }
 
 // 23.2.5.1
-func typedArrayBehavior(agent *Agent, name TypedArrayName, thisArgument Value, argumentsList []Value, newTarget ObjectType) Value {
+func typedArrayBehavior(agent *Agent, name TypedArrayName, thisArgument Value, argumentsList []Value, newTarget ObjectType) (co CompletionValue) {
 	if newTarget == nil {
-		panic("TypeError")
+		return co.ThrowTypeError(agent, "newTarget is nil")
 	}
 	constructorName := name
 	proto := IntrinsicNameTypedArrayPrototype
 	numberOfArgs := len(argumentsList)
 	if numberOfArgs == 0 {
-		return (AllocateTypedArray(agent, constructorName, newTarget, proto, 0)).ToValue()
+		return AllocateTypedArray(agent, constructorName, newTarget, proto, 0).ToValue().ToCompletion()
 	} else {
 		firstArgument := argumentsList[0]
 		if firstArgument.IsObject() {
@@ -784,10 +784,13 @@ func typedArrayBehavior(agent *Agent, name TypedArrayName, thisArgument Value, a
 					InitializeTypedArrayFromArrayLike(agent, O, MustGetObject(firstArgument))
 				}
 			}
-			return O.ToValue()
+			return O.ToValue().ToCompletion()
 		} else {
-			elementLength := ToIndex(agent, firstArgument)
-			return AllocateTypedArray(agent, constructorName, newTarget, proto, elementLength).ToValue()
+			elementLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, firstArgument), co)
+			if isAbrupt {
+				return rt
+			}
+			return AllocateTypedArray(agent, constructorName, newTarget, proto, elementLength).ToValue().ToCompletion()
 		}
 	}
 }
@@ -1079,7 +1082,10 @@ func InitializeTypedArrayFromArrayBuffer(
 	buffer *ArrayBufferLike, byteOffset, length Value,
 ) (co Completion[ObjectType]) {
 	elementSize := TypedArrayElementSize(O)
-	offset := ToIndex(agent, byteOffset)
+	offset, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, byteOffset), co)
+	if isAbrupt {
+		return rt
+	}
 	if offset%elementSize != 0 {
 		co.err = agent.ThrowException(RangeError, "offset is not a multiple of element size")
 		return
@@ -1087,7 +1093,11 @@ func InitializeTypedArrayFromArrayBuffer(
 	bufferIsFixedLength := IsFixedLengthArrayBuffer(buffer)
 	var newLength JSInt
 	if length == UndefinedValue {
-		newLength = ToIndex(agent, length)
+		_newLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, length), co)
+		if isAbrupt {
+			return rt
+		}
+		newLength = _newLength
 	}
 	if IsDetachedBuffer(buffer) {
 		co.err = agent.ThrowException(TypeError, "detached buffer")

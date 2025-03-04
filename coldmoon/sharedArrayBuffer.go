@@ -56,6 +56,7 @@ func NewSharedArrayBufferConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		length := argumentsList[0]
 		options := pkg.SliceSafeGet(argumentsList, 1)
 		if options == nil {
@@ -64,8 +65,14 @@ func NewSharedArrayBufferConstructor(realm *Realm) ObjectType {
 		if newTarget == nil {
 			return agent.ThrowTypeError("newTarget is nil in SharedArrayBuffer")
 		}
-		byteLength := ToIndex(agent, length)
-		requestedMaxByteLength := GetArrayBufferMaxByteLengthOption(agent, options)
+		byteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, length), co)
+		if isAbrupt {
+			return rt
+		}
+		requestedMaxByteLength, isAbrupt, rt := ReturnIfAbrupt(GetArrayBufferMaxByteLengthOption(agent, options), co)
+		if isAbrupt {
+			return rt
+		}
 		return AllocateSharedArrayBuffer(agent, newTarget, byteLength, requestedMaxByteLength).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, CMString("SharedArrayBuffer"), builtinFunctionArgs{
@@ -136,22 +143,25 @@ func NewSharedArrayBufferPrototype(realm *Realm) ObjectType {
 
 // MARK: - Internal
 
-func sharedArrayBufferGrow(agent *Agent, this Value, newLength Value) Value {
+func sharedArrayBufferGrow(agent *Agent, this Value, newLength Value) (co CompletionValue) {
 	O := RequireInternalSlot[*SharedArrayBufferObject](this)
 	if O.ArrayBufferMaxByteLength == 0 {
-		return agent.ThrowTypeError("SharedArrayBuffer.prototype.grow called on a non-growable SharedArrayBuffer")
+		return co.ThrowTypeError(agent, "SharedArrayBuffer.prototype.grow called on a non-growable SharedArrayBuffer")
 	}
 	currentLength := ArrayBufferByteLength(NewArrayBufferLike(O), SeqCst)
-	newByteLength := ToIndex(agent, newLength)
+	newByteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, newLength), co)
+	if isAbrupt {
+		return rt
+	}
 	if newByteLength <= currentLength {
-		return agent.ThrowRangeError("newByteLength <= currentLength")
+		return co.ThrowRangeError(agent, "newByteLength <= currentLength")
 	}
 	if newByteLength > O.ArrayBufferMaxByteLength {
-		return agent.ThrowRangeError("newByteLength > O.ArrayBufferMaxByteLength")
+		return co.ThrowRangeError(agent, "newByteLength > O.ArrayBufferMaxByteLength")
 	}
 	// TODO: resize
 
-	return UndefinedValue
+	return UndefinedValue.ToCompletion()
 }
 
 func sharedArrayBufferSlice(agent *Agent, this Value, start Value, end Value) (co CompletionValue) {

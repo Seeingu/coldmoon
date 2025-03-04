@@ -34,21 +34,25 @@ type DataView struct {
 func NewDataViewConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	behavior := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		bufferValue := args[0]
 		byteOffset := pkg.SliceSafeGet(args, 1)
 		byteLength := pkg.SliceSafeGet(args, 2)
 		if newTarget == nil {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "DataView constructor must be called with new")
 		}
 
 		buffer := RequireInternalSlot[*ArrayBufferLike](bufferValue)
-		offset := ToIndex(agent, byteOffset)
+		offset, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, byteOffset), co)
+		if isAbrupt {
+			return rt
+		}
 		if IsDetachedBuffer(buffer) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "DataView buffer is detached")
 		}
 		bufferByteLength := ArrayBufferByteLength(buffer, SeqCst)
 		if offset > bufferByteLength {
-			panic("RangeError")
+			return co.ThrowError(agent, RangeError, "DataView offset is out of bounds")
 		}
 		bufferIsFixedLength := IsFixedLengthArrayBuffer(buffer)
 		viewByteLength := &ByteLength{}
@@ -59,9 +63,12 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 				viewByteLength.Value = bufferByteLength - offset
 			}
 		} else {
-			viewByteLength.Value = ToIndex(agent, byteLength)
+			viewByteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, byteLength), co)
+			if isAbrupt {
+				return rt
+			}
 			if bufferIsFixedLength {
-				if viewByteLength.Value > bufferByteLength-offset {
+				if viewByteLength > bufferByteLength-offset {
 					panic("RangeError")
 				}
 			}
@@ -281,7 +288,10 @@ func GetViewByteLength(viewRecord *DataViewWithBufferWitnessRecord) JSInt {
 // 25.3.1.5
 func GetViewValue(agent *Agent, viewValue Value, requestIndex Value, size JSInt) (co CompletionValue) {
 	view := RequireInternalSlot[*DataView](viewValue)
-	getIndex := ToIndex(agent, requestIndex)
+	getIndex, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, requestIndex), co)
+	if isAbrupt {
+		return rt
+	}
 	viewOffset := view.ByteOffset
 	viewRecord := MakeDataViewWithBufferWitnessRecord(view, SeqCst)
 	if IsViewOutOfBounds(viewRecord) {
@@ -310,7 +320,10 @@ func SetViewValue(
 	size JSInt,
 ) (co CompletionValue) {
 	view := RequireInternalSlot[*DataView](viewValue)
-	setIndex := ToIndex(agent, requestIndex)
+	setIndex, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, requestIndex), co)
+	if isAbrupt {
+		return rt
+	}
 	viewOffset := view.ByteOffset
 	viewRecord := MakeDataViewWithBufferWitnessRecord(view, SeqCst)
 	var numberValue JSNumber

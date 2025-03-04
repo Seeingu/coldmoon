@@ -55,7 +55,10 @@ func ValidateAtomicAccessOnIntegerTypedArray(
 
 func ValidateAtomicAccess(agent *Agent, taRecord *TypedArrayWithBufferWitnessRecord, requestIndex Value) (co Completion[JSInt]) {
 	length := TypedArrayLength(taRecord)
-	accessIndex := ToIndex(agent, requestIndex)
+	accessIndex, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, requestIndex), co)
+	if isAbrupt {
+		return rt
+	}
 	if accessIndex >= length {
 		co.err = agent.ThrowRangeError("out of range")
 		return
