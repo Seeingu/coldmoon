@@ -129,7 +129,6 @@ func NewEval(realm *Realm) ObjectType {
 }
 
 // 7.1.17
-// TODO(BM): should use ToString
 func ToString(agent *Agent, v Value) *StringValue {
 	switch v.(type) {
 	case *StringValue:

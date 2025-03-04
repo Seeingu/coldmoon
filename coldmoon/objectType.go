@@ -24,7 +24,7 @@ type ObjectType interface {
 		thisArg Value,
 	) FoundResult
 	Get(key PropertyKey) Value
-	Set(key PropertyKey, value Value, throw setThrowType)
+	Set(key PropertyKey, value Value, throw setThrowType) CompletionValue
 	Agent() *Agent
 	HasProperty(key PropertyKey) bool
 	GetFunctionRealm() *Realm

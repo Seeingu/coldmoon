@@ -223,11 +223,14 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 				intLen = n.ToNumber()
 			}
 
-			array.Set(
+			_, isAbrupt, rt := ReturnIfAbrupt(array.Set(
 				NewStringPropertyKey("length"),
 				NewNumberValue(intLen),
 				setThrowTypeThrow,
-			)
+			), co)
+			if isAbrupt {
+				return rt
+			}
 
 			return array.ToValue()
 		} else {
@@ -505,7 +508,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			length++
 		}
 
-		array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
+		_, isAbrupt, rt = ReturnIfAbrupt(array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(length.ToNumber())
 	}
 	var pop BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -516,16 +522,22 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic(rt)
 		}
 		if length == 0 {
-			array.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow)
+			_, isAbrupt, rt := ReturnIfAbrupt(array.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
 			return UndefinedValue.ToCompletion()
 		}
 		length--
 		element := array.Get(NewIntegerIndexPropertyKey(length))
 		deleteSucceeded := array.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(length))
 		if !deleteSucceeded {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "delete failed")
 		}
-		array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
+		_, isAbrupt, rt = ReturnIfAbrupt(array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
 		return element
 	}
 	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -844,7 +856,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic(rt)
 		}
 		if length == 0 {
-			o.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow)
+			_, isAbrupt, rt := ReturnIfAbrupt(o.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
 			return UndefinedValue
 		}
 		first := o.Get(NewIntegerIndexPropertyKey(0))
@@ -854,7 +869,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			fromPresent := o.HasProperty(from)
 			if fromPresent {
 				fromValue := o.Get(from)
-				o.Set(to, fromValue, setThrowTypeThrow)
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(to, fromValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
 			} else {
 				o.DeletePropertyOrThrow(to)
 			}
@@ -863,7 +881,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if !deleteSucceeded {
 			panic("TypeError")
 		}
-		o.Set(NewStringPropertyKey("length"), NewNumberValue((length - 1).ToNumber()), setThrowTypeThrow)
+		_, isAbrupt, rt = ReturnIfAbrupt(o.Set(NewStringPropertyKey("length"), NewNumberValue((length-1).ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
 		return first
 	}
 	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -889,17 +910,26 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			fromPresent := o.HasProperty(from)
 			if fromPresent {
 				fromValue := o.Get(from)
-				o.Set(to, fromValue, setThrowTypeThrow)
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(to, fromValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
 			} else {
 				o.DeletePropertyOrThrow(to)
 			}
 		}
 		for j, arg := range args {
 			key := NewIntegerIndexPropertyKey(JSInt(j))
-			o.Set(key, arg, setThrowTypeThrow)
+			_, isAbrupt, rt := ReturnIfAbrupt(o.Set(key, arg, setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
 		}
 		newLength := (length + argCount).ToNumber()
-		o.Set(NewStringPropertyKey("length"), NewNumberValue(newLength), setThrowTypeThrow)
+		_, isAbrupt, rt = ReturnIfAbrupt(o.Set(NewStringPropertyKey("length"), NewNumberValue(newLength), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(newLength)
 	}
 	var filter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -1031,6 +1061,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return accumulator
 	}
 	var concat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		o := this.ToObject(agent).value
 		A := ArraySpeciesCreate(agent, o, 0)
 		n := JSInt(0)
@@ -1072,7 +1103,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 		}
 
-		A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow)
+		_, isAbrupt, rt := ReturnIfAbrupt(A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
 		return A.ToValue()
 	}
 	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -1132,7 +1166,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			k++
 			n++
 		}
-		A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow)
+		_, isAbrupt, rt = ReturnIfAbrupt(A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
 		return A.ToValue()
 	}
 	var fill BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -1176,7 +1213,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		for k < final {
 			pk := NewIntegerIndexPropertyKey(k)
-			o.Set(pk, value, setThrowTypeThrow)
+			_, isAbrupt, rt := ReturnIfAbrupt(o.Set(pk, value, setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
 			k++
 		}
 		return o.ToValue()
@@ -1255,7 +1295,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			fromPresent := o.HasProperty(fromKey)
 			if fromPresent {
 				fromValue := o.Get(fromKey)
-				o.Set(toKey, fromValue, setThrowTypeThrow)
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(toKey, fromValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
 			} else {
 				o.DeletePropertyOrThrow(toKey)
 			}
@@ -1290,13 +1333,25 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				upperValue = o.Get(upperP)
 			}
 			if lowerExists && upperExists {
-				o.Set(lowerP, upperValue, setThrowTypeThrow)
-				o.Set(upperP, lowerValue, setThrowTypeThrow)
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(lowerP, upperValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(o.Set(upperP, lowerValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
 			} else if !lowerExists && upperExists {
-				o.Set(lowerP, o.Get(upperP), setThrowTypeThrow)
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(lowerP, o.Get(upperP), setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
 				o.DeletePropertyOrThrow(upperP)
 			} else if lowerExists && !upperExists {
-				o.Set(upperP, o.Get(lowerP), setThrowTypeThrow)
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(upperP, o.Get(lowerP), setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
 				o.DeletePropertyOrThrow(lowerP)
 			}
 			lower++
@@ -1341,7 +1396,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 		j := JSInt(0)
 		for ; j < itemCount; j++ {
-			obj.Set(NewIntegerIndexPropertyKey(j), sortedList[j], setThrowTypeThrow)
+			_, isAbrupt, rt := ReturnIfAbrupt(obj.Set(NewIntegerIndexPropertyKey(j), sortedList[j], setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
 		}
 		for ; j < length; j++ {
 			obj.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(j))
@@ -1470,7 +1528,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(k), fromValue)
 			}
 		}
-		A.Set(NewStringPropertyKey("length"), NewNumberValue(actualDeleteCount.ToNumber()), setThrowTypeThrow)
+		_, isAbrupt, rt = ReturnIfAbrupt(A.Set(NewStringPropertyKey("length"), NewNumberValue(actualDeleteCount.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
 		if itemCount < actualDeleteCount {
 			k := actualStart
 			for k < length-actualDeleteCount {
@@ -1479,7 +1540,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				fromPresent := o.HasProperty(from)
 				if fromPresent {
 					fromValue := o.Get(from)
-					o.Set(to, fromValue, setThrowTypeThrow)
+					_, isAbrupt, rt := ReturnIfAbrupt(o.Set(to, fromValue, setThrowTypeThrow), co)
+					if isAbrupt {
+						return rt
+					}
 				} else {
 					o.DeletePropertyOrThrow(to)
 				}
@@ -1498,7 +1562,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				fromPresent := o.HasProperty(from)
 				if fromPresent {
 					fromValue := o.Get(from)
-					o.Set(to, fromValue, setThrowTypeThrow)
+					_, isAbrupt, rt := ReturnIfAbrupt(o.Set(to, fromValue, setThrowTypeThrow), co)
+					if isAbrupt {
+						return rt
+					}
 				} else {
 					o.DeletePropertyOrThrow(to)
 				}
@@ -1507,10 +1574,16 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		k := actualStart
 		for _, E := range items {
-			o.Set(NewIntegerIndexPropertyKey(k), E, setThrowTypeThrow)
+			_, isAbrupt, rt := ReturnIfAbrupt(o.Set(NewIntegerIndexPropertyKey(k), E, setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
 			k++
 		}
-		o.Set(NewStringPropertyKey("length"), NewNumberValue((length - actualDeleteCount + itemCount).ToNumber()), setThrowTypeThrow)
+		_, isAbrupt, rt = ReturnIfAbrupt(o.Set(NewStringPropertyKey("length"), NewNumberValue((length-actualDeleteCount+itemCount).ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
 		return A.ToValue()
 	}
 	var toSpliced BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
