@@ -294,7 +294,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		result := PerformPromiseRace(agent, iteratorRecord, MustGetObject(C), promiseCapability, promiseResolve)
 		if result.IsAbrupt() {
 			if !iteratorRecord.Done {
-				iteratorRecord.IteratorClose()
+				result = iteratorRecord.IteratorClose(result)
 			}
 			if !IfAbruptRejectPromise(agent, result, promiseCapability) {
 				return UndefinedValue
@@ -321,7 +321,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		result := PerformPromiseAll(agent, iteratorRecord, MustGetObject(C), promiseCapability, promiseResolve)
 		if result.IsAbrupt() {
 			if !iteratorRecord.Done {
-				iteratorRecord.IteratorClose()
+				result = iteratorRecord.IteratorClose(result)
 			}
 			if !IfAbruptRejectPromise(agent, result, promiseCapability) {
 				return UndefinedValue
@@ -348,7 +348,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		result := PerformPromiseAllSettled(agent, iteratorRecord, MustGetObject(C), promiseCapability, promiseResolve)
 		if result.IsAbrupt() {
 			if !iteratorRecord.Done {
-				iteratorRecord.IteratorClose()
+				result = iteratorRecord.IteratorClose(result)
 			}
 			if !IfAbruptRejectPromise(agent, result, promiseCapability) {
 				return UndefinedValue
@@ -375,7 +375,7 @@ func NewPromiseConstructor(realm *Realm) ObjectType {
 		result := PerformPromiseAny(agent, iteratorRecord, MustGetObject(C), promiseCapability, promiseResolve)
 		if result.IsAbrupt() {
 			if !iteratorRecord.Done {
-				iteratorRecord.IteratorClose()
+				result = iteratorRecord.IteratorClose(result)
 			}
 			if !IfAbruptRejectPromise(agent, result, promiseCapability) {
 				return UndefinedValue

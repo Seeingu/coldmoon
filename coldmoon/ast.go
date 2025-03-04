@@ -2056,23 +2056,19 @@ func (l *LeftHandSideExpression) DestructuringAssignmentEvaluation(vm *VM, value
 			switch e := elem.(type) {
 			case *ArrayElementExpression:
 				result = e.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
-				if !iteratorRecord.Done {
-					// TODO(BM): return this
-					iteratorRecord.IteratorClose()
-					return
-				}
 				if result.IsAbrupt() {
 					return result
+				}
+				if !iteratorRecord.Done {
+					return iteratorRecord.IteratorClose(result)
 				}
 			case *ArrayElementElision:
 				result = e.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
-				if !iteratorRecord.Done {
-					// TODO(BM): return this
-					iteratorRecord.IteratorClose()
-					return
-				}
 				if result.IsAbrupt() {
 					return result
+				}
+				if !iteratorRecord.Done {
+					return iteratorRecord.IteratorClose(result)
 				}
 			default:
 				panic("unimplemented")

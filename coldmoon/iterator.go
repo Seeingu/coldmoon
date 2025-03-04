@@ -145,8 +145,10 @@ func (i *IteratorRecord) IteratorStepValue() (co CompletionValue, isDone bool) {
 	return
 }
 
-// 7.4.9
-func (i *IteratorRecord) IteratorClose() {
+// TODO(BM): handle completion
+// IteratorClose
+// spec: 7.4.9
+func (i *IteratorRecord) IteratorClose(completion CompletionValue) (co CompletionValue) {
 	iterator := i.Iterator
 	agent := iterator.Agent()
 	innerResult := GetMethod(agent, iterator.ToValue(), NewStringPropertyKey("return"))
@@ -154,6 +156,7 @@ func (i *IteratorRecord) IteratorClose() {
 	if innerResult != nil {
 		innerResult.ToValue().CallNoArgs(iterator.ToValue())
 	}
+	return
 }
 
 // 7.4.12

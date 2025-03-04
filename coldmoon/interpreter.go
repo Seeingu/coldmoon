@@ -511,11 +511,9 @@ func (v *VM) ForInOfBodyEvaluation(
 				UpdateEmpty(result, V)
 				if iteratorKind == IteratorKindAsync {
 					// TODO: AsyncIteratorClose
+					panic("unimplemented")
 				}
-				// TODO: handle return value
-				iteratorRecord.IteratorClose()
-				co.value = UndefinedValue
-				return
+				return iteratorRecord.IteratorClose(result)
 			}
 		}
 		if result.value != nil {
