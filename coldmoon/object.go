@@ -927,7 +927,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		adder := CreateBuiltinFunction(agent, closure, 2, CMString(""), builtinFunctionArgs{
 			additionalFieldsV2: &Captures{object: obj},
 		})
-		return AddEntriesFromIterable(agent, obj, iterable, adder).ToValue()
+		return AddEntriesFromIterable(agent, obj, iterable, adder)
 	}
 
 	object.defineBuiltinFunction(realm, CMString("hasOwn"), hasOwn, 2)

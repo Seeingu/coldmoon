@@ -371,10 +371,12 @@ var _ RuntimeSemanticsIteratorDestructuringAssignmentEvaluation = (*ArrayElement
 
 func (a *ArrayElementElision) IteratorDestructuringAssignmentEvaluation(vm *VM, iteratorRecord *IteratorRecord) (co CompletionValue) {
 	if !iteratorRecord.Done {
-		next := iteratorRecord.IteratorStep()
-		// TODO(BM): if isabrupt set done to true
-		// next is false
-		if next == nil {
+		next, isFalse := iteratorRecord.IteratorStep()
+		if next.IsAbrupt() {
+			iteratorRecord.Done = true
+			return
+		}
+		if isFalse {
 			iteratorRecord.Done = true
 		}
 	}
@@ -403,9 +405,13 @@ func (a *ArrayElementExpression) IteratorDestructuringAssignmentEvaluation(vm *V
 	}
 	var value Value = UndefinedValue
 	if !iteratorRecord.Done {
-		next := iteratorRecord.IteratorStepValue()
-		if next.value != DoneValue {
-			value = next.value
+		next, isDone := iteratorRecord.IteratorStepValue()
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		if !isDone {
+			value = nextValue
 		}
 	}
 	// TODO: check initializer

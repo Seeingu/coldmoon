@@ -69,8 +69,9 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) (co Completion[*Ite
 	return
 }
 
-// 7.4.4
-func (i *IteratorRecord) IteratorNext(value Value) ObjectType {
+// IteratorNext
+// spec: 7.4.4
+func (i *IteratorRecord) IteratorNext(value Value) (co Completion[ObjectType]) {
 	var result CompletionValue
 	if value == nil {
 		result = i.NextMethod.CallNoArgs(i.Iterator.ToValue())
@@ -80,14 +81,17 @@ func (i *IteratorRecord) IteratorNext(value Value) ObjectType {
 
 	resultObject, ok := result.value.(*ObjectValue)
 	if !ok {
-		panic("TypeError")
+		return co.ThrowTypeError(i.Iterator.Agent(), "IteratorNext method must return an object")
 	}
-	return resultObject.Object
+	co.value = resultObject.Object
+	return
 }
 
-// 7.4.5
-func IteratorComplete(iterResult ObjectType) bool {
-	return iterResult.Get(NewStringPropertyKey("done")).ToBoolean()
+// IteratorComplete
+// spec: 7.4.5
+func IteratorComplete(iterResult ObjectType) (co Completion[bool]) {
+	co.value = iterResult.Get(NewStringPropertyKey("done")).ToBoolean()
+	return
 }
 
 // 7.4.6
@@ -95,32 +99,47 @@ func IteratorValue(iterResult ObjectType) Value {
 	return iterResult.Get(NewStringPropertyKey("value"))
 }
 
-// 7.4.7
-func (i *IteratorRecord) IteratorStep() ObjectType {
-	result := i.IteratorNext(nil)
-	done := IteratorComplete(result)
-	if done {
-		return nil
+// IteratorStep
+// spec: 7.4.7
+// returns Object, false or throw
+func (i *IteratorRecord) IteratorStep() (co Completion[ObjectType], isFalse bool) {
+	result, isAbrupt, rt := ReturnIfAbrupt(i.IteratorNext(nil), co)
+	if isAbrupt {
+		co = rt
+		return
 	}
-	return result
+	done, isAbrupt, rt := ReturnIfAbrupt(IteratorComplete(result), co)
+	if isAbrupt {
+		co = rt
+		return
+	}
+	if done {
+		isFalse = true
+		return
+	}
+	co.value = result
+	return
 }
-
-var DoneValue = NewStringValue("done")
 
 // IteratorStepValue
 // spec: 7.4.8
 // returns Value or DONE, abrupt
-func (i *IteratorRecord) IteratorStepValue() (co CompletionValue) {
+func (i *IteratorRecord) IteratorStepValue() (co CompletionValue, isDone bool) {
 	result := i.IteratorNext(nil)
-	// TODO(BM): is throw
-	done := IteratorComplete(result)
-	// TODO(BM): done is throw
-	if done {
+	if result.t == CompletionTypeThrow {
 		i.Done = true
-		co.value = DoneValue
-		return
+		return CompletionFrom(co, result), false
 	}
-	value := result.Get(CMString("value").ToPropertyKey())
+	done := IteratorComplete(result.value)
+	if done.t == CompletionTypeThrow {
+		i.Done = true
+		return CompletionFrom(co, done), false
+	}
+	if done.value {
+		i.Done = true
+		return co, true
+	}
+	value := result.value.Get(CMString("value").ToPropertyKey())
 	// TODO(BM): value is throw
 	co.value = value
 	return
@@ -147,15 +166,22 @@ func CreateIterResultObject(agent *Agent, value Value, done bool) ObjectType {
 	return obj
 }
 
-// 7.4.14
-func (i *IteratorRecord) IteratorToList() (values []Value) {
+// IteratorToList
+// spec: 7.4.14
+func (i *IteratorRecord) IteratorToList() (co Completion[[]Value]) {
+	var values []Value
 	for {
-		next := i.IteratorStep()
-		if next == nil {
+		next, isDone := i.IteratorStepValue()
+		if isDone {
 			break
 		}
-		values = append(values, IteratorValue(next))
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		values = append(values, nextValue)
 	}
+	co.value = values
 	return
 }
 

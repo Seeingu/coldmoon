@@ -18,16 +18,22 @@ type MapObject struct {
 	MapValue *MapValue
 }
 
-func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, adder ObjectType) ObjectType {
+// AddEntriesFromIterable
+// spec: 24.1.1.2
+func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, adder ObjectType) (co CompletionValue) {
 	iterator := GetIterator(agent, iterable, IteratorKindSync)
 	iteratorRecord := iterator.Data()
 	for {
-		next := iteratorRecord.IteratorStep()
-		if next == nil {
-			return target
+		next, isDone := iteratorRecord.IteratorStepValue()
+		nextItem, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		if isDone {
+			co.value = target.ToValue()
+			return
 		}
 
-		nextItem := IteratorValue(next)
 		if !ValueIs[*ObjectValue](nextItem) {
 			panic("TypeError")
 			// TODO IteratorClose
@@ -36,7 +42,8 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 		v := MustGetObject(nextItem).Get(NewStringPropertyKey("1"))
 		adder.Call(target.ToValue(), []Value{k, v})
 	}
-	return target
+	co.value = target.ToValue()
+	return
 }
 
 func NewMapConstructor(realm *Realm) ObjectType {
@@ -59,7 +66,7 @@ func NewMapConstructor(realm *Realm) ObjectType {
 		if !IsCallable(adder) {
 			panic("TypeError")
 		}
-		return (AddEntriesFromIterable(agent, m, iterable, MustGetObject(adder))).ToValue()
+		return AddEntriesFromIterable(agent, m, iterable, MustGetObject(adder))
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, CMString("Map"), builtinFunctionArgs{
 		prototype:     realm.Intrinsics.FunctionPrototype,

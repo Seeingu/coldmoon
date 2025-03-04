@@ -466,7 +466,10 @@ func (v *VM) ForInOfBodyEvaluation(
 			co.err = v.agent.ThrowTypeError("Iterator result is not an object")
 			return
 		}
-		done := IteratorComplete(nextResult)
+		done, isAbrupt, rt := ReturnIfAbrupt(IteratorComplete(nextResult), co)
+		if isAbrupt {
+			return rt
+		}
 		if done {
 			co.value = V
 			return

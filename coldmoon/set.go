@@ -53,7 +53,9 @@ func (s *SetObject) clear() {
 
 func NewSetConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
+	// 24.2.1
 	behavior := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		iterable := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget == nil {
 			return agent.ThrowTypeError("new target is nil")
@@ -72,13 +74,19 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		if !IsCallable(adder) {
 			return agent.ThrowTypeError("adder is not callable")
 		}
-		iteratorRecord := GetIterator(agent, iterable, IteratorKindSync)
+		iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(agent, iterable, IteratorKindSync), co)
+		if isAbrupt {
+			return rt
+		}
 		for {
-			next := iteratorRecord.Data().IteratorStep()
-			if next == nil {
+			next, isDone := iteratorRecord.IteratorStepValue()
+			nextItem, isAbrupt, rt := ReturnIfAbrupt(next, co)
+			if isAbrupt {
+				return rt
+			}
+			if isDone {
 				return s.ToValue()
 			}
-			nextItem := IteratorValue(next)
 			adder.Call(agent, s.ToValue(), []Value{nextItem})
 		}
 	}

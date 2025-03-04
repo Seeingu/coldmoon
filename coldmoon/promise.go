@@ -711,6 +711,8 @@ type promiseAdditionalFields struct {
 	RemainingElements *RemainingElements
 }
 
+// PerformPromiseAll
+// spec: 27.2.4.1.2
 func PerformPromiseAll(
 	agent *Agent,
 	iterator *IteratorRecord,
@@ -718,12 +720,16 @@ func PerformPromiseAll(
 	resultCapability *PromiseCapability,
 	promiseResolve ObjectType,
 ) (co Completion[Value]) {
-	values := []Value{}
+	var values []Value
 	remainingElements := &RemainingElements{Value: 1}
 	var index int = 0
 	for {
-		next := iterator.IteratorStep()
-		if next == nil {
+		next, isDone := iterator.IteratorStepValue()
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		if isDone {
 			iterator.Done = true
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
@@ -734,7 +740,6 @@ func PerformPromiseAll(
 			return
 		}
 
-		nextValue := IteratorValue(next)
 		values = append(values, nextValue)
 		nextPromise := promiseResolve.Call(constructor.ToValue(), []Value{nextValue})
 
@@ -784,8 +789,12 @@ func PerformPromiseAllSettled(
 	remainingElements := &RemainingElements{Value: 1}
 	var index int = 0
 	for {
-		next := iterator.IteratorStep()
-		if next == nil {
+		next, isDone := iterator.IteratorStepValue()
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		if isDone {
 			iterator.Done = true
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
@@ -796,7 +805,6 @@ func PerformPromiseAllSettled(
 			return
 		}
 
-		nextValue := IteratorValue(next)
 		values = append(values, nextValue)
 		nextPromise := promiseResolve.Call(constructor.ToValue(), []Value{nextValue})
 
@@ -879,8 +887,12 @@ func PerformPromiseAny(
 	remainingElements := &RemainingElements{Value: 1}
 	var index int = 0
 	for {
-		next := iterator.IteratorStep()
-		if next == nil {
+		next, isDone := iterator.IteratorStepValue()
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		if isDone {
 			iterator.Done = true
 			remainingElements.Value--
 			if remainingElements.Value == 0 {
@@ -898,7 +910,6 @@ func PerformPromiseAny(
 			return
 		}
 
-		nextValue := IteratorValue(next)
 		errors = append(errors, UndefinedValue)
 		nextPromise := promiseResolve.Call(constructor.ToValue(), []Value{nextValue})
 
@@ -987,14 +998,16 @@ func PerformPromiseRace(
 	promiseResolve ObjectType,
 ) (co Completion[Value]) {
 	for {
-		next := iterator.IteratorStep()
-		if next == nil {
+		next, isDone := iterator.IteratorStepValue()
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		if isDone {
 			iterator.Done = true
 			co.value = resultCapability.Promise.ToValue()
 			return
 		}
-
-		nextValue := IteratorValue(next)
 		nextPromise := promiseResolve.Call(constructor.ToValue(), []Value{nextValue})
 		ValueInvoke(agent, nextPromise.value, NewStringPropertyKey("then"), []Value{resultCapability.Resolve.ToValue(), resultCapability.Reject.ToValue()})
 	}

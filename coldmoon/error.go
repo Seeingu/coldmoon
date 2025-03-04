@@ -197,6 +197,7 @@ func NewNativeErrorPrototype(realm *Realm, name string) ObjectType {
 func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		errors := argumentsList[0]
 		message := argumentsList[1]
 		options := argumentsList[2]
@@ -219,7 +220,10 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 
 		InstallErrorCause(agent, errorObject, options)
 		iterator := GetIterator(agent, errors, IteratorKindSync)
-		errorsList := iterator.Data().IteratorToList()
+		errorsList, isAbrupt, rt := ReturnIfAbrupt(iterator.Data().IteratorToList(), co)
+		if isAbrupt {
+			return rt
+		}
 		errorObject.DefinePropertyOrThrow(NewStringPropertyKey("errors"), &PropertyDescriptor{
 			Value:        (CreateArrayFromList(agent, errorsList)).ToValue(),
 			Writable:     true,

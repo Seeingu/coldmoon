@@ -318,13 +318,16 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 
 			for k := JSInt(0); ; k++ {
 				pk := NewIntegerIndexPropertyKey(k)
-				next := iteratorRecord.IteratorStep()
-				if next == nil {
+				next, isDone := iteratorRecord.IteratorStepValue()
+				nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+				if isAbrupt {
+					return rt
+				}
+				if isDone {
 					a.Set(NewStringPropertyKey("length"), NewNumberValue(k.ToNumber()), setThrowTypeThrow)
 					return a.ToValue()
 				}
 
-				nextValue := IteratorValue(next)
 				var mappedValue Value
 				if mapping {
 					_mappedValue, isAbrupt, rt := ReturnIfAbrupt(

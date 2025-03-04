@@ -414,24 +414,27 @@ func NewTypedArrayNamePrototype(realm *Realm, name TypedArrayName) ObjectType {
 	return object
 }
 
-func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisArg Value) Value {
+func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisArg Value) (co CompletionValue) {
 	C := this
 	if !IsConstructor(C) {
-		return agent.ThrowException(TypeError, "is not a constructor")
+		return co.ThrowTypeError(agent, "is not a constructor")
 	}
 	var mapping bool
 	if mapper == UndefinedValue {
 		mapping = false
 	} else {
 		if !IsCallable(mapper) {
-			return agent.ThrowException(TypeError, "is not callable")
+			return co.ThrowTypeError(agent, "is not callable")
 		}
 		mapping = true
 	}
 
 	usingIterator := GetMethod(agent, source, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
 	if usingIterator != nil {
-		values := GetIteratorFromMethod(agent, source, usingIterator).IteratorToList()
+		values, isAbrupt, rt := ReturnIfAbrupt(GetIteratorFromMethod(agent, source, usingIterator).IteratorToList(), co)
+		if isAbrupt {
+			return rt
+		}
 		length := JSInt(len(values))
 		targetObj := TypedArrayCreateFromConstructor(agent, MustGetObject(C), []Value{NewNumberValue(length.ToNumber())})
 		k := JSInt(0)
@@ -449,10 +452,10 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 			targetObj.Set(Pk, mappedValue, setThrowTypeThrow)
 			k++
 		}
-		return targetObj.ToValue()
+		co.value = targetObj.ToValue()
+		return
 	}
 	arrayLike := MustGetObject(source)
-	var co CompletionValue
 	length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
 	if isAbrupt {
 		panic(rt)
@@ -474,7 +477,8 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 		targetObj.Set(Pk, mappedValue, setThrowTypeThrow)
 		k++
 	}
-	return targetObj.ToValue()
+	co.value = targetObj.ToValue()
+	return
 }
 
 // 23.2.3.26.1
@@ -778,7 +782,10 @@ func typedArrayBehavior(agent *Agent, name TypedArrayName, thisArgument Value, a
 			default:
 				usingIterator := GetMethod(agent, firstArgument, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
 				if usingIterator != nil {
-					values := GetIteratorFromMethod(agent, firstArgument, usingIterator).IteratorToList()
+					values, isAbrupt, rt := ReturnIfAbrupt(GetIteratorFromMethod(agent, firstArgument, usingIterator).IteratorToList(), co)
+					if isAbrupt {
+						return rt
+					}
 					InitializeTypedArrayFromList(agent, O, values)
 				} else {
 					InitializeTypedArrayFromArrayLike(agent, O, MustGetObject(firstArgument))
