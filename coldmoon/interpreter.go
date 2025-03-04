@@ -537,10 +537,9 @@ func (v *VM) BlockDeclarationInstantiation(code StaticSemanticsLexicallyScopedDe
 				}
 			}
 		}
-		switch decl.(type) {
-		case *FunctionDeclaration, *GeneratorDeclaration, *AsyncFunctionDeclaration, *AsyncGeneratorDeclaration:
+		if d, ok := decl.(RuntimeSemanticsInstantiateFunctionObject); ok {
 			fn := boundNames[0]
-			fo := decl.(RuntimeSemanticsInstantiateFunctionObject).InstantiateFunctionObject(env, privateEnv)
+			fo := d.InstantiateFunctionObject(env, privateEnv)
 			if !env.HasBinding(fn) {
 				env.InitializeBinding(fn, fo.ToValue())
 			} else {
@@ -548,6 +547,8 @@ func (v *VM) BlockDeclarationInstantiation(code StaticSemanticsLexicallyScopedDe
 				Assert(ok)
 				env.SetMutableBinding(fn, fo.ToValue(), false)
 			}
+		} else {
+			panic("unreachable")
 		}
 	}
 }
