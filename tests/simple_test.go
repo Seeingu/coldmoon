@@ -650,6 +650,25 @@ regexp.extra = 1;
 assertEqual(regexp.extra, 1);`)
 }
 
+// TestArrayConcatPropagatesSpreadableGetterError verifies the
+// Symbol.isConcatSpreadable lookup preserves an abrupt accessor completion.
+func TestArrayConcatPropagatesSpreadableGetterError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const value = {};
+Object.defineProperty(value, Symbol.isConcatSpreadable, {
+  get: function() {
+    throw sentinel;
+  }
+});
+let caught = null;
+try {
+  [].concat(value);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

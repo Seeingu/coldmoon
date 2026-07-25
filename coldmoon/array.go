@@ -1150,12 +1150,14 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				element = args[index-1]
 			}
 
-			spreadable := IsConcatSpreadable(agent, element)
+			spreadable, isAbrupt, rt := ReturnIfAbrupt(IsConcatSpreadable(agent, element), co)
+			if isAbrupt {
+				return rt
+			}
 			if spreadable {
-				var co CompletionValue
 				length, isAbrupt, rt := ReturnIfAbrupt(MustGetObject(element).LengthOfArrayLike(), co)
 				if isAbrupt {
-					panic(rt)
+					return rt
 				}
 
 				if float64(n)+float64(length) > POW_2_53-1 {
@@ -1830,15 +1832,28 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 }
 
 // 23.1.3.2.1
-func IsConcatSpreadable(agent *Agent, value Value) bool {
+func IsConcatSpreadable(agent *Agent, value Value) (co Completion[bool]) {
 	if !value.IsObject() {
-		return false
+		return
 	}
-	spreadable := MustGetObject(value).Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable]))
+	object := MustGetObject(value)
+	spreadable, isAbrupt, rt := ReturnIfAbrupt(
+		object.InternalMethods().Get(
+			object,
+			NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable]),
+			value,
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if spreadable != UndefinedValue {
-		return spreadable.ToBoolean()
+		co.value = spreadable.ToBoolean()
+		return
 	}
-	return IsArray(value)
+	co.value = IsArray(value)
+	return
 }
 
 type SortCompare struct {
