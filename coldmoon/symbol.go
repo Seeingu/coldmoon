@@ -22,9 +22,10 @@ func NewSymbolObject(agent *Agent, s *SymbolValue, prototype ObjectType) *Symbol
 func NewSymbolConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		description := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget != nil {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "Symbol is not a constructor")
 		}
 
 		var descriptionString string

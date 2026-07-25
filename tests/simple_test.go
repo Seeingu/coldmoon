@@ -966,6 +966,18 @@ for (let index = 0; index < 3; index++) {
 assert(total === 3);`)
 }
 
+// TestSymbolConstructionThrows verifies Symbol rejects construction with a
+// catchable TypeError.
+func TestSymbolConstructionThrows(t *testing.T) {
+	testSource(t, `let caught = null;
+try {
+  new Symbol("description");
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
