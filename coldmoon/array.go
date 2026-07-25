@@ -1373,8 +1373,14 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			toKey := NewIntegerIndexPropertyKey(to)
 			fromPresent := o.HasProperty(fromKey)
 			if fromPresent {
-				fromValue := o.Get(fromKey)
-				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(toKey, fromValue, setThrowTypeThrow), co)
+				fromValue, isAbrupt, rt := ReturnIfAbrupt(
+					o.InternalMethods().Get(o, fromKey, o.ToValue()),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(o.Set(toKey, fromValue, setThrowTypeThrow), co)
 				if isAbrupt {
 					return rt
 				}

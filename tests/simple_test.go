@@ -500,6 +500,25 @@ assert(Object.getPrototypeOf(array) === prototype);
 assertEqual(array[1], 2);`)
 }
 
+// TestArrayCopyWithinPropagatesElementGetterError verifies Get(O, fromKey)
+// preserves an abrupt accessor completion.
+func TestArrayCopyWithinPropagatesElementGetterError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const object = { length: 1 };
+Object.defineProperty(object, "0", {
+  get: function() {
+    throw sentinel;
+  }
+});
+let caught = null;
+try {
+  Array.prototype.copyWithin.call(object, 0, 0);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
