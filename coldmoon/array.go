@@ -1488,23 +1488,39 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var fill BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := args[0]
-		start := args[1]
-		end := args[2]
-		o := this.ToObject(agent).value
 		var co CompletionValue
+		value := pkg.SliceSafeGet(args, 0)
+		start := pkg.SliceSafeGet(args, 1)
+		end := pkg.SliceSafeGet(args, 2)
+		if value == nil {
+			value = UndefinedValue
+		}
+		if start == nil {
+			start = UndefinedValue
+		}
+		if end == nil {
+			end = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
 		if isAbrupt {
 			return rt
 		}
-		k := relativeStart.Max(0)
-		if end == UndefinedValue {
-			end = NewNumberValue(length.ToNumber())
+		var k JSInt
+		if relativeStart.IsNegInf() {
+			k = 0
+		} else if relativeStart < 0 {
+			k = (length + relativeStart).Max(0)
+		} else {
+			k = relativeStart.Min(length)
 		}
 		var relativeEnd JSInt
 		if end == UndefinedValue {

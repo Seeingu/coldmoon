@@ -147,6 +147,18 @@ assert([1, 2, 3].includes(2, -2));
 assert(Array.prototype.includes.call({ 0: "x", length: 1 }, "x"));`)
 }
 
+func TestArrayFillSupportsOmittedAndRelativeIndexes(t *testing.T) {
+	testSource(t, `const values = [1, 2, 3];
+assert(values.fill(9, -2) === values);
+assert(values[0] === 1);
+assert(values[1] === 9);
+assert(values[2] === 9);
+const arrayLike = { length: 2 };
+Array.prototype.fill.call(arrayLike, "x");
+assert(arrayLike[0] === "x");
+assert(arrayLike[1] === "x");`)
+}
+
 func TestFunctionInvocationHelpersDefaultArguments(t *testing.T) {
 	testSource(t, `function count() { return arguments.length; }
 assert(count.apply() === 0);
