@@ -80,6 +80,7 @@ func NewBooleanConstructor(realm *Realm) ObjectType {
 			Object: o,
 			Data:   b,
 		}
+		booleanObject.ref = booleanObject
 		booleanObject.SetSlot(SlotBooleanData, b)
 		return booleanObject.ToValue()
 	}

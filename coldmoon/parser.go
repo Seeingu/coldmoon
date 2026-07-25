@@ -1711,7 +1711,7 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 		TQuestionQuestionEquals:
 		return p.assignmentExpression(left, accept)
 	default:
-		panic("secondaryExpression: unexpected token")
+		panic("secondaryExpression: unexpected token " + t.Value + " after " + left.String())
 	}
 	return left
 }

@@ -159,12 +159,12 @@ func (t *Tokenizer) peek() Token {
 			return t.newToken(TDivideEquals, "/=")
 		}
 		if t.match('/') {
-			comment := t.comment("//")
-			return t.newToken(TComment, comment)
+			t.comment("//")
+			return t.peek()
 		}
 		if t.match('*') {
-			comment := t.comment("/*")
-			return t.newToken(TComment, comment)
+			t.comment("/*")
+			return t.peek()
 		}
 		if token, ok := t.tryToMatchRegularExpression(); ok {
 			return token

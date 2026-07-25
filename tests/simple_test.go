@@ -849,6 +849,16 @@ assert(seen);
 assert('single quote: \'' === "single quote: '");`)
 }
 
+// TestBooleanWrapperKeepsItsExoticIdentity verifies fallback
+// Object.prototype.toString observes the Boolean wrapper brand.
+func TestBooleanWrapperKeepsItsExoticIdentity(t *testing.T) {
+	testSource(t, `const original = Boolean.prototype.toString;
+delete Boolean.prototype.toString;
+const object = new Boolean();
+assert(object.toString() === "[object Boolean]");
+Boolean.prototype.toString = original;`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
