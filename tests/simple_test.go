@@ -255,6 +255,42 @@ assertEqual(descriptor.enumerable, true);
 assertEqual(descriptor.configurable, true);`)
 }
 
+// TestGeneratorResumeSequence verifies the next/yield handshake for both a
+// suspended yield and normal generator completion.
+func TestGeneratorResumeSequence(t *testing.T) {
+	testSource(t, `const iterator = function*() {
+  yield 2;
+}();
+const first = iterator.next();
+assertEqual(first.value, 2);
+assertEqual(first.done, false);
+const second = iterator.next();
+assertEqual(second.value, undefined);
+assertEqual(second.done, true);`)
+}
+
+// TestArrayFromGeneratorOverwritesConfigurableNonWritableElement covers the
+// generator-backed iterable path through CreateDataProperty.
+func TestArrayFromGeneratorOverwritesConfigurableNonWritableElement(t *testing.T) {
+	testSource(t, `const items = function*() {
+  yield 2;
+};
+const C = function() {
+  Object.defineProperty(this, "0", {
+    value: 1,
+    writable: false,
+    enumerable: false,
+    configurable: true
+  });
+};
+const result = Array.from.call(C, items());
+const descriptor = Object.getOwnPropertyDescriptor(result, "0");
+assertEqual(descriptor.value, 2);
+assertEqual(descriptor.writable, true);
+assertEqual(descriptor.enumerable, true);
+assertEqual(descriptor.configurable, true);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

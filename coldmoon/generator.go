@@ -77,7 +77,7 @@ func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody Gene
 	agent.ExecutionContextMap[generator.GetId()] = genContext
 	genVM := genContext.VM
 	genContext.Generator = generator
-	genContext.yieldCh = make(chan struct{})
+	genContext.generatorCh = make(chan Value)
 	closure := func() CompletionValue {
 		a := agent
 		var result CompletionValue
@@ -90,15 +90,17 @@ func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody Gene
 		a.ExecutionContextStack.Pop()
 		generator.GeneratorState = GeneratorStateCompleted
 
-		var resultValue Value
+		var completion CompletionValue
 		if result.t == CompletionTypeNormal {
-			resultValue = UndefinedValue
+			completion = CreateIterResultObject(a, UndefinedValue, true).ToValue().ToCompletion()
 		} else if result.t == CompletionTypeReturn {
-			resultValue = result.value
+			completion = CreateIterResultObject(a, result.value, true).ToValue().ToCompletion()
 		} else {
-			return result
+			completion = result
 		}
-		return CreateIterResultObject(a, resultValue, true).ToValue().ToCompletion()
+		genContext.Result = completion
+		a.RunningExecutionContext().Resume()
+		return completion
 	}
 	generator.closure = closure
 }
@@ -124,11 +126,14 @@ func GeneratorResume(agent *Agent, generator Value, value Value) CompletionValue
 	g := RequireInternalSlot[*GeneratorObject](generator)
 	genContext := agent.FindExecutionContextById(g.GetId())
 	methodContext := agent.RunningExecutionContext()
-	methodContext.Suspend()
 	g.GeneratorState = GeneratorStateExecuting
 	agent.ExecutionContextStack.Push(genContext)
-	g.Resume()
-	genContext.Suspend()
+	if state == GeneratorStateSuspendedStart {
+		go g.Resume()
+	} else {
+		genContext.generatorCh <- value
+	}
+	methodContext.Suspend()
 	Assert(methodContext == agent.RunningExecutionContext())
 	return genContext.Result
 }
@@ -191,14 +196,11 @@ func GeneratorYield(agent *Agent, iterNextObj ObjectType) (co CompletionValue) {
 	generator.GeneratorState = GeneratorStateSuspendedYield
 	agent.ExecutionContextStack.Pop()
 	callerContext := agent.RunningExecutionContext()
-	callerContext.Resume()
 	co.value = iterNextObj.ToValue()
 
 	genContext.Result = co
-	genContext.isSuspended = true
-	go genContext.Resume()
-	<-genContext.yieldCh
-	// TODO(BM): is return value unused?
+	callerContext.Resume()
+	co.value = <-genContext.generatorCh
 	return
 }
 

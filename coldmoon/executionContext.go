@@ -22,6 +22,7 @@ type ExecutionContext struct {
 	VM             *VM
 	ch             chan struct{}
 	yieldCh        chan struct{}
+	generatorCh    chan Value
 	// TODO: unify with yieldCh
 	awaitCh     chan struct{}
 	isSuspended bool
