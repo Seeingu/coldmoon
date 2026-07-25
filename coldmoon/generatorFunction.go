@@ -9,14 +9,14 @@ func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
 		if bodyArg == nil {
 			bodyArg = NewStringValue("")
 		}
-		return (CreateDynamicFunction(
+		return CreateDynamicFunction(
 			agent,
 			C,
 			newTarget,
 			dynamicFunctionKindGenerator,
 			parameterArgs,
 			bodyArg,
-		)).ToValue()
+		).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, CMString("GeneratorFunction"), builtinFunctionArgs{
 		realm:     realm,

@@ -192,9 +192,17 @@ func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsL
 	return RunNode(agent, functionBody)
 }
 
+// EvaluateAsyncGeneratorBody
+// spec: 15.6.2
 func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (co CompletionValue) {
 	FunctionDeclarationInstantiation(agent, function, argumentsList)
-	G := OrdinaryCreateFromConstructor(agent, function, "%AsyncGeneratorFunction.prototype.prototype%", nil)
+	o := OrdinaryCreateFromConstructor(agent, function, "%AsyncGeneratorFunction.prototype.prototype%", nil)
+	G := &AsyncGeneratorObject{
+		Object:         o,
+		GeneratorBrand: "",
+	}
+	G.ref = G
+	AsyncGeneratorStart(agent, G, function.ECMAScriptCode)
 	co.t = CompletionTypeReturn
 	co.value = G.ToValue()
 	return

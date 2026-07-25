@@ -53,7 +53,7 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) (co Completion[*Ite
 		if method == nil {
 			syncMethod := GetMethod(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
 			if syncMethod == nil {
-				panic("TypeError")
+				return co.ThrowTypeError(agent, "GetIterator: async no iterator method")
 			}
 			syncIteratorRecord := GetIteratorFromMethod(agent, obj, syncMethod)
 			co.value = CreateAsyncFromSyncIterator(syncIteratorRecord)
@@ -61,9 +61,7 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) (co Completion[*Ite
 		}
 	}
 	if method == nil {
-		// TODO: check completion type
-		co.err = agent.ThrowException(TypeError, "No iterator method")
-		return
+		return co.ThrowTypeError(agent, "No iterator method")
 	}
 	co.value = GetIteratorFromMethod(agent, obj, method)
 	return
@@ -159,7 +157,9 @@ func (i *IteratorRecord) IteratorClose(completion CompletionValue) (co Completio
 	return
 }
 
-// 7.4.12
+// CreateIterResultObject
+// spec: 7.4.12
+// returns Object
 func CreateIterResultObject(agent *Agent, value Value, done bool) ObjectType {
 	realm := agent.CurrentRealm()
 	obj := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, nil)

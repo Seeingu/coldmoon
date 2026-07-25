@@ -170,7 +170,7 @@ func (p *IdentifierReference) String() string {
 
 // MARK: - AsyncFunctionExpression
 
-type PrimaryExpressionAsyncFunctionExpression struct {
+type AsyncFunctionExpression struct {
 	PrimaryExpression
 	Identifier       IdentifierName
 	FormalParameters *FormalParameters
@@ -178,12 +178,52 @@ type PrimaryExpressionAsyncFunctionExpression struct {
 	SourceText       string
 }
 
-func (p *PrimaryExpressionAsyncFunctionExpression) _primaryExpression() {}
-func (p *PrimaryExpressionAsyncFunctionExpression) AssignmentTargetType() AssignmentTargetType {
+var _ RuntimeSemanticsEvaluation = (*AsyncFunctionExpression)(nil)
+
+func (p *AsyncFunctionExpression) _primaryExpression() {}
+func (p *AsyncFunctionExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
 }
 
-func (p *PrimaryExpressionAsyncFunctionExpression) String() string {
+// Evaluation
+// spec: 15.8.5
+func (p *AsyncFunctionExpression) Evaluation(vm *VM) (co CompletionValue) {
+	return p.InstantiateAsyncFunctionExpression(vm).ToValue().ToCompletion()
+}
+
+func (p *AsyncFunctionExpression) astHasBindingIdentifier() bool {
+	return p.Identifier != ""
+}
+
+// InstantiateAsyncFunctionExpression
+// spec: 15.8.3
+// returns function object
+func (p *AsyncFunctionExpression) InstantiateAsyncFunctionExpression(vm *VM) ObjectType {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	if p.astHasBindingIdentifier() {
+		panic("unimplemented")
+	} else {
+		name := ""
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.AsyncFunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		return closure
+	}
+}
+
+func (p *AsyncFunctionExpression) String() string {
 	return "AsyncFunctionExpression"
 }
 
@@ -740,7 +780,7 @@ type MethodDefinition struct {
 	PropertyName             PropertyName
 	FunctionExpression       *FunctionExpression
 	GeneratorExpression      *GeneratorExpression
-	AsyncFunctionExpression  *PrimaryExpressionAsyncFunctionExpression
+	AsyncFunctionExpression  *AsyncFunctionExpression
 	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
 }
 
@@ -4488,10 +4528,22 @@ func (f *ForInOfStatement) astIsVarForBinding() bool {
 // ForInOfLoopEvaluation
 // spec: 14.7.5.5
 func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue) {
+	kind := IteratorKindSync
+	iterationKind := ForInOfIterationKindIterate
+	if f.IsAwait {
+		kind = IteratorKindAsync
+		iterationKind = ForInOfIterationKindAsyncIterate
+	}
 	if f.astIsForDeclaration() {
 		forDeclaration := f.Initializer.ForDeclaration
 		if f.astIsOf() {
-			keyResult, isAbrupt, rt := ReturnIfAbrupt(vm.ForInOfHeadEvaluation(forDeclaration.BoundNames(), f.Expression, ForInOfIterationKindIterate), co)
+			keyResult, isAbrupt, rt := ReturnIfAbrupt(
+				vm.ForInOfHeadEvaluation(
+					forDeclaration.BoundNames(),
+					f.Expression,
+					iterationKind,
+				),
+				co)
 			if isAbrupt {
 				return rt
 			}
@@ -4499,10 +4551,10 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co 
 				forDeclaration,
 				f.Body,
 				keyResult,
-				ForInOfIterationKindIterate,
+				iterationKind,
 				ForInOfLhsKindLexicalBinding,
 				labelSet,
-				IteratorKindSync,
+				kind,
 			)
 		} else {
 			// for in
@@ -4522,7 +4574,7 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co 
 				ForInOfIterationKindEnumerate,
 				ForInOfLhsKindLexicalBinding,
 				labelSet,
-				IteratorKindSync,
+				kind,
 			)
 		}
 	} else if f.astIsVarForBinding() {
@@ -4542,7 +4594,7 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co 
 			ForInOfIterationKindEnumerate,
 			ForInOfLhsKindVarBinding,
 			labelSet,
-			IteratorKindSync,
+			kind,
 		)
 
 	} else {
@@ -4914,18 +4966,19 @@ func (d *AsyncGeneratorDeclaration) Evaluation(vm *VM) CompletionValue {
 	realm := agent.CurrentRealm()
 	env := realm.GlobalEnv
 	function := d.instantiateAsyncGeneratorFunctionObject(agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(d.Identifier), function.ToValue(), setThrowTypeIgnore)
 	return UndefinedValue.ToCompletion()
 }
 
-// 15.6.3
+// instantiateAsyncGeneratorFunctionObject
+// spec: 15.6.3
 func (d *AsyncGeneratorDeclaration) instantiateAsyncGeneratorFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
 	realm := agent.CurrentRealm()
 	name := d.Identifier
 	sourceText := d.SourceText
 	function := OrdinaryFunctionCreate(
 		agent,
-		realm.Intrinsics.FunctionPrototype,
+		realm.Intrinsics.AsyncGeneratorFunctionPrototype,
 		sourceText,
 		d.FormalParameters,
 		d.Body,
@@ -4936,7 +4989,7 @@ func (d *AsyncGeneratorDeclaration) instantiateAsyncGeneratorFunctionObject(agen
 	SetFunctionName(function, NewStringPropertyKey(string(name)), "")
 	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
 	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-		Value:        (prototype).ToValue(),
+		Value:        prototype.ToValue(),
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: false,

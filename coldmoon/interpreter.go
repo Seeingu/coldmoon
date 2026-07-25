@@ -459,7 +459,7 @@ func (v *VM) ForInOfBodyEvaluation(
 	for {
 		nextResultValue := ReturnAssertNormal(iteratorRecord.NextMethod.Call(agent, iteratorRecord.Iterator.ToValue(), nil))
 		if iteratorKind == IteratorKindAsync {
-			// TODO: Await
+			panic("unimplemented")
 		}
 		nextResult, ok := nextResultValue.GetObject()
 		if !ok {

@@ -1,5 +1,7 @@
 package coldmoon
 
+// TODO(BM): use object.defineBuiltinFunction
+// Deprecated
 func DefineBuiltinFunction(
 	realm *Realm,
 	name PropertyConvertable,

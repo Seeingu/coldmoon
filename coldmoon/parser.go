@@ -764,11 +764,14 @@ func (p *Parser) asyncArrowFunction() *AsyncArrowFunction {
 	}
 }
 
-func (p *Parser) asyncFunctionExpression() *PrimaryExpressionAsyncFunctionExpression {
+func (p *Parser) asyncFunctionExpression() *AsyncFunctionExpression {
 	startOffset := p.tokenizer.Index
 	p.tokenizer.Match(TAsync)
 	p.tokenizer.MustMatch(TFunction)
-	identifier := p.bindingIdentifier()
+	var identifier IdentifierName
+	if p.tokenizer.CurrentToken.Type == TIdentifier {
+		identifier = p.bindingIdentifier()
+	}
 	p.tokenizer.MustMatch(TLeftParen)
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
@@ -776,7 +779,7 @@ func (p *Parser) asyncFunctionExpression() *PrimaryExpressionAsyncFunctionExpres
 	body := p.functionBody(FunctionTypeAsync)
 	p.tokenizer.MustMatch(TRightBrace)
 	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
-	return &PrimaryExpressionAsyncFunctionExpression{
+	return &AsyncFunctionExpression{
 		Identifier:       identifier,
 		FormalParameters: params,
 		SourceText:       sourceText,
@@ -2262,9 +2265,9 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 			Body:             body,
 		}
 	}
-	var asyncExpression *PrimaryExpressionAsyncFunctionExpression
+	var asyncExpression *AsyncFunctionExpression
 	if m == MethodDefinitionTypeAsync {
-		asyncExpression = &PrimaryExpressionAsyncFunctionExpression{
+		asyncExpression = &AsyncFunctionExpression{
 			Identifier:       "",
 			FormalParameters: formalParameters,
 			SourceText:       sourceText,

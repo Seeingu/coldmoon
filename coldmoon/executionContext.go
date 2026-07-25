@@ -18,6 +18,7 @@ type ExecutionContext struct {
 	Function       ObjectType
 	ECMAScriptCode *ExecutionContextAdditionalState
 	Generator      *GeneratorObject
+	AsyncGenerator *AsyncGeneratorObject
 	VM             *VM
 	ch             chan struct{}
 	yieldCh        chan struct{}
