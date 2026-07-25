@@ -41,60 +41,133 @@ func (b *BaseValue) ToPropertyKey() PropertyKey {
 // ToPropertyDescriptor
 // spec: 6.2.6.5
 func (b *BaseValue) ToPropertyDescriptor(agent *Agent) *PropertyDescriptor {
-	value := b.Value
-	if value == UndefinedValue {
-		return nil
-	}
+	return ReturnAssertNormal(ToPropertyDescriptorCompletion(agent, b.Value))
+}
+
+func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*PropertyDescriptor]) {
 	objectValue, ok := value.(*ObjectValue)
 	if !ok {
-		agent.ThrowTypeError("Value is not an object")
-		return nil
+		return co.ThrowTypeError(agent, "Property descriptor is not an object")
 	}
 	object := objectValue.Object
 
 	desc := &PropertyDescriptor{}
 
-	hasEnumerable := object.HasProperty(NewStringPropertyKey("enumerable"))
-
+	hasEnumerable, isAbrupt, rt := ReturnIfAbrupt(
+		object.InternalMethods().HasProperty(object, NewStringPropertyKey("enumerable")),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if hasEnumerable {
-		enumerable := object.Get(NewStringPropertyKey("enumerable")).ToBoolean()
+		enumerableValue, isAbrupt, rt := ReturnIfAbrupt(
+			object.InternalMethods().Get(object, NewStringPropertyKey("enumerable"), value),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		enumerable := enumerableValue.ToBoolean()
 		desc.Enumerable = enumerable
 	}
 
-	hasConfigurable := object.HasProperty(NewStringPropertyKey("configurable"))
+	hasConfigurable, isAbrupt, rt := ReturnIfAbrupt(
+		object.InternalMethods().HasProperty(object, NewStringPropertyKey("configurable")),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if hasConfigurable {
-		configurable := object.Get(NewStringPropertyKey("configurable")).ToBoolean()
+		configurableValue, isAbrupt, rt := ReturnIfAbrupt(
+			object.InternalMethods().Get(object, NewStringPropertyKey("configurable"), value),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		configurable := configurableValue.ToBoolean()
 		desc.Configurable = configurable
 	}
 
-	hasValue := object.HasProperty(NewStringPropertyKey("value"))
+	hasValue, isAbrupt, rt := ReturnIfAbrupt(
+		object.InternalMethods().HasProperty(object, NewStringPropertyKey("value")),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if hasValue {
-		desc.Value = object.Get(NewStringPropertyKey("value"))
+		desc.Value, isAbrupt, rt = ReturnIfAbrupt(
+			object.InternalMethods().Get(object, NewStringPropertyKey("value"), value),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 	}
 
-	hasWritable := object.HasProperty(NewStringPropertyKey("writable"))
+	hasWritable, isAbrupt, rt := ReturnIfAbrupt(
+		object.InternalMethods().HasProperty(object, NewStringPropertyKey("writable")),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if hasWritable {
-		writable := object.Get(NewStringPropertyKey("writable")).ToBoolean()
+		writableValue, isAbrupt, rt := ReturnIfAbrupt(
+			object.InternalMethods().Get(object, NewStringPropertyKey("writable"), value),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		writable := writableValue.ToBoolean()
 		desc.Writable = writable
 		desc.WritableSet = true
 	}
 
-	hasGet := object.HasProperty(NewStringPropertyKey("get"))
+	hasGet, isAbrupt, rt := ReturnIfAbrupt(
+		object.InternalMethods().HasProperty(object, NewStringPropertyKey("get")),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if hasGet {
-		get := object.Get(NewStringPropertyKey("get"))
+		get, isAbrupt, rt := ReturnIfAbrupt(
+			object.InternalMethods().Get(object, NewStringPropertyKey("get"), value),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if !IsCallable(get) && get != UndefinedValue {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "Property descriptor getter is not callable")
 		}
 		if get != UndefinedValue {
 			desc.Get = MustGetObject(get)
 		}
 	}
 
-	hasSet := object.HasProperty(NewStringPropertyKey("set"))
+	hasSet, isAbrupt, rt := ReturnIfAbrupt(
+		object.InternalMethods().HasProperty(object, NewStringPropertyKey("set")),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if hasSet {
-		set := object.Get(NewStringPropertyKey("set"))
+		set, isAbrupt, rt := ReturnIfAbrupt(
+			object.InternalMethods().Get(object, NewStringPropertyKey("set"), value),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if !IsCallable(set) && set != UndefinedValue {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "Property descriptor setter is not callable")
 		}
 		if set != UndefinedValue {
 			desc.Set = MustGetObject(set)
@@ -103,11 +176,12 @@ func (b *BaseValue) ToPropertyDescriptor(agent *Agent) *PropertyDescriptor {
 
 	if hasGet || hasSet {
 		if hasValue || hasWritable {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "Invalid mixed data and accessor descriptor")
 		}
 	}
 
-	return desc
+	co.value = desc
+	return
 }
 
 // Call

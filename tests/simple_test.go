@@ -109,6 +109,24 @@ assert(Object.prototype.hasOwnProperty.call(object, "getter"));
 assert(Object.prototype.hasOwnProperty.call(object, "setter"));`)
 }
 
+func TestPropertyDescriptorErrorsAreCatchableAndAtomic(t *testing.T) {
+	testSource(t, `const object = {};
+let caught = null;
+try {
+  Object.defineProperty(object, "invalid", { get: 1 });
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);
+try {
+  Object.defineProperties(object, {
+    first: { value: 1 },
+    second: { get: 1 }
+  });
+} catch (error) {}
+assert(!Object.prototype.hasOwnProperty.call(object, "first"));`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

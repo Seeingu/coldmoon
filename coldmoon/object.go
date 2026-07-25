@@ -3,6 +3,7 @@ package coldmoon
 import (
 	"fmt"
 
+	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
 )
 
@@ -639,26 +640,51 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 		if len(arguments) > 1 && arguments[1] != UndefinedValue {
 			properties := arguments[1]
-			return (objectDefineProperties(agent, obj, properties)).ToValue()
+			var co CompletionValue
+			result, isAbrupt, rt := ReturnIfAbrupt(objectDefineProperties(agent, obj, properties), co)
+			if isAbrupt {
+				return rt
+			}
+			return result.ToValue()
 		}
 
 		return (obj).ToValue()
 	}
 
 	var defineProperties BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := arguments[0]
-		properties := arguments[1]
-		if !o.IsObject() {
-			return agent.ThrowTypeError("is not an object")
+		var co CompletionValue
+		o := pkg.SliceSafeGet(arguments, 0)
+		properties := pkg.SliceSafeGet(arguments, 1)
+		if o == nil {
+			o = UndefinedValue
 		}
-		return (objectDefineProperties(agent, MustGetObject(o), properties)).ToValue()
+		if properties == nil {
+			properties = UndefinedValue
+		}
+		if !o.IsObject() {
+			return co.ThrowTypeError(agent, "is not an object")
+		}
+		result, isAbrupt, rt := ReturnIfAbrupt(objectDefineProperties(agent, MustGetObject(o), properties), co)
+		if isAbrupt {
+			return rt
+		}
+		return result.ToValue()
 	}
 
 	defineProperty := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := arguments[0]
-		property := arguments[1]
-		attributes := arguments[2]
 		var co CompletionValue
+		o := pkg.SliceSafeGet(arguments, 0)
+		property := pkg.SliceSafeGet(arguments, 1)
+		attributes := pkg.SliceSafeGet(arguments, 2)
+		if o == nil {
+			o = UndefinedValue
+		}
+		if property == nil {
+			property = UndefinedValue
+		}
+		if attributes == nil {
+			attributes = UndefinedValue
+		}
 		if !o.IsObject() {
 			return co.ThrowTypeError(agent, "is not an object")
 		}
@@ -667,7 +693,10 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		desc := attributes.ToPropertyDescriptor(agent)
+		desc, isAbrupt, rt := ReturnIfAbrupt(ToPropertyDescriptorCompletion(agent, attributes), co)
+		if isAbrupt {
+			return rt
+		}
 		target := MustGetObject(o)
 		success, isAbrupt, rt := ReturnIfAbrupt(
 			target.InternalMethods().DefineOwnProperty(target, key, desc),
@@ -1162,20 +1191,52 @@ func CoerceOptionsToObject(agent *Agent, options Value) ObjectType {
 // 9.2.13
 
 // 20.1.2.3.1
-func objectDefineProperties(agent *Agent, object ObjectType, properties Value) ObjectType {
-	props := ReturnAssertNormal(properties.ToObject(agent))
+func objectDefineProperties(agent *Agent, object ObjectType, properties Value) (co Completion[ObjectType]) {
+	props, isAbrupt, rt := ReturnIfAbrupt(properties.ToObject(agent), co)
+	if isAbrupt {
+		return rt
+	}
 
 	keys := props.InternalMethods().OwnPropertyKeys(props)
 
+	type descriptorEntry struct {
+		key  PropertyKey
+		desc *PropertyDescriptor
+	}
+	var descriptors []descriptorEntry
 	for _, key := range keys {
-		descValue := props.Get(key)
-		desc := descValue.ToPropertyDescriptor(agent)
-		if desc != nil {
-			object.DefinePropertyOrThrow(key, desc)
+		propDesc := props.InternalMethods().GetOwnProperty(props, key)
+		if propDesc != nil && propDesc.Enumerable {
+			descValue, isAbrupt, rt := ReturnIfAbrupt(
+				props.InternalMethods().Get(props, key, properties),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			desc, isAbrupt, rt := ReturnIfAbrupt(ToPropertyDescriptorCompletion(agent, descValue), co)
+			if isAbrupt {
+				return rt
+			}
+			descriptors = append(descriptors, descriptorEntry{key: key, desc: desc})
 		}
 	}
 
-	return object
+	for _, entry := range descriptors {
+		success, isAbrupt, rt := ReturnIfAbrupt(
+			object.InternalMethods().DefineOwnProperty(object, entry.key, entry.desc),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		if !success {
+			return co.ThrowTypeError(agent, "Object.defineProperties failed")
+		}
+	}
+
+	co.value = object
+	return
 }
 
 // MARK: - FindViaPredicate
