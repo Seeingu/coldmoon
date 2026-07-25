@@ -505,10 +505,19 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 	var arrayMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		callbackFn := args[0]
+		callbackFn := pkg.SliceSafeGet(args, 0)
 		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
 
-		array := MustGetObject(this)
+		array, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
 		if isAbrupt {
 			return rt
@@ -522,15 +531,26 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if isAbrupt {
 			return rt
 		}
+		callbackObject := this
+		if !this.IsObject() {
+			callbackObject = array.ToValue()
+		}
 		for k := range length {
 			pk := NewIntegerIndexPropertyKey(k)
-			mappedValue := ReturnAssertNormal(callbackFn.Call(
-				agent,
-				thisArg,
-				[]Value{array.Get(pk), NewNumberValue(k.ToNumber()), this},
-			))
-
-			A.CreateDataPropertyOrThrow(pk, mappedValue)
+			if array.HasProperty(pk) {
+				mappedValue, isAbrupt, rt := ReturnIfAbrupt(callbackFn.Call(
+					agent,
+					thisArg,
+					[]Value{array.Get(pk), NewNumberValue(k.ToNumber()), callbackObject},
+				), co)
+				if isAbrupt {
+					return rt
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(A.CreateDataPropertyOrThrow(pk, mappedValue), co)
+				if isAbrupt {
+					return rt
+				}
+			}
 		}
 		return A.ToValue()
 	}

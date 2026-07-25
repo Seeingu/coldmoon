@@ -77,6 +77,20 @@ assert(values.findLast(function(value) { return value < 3; }) === 2);
 assert(values.findLastIndex(function(value) { return value < 3; }) === 1);`)
 }
 
+func TestArrayMapPreservesHoles(t *testing.T) {
+	testSource(t, `const values = [1, , 3];
+let calls = 0;
+const mapped = values.map(function(value) {
+  calls++;
+  return value * 2;
+});
+assert(calls === 2);
+assert(mapped.length === 3);
+assert(mapped[0] === 2);
+assert(!(1 in mapped));
+assert(mapped[2] === 6);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
