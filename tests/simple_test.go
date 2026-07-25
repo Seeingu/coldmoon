@@ -54,6 +54,14 @@ assert(Array.prototype.some.call(arrayLike, function(value) { return value === 1
 assert(Array.prototype.filter.call(arrayLike, function(value) { return value === 1; })[0] === 1);`)
 }
 
+func TestArrayIndexMethodsOptionalFromIndex(t *testing.T) {
+	testSource(t, `const arrayLike = { 0: "a", 1: "b", 2: "a", length: 3 };
+assert(Array.prototype.indexOf.call(arrayLike, "b") === 1);
+assert(Array.prototype.indexOf.call(arrayLike, "a", -1) === 2);
+assert(Array.prototype.lastIndexOf.call(arrayLike, "a") === 2);
+assert(Array.prototype.lastIndexOf.call(arrayLike, "a", -2) === 0);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

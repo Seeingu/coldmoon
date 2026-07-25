@@ -707,10 +707,19 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return FalseValue
 	}
 	var indexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		searchElement := args[0]
-		fromIndex := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		searchElement := pkg.SliceSafeGet(args, 0)
+		fromIndex := pkg.SliceSafeGet(args, 1)
+		if searchElement == nil {
+			searchElement = UndefinedValue
+		}
+		if fromIndex == nil {
+			fromIndex = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
 			return rt
@@ -731,9 +740,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			n = 0
 		}
 
-		k := n.Max(0)
-		if k < 0 {
-			k = (length + k).Max(0)
+		var k JSInt
+		if n >= 0 {
+			k = n
+		} else {
+			k = (length + n).Max(0)
 		}
 
 		for k < length {
@@ -797,13 +808,19 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(findRec.Index.ToNumber())
 	}
 	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		searchElement := args[0]
-		fromIndex := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		searchElement := pkg.SliceSafeGet(args, 0)
+		fromIndex := pkg.SliceSafeGet(args, 1)
+		if searchElement == nil {
+			searchElement = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 		if length == 0 {
 			return NewNumberValue(-1)
@@ -823,7 +840,12 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			return NewNumberValue(-1)
 		}
 
-		k := n.Max(0).Min(length - 1)
+		var k JSInt
+		if n >= 0 {
+			k = n.Min(length - 1)
+		} else {
+			k = length + n
+		}
 		for k >= 0 {
 			kPresent := o.HasProperty(NewIntegerIndexPropertyKey(k))
 			if kPresent {
