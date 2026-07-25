@@ -222,6 +222,39 @@ const result = Array.from.call(C, []);
 assert(Object.getPrototypeOf(result) === other.Object.prototype);`, realm)
 }
 
+// TestForInVarBinding verifies that enumeration assigns each key to the
+// existing var binding instead of evaluating the binding node as an expression.
+func TestForInVarBinding(t *testing.T) {
+	testSource(t, `const object = { a: 1, b: 2 };
+let count = 0;
+for (var key in object) {
+  if (key === "a" || key === "b") {
+    count += 1;
+  }
+}
+assertEqual(count, 2);`)
+}
+
+// TestArrayFromOverwritesConfigurableNonWritableElement verifies that
+// CreateDataProperty replaces a configurable indexed data property.
+func TestArrayFromOverwritesConfigurableNonWritableElement(t *testing.T) {
+	testSource(t, `const items = { "0": 2, length: 1 };
+const C = function() {
+  Object.defineProperty(this, "0", {
+    value: 1,
+    writable: false,
+    enumerable: false,
+    configurable: true
+  });
+};
+const result = Array.from.call(C, items);
+const descriptor = Object.getOwnPropertyDescriptor(result, "0");
+assertEqual(descriptor.value, 2);
+assertEqual(descriptor.writable, true);
+assertEqual(descriptor.enumerable, true);
+assertEqual(descriptor.configurable, true);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

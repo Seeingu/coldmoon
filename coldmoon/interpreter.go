@@ -486,8 +486,17 @@ func (v *VM) ForInOfBodyEvaluation(
 					// TODO
 				}
 			} else {
-				lhs.Evaluation(v)
-				// TODO: check is abrupt
+				if lhsKind == ForInOfLhsKindVarBinding {
+					lhsName := lhs.(*ForBinding).BindingIdentifier
+					lhsRef := agent.ResolveBinding(lhsName, nil, true)
+					_, isAbrupt, rt := ReturnIfAbrupt(lhsRef.PutValue(agent, nextValue), co)
+					if isAbrupt {
+						return rt
+					}
+				} else {
+					lhs.Evaluation(v)
+					// TODO: check is abrupt
+				}
 			}
 		} else {
 			f := lhs.(*ForDeclaration)

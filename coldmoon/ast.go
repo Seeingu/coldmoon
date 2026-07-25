@@ -4493,6 +4493,11 @@ type ForInOfStatement struct {
 var _ RuntimeSemanticsForInOfLoopEvaluation = (*ForInOfStatement)(nil)
 
 func (f *ForInOfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	if f.Initializer.ForBinding != nil && f.Initializer.ForBinding.BindingPattern == nil {
+		l = append(l, &VariableDeclaration{
+			BindingIdentifier: f.Initializer.ForBinding.BindingIdentifier,
+		})
+	}
 	l = append(l, f.Body.VarScopedDeclarations()...)
 	return
 }
