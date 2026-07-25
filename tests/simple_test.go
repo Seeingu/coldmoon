@@ -309,6 +309,23 @@ assert(prototype.isPrototypeOf(object));
 assert(!object.isPrototypeOf(prototype));`)
 }
 
+func TestStringObjectOwnKeysContainNoGaps(t *testing.T) {
+	testSource(t, `const emptyKeys = Object.getOwnPropertyNames("");
+assert(emptyKeys.length === 1);
+assert(emptyKeys[0] === "length");
+const keys = Object.getOwnPropertyNames("ab");
+assert(keys.length === 3);
+assert(keys[0] === "0");
+assert(keys[1] === "1");
+assert(keys[2] === "length");
+const boxed = new String("ab");
+boxed["01"] = 7;
+assert(boxed["01"] === 7);
+assert(boxed[1] === "b");
+const created = Object.create({}, "");
+assert(Object.getOwnPropertyNames(created).length === 0);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,

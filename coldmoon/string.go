@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Seeingu/coldmoon/pkg"
@@ -16,9 +17,21 @@ type StringObject struct {
 	Data string
 }
 
+func canonicalStringIndex(p PropertyKey) (JSInt, bool) {
+	key, ok := p.(StringPropertyKey)
+	if !ok || key.Value == "" {
+		return 0, false
+	}
+	index, err := strconv.ParseUint(key.Value, 10, 63)
+	if err != nil || strconv.FormatUint(index, 10) != key.Value {
+		return 0, false
+	}
+	return JSInt(index), true
+}
+
 func StringGetOwnProperty(s *StringObject, p PropertyKey) *PropertyDescriptor {
-	index, err := p.GetIndex()
-	if err != nil {
+	index, ok := canonicalStringIndex(p)
+	if !ok {
 		return nil
 	}
 
@@ -63,32 +76,29 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 		propertiesMap := o.PropertyStorage().Properties
 		str := o.(*StringObject).Data
 		length := JSInt(len(str))
-		keys := make([]PropertyKey, length+JSInt(len(propertiesMap)))
+		keys := make([]PropertyKey, 0, length+JSInt(len(propertiesMap)))
 		for i := range length {
-			keys[i] = NewIntegerIndexPropertyKey(i)
+			keys = append(keys, NewIntegerIndexPropertyKey(i))
 		}
 
 		keysGreaterThanLength := lo.Filter(lo.Keys(propertiesMap), func(pk PropertyKey, index int) bool {
-			if index, err := pk.GetIndex(); err == nil {
+			if index, ok := canonicalStringIndex(pk); ok {
 				return index >= length
 			}
 			return false
 		})
 		sort.Slice(keysGreaterThanLength, func(i, j int) bool {
-			ii, err := keysGreaterThanLength[i].GetIndex()
-			if err != nil {
-				panic(err)
-			}
-			jj, err := keysGreaterThanLength[j].GetIndex()
-			if err != nil {
-				panic(err)
-			}
+			ii, _ := canonicalStringIndex(keysGreaterThanLength[i])
+			jj, _ := canonicalStringIndex(keysGreaterThanLength[j])
 			return ii < jj
 		})
-		copy(keys[length:], keysGreaterThanLength)
+		keys = append(keys, keysGreaterThanLength...)
 
 		for pk := range propertiesMap {
 			if _, ok := pk.(StringPropertyKey); ok {
+				if _, isIndex := canonicalStringIndex(pk); isIndex {
+					continue
+				}
 				keys = append(keys, pk)
 			}
 		}
