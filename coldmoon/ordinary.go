@@ -13,7 +13,7 @@ func OrdinaryGetPrototypeOf(object ObjectType) ObjectType {
 }
 
 func InternalSetPrototypeOf(object ObjectType, prototype ObjectType) bool {
-	return OrdinarySetPrototypeOf(object.(*Object), prototype)
+	return OrdinarySetPrototypeOf(object, prototype)
 }
 
 // 10.1.2.1
@@ -43,7 +43,7 @@ func OrdinarySetPrototypeOf(object ObjectType, prototype ObjectType) bool {
 		}
 	}
 
-	object.(*Object).SetPrototype(prototype)
+	object.SetPrototype(prototype)
 
 	return true
 }

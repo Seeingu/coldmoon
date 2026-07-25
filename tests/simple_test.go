@@ -490,6 +490,16 @@ func TestArrayCopyWithinBoxesBooleanWithoutArguments(t *testing.T) {
 assert(Array.prototype.copyWithin.call(false) instanceof Boolean);`)
 }
 
+// TestArraySetPrototypeOf verifies array exotic objects use the ordinary
+// prototype mutation algorithm without assuming the concrete base object type.
+func TestArraySetPrototypeOf(t *testing.T) {
+	testSource(t, `const array = [];
+const prototype = [1, 2, 3];
+Object.setPrototypeOf(array, prototype);
+assert(Object.getPrototypeOf(array) === prototype);
+assertEqual(array[1], 2);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
