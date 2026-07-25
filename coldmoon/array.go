@@ -129,13 +129,16 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) (c
 	newLenDesc := desc
 
 	newLenValue := desc.Value
-	newLen := JSInt(newLenValue.(*NumberValue).Data)
+	newLen, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, newLenValue), co)
+	if isAbrupt {
+		return rt
+	}
 	numberLen, isAbrupt, rt := ReturnIfAbrupt(newLenValue.ToNumber(agent), co)
 	if isAbrupt {
 		return rt
 	}
 
-	if JSInt(numberLen.Data) != newLen {
+	if numberLen.Data != newLen.ToNumber() {
 		return co.ThrowError(agent, RangeError, "Invalid array length")
 	}
 
@@ -151,17 +154,15 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) (c
 		return
 	}
 
-	if !desc.Writable {
+	if !oldLenDesc.Writable {
 		co.value = false
 		return
 	}
 
-	newWritable := false
-	if newLenDesc.Writable {
-		newWritable = true
-	} else {
-		newWritable = false
+	newWritable := !newLenDesc.WritableSet || newLenDesc.Writable
+	if !newWritable {
 		newLenDesc.Writable = true
+		newLenDesc.WritableSet = true
 	}
 
 	succeeded := OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), newLenDesc)
@@ -176,7 +177,8 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) (c
 			newLenDesc.Value = NewNumberValue(JSNumber(k) + 1)
 			if !newWritable {
 				succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), &PropertyDescriptor{
-					Writable: false,
+					Writable:    false,
+					WritableSet: true,
 				})
 				Assert(succeeded)
 			}
@@ -187,7 +189,8 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) (c
 
 	if !newWritable {
 		succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), &PropertyDescriptor{
-			Writable: false,
+			Writable:    false,
+			WritableSet: true,
 		})
 		Assert(succeeded)
 	}

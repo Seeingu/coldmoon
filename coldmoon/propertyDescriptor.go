@@ -3,6 +3,7 @@ package coldmoon
 type PropertyDescriptor struct {
 	Value        Value
 	Writable     bool
+	WritableSet  bool
 	Get          ObjectType
 	Set          ObjectType
 	Enumerable   bool
@@ -80,9 +81,10 @@ func (p *PropertyDescriptor) CompletePropertyDescriptor() {
 		if p.Value == nil {
 			p.Value = like.Value
 		}
-		if p.Writable == false {
+		if !p.WritableSet && !p.Writable {
 			p.Writable = like.Writable
 		}
+		p.WritableSet = true
 	} else {
 		if p.Get == nil {
 			p.Get = like.Get
@@ -105,5 +107,5 @@ func (p *PropertyDescriptor) IsFullyPopulated() bool {
 }
 
 func (p *PropertyDescriptor) HasFields() bool {
-	return p.Value != nil || p.Writable || p.Get != EmptyObject || p.Set != EmptyObject || p.Enumerable || p.Configurable
+	return p.Value != nil || p.WritableSet || p.Writable || p.Get != EmptyObject || p.Set != EmptyObject || p.Enumerable || p.Configurable
 }

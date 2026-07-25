@@ -365,9 +365,9 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		value := argumentsList[0]
 		n := NewNumberValue(0)
 		if len(argumentsList) > 0 {
+			value := argumentsList[0]
 			prim, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, value), co)
 			if isAbrupt {
 				return rt
@@ -393,7 +393,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		object := OrdinaryCreateFromConstructor(
 			agent,
 			newTarget,
-			"%Number.prototype", nil)
+			"%Number.prototype%", nil)
 		numberObject := &NumberObject{
 			Object: object,
 			Data:   n.Data,
@@ -402,8 +402,9 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		return (numberObject).ToValue()
 	}
 	object := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("Number"), builtinFunctionArgs{
-		realm:     realm,
-		prototype: realm.Intrinsics.FunctionPrototype,
+		realm:         realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		isConstructor: true,
 	})
 
 	var isFinite BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {

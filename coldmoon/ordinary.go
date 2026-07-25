@@ -145,6 +145,7 @@ func ValidateAndApplyPropertyDescriptor(
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
 				Value:        value,
 				Writable:     desc.Writable,
+				WritableSet:  true,
 				Enumerable:   desc.Enumerable,
 				Configurable: desc.Configurable,
 			})
@@ -208,6 +209,7 @@ func ValidateAndApplyPropertyDescriptor(
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
 				Value:        desc.Value,
 				Writable:     desc.Writable,
+				WritableSet:  true,
 				Enumerable:   enumerable,
 				Configurable: configurable,
 			})
@@ -233,6 +235,7 @@ func ValidateAndApplyPropertyDescriptor(
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
 				Value:        v,
 				Writable:     desc.Writable,
+				WritableSet:  true,
 				Enumerable:   enumerable,
 				Configurable: configurable,
 			})
@@ -243,7 +246,10 @@ func ValidateAndApplyPropertyDescriptor(
 			if v == nil {
 				v = current.Value
 			}
-			w := desc.Writable || current.Writable
+			w := current.Writable
+			if desc.WritableSet || desc.Writable {
+				w = desc.Writable
+			}
 			e := desc.Enumerable || current.Enumerable
 			c := desc.Configurable || current.Configurable
 			g := desc.Get
@@ -258,6 +264,7 @@ func ValidateAndApplyPropertyDescriptor(
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
 				Value:        v,
 				Writable:     w,
+				WritableSet:  true,
 				Get:          g,
 				Set:          s,
 				Enumerable:   e,

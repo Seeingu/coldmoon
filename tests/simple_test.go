@@ -332,6 +332,38 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayLengthCoercesPrimitiveAndBoxedValues verifies that array exotic
+// length assignment performs numeric conversion instead of requiring a number.
+func TestArrayLengthCoercesPrimitiveAndBoxedValues(t *testing.T) {
+	testSource(t, `let array = [];
+array.length = true;
+assertEqual(array.length, 1);
+array = [0];
+array.length = null;
+assertEqual(array.length, 0);
+array = [0];
+array.length = new Boolean(false);
+assertEqual(array.length, 0);
+array = [];
+array.length = new Number(1);
+assertEqual(array.length, 1);
+array = [];
+array.length = "1";
+assertEqual(array.length, 1);
+array = [];
+array.length = new String("1");
+assertEqual(array.length, 1);
+array = [0, 1];
+Object.defineProperty(array, "length", {
+  value: 1,
+  writable: false
+});
+assertEqual(array.length, 1);
+assertEqual(Object.getOwnPropertyDescriptor(array, "length").writable, false);
+array.length = 2;
+assertEqual(array.length, 1);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

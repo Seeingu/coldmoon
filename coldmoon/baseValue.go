@@ -76,6 +76,7 @@ func (b *BaseValue) ToPropertyDescriptor(agent *Agent) *PropertyDescriptor {
 	if hasWritable {
 		writable := object.Get(NewStringPropertyKey("writable")).ToBoolean()
 		desc.Writable = writable
+		desc.WritableSet = true
 	}
 
 	hasGet := object.HasProperty(NewStringPropertyKey("get"))
