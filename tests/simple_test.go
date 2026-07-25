@@ -126,7 +126,17 @@ Object.defineProperty(object, "setter", { set: undefined });
 assert(object.getter === undefined);
 assert(object.setter === undefined);
 assert(Object.prototype.hasOwnProperty.call(object, "getter"));
-assert(Object.prototype.hasOwnProperty.call(object, "setter"));`)
+assert(Object.prototype.hasOwnProperty.call(object, "setter"));
+const getterDescriptor = Object.getOwnPropertyDescriptor(object, "getter");
+assert(Object.prototype.hasOwnProperty.call(getterDescriptor, "get"));
+assert(getterDescriptor.get === undefined);
+const configurable = {};
+Object.defineProperty(configurable, "value", {
+  get: function() { return 1; },
+  configurable: true
+});
+Object.defineProperty(configurable, "value", { get: undefined });
+assert(configurable.value === undefined);`)
 }
 
 func TestPropertyDescriptorErrorsAreCatchableAndAtomic(t *testing.T) {

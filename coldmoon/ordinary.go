@@ -86,7 +86,9 @@ func OrdinaryGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescrip
 		}
 
 		d.Get = x.Get
+		d.GetSet = true
 		d.Set = x.Set
+		d.SetSet = true
 	}
 
 	d.Enumerable = x.Enumerable
@@ -135,7 +137,9 @@ func ValidateAndApplyPropertyDescriptor(
 		if desc.IsAccessorDescriptor() {
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
 				Get:             desc.Get,
+				GetSet:          true,
 				Set:             desc.Set,
+				SetSet:          true,
 				Enumerable:      desc.Enumerable,
 				EnumerableSet:   true,
 				Configurable:    desc.Configurable,
@@ -181,15 +185,11 @@ func ValidateAndApplyPropertyDescriptor(
 		}
 
 		if current.IsAccessorDescriptor() {
-			if desc.Get != nil &&
-				current.Get != nil &&
-				!pkg.FuncEqual(desc.Get, current.Get) {
+			if desc.GetSet && !ObjectSameValue(desc.Get, current.Get) {
 				return false
 			}
 
-			if desc.Set != nil &&
-				current.Set != nil &&
-				!pkg.FuncEqual(desc.Set, current.Set) {
+			if desc.SetSet && !ObjectSameValue(desc.Set, current.Set) {
 				return false
 			}
 		} else if !current.Writable {
@@ -221,7 +221,9 @@ func ValidateAndApplyPropertyDescriptor(
 			// iii. Replace the property named P of O with an accessor property.
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
 				Get:             desc.Get,
+				GetSet:          true,
 				Set:             desc.Set,
+				SetSet:          true,
 				Enumerable:      enumerable,
 				EnumerableSet:   true,
 				Configurable:    configurable,
@@ -264,14 +266,6 @@ func ValidateAndApplyPropertyDescriptor(
 		} else {
 			// i. For each field of Desc, set the corresponding attribute of the property named P
 			//    of object O to the value of the field.
-			v := desc.Value
-			if v == nil {
-				v = current.Value
-			}
-			w := current.Writable
-			if desc.WritableSet || desc.Writable {
-				w = desc.Writable
-			}
 			e := current.Enumerable
 			if desc.EnumerableSet {
 				e = desc.Enumerable
@@ -280,26 +274,44 @@ func ValidateAndApplyPropertyDescriptor(
 			if desc.ConfigurableSet {
 				c = desc.Configurable
 			}
-			g := desc.Get
-			if g == nil {
-				g = current.Get
+			if current.IsAccessorDescriptor() {
+				g := desc.Get
+				if !desc.GetSet {
+					g = current.Get
+				}
+				s := desc.Set
+				if !desc.SetSet {
+					s = current.Set
+				}
+				object.PropertyStorage().Set(key, &PropertyDescriptor{
+					Get:             g,
+					GetSet:          true,
+					Set:             s,
+					SetSet:          true,
+					Enumerable:      e,
+					EnumerableSet:   true,
+					Configurable:    c,
+					ConfigurableSet: true,
+				})
+			} else {
+				v := desc.Value
+				if v == nil {
+					v = current.Value
+				}
+				w := current.Writable
+				if desc.WritableSet {
+					w = desc.Writable
+				}
+				object.PropertyStorage().Set(key, &PropertyDescriptor{
+					Value:           v,
+					Writable:        w,
+					WritableSet:     true,
+					Enumerable:      e,
+					EnumerableSet:   true,
+					Configurable:    c,
+					ConfigurableSet: true,
+				})
 			}
-			s := desc.Set
-			if s == nil {
-				s = current.Set
-			}
-
-			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Value:           v,
-				Writable:        w,
-				WritableSet:     true,
-				Get:             g,
-				Set:             s,
-				Enumerable:      e,
-				EnumerableSet:   true,
-				Configurable:    c,
-				ConfigurableSet: true,
-			})
 		}
 	}
 

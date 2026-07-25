@@ -138,6 +138,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 		return rt
 	}
 	if hasGet {
+		desc.GetSet = true
 		get, isAbrupt, rt := ReturnIfAbrupt(
 			object.InternalMethods().Get(object, NewStringPropertyKey("get"), value),
 			co,
@@ -161,6 +162,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 		return rt
 	}
 	if hasSet {
+		desc.SetSet = true
 		set, isAbrupt, rt := ReturnIfAbrupt(
 			object.InternalMethods().Get(object, NewStringPropertyKey("set"), value),
 			co,

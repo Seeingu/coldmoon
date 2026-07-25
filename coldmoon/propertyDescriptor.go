@@ -5,7 +5,9 @@ type PropertyDescriptor struct {
 	Writable        bool
 	WritableSet     bool
 	Get             ObjectType
+	GetSet          bool
 	Set             ObjectType
+	SetSet          bool
 	Enumerable      bool
 	EnumerableSet   bool
 	Configurable    bool
@@ -32,12 +34,12 @@ type PropertyDescriptorAttributes struct {
 
 // 6.2.6.1
 func (p *PropertyDescriptor) IsAccessorDescriptor() bool {
-	return p.Get != nil || p.Set != nil
+	return p.GetSet || p.Get != nil || p.SetSet || p.Set != nil
 }
 
 // 6.2.6.2
 func (p *PropertyDescriptor) IsDataDescriptor() bool {
-	return p.Value != nil || p.Writable
+	return p.Value != nil || p.WritableSet || p.Writable
 }
 
 // 6.2.6.3
@@ -98,12 +100,8 @@ func (p *PropertyDescriptor) CompletePropertyDescriptor() {
 		}
 		p.WritableSet = true
 	} else {
-		if p.Get == nil {
-			p.Get = like.Get
-		}
-		if p.Set == nil {
-			p.Set = like.Set
-		}
+		p.GetSet = true
+		p.SetSet = true
 	}
 
 	if p.Enumerable == false {
@@ -117,10 +115,13 @@ func (p *PropertyDescriptor) CompletePropertyDescriptor() {
 }
 
 func (p *PropertyDescriptor) IsFullyPopulated() bool {
-	return p.Value != nil && p.Get != EmptyObject && p.Set != EmptyObject
+	if p.IsAccessorDescriptor() {
+		return p.GetSet && p.SetSet && p.EnumerableSet && p.ConfigurableSet
+	}
+	return p.Value != nil && p.WritableSet && p.EnumerableSet && p.ConfigurableSet
 }
 
 func (p *PropertyDescriptor) HasFields() bool {
-	return p.Value != nil || p.WritableSet || p.Writable || p.Get != EmptyObject || p.Set != EmptyObject ||
+	return p.Value != nil || p.WritableSet || p.Writable || p.GetSet || p.Get != nil || p.SetSet || p.Set != nil ||
 		p.EnumerableSet || p.Enumerable || p.ConfigurableSet || p.Configurable
 }
