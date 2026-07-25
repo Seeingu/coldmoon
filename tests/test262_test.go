@@ -18,7 +18,7 @@ import (
 // MARK: - Coverage config
 
 // expectedCoverage is the expected coverage rate.
-const expectedCoverage = 0.3
+const expectedCoverage = 0.95
 
 // supportFeatures is a list of features that are tested
 // and gather coverage information.
