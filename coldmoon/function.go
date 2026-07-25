@@ -48,24 +48,34 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 
 	// 20.2.3.3
 	call := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		if len(argumentsList) == 0 {
-			panic("")
+		thisArg := Value(UndefinedValue)
+		if len(argumentsList) > 0 {
+			thisArg = argumentsList[0]
 		}
-		thisArg := argumentsList[0]
-		args := argumentsList[1:]
+		var args []Value
+		if len(argumentsList) > 1 {
+			args = argumentsList[1:]
+		}
 		fun := this
 		if !IsCallable(fun) {
-			panic("TypeError")
+			var co CompletionValue
+			return co.ThrowTypeError(agent, "Function.prototype.call receiver is not callable")
 		}
 		return fun.Call(agent, thisArg, args)
 	}
 	bind := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		thisArg := argumentsList[0]
-		args := argumentsList[1:]
+		thisArg := Value(UndefinedValue)
+		if len(argumentsList) > 0 {
+			thisArg = argumentsList[0]
+		}
+		var args []Value
+		if len(argumentsList) > 1 {
+			args = argumentsList[1:]
+		}
 		target := this
 		if !IsCallable(target) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "Function.prototype.bind receiver is not callable")
 		}
 		targetObject := MustGetObject(target)
 		F := BoundFunctionCreate(realm.Agent, targetObject, thisArg, args)
@@ -103,11 +113,18 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 	f.defineBuiltinFunction(realm, CMString("bind"), bind, 1)
 
 	apply := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		thisArg := argumentsList[0]
-		argArray := argumentsList[1]
+		thisArg := Value(UndefinedValue)
+		if len(argumentsList) > 0 {
+			thisArg = argumentsList[0]
+		}
+		argArray := Value(UndefinedValue)
+		if len(argumentsList) > 1 {
+			argArray = argumentsList[1]
+		}
 		fun := this
 		if !IsCallable(fun) {
-			panic("TypeError")
+			var co CompletionValue
+			return co.ThrowTypeError(agent, "Function.prototype.apply receiver is not callable")
 		}
 
 		if argArray == UndefinedValue || argArray == NullValue {

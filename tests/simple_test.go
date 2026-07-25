@@ -91,6 +91,14 @@ assert(!(1 in mapped));
 assert(mapped[2] === 6);`)
 }
 
+func TestFunctionInvocationHelpersDefaultArguments(t *testing.T) {
+	testSource(t, `function count() { return arguments.length; }
+assert(count.apply() === 0);
+assert(count.call() === 0);
+const bound = count.bind();
+assert(bound() === 0);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
