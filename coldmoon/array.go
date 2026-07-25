@@ -261,23 +261,43 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		return NewBooleanValue(IsArray(arg))
 	}
 	var of BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		length := JSInt(len(args))
 		lenNumber := NewNumberValue(length.ToNumber())
 
 		constructor := this
 		var array ObjectType
 		if IsConstructor(constructor) {
-			array = MustGetObject(constructor).Construct(args, nil).value
+			constructed, isAbrupt, rt := ReturnIfAbrupt(
+				MustGetObject(constructor).Construct([]Value{lenNumber}, nil),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			array = constructed
 		} else {
 			array = ArrayCreate(realm.Agent, length, nil)
 		}
 
 		for k := range args {
 			propertyKey := NewIntegerIndexPropertyKey(JSInt(k))
-			array.CreateDataPropertyOrThrow(propertyKey, args[k])
+			_, isAbrupt, rt := ReturnIfAbrupt(
+				array.CreateDataPropertyOrThrow(propertyKey, args[k]),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
 		}
 
-		array.Set(NewStringPropertyKey("length"), lenNumber, setThrowTypeThrow)
+		_, isAbrupt, rt := ReturnIfAbrupt(
+			array.Set(NewStringPropertyKey("length"), lenNumber, setThrowTypeThrow),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		return array.ToValue()
 	}
 

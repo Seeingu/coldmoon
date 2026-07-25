@@ -291,6 +291,27 @@ assertEqual(descriptor.enumerable, true);
 assertEqual(descriptor.configurable, true);`)
 }
 
+// TestArrayOfPropagatesLengthSetterError verifies that Array.of forwards the
+// final Set operation's abrupt completion.
+func TestArrayOfPropagatesLengthSetterError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const C = function(length) {
+  assertEqual(length, 0);
+  Object.defineProperty(this, "length", {
+    set: function() {
+      throw sentinel;
+    }
+  });
+};
+let caught = null;
+try {
+  Array.of.call(C);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
