@@ -250,7 +250,7 @@ func (b *BaseValue) ToNumber(agent *Agent) (co Completion[*NumberValue]) {
 	case *ObjectValue:
 		primValue, isAbrupt, rt := ReturnIfAbrupt(value.ToPrimitive(agent, PreferredTypeNumber), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 		return primValue.ToNumber(agent)
 	}

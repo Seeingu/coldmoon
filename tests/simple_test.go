@@ -364,6 +364,24 @@ array.length = 2;
 assertEqual(array.length, 1);`)
 }
 
+// TestArrayLengthPropagatesNumericCoercionError verifies that a valueOf
+// exception remains catchable JavaScript state during ToUint32.
+func TestArrayLengthPropagatesNumericCoercionError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const array = [];
+let caught = null;
+try {
+  array.length = {
+    valueOf: function() {
+      throw sentinel;
+    }
+  };
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
