@@ -1168,6 +1168,89 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 		return NewBooleanValue(desc.Enumerable)
 	}
+	defineLegacyAccessor := func(this Value, args []Value, getter bool) CompletionConvertable[Value] {
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		property := pkg.SliceSafeGet(args, 0)
+		accessor := pkg.SliceSafeGet(args, 1)
+		if property == nil {
+			property = UndefinedValue
+		}
+		if accessor == nil {
+			accessor = UndefinedValue
+		}
+		if !IsCallable(accessor) {
+			return co.ThrowTypeError(agent, "legacy accessor must be callable")
+		}
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, property), co)
+		if isAbrupt {
+			return rt
+		}
+		desc := &PropertyDescriptor{
+			Enumerable:      true,
+			EnumerableSet:   true,
+			Configurable:    true,
+			ConfigurableSet: true,
+		}
+		if getter {
+			desc.Get = MustGetObject(accessor)
+			desc.GetSet = true
+		} else {
+			desc.Set = MustGetObject(accessor)
+			desc.SetSet = true
+		}
+		if !o.DefinePropertyOrThrow(key, desc) {
+			return co.ThrowTypeError(agent, "could not define legacy accessor")
+		}
+		return UndefinedValue
+	}
+	var defineGetter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return defineLegacyAccessor(this, args, true)
+	}
+	var defineSetter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return defineLegacyAccessor(this, args, false)
+	}
+	lookupLegacyAccessor := func(this Value, args []Value, getter bool) CompletionConvertable[Value] {
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		property := pkg.SliceSafeGet(args, 0)
+		if property == nil {
+			property = UndefinedValue
+		}
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, property), co)
+		if isAbrupt {
+			return rt
+		}
+		for o != nil {
+			desc := o.InternalMethods().GetOwnProperty(o, key)
+			if desc != nil {
+				if !desc.IsAccessorDescriptor() {
+					return UndefinedValue
+				}
+				if getter && desc.Get != nil {
+					return desc.Get.ToValue()
+				}
+				if !getter && desc.Set != nil {
+					return desc.Set.ToValue()
+				}
+				return UndefinedValue
+			}
+			o = o.InternalMethods().GetPrototypeOf(o)
+		}
+		return UndefinedValue
+	}
+	var lookupGetter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return lookupLegacyAccessor(this, args, true)
+	}
+	var lookupSetter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return lookupLegacyAccessor(this, args, false)
+	}
 	toLocaleString := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
 		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
@@ -1183,6 +1266,10 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("isPrototypeOf"), isPrototypeOf, 1)
 	object.defineBuiltinFunction(realm, CMString("propertyIsEnumerable"), propertyIsEnumerable, 1)
 	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
+	object.defineBuiltinFunction(realm, CMString("__defineGetter__"), defineGetter, 2)
+	object.defineBuiltinFunction(realm, CMString("__defineSetter__"), defineSetter, 2)
+	object.defineBuiltinFunction(realm, CMString("__lookupGetter__"), lookupGetter, 1)
+	object.defineBuiltinFunction(realm, CMString("__lookupSetter__"), lookupSetter, 1)
 
 	return object
 }

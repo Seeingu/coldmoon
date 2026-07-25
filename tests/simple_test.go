@@ -270,6 +270,19 @@ const entries = Object.entries(object);
 assert(entries.length === 2);`)
 }
 
+func TestObjectLegacyAccessorMethods(t *testing.T) {
+	testSource(t, `const object = {};
+function getter() { return 42; }
+function setter(value) { this.stored = value; }
+object.__defineGetter__("value", getter);
+object.__defineSetter__("other", setter);
+assert(object.value === 42);
+assert(object.__lookupGetter__("value") === getter);
+assert(object.__lookupSetter__("other") === setter);
+object.other = 7;
+assert(object.stored === 7);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,
