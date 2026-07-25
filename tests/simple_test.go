@@ -69,6 +69,14 @@ assert([1, 2, 3].reduceRight(function(a, b) { return a - b; }) === 0);
 assert([1].reduceRight(function(a) { return a; }, undefined) === undefined);`)
 }
 
+func TestArrayFindMethodsAdvanceAndDefaultThisArgument(t *testing.T) {
+	testSource(t, `const values = [1, 2, 3];
+assert(values.find(function(value) { return value === 2; }) === 2);
+assert(values.findIndex(function(value) { return value === 3; }) === 2);
+assert(values.findLast(function(value) { return value < 3; }) === 2);
+assert(values.findLastIndex(function(value) { return value < 3; }) === 1);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

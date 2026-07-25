@@ -22,7 +22,7 @@ type ObjectType interface {
 		direction direction,
 		predicate Value,
 		thisArg Value,
-	) FoundResult
+	) Completion[FoundResult]
 	Get(key PropertyKey) Value
 	Set(key PropertyKey, value Value, throw setThrowType) CompletionValue
 	Agent() *Agent

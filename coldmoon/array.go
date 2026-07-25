@@ -760,51 +760,87 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(-1)
 	}
 	var find BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		predicate := args[0]
-		thisArg := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		predicate := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if predicate == nil {
+			predicate = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
-		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
+		findRec, isAbrupt, rt := ReturnIfAbrupt(o.FindViaPredicate(length, DirectionAscending, predicate, thisArg), co)
+		if isAbrupt {
+			return rt
+		}
 		return findRec.Value
 	}
 	var findIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		predicate := args[0]
-		thisArg := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		predicate := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if predicate == nil {
+			predicate = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
-		findRec := o.FindViaPredicate(length, DirectionAscending, predicate, thisArg)
+		findRec, isAbrupt, rt := ReturnIfAbrupt(o.FindViaPredicate(length, DirectionAscending, predicate, thisArg), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(findRec.Index.ToNumber())
 	}
 	var findLast BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		predicate := args[0]
-		thisArg := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		predicate := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if predicate == nil {
+			predicate = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
-		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
+		findRec, isAbrupt, rt := ReturnIfAbrupt(o.FindViaPredicate(length, DirectionDescending, predicate, thisArg), co)
+		if isAbrupt {
+			return rt
+		}
 		return findRec.Value
 	}
 	var findLastIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		predicate := args[0]
-		thisArg := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		predicate := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if predicate == nil {
+			predicate = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
-		findRec := o.FindViaPredicate(length, DirectionDescending, predicate, thisArg)
+		findRec, isAbrupt, rt := ReturnIfAbrupt(o.FindViaPredicate(length, DirectionDescending, predicate, thisArg), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewNumberValue(findRec.Index.ToNumber())
 	}
 	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {

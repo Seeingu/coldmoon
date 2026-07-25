@@ -1198,9 +1198,12 @@ func (o *Object) FindViaPredicate(
 	direction direction,
 	predicate Value,
 	thisArg Value,
-) FoundResult {
+) (co Completion[FoundResult]) {
+	if thisArg == nil {
+		thisArg = UndefinedValue
+	}
 	if !IsCallable(predicate) {
-		panic("TypeError")
+		return co.ThrowTypeError(o.Agent(), "predicate is not callable")
 	}
 
 	var k JSInt
@@ -1218,21 +1221,40 @@ func (o *Object) FindViaPredicate(
 			break
 		}
 		pk := NewIntegerIndexPropertyKey(k)
-		kValue := o.Ref().Get(pk)
-		testResult := predicate.Call(o.Agent(), thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()}).value
+		kValue, isAbrupt, rt := ReturnIfAbrupt(
+			o.InternalMethods().Get(o.Ref(), pk, o.ToValue()),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		testResult, isAbrupt, rt := ReturnIfAbrupt(
+			predicate.Call(o.Agent(), thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()}),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 
 		if testResult.ToBoolean() {
-			return FoundResult{
+			co.value = FoundResult{
 				Index: k,
 				Value: kValue,
 			}
+			return
+		}
+		if direction == DirectionAscending {
+			k++
+		} else {
+			k--
 		}
 	}
 
-	return FoundResult{
+	co.value = FoundResult{
 		Index: -1,
 		Value: UndefinedValue,
 	}
+	return
 }
 
 func SameObject(o1, o2 ObjectType) bool {

@@ -182,7 +182,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		taRecord := ValidateTypedArray(agent, this, SeqCst)
 		length := TypedArrayLength(taRecord)
-		findRec := MustGetObject(O).FindViaPredicate(length, DirectionAscending, predicate, thisArg)
+		findRec := ReturnAssertNormal(MustGetObject(O).FindViaPredicate(length, DirectionAscending, predicate, thisArg))
 		return findRec.Value
 	}
 	taFindIndex := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -191,7 +191,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
-		findRec := MustGetObject(O).FindViaPredicate(length, DirectionAscending, predicate, thisArg)
+		findRec := ReturnAssertNormal(MustGetObject(O).FindViaPredicate(length, DirectionAscending, predicate, thisArg))
 		return findRec.Index.ToValue()
 	}
 	taFindLast := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -200,7 +200,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
-		findRec := MustGetObject(O).FindViaPredicate(length, DirectionDescending, predicate, thisArg)
+		findRec := ReturnAssertNormal(MustGetObject(O).FindViaPredicate(length, DirectionDescending, predicate, thisArg))
 		return findRec.Value
 	}
 	taFindLastIndex := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -209,7 +209,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
-		findRec := MustGetObject(O).FindViaPredicate(length, DirectionDescending, predicate, thisArg)
+		findRec := ReturnAssertNormal(MustGetObject(O).FindViaPredicate(length, DirectionDescending, predicate, thisArg))
 		return findRec.Index.ToValue()
 	}
 	taForEach := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
