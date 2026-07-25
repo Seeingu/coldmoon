@@ -202,12 +202,26 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewStringValue(thisArgument.ThisStringValue())
 	}
 	toLowerCase := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		s := this.ThisStringValue()
-		return NewStringValue(strings.ToLower(s))
+		var co CompletionValue
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String case conversion called on null or undefined")
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewStringValue(strings.ToLower(s.Data))
 	}
 	toUpperCase := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		s := this.ThisStringValue()
-		return NewStringValue(strings.ToUpper(s))
+		var co CompletionValue
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String case conversion called on null or undefined")
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewStringValue(strings.ToUpper(s.Data))
 	}
 	isTrimWhiteSpace := func(r rune) bool {
 		switch r {
@@ -1004,6 +1018,8 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("codePointAt"), codePointAt, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("toLowerCase"), toLowerCase, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("toUpperCase"), toUpperCase, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toLocaleLowerCase"), toLowerCase, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toLocaleUpperCase"), toUpperCase, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("trim"), trim, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("trimEnd"), trimEnd, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("trimStart"), trimStart, 0)
@@ -1034,6 +1050,8 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("codePointAt"), codePointAt, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("toLowerCase"), toLowerCase, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("toUpperCase"), toUpperCase, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toLocaleLowerCase"), toLowerCase, 0)
+	stringPrototype.defineBuiltinFunction(realm, CMString("toLocaleUpperCase"), toUpperCase, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("trim"), trim, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("trimEnd"), trimEnd, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("trimStart"), trimStart, 0)

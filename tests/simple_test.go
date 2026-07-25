@@ -323,6 +323,15 @@ try {
 assert(caught instanceof TypeError);`)
 }
 
+func TestStringCaseConversionCoercesReceivers(t *testing.T) {
+	testSource(t, `assert(String.prototype.toLowerCase.call("ABC") === "abc");
+assert(String.prototype.toUpperCase.call("abc") === "ABC");
+assert(String.prototype.toLowerCase.call(true) === "true");
+assert(String.prototype.toUpperCase.call(123) === "123");
+assert("ABC".toLocaleLowerCase() === "abc");
+assert("abc".toLocaleUpperCase() === "ABC");`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
