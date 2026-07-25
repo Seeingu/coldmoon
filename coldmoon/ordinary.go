@@ -206,15 +206,10 @@ func ValidateAndApplyPropertyDescriptor(
 			//     let enumerable be current.[[Enumerable]].
 			enumerable := desc.Enumerable || current.Enumerable
 
-			// iii. Replace the property named P of object O with a data property whose
-			//      [[Configurable]] and [[Enumerable]] attributes are set to configurable and
-			//      enumerable, respectively, and whose [[Value]] and [[Writable]] attributes are
-			//      set to the value of the corresponding field in Desc if Desc has that field, or
-			//      to the attribute's default value otherwise.
+			// iii. Replace the property named P of O with an accessor property.
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Value:        desc.Value,
-				Writable:     desc.Writable,
-				WritableSet:  true,
+				Get:          desc.Get,
+				Set:          desc.Set,
 				Enumerable:   enumerable,
 				Configurable: configurable,
 			})

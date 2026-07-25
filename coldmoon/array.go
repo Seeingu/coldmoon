@@ -1170,10 +1170,29 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				k := JSInt(0)
 				for k < length {
 					pk := NewIntegerIndexPropertyKey(k)
-					kPresent := MustGetObject(element).HasProperty(pk)
+					elementObject := MustGetObject(element)
+					kPresent, isAbrupt, rt := ReturnIfAbrupt(
+						elementObject.InternalMethods().HasProperty(elementObject, pk),
+						co,
+					)
+					if isAbrupt {
+						return rt
+					}
 					if kPresent {
-						kValue := MustGetObject(element).Get(pk)
-						A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(n), kValue)
+						kValue, isAbrupt, rt := ReturnIfAbrupt(
+							elementObject.InternalMethods().Get(elementObject, pk, element),
+							co,
+						)
+						if isAbrupt {
+							return rt
+						}
+						_, isAbrupt, rt = ReturnIfAbrupt(
+							A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(n), kValue),
+							co,
+						)
+						if isAbrupt {
+							return rt
+						}
 					}
 					k++
 					n++

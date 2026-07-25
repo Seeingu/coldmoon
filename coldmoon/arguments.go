@@ -36,13 +36,27 @@ func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *Proper
 	}
 	if isMapped {
 		if desc.IsAccessorDescriptor() {
-			_map.InternalMethods().Delete(_map, key)
+			deleted, isAbrupt, rt := ReturnIfAbrupt(
+				_map.InternalMethods().Delete(_map, key),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			Assert(deleted)
 		} else {
 			if desc.Value != nil {
 				_map.Set(key, desc.Value, setThrowTypeIgnore)
 			}
 			if !desc.Writable {
-				_map.InternalMethods().Delete(_map, key)
+				deleted, isAbrupt, rt := ReturnIfAbrupt(
+					_map.InternalMethods().Delete(_map, key),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				Assert(deleted)
 			}
 		}
 	}

@@ -715,6 +715,42 @@ assertEqual(result.values[1], 2);
 assertEqual(result.values[2], 3);`)
 }
 
+// TestArrayConcatPropagatesArgumentsGetterError verifies element access on a
+// mapped arguments exotic object preserves an abrupt getter completion.
+func TestArrayConcatPropagatesArgumentsGetterError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const args = (function(a) {
+  return arguments;
+})(1);
+let calls = 0;
+const getter = function() {
+  calls++;
+  throw sentinel;
+};
+Object.defineProperty(args, "0", {
+  get: getter
+});
+const descriptor = Object.getOwnPropertyDescriptor(args, "0");
+assert(descriptor.get === getter, "mapped argument descriptor getter");
+let direct = null;
+try {
+  direct = args[0];
+} catch (error) {
+  direct = error;
+}
+assert(calls === 1, "mapped argument getter call count");
+assert(direct !== null, "direct mapped argument getter throws");
+assert(direct === sentinel, "direct mapped argument getter");
+args[Symbol.isConcatSpreadable] = true;
+let caught = null;
+try {
+  [].concat(args);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel, "concat mapped argument getter");`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
