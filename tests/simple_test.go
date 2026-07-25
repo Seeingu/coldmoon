@@ -283,6 +283,15 @@ object.other = 7;
 assert(object.stored === 7);`)
 }
 
+func TestObjectAssignReadsEachSource(t *testing.T) {
+	testSource(t, `const target = { existing: 1 };
+const result = Object.assign(target, { alpha: 2 }, { beta: 3 });
+assert(result === target);
+assert(result.existing === 1);
+assert(result.alpha === 2);
+assert(result.beta === 3);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,

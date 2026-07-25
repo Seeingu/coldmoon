@@ -934,7 +934,10 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 	var assign BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		target := args[0]
+		target := pkg.SliceSafeGet(args, 0)
+		if target == nil {
+			target = UndefinedValue
+		}
 		to, isAbrupt, rt := ReturnIfAbrupt(target.ToObject(agent), co)
 		if isAbrupt {
 			return rt
@@ -945,7 +948,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		for _, nextSource := range sources {
 			if nextSource != UndefinedValue && nextSource != NullValue {
-				from, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+				from, isAbrupt, rt := ReturnIfAbrupt(nextSource.ToObject(agent), co)
 				if isAbrupt {
 					return rt
 				}
@@ -954,7 +957,13 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 					desc := from.InternalMethods().GetOwnProperty(from, nextKey)
 					if desc != nil && desc.Enumerable {
 						propValue := from.Get(nextKey)
-						to.Set(nextKey, propValue, setThrowTypeThrow)
+						_, isAbrupt, rt := ReturnIfAbrupt(
+							to.Set(nextKey, propValue, setThrowTypeThrow),
+							co,
+						)
+						if isAbrupt {
+							return rt
+						}
 					}
 				}
 			}
