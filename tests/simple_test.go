@@ -835,6 +835,20 @@ values.forEach(function(value) {
 });`)
 }
 
+// TestForInAssignmentTargetAndEscapedString verifies a bare assignment target
+// in for-in loops and escaped delimiters in string literals.
+func TestForInAssignmentTargetAndEscapedString(t *testing.T) {
+	testSource(t, `var key;
+var seen = false;
+for (key in { visible: 1 }) {
+  if (key === "visible") {
+    seen = true;
+  }
+}
+assert(seen);
+assert('single quote: \'' === "single quote: '");`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

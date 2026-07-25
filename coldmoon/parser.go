@@ -1235,7 +1235,7 @@ func (p *Parser) forInOfStatement() *ForInOfStatement {
 	} else if p.tokenizer.CurrentToken.Type == TLet || p.tokenizer.CurrentToken.Type == TConst {
 		init.ForDeclaration = p.forDeclaration()
 	} else {
-		init.LeftHandSideExpression = p.expression(p.acceptContextLowest())
+		init.LeftHandSideExpression = p.expression(p.acceptContextHigherThan(TIn))
 	}
 
 	var statementType ForInOfStatementType

@@ -4591,7 +4591,9 @@ func (f *ForInOfStatement) astIsVarForBinding() bool {
 func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue) {
 	kind := IteratorKindSync
 	iterationKind := ForInOfIterationKindIterate
-	if f.IsAwait {
+	if f.astIsIn() {
+		iterationKind = ForInOfIterationKindEnumerate
+	} else if f.IsAwait {
 		kind = IteratorKindAsync
 		iterationKind = ForInOfIterationKindAsyncIterate
 	}
@@ -4657,10 +4659,28 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co 
 			labelSet,
 			kind,
 		)
-
-	} else {
-		panic("unimplemented")
 	}
+
+	keyResult, isAbrupt, rt := ReturnIfAbrupt(
+		vm.ForInOfHeadEvaluation(
+			[]string{},
+			f.Expression,
+			iterationKind,
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	return vm.ForInOfBodyEvaluation(
+		f.Initializer.LeftHandSideExpression,
+		f.Body,
+		keyResult,
+		iterationKind,
+		ForInOfLhsKindAssignment,
+		labelSet,
+		kind,
+	)
 }
 
 type ForInOfIterationKind int

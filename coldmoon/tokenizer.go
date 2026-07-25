@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/Seeingu/coldmoon/pkg"
 	lo "github.com/samber/lo"
@@ -371,20 +372,47 @@ func (t *Tokenizer) comment(commentType string) string {
 
 // MARK: - String
 func (t *Tokenizer) string() Token {
-	// TODO: handle escape
-	start := t.Index + 1
 	quote := t.SourceText[t.Index]
 	t.step()
+	var value strings.Builder
 	for !t.atEnd() {
 		ch := t.SourceText[t.Index]
 		if ch == quote {
 			t.step()
-			break
+			return t.newToken(TString, value.String())
 		}
+		if ch != '\\' {
+			value.WriteRune(ch)
+			t.step()
+			continue
+		}
+
 		t.step()
+		if t.atEnd() {
+			panic("unterminated string escape")
+		}
+		escaped := t.SourceText[t.Index]
+		t.step()
+		switch escaped {
+		case 'b':
+			value.WriteRune('\b')
+		case 'f':
+			value.WriteRune('\f')
+		case 'n':
+			value.WriteRune('\n')
+		case 'r':
+			value.WriteRune('\r')
+		case 't':
+			value.WriteRune('\t')
+		case 'v':
+			value.WriteRune('\v')
+		case '\n':
+			// A line continuation contributes no character.
+		default:
+			value.WriteRune(escaped)
+		}
 	}
-	value := string(t.SourceText[start : t.Index-1])
-	return t.newToken(TString, value)
+	panic("unterminated string")
 }
 
 // MARK: - Number

@@ -494,8 +494,18 @@ func (v *VM) ForInOfBodyEvaluation(
 						return rt
 					}
 				} else {
-					lhs.Evaluation(v)
-					// TODO: check is abrupt
+					lhsValue, isAbrupt, rt := ReturnIfAbrupt(lhs.Evaluation(v), co)
+					if isAbrupt {
+						return rt
+					}
+					lhsRef, ok := lhsValue.ReferenceRecord()
+					if !ok {
+						return co.ThrowTypeError(agent, "for-in target is not assignable")
+					}
+					_, isAbrupt, rt = ReturnIfAbrupt(lhsRef.PutValue(agent, nextValue), co)
+					if isAbrupt {
+						return rt
+					}
 				}
 			}
 		} else {
