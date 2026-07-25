@@ -2751,7 +2751,22 @@ func (e *RelationalExpression) Evaluation(vm *VM) (co CompletionValue) {
 	case RelationalOperatorInstanceof:
 		return NewBooleanValue(vm.InstanceOfOperator(lval, rval)).ToCompletion()
 	case RelationalOperatorIn:
-		panic("unimplemented")
+		if !rval.IsObject() {
+			return co.ThrowTypeError(vm.agent, "right-hand side of 'in' is not an object")
+		}
+		propertyKey, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, lval), co)
+		if isAbrupt {
+			return rt
+		}
+		object := MustGetObject(rval)
+		hasProperty, isAbrupt, rt := ReturnIfAbrupt(
+			object.InternalMethods().HasProperty(object, propertyKey),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(hasProperty).ToCompletion()
 	}
 	panic("unreachable")
 }

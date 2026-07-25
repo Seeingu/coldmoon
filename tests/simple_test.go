@@ -589,6 +589,17 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestInOperatorUsesHasProperty verifies property-key conversion and prototype
+// lookup through the language-level relational operator.
+func TestInOperatorUsesHasProperty(t *testing.T) {
+	testSource(t, `const prototype = { inherited: true };
+const object = Object.create(prototype);
+object.own = true;
+assert("own" in object);
+assert("inherited" in object);
+assertEqual("missing" in object, false);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
