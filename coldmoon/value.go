@@ -309,7 +309,7 @@ func StringToNumber(value *StringValue) *NumberValue {
 	}
 
 	n, err := strconv.ParseFloat(strings.Trim(value.Data, " "), 64)
-	if err != nil {
+	if err != nil && !math.IsInf(n, 0) {
 		return NaNValue
 	}
 

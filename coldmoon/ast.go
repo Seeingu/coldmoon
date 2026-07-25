@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -1439,7 +1440,7 @@ func (l *NumericLiteral) NumericValue() (Value, error) {
 		return NewBigIntValue(bi), nil
 	}
 	num, err := strconv.ParseFloat(l.Value, 64)
-	if err != nil {
+	if err != nil && !math.IsInf(num, 0) {
 		return nil, err
 	}
 	return NewNumberValue(JSNumber(num)), nil

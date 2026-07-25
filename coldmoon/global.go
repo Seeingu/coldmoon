@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -223,7 +224,7 @@ func NewParseFloat(realm *Realm) ObjectType {
 		trimmedString := inputString.TrimString()
 
 		f, err := strconv.ParseFloat(trimmedString, 64)
-		if err != nil {
+		if err != nil && !math.IsInf(f, 0) {
 			return NaNValue
 		}
 		return NewNumberValue(JSNumber(f))

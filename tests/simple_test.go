@@ -936,6 +936,14 @@ try {
 assert(caught instanceof RangeError);`)
 }
 
+// TestNumericOverflowProducesInfinity verifies decimal parsing accepts
+// strconv range results as JavaScript infinities.
+func TestNumericOverflowProducesInfinity(t *testing.T) {
+	testSource(t, `assert(10e10000 === Infinity);
+assert(Number("10e10000") === Infinity);
+assert(parseFloat("-10e10000") === -Infinity);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
