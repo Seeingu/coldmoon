@@ -323,7 +323,14 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		if usingIterator != nil {
 			var a ObjectType
 			if IsConstructor(c) {
-				a = MustGetObject(c).Construct([]Value{NewNumberValue(0)}, nil).value
+				constructed, isAbrupt, rt := ReturnIfAbrupt(
+					MustGetObject(c).Construct(nil, nil),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				a = constructed
 			} else {
 				a = ArrayCreate(agent, 0, nil)
 			}

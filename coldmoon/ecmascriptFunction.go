@@ -437,21 +437,22 @@ func (e *ECMAScriptFunction) Construct(
 
 	constructorEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
 
-	result, isAbrupt, rt := ReturnIfAbrupt(OrdinaryCallEvaluateBody(agent, function, argumentsList), co)
+	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
 
 	agent.ExecutionContextStack.Pop()
 
-	if isAbrupt {
-		if o, ok := result.(*ObjectValue); ok {
+	if result.t == CompletionTypeReturn {
+		if o, ok := result.value.(*ObjectValue); ok {
 			return o.Object.ToCompletion()
 		}
 		if kind == ConstructorKindBase {
 			return MustGetObject(thisArgument).ToCompletion()
 		}
-		if result != UndefinedValue {
+		if result.value != UndefinedValue {
 			return co.ThrowTypeError(agent, "Construct TypeError")
 		}
-		return rt
+	} else if result.IsAbrupt() {
+		return CompletionFrom(co, result)
 	}
 
 	thisBinding := constructorEnv.GetThisBinding()

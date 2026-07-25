@@ -119,6 +119,24 @@ assert(caught === sentinel);
 assertEqual(closeCount, 1);`)
 }
 
+// TestArrayFromPropagatesCustomConstructorError verifies that the iterable
+// path stops before iteration when construction completes abruptly.
+func TestArrayFromPropagatesCustomConstructorError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const C = function() {
+  throw sentinel;
+};
+const items = {};
+items[Symbol.iterator] = function() {};
+let caught = null;
+try {
+  Array.from.call(C, items);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
