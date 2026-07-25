@@ -944,6 +944,14 @@ assert(Number("10e10000") === Infinity);
 assert(parseFloat("-10e10000") === -Infinity);`)
 }
 
+// TestBigIntToNumberConversion verifies unary BigInt operations allocate a
+// result and preserve Number conversion rounding.
+func TestBigIntToNumberConversion(t *testing.T) {
+	testSource(t, `assert(Number(2n ** 53n + 1n) === 9007199254740992);
+assert(Number(-(2n ** 53n + 3n)) === -9007199254740996);
+assert(~0n === -1n);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

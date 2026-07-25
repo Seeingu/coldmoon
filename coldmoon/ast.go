@@ -2924,7 +2924,7 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 			if n != nil {
 				return NewNumberValue(-n.Data).ToCompletion()
 			} else {
-				return NewBigIntValue(b.Data.Neg(nil)).ToCompletion()
+				return b.UnaryMinus().ToCompletion()
 			}
 		} else {
 			Assert(false)
@@ -2943,7 +2943,7 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 			if n != nil {
 				return NewNumberValue(JSNumber(^int64(n.Data))).ToCompletion()
 			} else {
-				return NewBigIntValue(b.Data.Not(nil)).ToCompletion()
+				return b.BitwiseNot().ToCompletion()
 			}
 		} else {
 			Assert(false)
