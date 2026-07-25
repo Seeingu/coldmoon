@@ -221,10 +221,13 @@ func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) (co Compl
 // 7.3.5
 func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 	newDesc := o.InternalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
-		Value:        value,
-		Writable:     true,
-		Enumerable:   true,
-		Configurable: true,
+		Value:           value,
+		Writable:        true,
+		WritableSet:     true,
+		Enumerable:      true,
+		EnumerableSet:   true,
+		Configurable:    true,
+		ConfigurableSet: true,
 	})
 	return ReturnAssertNormal(newDesc)
 }
@@ -234,10 +237,13 @@ func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) (co Completion[bool]) {
 	success, isAbrupt, rt := ReturnIfAbrupt(
 		o.InternalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
-			Value:        value,
-			Writable:     true,
-			Enumerable:   true,
-			Configurable: true,
+			Value:           value,
+			Writable:        true,
+			WritableSet:     true,
+			Enumerable:      true,
+			EnumerableSet:   true,
+			Configurable:    true,
+			ConfigurableSet: true,
 		}),
 		co,
 	)
