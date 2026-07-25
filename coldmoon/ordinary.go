@@ -186,7 +186,7 @@ func ValidateAndApplyPropertyDescriptor(
 				return false
 			}
 
-			if !SameValue(desc.Value, current.Value) {
+			if desc.Value != nil && !SameValue(desc.Value, current.Value) {
 				return false
 			}
 		}

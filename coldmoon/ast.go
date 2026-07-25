@@ -5933,8 +5933,18 @@ func (s StatementList) ContainsDirective(directive string) bool {
 		}
 		statementItem := item.(*StatementListItemStatement).Statement
 		statementExpression := statementItem.(*StatementExpression).Expression
-		primary := statementExpression.(*ExpressionPrimary).PrimaryExpression
-		literal := primary.(Literal).(*StringLiteral)
+		var literal *StringLiteral
+		switch expression := statementExpression.(type) {
+		case *StringLiteral:
+			literal = expression
+		case *ExpressionPrimary:
+			literal = expression.PrimaryExpression.(Literal).(*StringLiteral)
+		default:
+			break
+		}
+		if literal == nil {
+			break
+		}
 		if literal.Value == directive {
 			return true
 		}

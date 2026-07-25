@@ -605,5 +605,8 @@ func UpdateEmpty(result CompletionValue, V Value) CompletionValue {
 
 func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {
 	vm2 := NewVM2(agent)
+	if functionBody, ok := node.(*FunctionBody); ok {
+		vm2.containedInStrictCode = functionBody.Strict
+	}
 	return node.Evaluation(vm2)
 }

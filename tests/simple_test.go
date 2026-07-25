@@ -382,6 +382,37 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayLengthCoercionPrecedesWritableCheck verifies both numeric coercions
+// happen before a side effect makes the current length non-writable.
+func TestArrayLengthCoercionPrecedesWritableCheck(t *testing.T) {
+	testSource(t, `let array = [1, 2, 3];
+let coercions = 0;
+const length = {};
+length[Symbol.toPrimitive] = function(hint) {
+  assertEqual(hint, "number");
+  coercions += 1;
+  Object.defineProperty(array, "length", { writable: false });
+  return 0;
+};
+assertEqual(Reflect.set(array, "length", length), false);
+assertEqual(coercions, 2);
+assertEqual(array.length, 3);
+array = [1, 2, 3];
+coercions = 0;
+let caught = null;
+try {
+  (function() {
+    "use strict";
+    array.length = length;
+  })();
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);
+assertEqual(coercions, 2);
+assertEqual(array.length, 3);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

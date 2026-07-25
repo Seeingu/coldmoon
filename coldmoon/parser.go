@@ -499,6 +499,7 @@ func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 	list := p.statementList()
 	return &FunctionBody{
 		StatementList: list,
+		Strict:        list.ContainsDirective("use strict"),
 		Type:          functionType,
 	}
 }
