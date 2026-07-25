@@ -202,7 +202,7 @@ func NewSymbolPrototype(realm *Realm) ObjectType {
 	})
 	object.defineBuiltinFunctionWithAttributes(
 		realm,
-		WellKnownSymbolsToPrimitive, toPrimitive, 0,
+		WellKnownSymbolsToPrimitive, toPrimitive, 1,
 		PropertyDescriptorAttributes{
 			Writable:     false,
 			Enumerable:   false,
