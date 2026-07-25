@@ -70,6 +70,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 		}
 		enumerable := enumerableValue.ToBoolean()
 		desc.Enumerable = enumerable
+		desc.EnumerableSet = true
 	}
 
 	hasConfigurable, isAbrupt, rt := ReturnIfAbrupt(
@@ -89,6 +90,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 		}
 		configurable := configurableValue.ToBoolean()
 		desc.Configurable = configurable
+		desc.ConfigurableSet = true
 	}
 
 	hasValue, isAbrupt, rt := ReturnIfAbrupt(

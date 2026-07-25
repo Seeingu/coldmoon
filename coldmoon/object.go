@@ -331,7 +331,8 @@ func SetIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 	case IntegrityLevelSealed:
 		for _, k := range keys {
 			o.DefinePropertyOrThrow(k, &PropertyDescriptor{
-				Configurable: false,
+				Configurable:    false,
+				ConfigurableSet: true,
 			})
 		}
 	case IntegrityLevelFrozen:
@@ -342,12 +343,15 @@ func SetIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 			if currentDesc != nil {
 				if currentDesc.IsAccessorDescriptor() {
 					desc = &PropertyDescriptor{
-						Configurable: false,
+						Configurable:    false,
+						ConfigurableSet: true,
 					}
 				} else {
 					desc = &PropertyDescriptor{
-						Configurable: false,
-						Writable:     false,
+						Configurable:    false,
+						ConfigurableSet: true,
+						Writable:        false,
+						WritableSet:     true,
 					}
 				}
 				o.DefinePropertyOrThrow(k, desc)
@@ -372,7 +376,7 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 			continue
 		}
 
-		if !currentDesc.Configurable {
+		if currentDesc.Configurable {
 			return false
 		}
 

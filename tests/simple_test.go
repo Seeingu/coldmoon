@@ -127,6 +127,16 @@ try {
 assert(!Object.prototype.hasOwnProperty.call(object, "first"));`)
 }
 
+func TestObjectIntegrityLevelsUseConcreteObjectIdentity(t *testing.T) {
+	testSource(t, `const array = [1, 2];
+Object.seal(array);
+assert(Object.isSealed(array));
+assert(!Object.isFrozen(array));
+Object.freeze(array);
+assert(Object.isFrozen(array));
+assert(!Object.isExtensible(array));`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

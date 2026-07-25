@@ -1,21 +1,26 @@
 package coldmoon
 
 type PropertyDescriptor struct {
-	Value        Value
-	Writable     bool
-	WritableSet  bool
-	Get          ObjectType
-	Set          ObjectType
-	Enumerable   bool
-	Configurable bool
+	Value           Value
+	Writable        bool
+	WritableSet     bool
+	Get             ObjectType
+	Set             ObjectType
+	Enumerable      bool
+	EnumerableSet   bool
+	Configurable    bool
+	ConfigurableSet bool
 }
 
 func NewFrozenPropertyDescriptor(value Value) *PropertyDescriptor {
 	return &PropertyDescriptor{
-		Value:        value,
-		Writable:     false,
-		Enumerable:   false,
-		Configurable: false,
+		Value:           value,
+		Writable:        false,
+		WritableSet:     true,
+		Enumerable:      false,
+		EnumerableSet:   true,
+		Configurable:    false,
+		ConfigurableSet: true,
 	}
 }
 
@@ -104,9 +109,11 @@ func (p *PropertyDescriptor) CompletePropertyDescriptor() {
 	if p.Enumerable == false {
 		p.Enumerable = like.Enumerable
 	}
+	p.EnumerableSet = true
 	if p.Configurable == false {
 		p.Configurable = like.Configurable
 	}
+	p.ConfigurableSet = true
 }
 
 func (p *PropertyDescriptor) IsFullyPopulated() bool {
@@ -114,5 +121,6 @@ func (p *PropertyDescriptor) IsFullyPopulated() bool {
 }
 
 func (p *PropertyDescriptor) HasFields() bool {
-	return p.Value != nil || p.WritableSet || p.Writable || p.Get != EmptyObject || p.Set != EmptyObject || p.Enumerable || p.Configurable
+	return p.Value != nil || p.WritableSet || p.Writable || p.Get != EmptyObject || p.Set != EmptyObject ||
+		p.EnumerableSet || p.Enumerable || p.ConfigurableSet || p.Configurable
 }

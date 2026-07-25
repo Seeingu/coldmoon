@@ -49,7 +49,7 @@ func OrdinarySetPrototypeOf(object ObjectType, prototype ObjectType) bool {
 }
 
 func InternalIsExtensible(object ObjectType) bool {
-	return OrdinaryIsExtensible(object.(*Object))
+	return object.Extensible()
 }
 
 func OrdinaryIsExtensible(object *Object) bool {
@@ -57,11 +57,11 @@ func OrdinaryIsExtensible(object *Object) bool {
 }
 
 func InternalPreventExtensions(object ObjectType) bool {
-	return OrdinaryPreventExtensions(object.(*Object))
+	return OrdinaryPreventExtensions(object)
 }
 
-func OrdinaryPreventExtensions(object *Object) bool {
-	object.data.extensible = false
+func OrdinaryPreventExtensions(object ObjectType) bool {
+	object.SetExtensible(false)
 	return true
 }
 
@@ -90,7 +90,9 @@ func OrdinaryGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescrip
 	}
 
 	d.Enumerable = x.Enumerable
+	d.EnumerableSet = true
 	d.Configurable = x.Configurable
+	d.ConfigurableSet = true
 
 	return d
 }
@@ -132,10 +134,12 @@ func ValidateAndApplyPropertyDescriptor(
 
 		if desc.IsAccessorDescriptor() {
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Get:          desc.Get,
-				Set:          desc.Set,
-				Enumerable:   desc.Enumerable,
-				Configurable: desc.Configurable,
+				Get:             desc.Get,
+				Set:             desc.Set,
+				Enumerable:      desc.Enumerable,
+				EnumerableSet:   true,
+				Configurable:    desc.Configurable,
+				ConfigurableSet: true,
 			})
 		} else {
 			value := desc.Value
@@ -143,11 +147,13 @@ func ValidateAndApplyPropertyDescriptor(
 				value = UndefinedValue
 			}
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Value:        value,
-				Writable:     desc.Writable,
-				WritableSet:  true,
-				Enumerable:   desc.Enumerable,
-				Configurable: desc.Configurable,
+				Value:           value,
+				Writable:        desc.Writable,
+				WritableSet:     true,
+				Enumerable:      desc.Enumerable,
+				EnumerableSet:   true,
+				Configurable:    desc.Configurable,
+				ConfigurableSet: true,
 			})
 		}
 
@@ -165,7 +171,7 @@ func ValidateAndApplyPropertyDescriptor(
 			return false
 		}
 
-		if desc.Enumerable != current.Enumerable {
+		if desc.EnumerableSet && desc.Enumerable != current.Enumerable {
 			return false
 		}
 
@@ -201,27 +207,41 @@ func ValidateAndApplyPropertyDescriptor(
 		if current.IsDataDescriptor() && desc.IsAccessorDescriptor() {
 			// i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
 			//    else let configurable be current.[[Configurable]].
-			configurable := desc.Configurable || current.Configurable
+			configurable := current.Configurable
+			if desc.ConfigurableSet {
+				configurable = desc.Configurable
+			}
 			// ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
 			//     let enumerable be current.[[Enumerable]].
-			enumerable := desc.Enumerable || current.Enumerable
+			enumerable := current.Enumerable
+			if desc.EnumerableSet {
+				enumerable = desc.Enumerable
+			}
 
 			// iii. Replace the property named P of O with an accessor property.
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Get:          desc.Get,
-				Set:          desc.Set,
-				Enumerable:   enumerable,
-				Configurable: configurable,
+				Get:             desc.Get,
+				Set:             desc.Set,
+				Enumerable:      enumerable,
+				EnumerableSet:   true,
+				Configurable:    configurable,
+				ConfigurableSet: true,
 			})
 		} else if current.IsAccessorDescriptor() && desc.IsDataDescriptor() {
 
 			// i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
 			//    else let configurable be current.[[Configurable]].
-			configurable := desc.Configurable || current.Configurable
+			configurable := current.Configurable
+			if desc.ConfigurableSet {
+				configurable = desc.Configurable
+			}
 
 			// ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
 			//     let enumerable be current.[[Enumerable]].
-			enumerable := desc.Enumerable || current.Enumerable
+			enumerable := current.Enumerable
+			if desc.EnumerableSet {
+				enumerable = desc.Enumerable
+			}
 
 			// iii. Replace the property named P of object O with a data property whose
 			//      [[Configurable]] and [[Enumerable]] attributes are set to configurable and
@@ -233,11 +253,13 @@ func ValidateAndApplyPropertyDescriptor(
 				v = UndefinedValue
 			}
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Value:        v,
-				Writable:     desc.Writable,
-				WritableSet:  true,
-				Enumerable:   enumerable,
-				Configurable: configurable,
+				Value:           v,
+				Writable:        desc.Writable,
+				WritableSet:     true,
+				Enumerable:      enumerable,
+				EnumerableSet:   true,
+				Configurable:    configurable,
+				ConfigurableSet: true,
 			})
 		} else {
 			// i. For each field of Desc, set the corresponding attribute of the property named P
@@ -250,8 +272,14 @@ func ValidateAndApplyPropertyDescriptor(
 			if desc.WritableSet || desc.Writable {
 				w = desc.Writable
 			}
-			e := desc.Enumerable || current.Enumerable
-			c := desc.Configurable || current.Configurable
+			e := current.Enumerable
+			if desc.EnumerableSet {
+				e = desc.Enumerable
+			}
+			c := current.Configurable
+			if desc.ConfigurableSet {
+				c = desc.Configurable
+			}
 			g := desc.Get
 			if g == nil {
 				g = current.Get
@@ -262,13 +290,15 @@ func ValidateAndApplyPropertyDescriptor(
 			}
 
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Value:        v,
-				Writable:     w,
-				WritableSet:  true,
-				Get:          g,
-				Set:          s,
-				Enumerable:   e,
-				Configurable: c,
+				Value:           v,
+				Writable:        w,
+				WritableSet:     true,
+				Get:             g,
+				Set:             s,
+				Enumerable:      e,
+				EnumerableSet:   true,
+				Configurable:    c,
+				ConfigurableSet: true,
 			})
 		}
 	}
