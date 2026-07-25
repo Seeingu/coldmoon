@@ -172,6 +172,21 @@ func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	}
 }
 
+func TestStringSplitSupportsLimitsAndCustomDispatch(t *testing.T) {
+	testSource(t, `const parts = "one,two,three".split(",", 2);
+assert(parts.length === 2);
+assert(parts[0] === "one");
+assert(parts[1] === "two");
+assert(String.prototype.split.call(123, "2")[0] === "1");
+const separator = {};
+separator[Symbol.split] = function(value, limit) {
+  return [value, limit];
+};
+const custom = "value".split(separator, 3);
+assert(custom[0] === "value");
+assert(custom[1] === 3);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

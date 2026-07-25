@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
 )
 
@@ -372,6 +373,60 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewStringValue(s)
 	}
+	var split BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		separator := pkg.SliceSafeGet(argumentsList, 0)
+		limit := pkg.SliceSafeGet(argumentsList, 1)
+		if separator == nil {
+			separator = UndefinedValue
+		}
+		if limit == nil {
+			limit = UndefinedValue
+		}
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String.prototype.split called on null or undefined")
+		}
+		if !IsUndefinedOrNull(separator) {
+			splitter := GetMethod(agent, separator, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSplit]))
+			if splitter != nil {
+				return splitter.Call(separator, []Value{this, limit})
+			}
+		}
+		stringValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		var lim JSInt = JSInt(POW_2_32 - 1)
+		if limit != UndefinedValue {
+			lim, isAbrupt, rt = ReturnIfAbrupt(ToUint32(agent, limit), co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		result := ArrayCreate(agent, 0, nil)
+		if lim == 0 {
+			return result.ToValue()
+		}
+		if separator == UndefinedValue {
+			result.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(0), stringValue)
+			return result.ToValue()
+		}
+		separatorValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, separator), co)
+		if isAbrupt {
+			return rt
+		}
+		parts := strings.Split(stringValue.Data, separatorValue.Data)
+		if JSInt(len(parts)) > lim {
+			parts = parts[:int(lim)]
+		}
+		for index, part := range parts {
+			result.CreateDataPropertyOrThrow(
+				NewIntegerIndexPropertyKey(JSInt(index)),
+				NewStringValue(part),
+			)
+		}
+		return result.ToValue()
+	}
 	var search BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		regexp := argumentsList[0]
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -618,6 +673,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("repeat"), repeat, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("concat"), concat, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("split"), split, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
@@ -641,6 +697,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("repeat"), repeat, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("concat"), concat, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("split"), split, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
