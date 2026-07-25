@@ -591,33 +591,45 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 
 	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callbackFn := args[0]
-		var thisArg Value = UndefinedValue
-		if len(args) > 1 {
-			thisArg = args[1]
+		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
 		}
 
-		array := MustGetObject(this)
-		var co CompletionValue
+		array, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
 		if isAbrupt {
 			return rt
 		}
 
 		if !IsCallable(callbackFn) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "forEach: callback is not callable")
 		}
 
-		for k := range length {
+		for k := JSInt(0); k < length; k++ {
 			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := array.HasProperty(pk)
 			if kPresent {
 				kValue := array.Get(pk)
-				callbackFn.Call(
-					agent,
-					thisArg,
-					[]Value{kValue, NewNumberValue(k.ToNumber()), this},
+				_, isAbrupt, rt := ReturnIfAbrupt(
+					callbackFn.Call(
+						agent,
+						thisArg,
+						[]Value{kValue, NewNumberValue(k.ToNumber()), array.ToValue()},
+					),
+					co,
 				)
+				if isAbrupt {
+					return rt
+				}
 			}
 		}
 		return UndefinedValue

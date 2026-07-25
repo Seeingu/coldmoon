@@ -91,6 +91,26 @@ assert(!(1 in mapped));
 assert(mapped[2] === 6);`)
 }
 
+func TestArrayForEachSupportsGenericReceiversAndAbruptCallbacks(t *testing.T) {
+	testSource(t, `const arrayLike = { 0: "first", 2: "third", length: 3 };
+const seen = [];
+Array.prototype.forEach.call(arrayLike, function(value, index, object) {
+  seen.push(value + index);
+  assert(object === arrayLike);
+});
+assert(seen.length === 2);
+assert(seen[0] === "first0");
+assert(seen[1] === "third2");
+const sentinel = {};
+let caught = null;
+try {
+  [1].forEach(function() { throw sentinel; });
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestFunctionInvocationHelpersDefaultArguments(t *testing.T) {
 	testSource(t, `function count() { return arguments.length; }
 assert(count.apply() === 0);
