@@ -137,6 +137,21 @@ assert(Object.isFrozen(array));
 assert(!Object.isExtensible(array));`)
 }
 
+func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
+	tests := map[string]string{
+		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,
+		"number":     `assert(String.prototype.trim.call(42) === "42");`,
+		"both":       `assert("  value 　".trim() === "value");`,
+		"start only": `assert(" value ".trimStart() === "value ");`,
+		"end only":   `assert(" value ".trimEnd() === " value");`,
+	}
+	for name, source := range tests {
+		t.Run(name, func(t *testing.T) {
+			testSource(t, source)
+		})
+	}
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

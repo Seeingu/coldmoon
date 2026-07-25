@@ -207,21 +207,43 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		s := this.ThisStringValue()
 		return NewStringValue(strings.ToUpper(s))
 	}
+	isTrimWhiteSpace := func(r rune) bool {
+		switch r {
+		case '\u0009', '\u000A', '\u000B', '\u000C', '\u000D', '\u0020',
+			'\u00A0', '\u1680', '\u2028', '\u2029', '\u202F', '\u205F',
+			'\u3000', '\uFEFF':
+			return true
+		}
+		return r >= '\u2000' && r <= '\u200A'
+	}
+	trimString := func(this Value, where string) CompletionConvertable[Value] {
+		var co CompletionValue
+		if IsUndefinedOrNil(this) || this == NullValue {
+			return co.ThrowTypeError(agent, "String trim called on null or undefined")
+		}
+		stringValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		s := stringValue.Data
+		switch where {
+		case "start":
+			s = strings.TrimLeftFunc(s, isTrimWhiteSpace)
+		case "end":
+			s = strings.TrimRightFunc(s, isTrimWhiteSpace)
+		default:
+			s = strings.TrimFunc(s, isTrimWhiteSpace)
+		}
+		return NewStringValue(s)
+	}
 	trim := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		s := this.ThisStringValue()
-		return NewStringValue(strings.TrimSpace(s))
+		return trimString(this, "both")
 	}
 	trimEnd := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		s := this.ThisStringValue()
-		return NewStringValue(strings.TrimRightFunc(s, func(r rune) bool {
-			return strings.ContainsRune(" \t\n\v\f\r", r)
-		}))
+		return trimString(this, "end")
 	}
 	trimStart := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		s := this.ThisStringValue()
-		return NewStringValue(strings.TrimLeftFunc(s, func(r rune) bool {
-			return strings.ContainsRune(" \t\n\v\f\r", r)
-		}))
+		return trimString(this, "start")
 	}
 	var charAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
