@@ -1292,9 +1292,18 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return o.ToValue()
 	}
 	var copyWithin BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		target := args[0]
-		start := args[1]
-		end := args[2]
+		var target Value = UndefinedValue
+		var start Value = UndefinedValue
+		var end Value = UndefinedValue
+		if len(args) > 0 {
+			target = args[0]
+		}
+		if len(args) > 1 {
+			start = args[1]
+		}
+		if len(args) > 2 {
+			end = args[2]
+		}
 		o := this.ToObject(agent).value
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)

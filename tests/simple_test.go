@@ -483,6 +483,13 @@ func TestObjectGetPrototypeOfReturnsNull(t *testing.T) {
 assert(Object.getPrototypeOf(object) === null);`)
 }
 
+// TestArrayCopyWithinBoxesBooleanWithoutArguments verifies omitted parameters
+// are treated as undefined and the boxed receiver is returned.
+func TestArrayCopyWithinBoxesBooleanWithoutArguments(t *testing.T) {
+	testSource(t, `assert(Array.prototype.copyWithin.call(true) instanceof Boolean);
+assert(Array.prototype.copyWithin.call(false) instanceof Boolean);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
