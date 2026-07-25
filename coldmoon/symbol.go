@@ -136,10 +136,11 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 		return newSymbol
 	}
 	var keyFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		symbol := arguments[0]
+		var co CompletionValue
+		symbol := pkg.SliceSafeGet(arguments, 0)
 		s, ok := symbol.(*SymbolValue)
 		if !ok {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "Symbol.keyFor requires a Symbol")
 		}
 		return NewStringValue(KeyForSymbol(agent, s))
 	}

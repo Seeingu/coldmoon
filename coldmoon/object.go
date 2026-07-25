@@ -598,11 +598,16 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			).ToValue()
 		}
 
-		if value == nil {
+		if value == nil || value == UndefinedValue || value == NullValue {
 			return OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{}).ToValue()
 		}
 
-		return value
+		var co CompletionValue
+		objectValue, isAbrupt, rt := ReturnIfAbrupt(value.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return objectValue.ToValue()
 	}
 
 	object := CreateBuiltinFunction(

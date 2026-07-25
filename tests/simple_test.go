@@ -978,6 +978,23 @@ try {
 assert(caught instanceof TypeError);`)
 }
 
+// TestSymbolKeyForRejectsNonSymbols verifies non-symbol inputs produce
+// catchable TypeErrors.
+func TestSymbolKeyForRejectsNonSymbols(t *testing.T) {
+	testSource(t, `const symbolObject = Object(Symbol("s"));
+assert(typeof symbolObject === "object");
+const values = [null, undefined, "key", {}, [], symbolObject];
+values.forEach(function(value) {
+  let caught = null;
+  try {
+    Symbol.keyFor(value);
+  } catch (error) {
+    caught = error;
+  }
+  assert(caught instanceof TypeError);
+});`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
