@@ -36,17 +36,5 @@ func (o *ObjectValue) String() string {
 }
 
 func (o *ObjectValue) ToBoolean() bool {
-	switch oo := o.Object.(type) {
-	case *BooleanObject:
-		return oo.getData()
-	case *StringObject:
-		return oo.Data != ""
-	case *Object:
-		return true
-	case *NumberObject:
-		return oo.Data != 0
-	default:
-		panic("unimplemented")
-
-	}
+	return true
 }

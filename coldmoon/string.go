@@ -125,9 +125,9 @@ var StringCreate = NewStringObject
 
 func NewStringConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := argumentsList[0]
 		var s string
 		if len(argumentsList) > 0 {
+			value := argumentsList[0]
 			symbolValue, isSymbol := value.(*SymbolValue)
 			if newTarget == nil && isSymbol {
 				return NewStringValue(symbolValue.SymbolDescriptiveString())

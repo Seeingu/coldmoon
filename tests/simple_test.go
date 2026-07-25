@@ -803,6 +803,16 @@ try {
 assert(caught instanceof TypeError);`)
 }
 
+// TestObjectBooleanCoercionIsAlwaysTrue verifies wrapper objects do not use
+// their wrapped primitive value during ToBoolean.
+func TestObjectBooleanCoercionIsAlwaysTrue(t *testing.T) {
+	testSource(t, `assert(Boolean(new Boolean(false)) === true);
+assert(Boolean(new String("")) === true);
+assert(Boolean(new String()) === true);
+assert(Boolean(new Number(0)) === true);
+assert(Boolean(new Number(NaN)) === true);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
