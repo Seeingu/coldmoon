@@ -195,6 +195,18 @@ const bound = count.bind();
 assert(bound() === 0);`)
 }
 
+func TestBoundFunctionConstructionUsesExoticIdentity(t *testing.T) {
+	testSource(t, `function Pair(left, right) {
+  this.left = left;
+  this.right = right;
+}
+const BoundPair = Pair.bind(null, 1);
+const pair = new BoundPair(2);
+assert(pair.left === 1);
+assert(pair.right === 2);
+assert(pair instanceof Pair);`)
+}
+
 func TestPropertyDescriptorAllowsUndefinedAccessors(t *testing.T) {
 	testSource(t, `const object = {};
 Object.defineProperty(object, "getter", { get: undefined });

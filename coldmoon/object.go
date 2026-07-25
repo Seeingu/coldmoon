@@ -312,10 +312,11 @@ func (o *Object) Construct(
 	argumentLists []Value,
 	newTarget ObjectType,
 ) (co Completion[ObjectType]) {
+	object := o.Ref()
 	if newTarget == nil {
-		newTarget = o
+		newTarget = object
 	}
-	return o.InternalMethods().Construct(o, argumentLists, newTarget)
+	return object.InternalMethods().Construct(object, argumentLists, newTarget)
 }
 
 // 7.3.15
