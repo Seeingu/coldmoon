@@ -751,6 +751,23 @@ try {
 assert(caught === sentinel, "concat mapped argument getter");`)
 }
 
+// TestArrayConcatRejectsNonObjectConstructor verifies ArraySpeciesCreate
+// reports a catchable TypeError when an array constructor is not an object.
+func TestArrayConcatRejectsNonObjectConstructor(t *testing.T) {
+	testSource(t, `const values = [null, 1, "string", true];
+values.forEach(function(value) {
+  const array = [];
+  array.constructor = value;
+  let caught = null;
+  try {
+    array.concat();
+  } catch (error) {
+    caught = error;
+  }
+  assert(caught instanceof TypeError);
+});`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

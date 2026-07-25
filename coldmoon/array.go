@@ -85,13 +85,24 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
 }
 
 // 10.4.2.3
-func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) ObjectType {
+func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) (co Completion[ObjectType]) {
 	isArray := IsArray(originalArray.ToValue())
 	if !isArray {
-		return ArrayCreate(agent, length, nil)
+		co.value = ArrayCreate(agent, length, nil)
+		return
 	}
 
-	c := originalArray.Get(NewStringPropertyKey("constructor"))
+	c, isAbrupt, rt := ReturnIfAbrupt(
+		originalArray.InternalMethods().Get(
+			originalArray,
+			NewStringPropertyKey("constructor"),
+			originalArray.ToValue(),
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	constructorObject, isObject := c.(*ObjectValue)
 	if IsConstructor(c) {
 		thisRealm := agent.CurrentRealm()
@@ -104,19 +115,30 @@ func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) Ob
 	}
 
 	if isObject {
-		c = constructorObject.Object.Get(NewStringPropertyKey("Symbol.species"))
+		c, isAbrupt, rt = ReturnIfAbrupt(
+			constructorObject.Object.InternalMethods().Get(
+				constructorObject.Object,
+				NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]),
+				c,
+			),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if c == NullValue {
 			c = UndefinedValue
 		}
 	}
 	if c == UndefinedValue {
-		return ArrayCreate(agent, length, nil)
+		co.value = ArrayCreate(agent, length, nil)
+		return
 	}
 	if !IsConstructor(c) {
-		panic("TypeError")
+		return co.ThrowTypeError(agent, "Array species is not a constructor")
 	}
 
-	return constructorObject.Object.Construct([]Value{NewNumberValue(length.ToNumber())}, nil).value
+	return MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil)
 }
 
 // ArraySetLength
@@ -493,7 +515,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			return co.ThrowTypeError(agent, "map: callback is not callable")
 		}
 
-		A := ArraySpeciesCreate(agent, array, length)
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, array, length), co)
+		if isAbrupt {
+			return rt
+		}
 		for k := range length {
 			pk := NewIntegerIndexPropertyKey(k)
 			mappedValue := ReturnAssertNormal(callbackFn.Call(
@@ -1023,7 +1048,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
 		}
-		A := ArraySpeciesCreate(agent, o, 0)
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
+		if isAbrupt {
+			return rt
+		}
 		k := JSInt(0)
 		to := JSInt(0)
 		for k < length {
@@ -1142,7 +1170,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	var concat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
 		o := this.ToObject(agent).value
-		A := ArraySpeciesCreate(agent, o, 0)
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
+		if isAbrupt {
+			return rt
+		}
 		n := JSInt(0)
 
 		for index := range len(args) + 1 {
@@ -1203,7 +1234,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 		}
 
-		_, isAbrupt, rt := ReturnIfAbrupt(A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow), co)
+		_, isAbrupt, rt = ReturnIfAbrupt(A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow), co)
 		if isAbrupt {
 			return rt
 		}
@@ -1255,7 +1286,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		count := (final - k).Max(0)
 
 		n := JSInt(0)
-		A := ArraySpeciesCreate(agent, o, count)
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, count), co)
+		if isAbrupt {
+			return rt
+		}
 		for k < final {
 			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := o.HasProperty(pk)
@@ -1580,7 +1614,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				depthNum = 0
 			}
 		}
-		A := ArraySpeciesCreate(agent, o, 0)
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
+		if isAbrupt {
+			return rt
+		}
 		FlattenIntoArray(agent, A, o, sourceLen, 0, depthNum, nil, nil)
 		return A.ToValue()
 	}
@@ -1597,7 +1634,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if !IsCallable(mapperFunction) {
 			panic("TypeError")
 		}
-		A := ArraySpeciesCreate(agent, o, 0)
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
+		if isAbrupt {
+			return rt
+		}
 		FlattenIntoArray(agent, A, o, sourceLen, 0, 1, MustGetObject(mapperFunction), thisArg)
 		return A.ToValue()
 	}
@@ -1649,7 +1689,10 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 
-		A := ArraySpeciesCreate(agent, o, actualDeleteCount)
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, actualDeleteCount), co)
+		if isAbrupt {
+			return rt
+		}
 		for k := JSInt(0); k < actualDeleteCount; k++ {
 			from := NewIntegerIndexPropertyKey(actualStart + k)
 			fromPresent := o.HasProperty(from)
