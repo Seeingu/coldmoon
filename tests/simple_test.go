@@ -45,6 +45,10 @@ func TestObjectLiteralDataPropertyNamedReservedWord(t *testing.T) {
 assertEqual(iterator.return(), 1);`)
 }
 
+func TestTemplateLiteralCooksEscapeSequences(t *testing.T) {
+	testSource(t, "assertEqual(`line 1\\n\\x6c\\u0069\\u{6e}e 2`, \"line 1\\nline 2\");")
+}
+
 func TestArrayPredicateMethodsDefaultThisArgument(t *testing.T) {
 	testSource(t, `const arrayLike = { 0: 1, length: 1 };
 assert(Array.prototype.every.call(arrayLike, function(value, index, object) {

@@ -1809,6 +1809,9 @@ type TemplateSpan struct {
 func (t *TemplateSpan) TV() CMString {
 	start := 0
 	end := len(t.Text)
+	if end == 0 {
+		return CMString("")
+	}
 	if t.Text[0] == '`' || t.Text[0] == '}' {
 		start = 1
 	}
@@ -1821,7 +1824,80 @@ func (t *TemplateSpan) TV() CMString {
 	if start > end {
 		return CMString("")
 	}
-	return CMString(t.Text[start:end])
+	return cookTemplateText(t.Text[start:end])
+}
+
+func cookTemplateText(text string) CMString {
+	var value strings.Builder
+	for i := 0; i < len(text); i++ {
+		ch := text[i]
+		if ch == '\r' {
+			if i+1 < len(text) && text[i+1] == '\n' {
+				i++
+			}
+			value.WriteByte('\n')
+			continue
+		}
+		if ch != '\\' || i+1 >= len(text) {
+			value.WriteByte(ch)
+			continue
+		}
+
+		i++
+		escaped := text[i]
+		switch escaped {
+		case 'b':
+			value.WriteByte('\b')
+		case 'f':
+			value.WriteByte('\f')
+		case 'n':
+			value.WriteByte('\n')
+		case 'r':
+			value.WriteByte('\r')
+		case 't':
+			value.WriteByte('\t')
+		case 'v':
+			value.WriteByte('\v')
+		case '0':
+			value.WriteByte(0)
+		case '\n':
+			// A line continuation contributes no character.
+		case '\r':
+			if i+1 < len(text) && text[i+1] == '\n' {
+				i++
+			}
+		case 'x':
+			if i+2 < len(text) {
+				if code, err := strconv.ParseUint(text[i+1:i+3], 16, 8); err == nil {
+					value.WriteByte(byte(code))
+					i += 2
+					continue
+				}
+			}
+			value.WriteByte(escaped)
+		case 'u':
+			if i+1 < len(text) && text[i+1] == '{' {
+				if close := strings.IndexByte(text[i+2:], '}'); close >= 0 {
+					end := i + 2 + close
+					if code, err := strconv.ParseUint(text[i+2:end], 16, 32); err == nil {
+						value.WriteRune(rune(code))
+						i = end
+						continue
+					}
+				}
+			} else if i+4 < len(text) {
+				if code, err := strconv.ParseUint(text[i+1:i+5], 16, 16); err == nil {
+					value.WriteRune(rune(code))
+					i += 4
+					continue
+				}
+			}
+			value.WriteByte(escaped)
+		default:
+			value.WriteByte(escaped)
+		}
+	}
+	return CMString(value.String())
 }
 
 // TemplateLiteral [Yield, Await, Tagged] :
