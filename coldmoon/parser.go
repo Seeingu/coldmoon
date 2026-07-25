@@ -2195,7 +2195,13 @@ func (p *Parser) propertyName() (PropertyName, bool) {
 		}
 		p.tokenizer.MustMatch(TRightBracket)
 	default:
-		return nil, false
+		if !lo.Contains(lo.Values(keywordsMap), t.Type) {
+			return nil, false
+		}
+		p.tokenizer.Next()
+		propertyName = &PropertyNameLiteralIdentifier{
+			Identifier: IdentifierName(t.Value),
+		}
 	}
 	return propertyName, true
 }

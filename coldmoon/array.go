@@ -349,7 +349,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 						co,
 					)
 					if isAbrupt {
-						return rt
+						return iteratorRecord.IteratorClose(rt)
 					}
 					mappedValue = _mappedValue
 				} else {

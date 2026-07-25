@@ -38,6 +38,13 @@ func TestObjectLiteralDataPropertyNamedGet(t *testing.T) {
 assertEqual(descriptor.get(), 1);`)
 }
 
+// TestObjectLiteralDataPropertyNamedReservedWord verifies that IdentifierName
+// property keys may use reserved words.
+func TestObjectLiteralDataPropertyNamedReservedWord(t *testing.T) {
+	testSource(t, `const iterator = { return: function() { return 1; } };
+assertEqual(iterator.return(), 1);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
@@ -82,6 +89,34 @@ try {
   caught = error;
 }
 assert(caught === sentinel);`)
+}
+
+// TestArrayFromClosesIteratorOnMapperError verifies that an abrupt mapper
+// completion is preserved after invoking the iterator's return method.
+func TestArrayFromClosesIteratorOnMapperError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+let closeCount = 0;
+const items = {};
+items[Symbol.iterator] = function() {
+  return {
+    return: function() {
+      closeCount += 1;
+    },
+    next: function() {
+      return { done: false };
+    }
+  };
+};
+let caught = null;
+try {
+  Array.from(items, function() {
+    throw sentinel;
+  });
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);
+assertEqual(closeCount, 1);`)
 }
 
 func TestBaselineNew(t *testing.T) {

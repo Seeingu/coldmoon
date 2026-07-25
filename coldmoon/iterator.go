@@ -152,7 +152,6 @@ func (i *IteratorRecord) IteratorStepValue() (co CompletionValue, isDone bool) {
 	return
 }
 
-// TODO(BM): handle completion
 // IteratorClose
 // spec: 7.4.9
 func (i *IteratorRecord) IteratorClose(completion CompletionValue) (co CompletionValue) {
@@ -161,9 +160,20 @@ func (i *IteratorRecord) IteratorClose(completion CompletionValue) (co Completio
 	innerResult := GetMethod(agent, iterator.ToValue(), NewStringPropertyKey("return"))
 
 	if innerResult != nil {
-		innerResult.ToValue().CallNoArgs(iterator.ToValue())
+		callResult := innerResult.ToValue().CallNoArgs(iterator.ToValue())
+		// A throw completion supplied by the caller takes precedence over
+		// failures or a non-object result produced while closing the iterator.
+		if completion.IsError() || completion.t == CompletionTypeThrow {
+			return completion
+		}
+		if callResult.IsAbrupt() {
+			return callResult
+		}
+		if !callResult.value.IsObject() {
+			return co.ThrowTypeError(agent, "iterator return method must return an object")
+		}
 	}
-	return
+	return completion
 }
 
 // CreateIterResultObject
