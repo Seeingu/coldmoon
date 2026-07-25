@@ -408,7 +408,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 	})
 
 	var isFinite BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := arguments[0]
+		value := pkg.SliceSafeGet(arguments, 0)
 		numberValue, ok := value.(*NumberValue)
 		if !ok {
 			return NewBooleanValue(false)
@@ -419,11 +419,14 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		return NewBooleanValue(true)
 	}
 	var isInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := arguments[0]
+		value := pkg.SliceSafeGet(arguments, 0)
+		if value == nil {
+			return NewBooleanValue(false)
+		}
 		return NewBooleanValue(IsIntegralNumber(value))
 	}
 	var isNaN BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := arguments[0]
+		value := pkg.SliceSafeGet(arguments, 0)
 		numberValue, ok := value.(*NumberValue)
 		if !ok {
 			return NewBooleanValue(false)
@@ -431,9 +434,9 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		return NewBooleanValue(numberValue.IsNaN())
 	}
 	var isSafeInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		numberValue := arguments[0]
+		numberValue := pkg.SliceSafeGet(arguments, 0)
 
-		if IsIntegralNumber(numberValue) {
+		if numberValue != nil && IsIntegralNumber(numberValue) {
 			data := numberValue.(*NumberValue).Data
 			if float64(data) <= POW_2_53-1 {
 				return NewBooleanValue(true)

@@ -874,6 +874,15 @@ values.forEach(function(value) {
 });`)
 }
 
+// TestNumberPredicatesWithoutArguments verifies missing arguments are treated
+// as undefined and return false.
+func TestNumberPredicatesWithoutArguments(t *testing.T) {
+	testSource(t, `assert(Number.isFinite() === false);
+assert(Number.isInteger() === false);
+assert(Number.isNaN() === false);
+assert(Number.isSafeInteger() === false);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
