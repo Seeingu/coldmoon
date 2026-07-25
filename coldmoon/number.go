@@ -143,7 +143,11 @@ func normalizeNumberExponent(formatted string) string {
 }
 
 func formatNumberExponential(number float64, fractionDigits int) string {
-	if number != 0 && fractionDigits >= 0 && fractionDigits <= 15 {
+	if number != 0 &&
+		fractionDigits >= 0 &&
+		fractionDigits <= 15 &&
+		math.Abs(number) <= POW_2_53-1 &&
+		number == math.Trunc(number) {
 		absolute := math.Abs(number)
 		exponent := int(math.Floor(math.Log10(absolute)))
 		factor := math.Pow10(fractionDigits)
