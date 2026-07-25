@@ -1812,12 +1812,18 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var flat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		depth := args[0]
-		o := this.ToObject(agent).value
 		var co CompletionValue
+		depth := pkg.SliceSafeGet(args, 0)
+		if depth == nil {
+			depth = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		sourceLen, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		var depthNum JSInt = 1
@@ -1839,17 +1845,26 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var flatMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		mapperFunction := args[0]
-		thisArg := args[1]
-		o := this.ToObject(agent).value
 		var co CompletionValue
+		mapperFunction := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if mapperFunction == nil {
+			mapperFunction = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		sourceLen, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		if !IsCallable(mapperFunction) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "flatMap mapper is not callable")
 		}
 		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
 		if isAbrupt {
@@ -2298,7 +2313,7 @@ func FlattenIntoArray(
 					panic(rt)
 				}
 
-				targetIndex = FlattenIntoArray(agent, target, MustGetObject(element), elementLen, targetIndex, newDepth, mapperFunction, thisArg)
+				targetIndex = FlattenIntoArray(agent, target, MustGetObject(element), elementLen, targetIndex, newDepth, nil, nil)
 			} else {
 				if float64(targetIndex) >= POW_2_53-1 {
 					panic("TypeError")

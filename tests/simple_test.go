@@ -159,6 +159,20 @@ assert(arrayLike[0] === "x");
 assert(arrayLike[1] === "x");`)
 }
 
+func TestArrayFlatteningDefaultsAndGenericReceivers(t *testing.T) {
+	testSource(t, `const flattened = [1, [2, [3]]].flat();
+assert(flattened.length === 3);
+assert(flattened[0] === 1);
+assert(flattened[1] === 2);
+assert(flattened[2][0] === 3);
+const mapped = Array.prototype.flatMap.call({ 0: 2, length: 1 }, function(value) {
+  return [value, value + 1];
+});
+assert(mapped.length === 2);
+assert(mapped[0] === 2);
+assert(mapped[1] === 3);`)
+}
+
 func TestFunctionInvocationHelpersDefaultArguments(t *testing.T) {
 	testSource(t, `function count() { return arguments.length; }
 assert(count.apply() === 0);
