@@ -2399,6 +2399,17 @@ type ExpressionSequenceExpression struct {
 	Expressions []Expression
 }
 
+func (e *ExpressionSequenceExpression) Evaluation(vm *VM) (co CompletionValue) {
+	for _, expression := range e.Expressions {
+		value, _, isAbrupt, rt := vm.EvalAndGetValue(expression, co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = value
+	}
+	return
+}
+
 func (e *ExpressionSequenceExpression) String() string {
 	var sb string
 	for i, expr := range e.Expressions {
@@ -2955,8 +2966,10 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		return NewStringValue(val.TypeString()).ToCompletion()
 	case u.astIsVoid():
 		// 13.5.2.1
-		expr := u.Operand.Evaluation(vm)
-		expr.value.GetValue(agent)
+		_, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
 		return UndefinedValue.ToCompletion()
 	case u.astIsDelete():
 		// 13.5.1.2

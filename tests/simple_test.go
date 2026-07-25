@@ -609,6 +609,15 @@ assert(Object.getPrototypeOf(called) === Object.prototype);
 assert(Object.getPrototypeOf(constructed) === Object.prototype);`)
 }
 
+// TestVoidAndSequenceExpressionEvaluation verifies void preserves operand side
+// effects and a comma expression yields its final value.
+func TestVoidAndSequenceExpressionEvaluation(t *testing.T) {
+	testSource(t, `let value = 0;
+assert((value = 1, value = 2, value) === 2);
+assert((void (value = 3)) === undefined);
+assertEqual(value, 3);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
