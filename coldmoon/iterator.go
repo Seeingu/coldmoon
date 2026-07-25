@@ -44,6 +44,9 @@ func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *Itera
 // GetIterator
 // spec: 7.4.3
 func GetIterator(agent *Agent, obj Value, kind IteratorKind) (co Completion[*IteratorRecord]) {
+	if IsUndefinedOrNull(obj) {
+		return co.ThrowTypeError(agent, "value is not iterable")
+	}
 	var method ObjectType
 	switch kind {
 	case IteratorKindSync:

@@ -709,7 +709,11 @@ func IsStrictlyEqual(x Value, y Value) bool {
 
 // 7.3.3
 func GetV(agent *Agent, value Value, key PropertyKey) CompletionValue {
-	object := value.ToObject(agent).value
+	var co CompletionValue
+	object, isAbrupt, rt := ReturnIfAbrupt(value.ToObject(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	return object.InternalMethods().Get(object, key, value)
 }
 

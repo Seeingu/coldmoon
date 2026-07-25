@@ -25,7 +25,10 @@ func NewErrorConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
-		message := argumentsList[0]
+		message := pkg.SliceSafeGet(argumentsList, 0)
+		if message == nil {
+			message = UndefinedValue
+		}
 		options := pkg.SliceSafeGet(argumentsList, 1)
 
 		newTarget := _newTarget
@@ -198,9 +201,15 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		errors := argumentsList[0]
-		message := argumentsList[1]
-		options := argumentsList[2]
+		errors := pkg.SliceSafeGet(argumentsList, 0)
+		message := pkg.SliceSafeGet(argumentsList, 1)
+		options := pkg.SliceSafeGet(argumentsList, 2)
+		if errors == nil {
+			errors = UndefinedValue
+		}
+		if message == nil {
+			message = UndefinedValue
+		}
 		newTarget := _newTarget
 		if newTarget == nil {
 			newTarget = agent.ActiveFunctionObject()
@@ -219,8 +228,11 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 		}
 
 		InstallErrorCause(agent, errorObject, options)
-		iterator := GetIterator(agent, errors, IteratorKindSync)
-		errorsList, isAbrupt, rt := ReturnIfAbrupt(iterator.Data().IteratorToList(), co)
+		iterator, isAbrupt, rt := ReturnIfAbrupt(GetIterator(agent, errors, IteratorKindSync), co)
+		if isAbrupt {
+			return rt
+		}
+		errorsList, isAbrupt, rt := ReturnIfAbrupt(iterator.IteratorToList(), co)
 		if isAbrupt {
 			return rt
 		}
@@ -233,8 +245,9 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 		return (errorObject).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 2, CMString("AggregateError"), builtinFunctionArgs{
-		realm:     realm,
-		prototype: realm.Intrinsics.ErrorConstructor,
+		realm:         realm,
+		prototype:     realm.Intrinsics.ErrorConstructor,
+		isConstructor: true,
 	})
 	BindPrototypeAndConstructor(realm.Intrinsics.AggregateErrorPrototype, object)
 	return object

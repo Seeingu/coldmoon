@@ -326,6 +326,16 @@ const created = Object.create({}, "");
 assert(Object.getOwnPropertyNames(created).length === 0);`)
 }
 
+func TestErrorConstructorsAcceptMissingOptionalArguments(t *testing.T) {
+	testSource(t, `const error = new Error();
+assert(error instanceof Error);
+assert(error.message === "");
+assert(!Object.prototype.hasOwnProperty.call(error, "message"));
+let caught = false;
+try { new AggregateError(); } catch (error) { caught = error instanceof TypeError; }
+assert(caught);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,
