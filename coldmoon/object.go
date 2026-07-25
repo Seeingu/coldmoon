@@ -448,25 +448,27 @@ const (
 )
 
 func (o *Object) EnumerableOwnProperties(kind objectOwnPropertiesKind) (results []Value) {
-	ownKeys := o.InternalMethods().OwnPropertyKeys(o)
+	object := o.Ref()
+	ownKeys := object.InternalMethods().OwnPropertyKeys(object)
 
 	for _, key := range ownKeys {
-		if _, err := key.GetIndex(); err == nil {
-			desc := o.InternalMethods().GetOwnProperty(o, key)
-			if desc != nil && desc.Enumerable {
-				switch kind {
-				case objectOwnPropertiesKindKey:
-					results = append(results, key.ToValue())
-				case objectOwnPropertiesKindValue:
-					results = append(results, o.Get(key))
-				case objectOwnPropertiesKindKeyAndValue:
-					keyValue := key.ToValue()
-					entry := CreateArrayFromList(o.Agent(), []Value{
-						keyValue,
-						o.Get(key),
-					})
-					results = append(results, (entry).ToValue())
-				}
+		if _, isSymbol := key.(SymbolPropertyKey); isSymbol {
+			continue
+		}
+		desc := object.InternalMethods().GetOwnProperty(object, key)
+		if desc != nil && desc.Enumerable {
+			switch kind {
+			case objectOwnPropertiesKindKey:
+				results = append(results, key.ToValue())
+			case objectOwnPropertiesKindValue:
+				results = append(results, object.Get(key))
+			case objectOwnPropertiesKindKeyAndValue:
+				keyValue := key.ToValue()
+				entry := CreateArrayFromList(o.Agent(), []Value{
+					keyValue,
+					object.Get(key),
+				})
+				results = append(results, (entry).ToValue())
 			}
 		}
 	}

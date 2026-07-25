@@ -255,6 +255,21 @@ assert(Object.isFrozen(array));
 assert(!Object.isExtensible(array));`)
 }
 
+func TestObjectEnumerableOwnPropertiesIncludesStringKeys(t *testing.T) {
+	testSource(t, `const symbol = Symbol("hidden");
+const object = { alpha: 1, beta: 2 };
+object[symbol] = 3;
+const keys = Object.keys(object);
+assert(keys.length === 2);
+assert(keys.includes("alpha"));
+assert(keys.includes("beta"));
+const values = Object.values(object);
+assert(values.includes(1));
+assert(values.includes(2));
+const entries = Object.entries(object);
+assert(entries.length === 2);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,
