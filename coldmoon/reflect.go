@@ -173,7 +173,14 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		targetObject := MustGetObject(target)
 
-		return NewBooleanValue(targetObject.InternalMethods().HasProperty(targetObject, key))
+		hasProperty, isAbrupt, rt := ReturnIfAbrupt(
+			targetObject.InternalMethods().HasProperty(targetObject, key),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(hasProperty)
 	}
 	var isExtensible BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := arguments[0]

@@ -285,7 +285,7 @@ func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
 
 // 7.3.11
 func (o *Object) HasProperty(key PropertyKey) bool {
-	return o.InternalMethods().HasProperty(o.Ref(), key)
+	return ReturnAssertNormal(o.InternalMethods().HasProperty(o.Ref(), key))
 }
 
 // 7.3.12

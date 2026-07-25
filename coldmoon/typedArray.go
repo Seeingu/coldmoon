@@ -855,9 +855,10 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		}
 		return OrdinaryGetOwnProperty(oo.Object, p)
 	}
-	internalMethods.HasProperty = func(o ObjectType, p PropertyKey) bool {
+	internalMethods.HasProperty = func(o ObjectType, p PropertyKey) (co Completion[bool]) {
 		if i, err := p.GetIndex(); err == nil {
-			return o.(*TypedArrayObject).IsValidIntegerIndex(agent, i)
+			co.value = o.(*TypedArrayObject).IsValidIntegerIndex(agent, i)
+			return
 		}
 		return OrdinaryHasProperty(o.(*TypedArrayObject).Object, p)
 	}

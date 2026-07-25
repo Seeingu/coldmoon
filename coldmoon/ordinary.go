@@ -281,14 +281,15 @@ func ValidateAndApplyPropertyDescriptor(
 	return true
 }
 
-func InternalHasProperty(object ObjectType, key PropertyKey) bool {
+func InternalHasProperty(object ObjectType, key PropertyKey) Completion[bool] {
 	return OrdinaryHasProperty(object, key)
 }
 
-func OrdinaryHasProperty(object ObjectType, key PropertyKey) bool {
+func OrdinaryHasProperty(object ObjectType, key PropertyKey) (co Completion[bool]) {
 	hasOwn := object.InternalMethods().GetOwnProperty(object, key)
 	if hasOwn != nil {
-		return true
+		co.value = true
+		return
 	}
 
 	parent := object.InternalMethods().GetPrototypeOf(object)
@@ -296,7 +297,7 @@ func OrdinaryHasProperty(object ObjectType, key PropertyKey) bool {
 		return parent.InternalMethods().HasProperty(parent, key)
 	}
 
-	return false
+	return
 }
 
 func InternalGet(object ObjectType, key PropertyKey, receiver Value) CompletionValue {

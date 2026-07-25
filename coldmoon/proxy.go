@@ -214,7 +214,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		co.value = true
 		return
 	}
-	hasProperty := func(o ObjectType, pk PropertyKey) bool {
+	hasProperty := func(o ObjectType, pk PropertyKey) (co Completion[bool]) {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -224,10 +224,17 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().HasProperty(t, pk)
 		}
 
-		booleanTrapResult := trap.Call(
-			h.ToValue(),
-			[]Value{t.ToValue(), pk.ToValue()},
-		).value.ToBoolean()
+		trapResult, isAbrupt, rt := ReturnIfAbrupt(
+			trap.Call(
+				h.ToValue(),
+				[]Value{t.ToValue(), pk.ToValue()},
+			),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		booleanTrapResult := trapResult.ToBoolean()
 		if !booleanTrapResult {
 			targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
 			if targetDesc != nil && !targetDesc.Configurable {
@@ -239,7 +246,8 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 				panic("TypeError")
 			}
 		}
-		return booleanTrapResult
+		co.value = booleanTrapResult
+		return
 	}
 	get := func(o ObjectType, pk PropertyKey, receiver Value) CompletionValue {
 		proxy := o.(*ProxyObject)

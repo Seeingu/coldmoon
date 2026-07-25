@@ -568,6 +568,27 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayCopyWithinPropagatesProxyHasError verifies an abrupt has trap
+// completion is preserved by [[HasProperty]].
+func TestArrayCopyWithinPropagatesProxyHasError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const proxy = new Proxy({ length: 1 }, {
+  has: function(target, property) {
+    if (property === "0") {
+      throw sentinel;
+    }
+    return property in target;
+  }
+});
+let caught = null;
+try {
+  Array.prototype.copyWithin.call(proxy, 0, 0);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

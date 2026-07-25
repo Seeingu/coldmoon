@@ -65,12 +65,13 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 		co.value = true
 		return
 	}
-	internalMethods.HasProperty = func(o ObjectType, p PropertyKey) bool {
+	internalMethods.HasProperty = func(o ObjectType, p PropertyKey) (co Completion[bool]) {
 		if _, ok := p.(SymbolPropertyKey); ok {
 			return OrdinaryHasProperty(o, p)
 		}
 		_exports := o.(*ModuleNamespace).Exports
-		return lo.Contains(_exports, p.ToValue().String())
+		co.value = lo.Contains(_exports, p.ToValue().String())
+		return
 	}
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) CompletionValue {
 		return moduleNamespaceGet(agent, o, p, receiver)
