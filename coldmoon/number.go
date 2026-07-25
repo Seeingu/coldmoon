@@ -115,23 +115,31 @@ func (n *NumberValue) ToString() CMString {
 	}
 	absolute := math.Abs(n.Data.ToFloat())
 	if absolute >= 1e21 || absolute < 1e-6 {
-		formatted := strconv.FormatFloat(n.Data.ToFloat(), 'e', -1, 64)
-		parts := strings.SplitN(formatted, "e", 2)
-		exponent := parts[1]
-		sign := "+"
-		if strings.HasPrefix(exponent, "-") {
-			sign = "-"
-			exponent = exponent[1:]
-		} else if strings.HasPrefix(exponent, "+") {
-			exponent = exponent[1:]
-		}
-		exponent = strings.TrimLeft(exponent, "0")
-		if exponent == "" {
-			exponent = "0"
-		}
-		return CMString(parts[0] + "e" + sign + exponent)
+		return CMString(normalizeNumberExponent(
+			strconv.FormatFloat(n.Data.ToFloat(), 'e', -1, 64),
+		))
 	}
 	return CMString(strconv.FormatFloat(n.Data.ToFloat(), 'f', -1, 64))
+}
+
+func normalizeNumberExponent(formatted string) string {
+	parts := strings.SplitN(formatted, "e", 2)
+	if len(parts) != 2 {
+		return formatted
+	}
+	exponent := parts[1]
+	sign := "+"
+	if strings.HasPrefix(exponent, "-") {
+		sign = "-"
+		exponent = exponent[1:]
+	} else if strings.HasPrefix(exponent, "+") {
+		exponent = exponent[1:]
+	}
+	exponent = strings.TrimLeft(exponent, "0")
+	if exponent == "" {
+		exponent = "0"
+	}
+	return parts[0] + "e" + sign + exponent
 }
 
 func (n *NumberValue) IsNaN() bool {
@@ -570,11 +578,41 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		}
 		return NewStringValue(strconv.FormatFloat(number, 'f', int(fractionDigits), 64))
 	}
+	var toExponential BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+
+		fractionDigits := JSInt(-1)
+		if value := pkg.SliceSafeGet(arguments, 0); value != nil && value != UndefinedValue {
+			fractionDigits, isAbrupt, rt = ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		if x.IsNaN() || x.IsPositiveInf() || x.IsNegativeInf() {
+			return NewStringValue(string(x.ToString()))
+		}
+		if fractionDigits < -1 || fractionDigits > 100 {
+			return co.ThrowRangeError(agent, "toExponential digits must be between 0 and 100")
+		}
+
+		number := x.Data.ToFloat()
+		if number == 0 {
+			number = 0
+		}
+		return NewStringValue(normalizeNumberExponent(
+			strconv.FormatFloat(number, 'e', int(fractionDigits), 64),
+		))
+	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 1)
 	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
 	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
 	object.defineBuiltinFunction(realm, CMString("toFixed"), toFixed, 1)
+	object.defineBuiltinFunction(realm, CMString("toExponential"), toExponential, 1)
 
 	return object
 }

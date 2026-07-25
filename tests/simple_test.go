@@ -902,6 +902,22 @@ try {
 assert(caught instanceof RangeError);`)
 }
 
+// TestNumberToExponential verifies exponential formatting and non-finite
+// handling.
+func TestNumberToExponential(t *testing.T) {
+	testSource(t, `assert((123.456).toExponential(2) === "1.23e+2");
+assert((0).toExponential(2) === "0.00e+0");
+assert((Infinity).toExponential(1000) === "Infinity");
+assert((NaN).toExponential(Infinity) === "NaN");
+let caught = null;
+try {
+  (3).toExponential(101);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof RangeError);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
