@@ -169,6 +169,11 @@ func ValidateAndApplyPropertyDescriptor(
 			return false
 		}
 
+		if (current.IsDataDescriptor() && desc.IsAccessorDescriptor()) ||
+			(current.IsAccessorDescriptor() && desc.IsDataDescriptor()) {
+			return false
+		}
+
 		if current.IsAccessorDescriptor() {
 			if desc.Get != nil &&
 				current.Get != nil &&

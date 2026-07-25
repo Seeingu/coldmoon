@@ -444,6 +444,38 @@ assertEqual(
 assertEqual(calls, 2);`)
 }
 
+// TestArrayLengthRejectsAccessorDescriptor verifies the non-configurable data
+// property cannot be converted to an accessor and its getter is never called.
+func TestArrayLengthRejectsAccessorDescriptor(t *testing.T) {
+	testSource(t, `let getterCalled = false;
+let caught = null;
+try {
+  Object.defineProperty([], "length", {
+    get: function() {
+      getterCalled = true;
+      return 0;
+    }
+  });
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);
+assertEqual(getterCalled, false);
+assertEqual(
+  Reflect.defineProperty([], "length", { set: function(_) {} }),
+  false
+);
+const array = [];
+Object.defineProperty(array, "length", { writable: false });
+caught = null;
+try {
+  Object.defineProperty(array, "length", { writable: true });
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
