@@ -1385,7 +1385,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 					return rt
 				}
 			} else {
-				o.DeletePropertyOrThrow(toKey)
+				if !o.InternalMethods().Delete(o, toKey) {
+					return co.ThrowTypeError(agent, "copyWithin could not delete target property")
+				}
 			}
 			from += JSInt(direction)
 			to += JSInt(direction)

@@ -531,6 +531,23 @@ try {
 assert(caught instanceof TypeError);`)
 }
 
+// TestArrayCopyWithinThrowsWhenTargetCannotBeDeleted verifies the
+// DeletePropertyOrThrow branch turns a false internal delete into TypeError.
+func TestArrayCopyWithinThrowsWhenTargetCannotBeDeleted(t *testing.T) {
+	testSource(t, `const object = { length: 2 };
+Object.defineProperty(object, "1", {
+  configurable: false,
+  writable: true
+});
+let caught = null;
+try {
+  Array.prototype.copyWithin.call(object, 1, 0);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
