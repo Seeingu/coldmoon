@@ -900,11 +900,13 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		}
 		return OrdinarySet(o.(*TypedArrayObject).Object, p, v, receiver)
 	}
-	internalMethods.Delete = func(o ObjectType, p PropertyKey) bool {
+	internalMethods.Delete = func(o ObjectType, p PropertyKey) (co Completion[bool]) {
 		if i, err := p.GetIndex(); err == nil {
-			return !o.(*TypedArrayObject).IsValidIntegerIndex(agent, i)
+			co.value = !o.(*TypedArrayObject).IsValidIntegerIndex(agent, i)
+			return
 		}
-		return OrdinaryDelete(o.(*TypedArrayObject).Object, p)
+		co.value = OrdinaryDelete(o.(*TypedArrayObject).Object, p)
+		return
 	}
 	internalMethods.OwnPropertyKeys = func(o ObjectType) []PropertyKey {
 		oo := o.(*TypedArrayObject)

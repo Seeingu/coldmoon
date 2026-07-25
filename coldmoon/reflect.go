@@ -93,7 +93,13 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		targetObject := MustGetObject(target)
 
-		ret := targetObject.InternalMethods().Delete(targetObject, key)
+		ret, isAbrupt, rt := ReturnIfAbrupt(
+			targetObject.InternalMethods().Delete(targetObject, key),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		return NewBooleanValue(ret)
 	}
 	var get BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {

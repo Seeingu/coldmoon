@@ -2969,7 +2969,13 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 			} else {
 				referencedName = NewStringPropertyKey(ref.ReferencedName.String)
 			}
-			deleteStatus := baseObj.InternalMethods().Delete(baseObj, referencedName)
+			deleteStatus, isAbrupt, rt := ReturnIfAbrupt(
+				baseObj.InternalMethods().Delete(baseObj, referencedName),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
 			if !deleteStatus && ref.Strict {
 				vm.panic(agent.ThrowTypeError("cannot delete property"))
 			}

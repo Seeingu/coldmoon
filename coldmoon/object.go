@@ -276,7 +276,7 @@ func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor
 
 // 7.3.9
 func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
-	success := o.InternalMethods().Delete(o.Ref(), key)
+	success := ReturnAssertNormal(o.InternalMethods().Delete(o.Ref(), key))
 	if !success {
 		o.Agent().ThrowException(TypeError, "DeletePropertyOrThrow failed")
 	}
@@ -285,7 +285,7 @@ func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
 
 // 7.3.11
 func (o *Object) HasProperty(key PropertyKey) bool {
-	return o.InternalMethods().HasProperty(o, key)
+	return o.InternalMethods().HasProperty(o.Ref(), key)
 }
 
 // 7.3.12

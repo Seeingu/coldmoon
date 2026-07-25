@@ -86,7 +86,7 @@ func (o *ObjectEnvironment) GetBindingValue(agent *Agent, name string, strict bo
 
 func (o *ObjectEnvironment) DeleteBinding(name string) bool {
 	bindingObject := o.BindingObject
-	return bindingObject.InternalMethods().Delete(bindingObject, NewStringPropertyKey(name))
+	return ReturnAssertNormal(bindingObject.InternalMethods().Delete(bindingObject, NewStringPropertyKey(name)))
 }
 
 // 9.1.1.2.8

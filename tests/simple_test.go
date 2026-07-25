@@ -548,6 +548,26 @@ try {
 assert(caught instanceof TypeError);`)
 }
 
+// TestArrayCopyWithinPropagatesProxyDeleteError verifies an abrupt
+// deleteProperty trap completion is preserved by [[Delete]].
+func TestArrayCopyWithinPropagatesProxyDeleteError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const proxy = new Proxy({ "1": true, length: 2 }, {
+  deleteProperty: function(target, property) {
+    if (property === "1") {
+      throw sentinel;
+    }
+  }
+});
+let caught = null;
+try {
+  Array.prototype.copyWithin.call(proxy, 1, 0);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

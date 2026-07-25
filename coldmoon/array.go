@@ -172,7 +172,13 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) (c
 	}
 
 	for k := oldLen - 1; k >= newLen; k-- {
-		deleteSucceeded := array.InternalMethods().Delete(array, NewIntegerIndexPropertyKey(k))
+		deleteSucceeded, isAbrupt, rt := ReturnIfAbrupt(
+			array.InternalMethods().Delete(array, NewIntegerIndexPropertyKey(k)),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if !deleteSucceeded {
 			newLenDesc.Value = NewNumberValue(JSNumber(k) + 1)
 			if !newWritable {
@@ -1385,7 +1391,14 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 					return rt
 				}
 			} else {
-				if !o.InternalMethods().Delete(o, toKey) {
+				deleteSucceeded, isAbrupt, rt := ReturnIfAbrupt(
+					o.InternalMethods().Delete(o, toKey),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				if !deleteSucceeded {
 					return co.ThrowTypeError(agent, "copyWithin could not delete target property")
 				}
 			}

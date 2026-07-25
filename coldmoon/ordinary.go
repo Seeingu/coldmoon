@@ -413,8 +413,9 @@ func OrdinarySetWithOwnDescriptor(
 	return
 }
 
-func InternalDelete(object ObjectType, key PropertyKey) bool {
-	return OrdinaryDelete(object, key)
+func InternalDelete(object ObjectType, key PropertyKey) (co Completion[bool]) {
+	co.value = OrdinaryDelete(object, key)
+	return
 }
 
 func OrdinaryDelete(object ObjectType, key PropertyKey) bool {

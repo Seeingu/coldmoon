@@ -79,14 +79,15 @@ func argumentsSet(object ObjectType, key PropertyKey, value Value, receiver Valu
 }
 
 // 10.4.4.5
-func argumentsDelete(object ObjectType, key PropertyKey) bool {
+func argumentsDelete(object ObjectType, key PropertyKey) (co Completion[bool]) {
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	result := OrdinaryDelete(object, key)
 	if result && isMapped {
 		_map.InternalMethods().Delete(_map, key)
 	}
-	return result
+	co.value = result
+	return
 }
 
 // 10.4.4.6

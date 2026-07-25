@@ -9,6 +9,7 @@ const (
 
 type (
 	SetFn               = func(o ObjectType, p PropertyKey, v Value, receiver Value) Completion[bool]
+	DeleteFn            = func(o ObjectType, p PropertyKey) Completion[bool]
 	GetOwnPropertyFn    = func(o ObjectType, p PropertyKey) *PropertyDescriptor
 	DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) Completion[bool]
 	GetPrototypeOfFn    = func(o ObjectType) ObjectType
@@ -26,7 +27,7 @@ type InternalMethods struct {
 	HasProperty       func(o ObjectType, p PropertyKey) bool
 	Get               func(o ObjectType, p PropertyKey, receiver Value) CompletionValue
 	Set               SetFn
-	Delete            func(o ObjectType, p PropertyKey) bool
+	Delete            DeleteFn
 	OwnPropertyKeys   func(o ObjectType) []PropertyKey
 	Call              func(o ObjectType, this Value, arguments []Value) CompletionValue
 	Construct         func(o ObjectType, arguments []Value, newTarget ObjectType) Completion[ObjectType]

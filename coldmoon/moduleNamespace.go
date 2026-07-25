@@ -78,15 +78,17 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 	internalMethods.Set = func(o ObjectType, p PropertyKey, v Value, receiver Value) (co Completion[bool]) {
 		return
 	}
-	internalMethods.Delete = func(o ObjectType, p PropertyKey) bool {
+	internalMethods.Delete = func(o ObjectType, p PropertyKey) (co Completion[bool]) {
 		if _, ok := p.(SymbolPropertyKey); ok {
-			return OrdinaryDelete(o, p)
+			co.value = OrdinaryDelete(o, p)
+			return
 		}
 		_exports := o.(*ModuleNamespace).Exports
 		if !lo.Contains(_exports, p.ToValue().String()) {
-			return false
+			return
 		}
-		return true
+		co.value = true
+		return
 	}
 	internalMethods.OwnPropertyKeys = func(o ObjectType) []PropertyKey {
 		_exports := o.(*ModuleNamespace).Exports

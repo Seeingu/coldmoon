@@ -310,7 +310,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		co.value = true
 		return
 	}
-	proxyDelete := func(o ObjectType, pk PropertyKey) bool {
+	proxyDelete := func(o ObjectType, pk PropertyKey) (co Completion[bool]) {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -320,19 +320,24 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().Delete(t, pk)
 		}
 
-		booleanTrapResult := trap.
-			ToValue().
-			Call(
-				agent,
+		trapResult, isAbrupt, rt := ReturnIfAbrupt(
+			trap.Call(
 				h.ToValue(),
 				[]Value{t.ToValue(), pk.ToValue()},
-			).value.ToBoolean()
+			),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		booleanTrapResult := trapResult.ToBoolean()
 		if !booleanTrapResult {
-			return false
+			return
 		}
 		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
 		if targetDesc == nil {
-			return true
+			co.value = true
+			return
 		}
 		if !targetDesc.Configurable {
 			agent.ThrowTypeError("TypeError")
@@ -341,7 +346,8 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		if !extensibleTarget {
 			agent.ThrowTypeError("TypeError")
 		}
-		return true
+		co.value = true
+		return
 	}
 	ownPropertyKeys := func(o ObjectType) []PropertyKey {
 		proxy := o.(*ProxyObject)
