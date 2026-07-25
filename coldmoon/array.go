@@ -1308,7 +1308,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		relativeTarget, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, target), co)

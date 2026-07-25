@@ -519,6 +519,18 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayCopyWithinPropagatesLengthConversionError verifies an invalid
+// symbolic length remains a catchable TypeError completion.
+func TestArrayCopyWithinPropagatesLengthConversionError(t *testing.T) {
+	testSource(t, `let caught = null;
+try {
+  Array.prototype.copyWithin.call({ length: Symbol() }, 0, 0);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
