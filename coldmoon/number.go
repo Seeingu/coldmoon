@@ -586,7 +586,9 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		}
 
 		fractionDigits := JSInt(-1)
+		hasFractionDigits := false
 		if value := pkg.SliceSafeGet(arguments, 0); value != nil && value != UndefinedValue {
+			hasFractionDigits = true
 			fractionDigits, isAbrupt, rt = ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
 			if isAbrupt {
 				return rt
@@ -595,7 +597,7 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		if x.IsNaN() || x.IsPositiveInf() || x.IsNegativeInf() {
 			return NewStringValue(string(x.ToString()))
 		}
-		if fractionDigits < -1 || fractionDigits > 100 {
+		if hasFractionDigits && (fractionDigits < 0 || fractionDigits > 100) {
 			return co.ThrowRangeError(agent, "toExponential digits must be between 0 and 100")
 		}
 
