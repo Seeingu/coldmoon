@@ -99,6 +99,16 @@ const bound = count.bind();
 assert(bound() === 0);`)
 }
 
+func TestPropertyDescriptorAllowsUndefinedAccessors(t *testing.T) {
+	testSource(t, `const object = {};
+Object.defineProperty(object, "getter", { get: undefined });
+Object.defineProperty(object, "setter", { set: undefined });
+assert(object.getter === undefined);
+assert(object.setter === undefined);
+assert(Object.prototype.hasOwnProperty.call(object, "getter"));
+assert(Object.prototype.hasOwnProperty.call(object, "setter"));`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

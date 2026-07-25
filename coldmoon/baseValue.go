@@ -85,7 +85,9 @@ func (b *BaseValue) ToPropertyDescriptor(agent *Agent) *PropertyDescriptor {
 		if !IsCallable(get) && get != UndefinedValue {
 			panic("TypeError")
 		}
-		desc.Get = MustGetObject(get)
+		if get != UndefinedValue {
+			desc.Get = MustGetObject(get)
+		}
 	}
 
 	hasSet := object.HasProperty(NewStringPropertyKey("set"))
@@ -94,7 +96,9 @@ func (b *BaseValue) ToPropertyDescriptor(agent *Agent) *PropertyDescriptor {
 		if !IsCallable(set) && set != UndefinedValue {
 			panic("TypeError")
 		}
-		desc.Set = MustGetObject(set)
+		if set != UndefinedValue {
+			desc.Set = MustGetObject(set)
+		}
 	}
 
 	if hasGet || hasSet {
