@@ -641,6 +641,15 @@ assertEqual(2 in result, false);
 delete Function.prototype[Symbol.isConcatSpreadable];`)
 }
 
+// TestRegularExpressionLiteralEvaluation verifies a regex literal creates a
+// RegExp instance and can participate in ordinary property operations.
+func TestRegularExpressionLiteralEvaluation(t *testing.T) {
+	testSource(t, `const regexp = /abc/;
+assert(regexp instanceof RegExp);
+regexp.extra = 1;
+assertEqual(regexp.extra, 1);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

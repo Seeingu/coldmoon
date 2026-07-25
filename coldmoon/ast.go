@@ -104,6 +104,17 @@ func (p *PrimaryExpressionRegularExpressionLiteral) AssignmentTargetType() Assig
 	return AssignmentTargetTypeInvalid
 }
 
+func (p *PrimaryExpressionRegularExpressionLiteral) Evaluation(vm *VM) (co CompletionValue) {
+	regexp, isAbrupt, rt := ReturnIfAbrupt(
+		RegExpCreate(vm.agent, NewStringValue(p.Pattern), NewStringValue(p.Flags)),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	return regexp.ToValue().ToCompletion()
+}
+
 func (p *PrimaryExpressionRegularExpressionLiteral) String() string {
 	return "/" + p.Pattern + "/" + p.Flags
 }
