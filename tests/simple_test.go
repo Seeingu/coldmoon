@@ -111,6 +111,22 @@ try {
 assert(caught === sentinel);`)
 }
 
+func TestArraySortDefaultsAndGenericReceivers(t *testing.T) {
+	testSource(t, `const values = [10, 2, 1];
+assert(values.sort() === values);
+let caught = null;
+try {
+  values.sort(1);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);
+const original = [3, 1, 2];
+const sorted = original.toSorted();
+assert(sorted !== original);
+assert(original[0] === 3);`)
+}
+
 func TestFunctionInvocationHelpersDefaultArguments(t *testing.T) {
 	testSource(t, `function count() { return arguments.length; }
 assert(count.apply() === 0);

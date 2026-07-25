@@ -1705,19 +1705,29 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var sort BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		compareFn := args[0]
-		if compareFn != UndefinedValue && !IsCallable(compareFn) {
-			panic("TypeError")
-		}
-		obj := this.ToObject(agent).value
 		var co CompletionValue
+		compareFn := pkg.SliceSafeGet(args, 0)
+		if compareFn == nil {
+			compareFn = UndefinedValue
+		}
+		if compareFn != UndefinedValue && !IsCallable(compareFn) {
+			return co.ThrowTypeError(agent, "sort comparator is not callable")
+		}
+		obj, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(obj.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
+		var compareObject ObjectType
+		if compareFn != UndefinedValue {
+			compareObject = MustGetObject(compareFn)
+		}
 		sortCompare := SortCompare{
-			compareFn: MustGetObject(compareFn),
+			compareFn: compareObject,
 			impl:      CompareArrayElements,
 		}
 
@@ -1737,19 +1747,29 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return obj.ToValue()
 	}
 	var toSorted BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		compareFn := args[0]
-		if compareFn != UndefinedValue && !IsCallable(compareFn) {
-			panic("TypeError")
-		}
-		obj := this.ToObject(agent).value
 		var co CompletionValue
+		compareFn := pkg.SliceSafeGet(args, 0)
+		if compareFn == nil {
+			compareFn = UndefinedValue
+		}
+		if compareFn != UndefinedValue && !IsCallable(compareFn) {
+			return co.ThrowTypeError(agent, "toSorted comparator is not callable")
+		}
+		obj, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(obj.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
+		var compareObject ObjectType
+		if compareFn != UndefinedValue {
+			compareObject = MustGetObject(compareFn)
+		}
 		sortCompare := SortCompare{
-			compareFn: MustGetObject(compareFn),
+			compareFn: compareObject,
 			impl:      CompareArrayElements,
 		}
 
