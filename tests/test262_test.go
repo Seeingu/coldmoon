@@ -45,11 +45,7 @@ var supportFeatures = []string{
 func Test262WithCoverage(t *testing.T) {
 	passedFiles := loadPassedResultFiles()
 	skipped := getSkippedFiles()
-	agent := NewAgent()
 	InitializeConstants()
-	InitializeHostDefinedRealm(agent, nil)
-	realm := agent.CurrentRealm()
-	runtime.RegisterTest262Runtime(realm)
 
 	var passed []string
 	var failedLog strings.Builder
@@ -74,7 +70,12 @@ func Test262WithCoverage(t *testing.T) {
 			return nil
 		}
 		fmt.Println("Testing file: ", path)
+		agent := NewAgent()
+		InitializeHostDefinedRealm(agent, nil)
+		realm := agent.CurrentRealm()
+		runtime.RegisterTest262Runtime(realm)
 		err = evaluate(path, realm)
+		runtime.ReleaseTest262Runtime(realm)
 		if err != nil {
 			failedCount++
 			msg := fmt.Sprintf("Failed : %v", err)

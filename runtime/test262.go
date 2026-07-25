@@ -109,6 +109,13 @@ func RegisterTest262Runtime(realm *coldmoon.Realm) {
 	loadedTest262Includes.Unlock()
 }
 
+// ReleaseTest262Runtime removes per-realm harness bookkeeping after a test.
+func ReleaseTest262Runtime(realm *coldmoon.Realm) {
+	loadedTest262Includes.Lock()
+	delete(loadedTest262Includes.byRealm, realm)
+	loadedTest262Includes.Unlock()
+}
+
 // RegisterTest262Includes evaluates the optional harness files declared by a
 // test's frontmatter. Harnesses are loaded once per realm because many of them
 // declare top-level lexical bindings.
