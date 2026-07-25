@@ -605,15 +605,22 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	)
 
 	var create BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := arguments[0]
-		properties := arguments[1]
-		if !o.IsObject() {
+		var o Value
+		if len(arguments) > 0 {
+			o = arguments[0]
+		}
+		if o == nil || (!o.IsObject() && o != NullValue) {
 			return agent.ThrowTypeError("is not an object")
 		}
 
-		obj := OrdinaryObjectCreate(agent, MustGetObject(o), []string{})
+		var proto ObjectType
+		if o != NullValue {
+			proto = MustGetObject(o)
+		}
+		obj := OrdinaryObjectCreate(agent, proto, []string{})
 
-		if properties != nil {
+		if len(arguments) > 1 && arguments[1] != UndefinedValue {
+			properties := arguments[1]
 			return (objectDefineProperties(agent, obj, properties)).ToValue()
 		}
 
@@ -725,6 +732,9 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			return rt
 		}
 		proto := obj.InternalMethods().GetPrototypeOf(obj)
+		if proto == nil {
+			return NullValue
+		}
 		return proto.ToValue()
 	}
 

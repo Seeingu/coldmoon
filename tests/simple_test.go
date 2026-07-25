@@ -476,6 +476,13 @@ try {
 assert(caught instanceof TypeError);`)
 }
 
+// TestObjectGetPrototypeOfReturnsNull verifies a null internal prototype is
+// exposed as the JavaScript null value.
+func TestObjectGetPrototypeOfReturnsNull(t *testing.T) {
+	testSource(t, `const object = Object.create(null);
+assert(Object.getPrototypeOf(object) === null);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
