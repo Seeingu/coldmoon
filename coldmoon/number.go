@@ -528,10 +528,41 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		}
 		return toString(x, nil, nil)
 	}
+	var toFixed BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+
+		fractionDigits := JSInt(0)
+		if value := pkg.SliceSafeGet(arguments, 0); value != nil {
+			fractionDigits, isAbrupt, rt = ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		if fractionDigits < 0 || fractionDigits > 100 {
+			return co.ThrowRangeError(agent, "toFixed digits must be between 0 and 100")
+		}
+		if x.IsNaN() || x.IsPositiveInf() || x.IsNegativeInf() {
+			return NewStringValue(string(x.ToString()))
+		}
+		if math.Abs(x.Data.ToFloat()) >= 1e21 {
+			return NewStringValue(string(x.ToString()))
+		}
+
+		number := x.Data.ToFloat()
+		if number == 0 {
+			number = 0
+		}
+		return NewStringValue(strconv.FormatFloat(number, 'f', int(fractionDigits), 64))
+	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 1)
 	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
 	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
+	object.defineBuiltinFunction(realm, CMString("toFixed"), toFixed, 1)
 
 	return object
 }

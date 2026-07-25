@@ -883,6 +883,23 @@ assert(Number.isNaN() === false);
 assert(Number.isSafeInteger() === false);`)
 }
 
+// TestNumberToFixed verifies fixed-point formatting, coercion, and range
+// validation for Number primitives and wrappers.
+func TestNumberToFixed(t *testing.T) {
+	testSource(t, `assert(Number.prototype.toFixed() === "0");
+assert((new Number(1)).toFixed(1) === "1.0");
+assert((123.456).toFixed(2) === "123.46");
+assert((-0).toFixed(2) === "0.00");
+assert(NaN.toFixed(1) === "NaN");
+let caught = null;
+try {
+  (3).toFixed(101);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof RangeError);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
