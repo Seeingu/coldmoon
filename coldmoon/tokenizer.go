@@ -1,7 +1,7 @@
 package coldmoon
 
 import (
-	"strconv"
+	"math/big"
 	"strings"
 
 	"github.com/Seeingu/coldmoon/pkg"
@@ -441,13 +441,12 @@ func (t *Tokenizer) number() Token {
 func (t *Tokenizer) parseNumber(base int, validDigits []rune) string {
 	start := t.Index
 	for t.matchCharset(validDigits) {
-		t.Index++
 	}
-	value, err := strconv.ParseInt(string(t.SourceText[start:t.Index]), base, 64)
-	if err != nil {
-		panic(err)
+	value, ok := new(big.Int).SetString(string(t.SourceText[start:t.Index]), base)
+	if !ok {
+		panic("invalid numeric literal")
 	}
-	return strconv.FormatInt(value, 10)
+	return value.Text(10)
 }
 
 func (t *Tokenizer) parseDecimalNumber() string {

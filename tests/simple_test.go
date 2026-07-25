@@ -952,6 +952,11 @@ assert(Number(-(2n ** 53n + 3n)) === -9007199254740996);
 assert(~0n === -1n);`)
 }
 
+func TestBigIntWidthTruncation(t *testing.T) {
+	testSource(t, `assert(BigInt.asIntN(8, 0xabcdef0123456789abcdef0183n) === -0x7dn);
+assert(BigInt.asUintN(8, 0xabcdef0123456789abcdef0183n) === 0x83n);`)
+}
+
 // TestNumberToStringRadixDigits verifies lowercase digits a-z are used for
 // integer radices through 36.
 func TestNumberToStringRadixDigits(t *testing.T) {

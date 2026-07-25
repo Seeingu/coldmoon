@@ -166,6 +166,50 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 		isConstructor: true,
 	})
 
+	var asUintN BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		bitsValue := pkg.SliceSafeGet(arguments, 0)
+		bigintValue := pkg.SliceSafeGet(arguments, 1)
+		bits, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, bitsValue), co)
+		if isAbrupt {
+			return rt
+		}
+		bigint, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, bigintValue), co)
+		if isAbrupt {
+			return rt
+		}
+		if bits == 0 {
+			return NewBigIntValue(new(big.Int))
+		}
+		modulus := new(big.Int).Lsh(big.NewInt(1), uint(bits))
+		return NewBigIntValue(new(big.Int).Mod(bigint.Data, modulus))
+	}
+	var asIntN BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		bitsValue := pkg.SliceSafeGet(arguments, 0)
+		bigintValue := pkg.SliceSafeGet(arguments, 1)
+		bits, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, bitsValue), co)
+		if isAbrupt {
+			return rt
+		}
+		bigint, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, bigintValue), co)
+		if isAbrupt {
+			return rt
+		}
+		if bits == 0 {
+			return NewBigIntValue(new(big.Int))
+		}
+		modulus := new(big.Int).Lsh(big.NewInt(1), uint(bits))
+		result := new(big.Int).Mod(bigint.Data, modulus)
+		signedLimit := new(big.Int).Rsh(new(big.Int).Set(modulus), 1)
+		if result.Cmp(signedLimit) >= 0 {
+			result.Sub(result, modulus)
+		}
+		return NewBigIntValue(result)
+	}
+	object.defineBuiltinFunction(realm, CMString("asIntN"), asIntN, 2)
+	object.defineBuiltinFunction(realm, CMString("asUintN"), asUintN, 2)
+
 	BindPrototypeAndConstructor(realm.Intrinsics.BigIntPrototype, object)
 
 	return object
