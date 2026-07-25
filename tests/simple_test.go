@@ -918,6 +918,24 @@ try {
 assert(caught instanceof RangeError);`)
 }
 
+// TestNumberToPrecision verifies significant-digit formatting and its
+// fixed/exponential threshold.
+func TestNumberToPrecision(t *testing.T) {
+	testSource(t, `assert((7).toPrecision(3) === "7.00");
+assert((10).toPrecision(1) === "1e+1");
+assert((0.000001).toPrecision(2) === "0.0000010");
+assert((0.0000001).toPrecision(2) === "1.0e-7");
+assert((Infinity).toPrecision(1000) === "Infinity");
+assert((42).toPrecision() === "42");
+let caught = null;
+try {
+  (3).toPrecision(0);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof RangeError);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

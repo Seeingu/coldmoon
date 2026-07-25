@@ -632,12 +632,46 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		}
 		return NewStringValue(formatNumberExponential(number, int(fractionDigits)))
 	}
+	var toPrecision BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+
+		precisionValue := pkg.SliceSafeGet(arguments, 0)
+		if precisionValue == nil || precisionValue == UndefinedValue {
+			return NewStringValue(string(x.ToString()))
+		}
+		precision, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, precisionValue), co)
+		if isAbrupt {
+			return rt
+		}
+		if x.IsNaN() || x.IsPositiveInf() || x.IsNegativeInf() {
+			return NewStringValue(string(x.ToString()))
+		}
+		if precision < 1 || precision > 100 {
+			return co.ThrowRangeError(agent, "toPrecision digits must be between 1 and 100")
+		}
+
+		number := x.Data.ToFloat()
+		if number == 0 {
+			return NewStringValue(strconv.FormatFloat(0, 'f', int(precision-1), 64))
+		}
+		exponent := int(math.Floor(math.Log10(math.Abs(number))))
+		if exponent < -6 || exponent >= int(precision) {
+			return NewStringValue(formatNumberExponential(number, int(precision-1)))
+		}
+		fractionDigits := int(precision) - exponent - 1
+		return NewStringValue(strconv.FormatFloat(number, 'f', fractionDigits, 64))
+	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 1)
 	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
 	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
 	object.defineBuiltinFunction(realm, CMString("toFixed"), toFixed, 1)
 	object.defineBuiltinFunction(realm, CMString("toExponential"), toExponential, 1)
+	object.defineBuiltinFunction(realm, CMString("toPrecision"), toPrecision, 1)
 
 	return object
 }
