@@ -700,6 +700,21 @@ func TestArrayForEachDefaultsThisArgument(t *testing.T) {
 assertEqual(count, 3);`)
 }
 
+// TestSloppyDuplicateParameters verifies the shared binding takes the last
+// argument while the arguments object retains every indexed value.
+func TestSloppyDuplicateParameters(t *testing.T) {
+	testSource(t, `const result = (function(a, a, a) {
+  return {
+    binding: a,
+    values: [arguments[0], arguments[1], arguments[2]]
+  };
+})(1, 2, 3);
+assertEqual(result.binding, 3);
+assertEqual(result.values[0], 1);
+assertEqual(result.values[1], 2);
+assertEqual(result.values[2], 3);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

@@ -321,7 +321,7 @@ loop:
 				})
 				value = node.Data()
 			}
-			if e == nil {
+			if e == nil || hasDuplicates {
 				_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(agent, value), co)
 				if isAbrupt {
 					return rt
