@@ -31,6 +31,32 @@ func testModule(t *testing.T, f string) {
 	EvaluateModule(resolveTestdataPath(f), realm)
 }
 
+// TestObjectLiteralDataPropertyNamedGet verifies that contextual accessor
+// keywords remain valid ordinary property names when followed by a colon.
+func TestObjectLiteralDataPropertyNamedGet(t *testing.T) {
+	testSource(t, `const descriptor = { get: function() { return 1; } };
+assertEqual(descriptor.get(), 1);`)
+}
+
+// TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
+// before Array.from chooses between iterator and array-like processing.
+func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const items = {};
+Object.defineProperty(items, Symbol.iterator, {
+  get: function() {
+    throw sentinel;
+  }
+});
+let caught = null;
+try {
+  Array.from(items);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

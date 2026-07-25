@@ -305,7 +305,21 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 			}
 			mapping = true
 		}
-		usingIterator := GetMethod(agent, items, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
+		iteratorMethod, isAbrupt, rt := ReturnIfAbrupt(
+			GetV(agent, items, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator])),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+
+		var usingIterator ObjectType
+		if !IsUndefinedOrNull(iteratorMethod) {
+			if !IsCallable(iteratorMethod) {
+				return co.ThrowTypeError(agent, "items iterator method is not callable")
+			}
+			usingIterator = MustGetObject(iteratorMethod)
+		}
 		if usingIterator != nil {
 			var a ObjectType
 			if IsConstructor(c) {

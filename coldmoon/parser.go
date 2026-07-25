@@ -2201,7 +2201,6 @@ func (p *Parser) propertyName() (PropertyName, bool) {
 }
 
 func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefinition {
-	p.tokenizer.store()
 	inMethodDefinition := p.inMethodDefinition
 	inClassConstructor := p.inClassConstructor
 	p.inMethodDefinition = true
@@ -2296,7 +2295,6 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 func (p *Parser) propertyDefinition() PropertyDefinition {
 	t := p.tokenizer.CurrentToken
 	var propertyName PropertyName
-	p.tokenizer.store()
 
 	accept := p.acceptContextHigherThan(TComma)
 	switch t.Type {
