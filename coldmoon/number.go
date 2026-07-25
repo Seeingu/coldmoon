@@ -142,6 +142,31 @@ func normalizeNumberExponent(formatted string) string {
 	return parts[0] + "e" + sign + exponent
 }
 
+func formatNumberExponential(number float64, fractionDigits int) string {
+	if number != 0 && fractionDigits >= 0 && fractionDigits <= 15 {
+		absolute := math.Abs(number)
+		exponent := int(math.Floor(math.Log10(absolute)))
+		factor := math.Pow10(fractionDigits)
+		scaled := absolute / math.Pow10(exponent) * factor
+		lower := math.Floor(scaled)
+		if math.Abs((scaled-lower)-0.5) < 1e-12 {
+			mantissa := (lower + 1) / factor
+			if mantissa >= 10 {
+				mantissa /= 10
+				exponent++
+			}
+			formatted := strconv.FormatFloat(mantissa, 'f', fractionDigits, 64)
+			if math.Signbit(number) {
+				formatted = "-" + formatted
+			}
+			return normalizeNumberExponent(formatted + "e" + strconv.Itoa(exponent))
+		}
+	}
+	return normalizeNumberExponent(
+		strconv.FormatFloat(number, 'e', fractionDigits, 64),
+	)
+}
+
 func (n *NumberValue) IsNaN() bool {
 	return math.IsNaN(n.Data.ToFloat())
 }
@@ -605,9 +630,7 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		if number == 0 {
 			number = 0
 		}
-		return NewStringValue(normalizeNumberExponent(
-			strconv.FormatFloat(number, 'e', int(fractionDigits), 64),
-		))
+		return NewStringValue(formatNumberExponential(number, int(fractionDigits)))
 	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 1)
