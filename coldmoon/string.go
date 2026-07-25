@@ -703,6 +703,36 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		rx := RegExpCreate(agent, regexp, UndefinedValue)
 		return ValueInvoke(agent, rx.Data().ToValue(), NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]), []Value{s})
 	}
+	var match BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String.prototype.match called on null or undefined")
+		}
+		regexp := pkg.SliceSafeGet(argumentsList, 0)
+		if regexp == nil {
+			regexp = UndefinedValue
+		}
+		if !IsUndefinedOrNull(regexp) {
+			matcher := GetMethod(agent, regexp, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatch]))
+			if matcher != nil {
+				return matcher.Call(regexp, []Value{this})
+			}
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		rx, isAbrupt, rt := ReturnIfAbrupt(RegExpCreate(agent, regexp, UndefinedValue), co)
+		if isAbrupt {
+			return rt
+		}
+		return ValueInvoke(
+			agent,
+			rx.ToValue(),
+			NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsMatch]),
+			[]Value{s},
+		)
+	}
 	var matchAll BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		regexp := argumentsList[0]
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -1009,6 +1039,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("localeCompare"), localeCompare, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("normalize"), normalizeString, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("match"), match, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("lastIndexOf"), lastIndexOf, 1)
@@ -1041,6 +1072,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("localeCompare"), localeCompare, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("normalize"), normalizeString, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("match"), match, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("lastIndexOf"), lastIndexOf, 1)

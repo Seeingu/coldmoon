@@ -175,6 +175,78 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		return MustGetObject(result.Data()).Get(NewStringPropertyKey("index"))
 	}
+	match := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		rxValue, ok := this.(*ObjectValue)
+		if !ok {
+			return co.ThrowTypeError(agent, "RegExp match receiver is not an object")
+		}
+		rx, ok := rxValue.Object.(*RegExpObject)
+		if !ok {
+			return co.ThrowTypeError(agent, "RegExp match receiver is not a RegExp")
+		}
+		input := pkg.SliceSafeGet(arguments, 0)
+		if input == nil {
+			input = UndefinedValue
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, input), co)
+		if isAbrupt {
+			return rt
+		}
+		if !rx.Get(NewStringPropertyKey("global")).ToBoolean() {
+			return RegExpExec(agent, rx, s.Data)
+		}
+		fullUnicode := rx.Get(NewStringPropertyKey("unicode")).ToBoolean() ||
+			rx.Get(NewStringPropertyKey("unicodeSets")).ToBoolean()
+		_, isAbrupt, rt = ReturnIfAbrupt(
+			rx.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		result := ArrayCreate(agent, 0, nil)
+		count := JSInt(0)
+		for {
+			next, isAbrupt, rt := ReturnIfAbrupt(RegExpExec(agent, rx, s.Data), co)
+			if isAbrupt {
+				return rt
+			}
+			if next == NullValue {
+				if count == 0 {
+					return NullValue
+				}
+				return result.ToValue()
+			}
+			nextObject := MustGetObject(next)
+			matched, isAbrupt, rt := ReturnIfAbrupt(
+				ToStringCompletion(agent, nextObject.Get(NewStringPropertyKey("0"))),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			result.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(count), matched)
+			count++
+			if matched.Data == "" {
+				lastIndex, isAbrupt, rt := ReturnIfAbrupt(
+					ToLength(agent, rx.Get(NewStringPropertyKey("lastIndex"))),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				nextIndex := AdvanceStringIndex(s.Data, lastIndex, fullUnicode)
+				_, isAbrupt, rt = ReturnIfAbrupt(
+					rx.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(nextIndex.ToNumber()), setThrowTypeThrow),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+			}
+		}
+	}
 	matchAll := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
 			panic("TypeError")
@@ -199,6 +271,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("exec"), exec, 1)
 	object.defineBuiltinFunction(realm, CMString("test"), test, 1)
 	object.defineBuiltinFunction(realm, WellKnownSymbolsSearch, search, 1)
+	object.defineBuiltinFunction(realm, WellKnownSymbolsMatch, match, 1)
 	object.defineBuiltinFunction(realm, WellKnownSymbolsMatchAll, matchAll, 1)
 	object.defineBuiltinAccessor(realm, CMString("dotAll"), builtinAccessorParams{
 		Getter: dotAll,
@@ -423,8 +496,8 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) (co Complet
 			match = r
 			matchSucceeded = true
 			matchRecord = &MatchRecord{
-				StartIndex: JSInt(match.Index),
-				EndIndex:   JSInt(match.Index + match.Length),
+				StartIndex: JSInt(lastIndex + match.Index),
+				EndIndex:   JSInt(lastIndex + match.Index + match.Length),
 			}
 		}
 	}
@@ -438,7 +511,7 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) (co Complet
 	n := JSInt(len(match.Captures))
 	Assert(float64(n) < POW_2_32-1)
 
-	A := ArrayCreate(agent, n+1, nil)
+	A := ArrayCreate(agent, n, nil)
 	A.CreateDataPropertyOrThrow(
 		NewStringPropertyKey("index"),
 		NewNumberValue(matchRecord.StartIndex.ToNumber()))

@@ -332,6 +332,15 @@ assert("ABC".toLocaleLowerCase() === "abc");
 assert("abc".toLocaleUpperCase() === "ABC");`)
 }
 
+func TestStringMatchSupportsRegExpAndCustomDispatch(t *testing.T) {
+	testSource(t, `const single = "abc".match(/b/);
+assert(single[0] === "b");
+assert(single.index === 1);
+const matcher = {};
+matcher[Symbol.match] = function(value) { return value + "!"; };
+assert("value".match(matcher) === "value!");`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
