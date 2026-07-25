@@ -127,6 +127,19 @@ assert(sorted !== original);
 assert(original[0] === 3);`)
 }
 
+func TestArraySliceSupportsOmittedArgumentsAndGenericReceivers(t *testing.T) {
+	testSource(t, `const values = [1, 2, 3];
+const copy = values.slice();
+assert(copy.length === 3);
+assert(copy[0] === 1);
+assert(copy !== values);
+const arrayLike = { 0: "a", 2: "c", length: 3 };
+const sliced = Array.prototype.slice.call(arrayLike, 1);
+assert(sliced.length === 2);
+assert(!(0 in sliced));
+assert(sliced[1] === "c");`)
+}
+
 func TestFunctionInvocationHelpersDefaultArguments(t *testing.T) {
 	testSource(t, `function count() { return arguments.length; }
 assert(count.apply() === 0);

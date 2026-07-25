@@ -1407,14 +1407,23 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := this.ToObject(agent).value
 		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
-		start := args[0]
-		end := args[1]
+		start := pkg.SliceSafeGet(args, 0)
+		end := pkg.SliceSafeGet(args, 1)
+		if start == nil {
+			start = UndefinedValue
+		}
+		if end == nil {
+			end = UndefinedValue
+		}
 
 		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
 		if isAbrupt {
