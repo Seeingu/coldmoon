@@ -813,6 +813,28 @@ assert(Boolean(new Number(0)) === true);
 assert(Boolean(new Number(NaN)) === true);`)
 }
 
+// TestBooleanPrototypeMethodsRejectOtherObjects verifies the Boolean
+// prototype methods return catchable TypeErrors for incompatible receivers.
+func TestBooleanPrototypeMethodsRejectOtherObjects(t *testing.T) {
+	testSource(t, `const values = [new String(), new Date(), {}, { x: 1 }];
+values.forEach(function(value) {
+  let toStringError = null;
+  let valueOfError = null;
+  try {
+    Boolean.prototype.toString.call(value);
+  } catch (error) {
+    toStringError = error;
+  }
+  try {
+    Boolean.prototype.valueOf.call(value);
+  } catch (error) {
+    valueOfError = error;
+  }
+  assert(toStringError instanceof TypeError);
+  assert(valueOfError instanceof TypeError);
+});`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

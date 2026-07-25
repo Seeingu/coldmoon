@@ -109,7 +109,11 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 	object.ref = object
 	agent := realm.Agent
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		b := ThisBooleanValue(agent, thisArgument)
+		var co CompletionValue
+		b, isAbrupt, rt := ReturnIfAbrupt(ThisBooleanValue(agent, thisArgument), co)
+		if isAbrupt {
+			return rt
+		}
 		if b {
 			return NewStringValue("true")
 		} else {
@@ -117,7 +121,12 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 		}
 	}
 	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		return NewBooleanValue(ThisBooleanValue(realm.Agent, thisArgument))
+		var co CompletionValue
+		b, isAbrupt, rt := ReturnIfAbrupt(ThisBooleanValue(agent, thisArgument), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(b)
 	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
@@ -128,19 +137,20 @@ func NewBooleanPrototype(realm *Realm) *BooleanObject {
 
 // ThisBooleanValue
 // spec: 20.3.3.3.1
-func ThisBooleanValue(agent *Agent, value Value) bool {
+func ThisBooleanValue(agent *Agent, value Value) (co Completion[bool]) {
 	switch o := value.(type) {
 	case *BooleanValue:
-		return value.ToBoolean()
+		co.value = value.ToBoolean()
+		return
 	case *ObjectValue:
 		if b, ok := o.Object.GetSlot(SlotBooleanData); ok {
-			return b.(bool)
+			co.value = b.(bool)
+			return
 		}
 		if o, ok := o.Object.(*BooleanObject); ok {
-			b := o.getData()
-			return b
+			co.value = o.getData()
+			return
 		}
 	}
-	agent.ThrowException(TypeError, "Not a boolean")
-	panic("")
+	return co.ThrowTypeError(agent, "Not a boolean")
 }
