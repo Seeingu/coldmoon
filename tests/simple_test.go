@@ -669,6 +669,26 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayConcatPropagatesLengthGetterError verifies LengthOfArrayLike
+// preserves an abrupt length accessor completion.
+func TestArrayConcatPropagatesLengthGetterError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const value = {};
+value[Symbol.isConcatSpreadable] = true;
+Object.defineProperty(value, "length", {
+  get: function() {
+    throw sentinel;
+  }
+});
+let caught = null;
+try {
+  [].concat(value);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

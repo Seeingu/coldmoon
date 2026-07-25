@@ -386,8 +386,18 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 
 // LengthOfArrayLike
 // spec: 7.3.18
-func (o *Object) LengthOfArrayLike() Completion[JSInt] {
-	length := o.Get(NewStringPropertyKey("length"))
+func (o *Object) LengthOfArrayLike() (co Completion[JSInt]) {
+	length, isAbrupt, rt := ReturnIfAbrupt(
+		o.InternalMethods().Get(
+			o.Ref(),
+			NewStringPropertyKey("length"),
+			o.ToValue(),
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	return ToLength(o.Agent(), length)
 }
 
