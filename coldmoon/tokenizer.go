@@ -185,6 +185,9 @@ func (t *Tokenizer) peek() Token {
 		}
 		return t.newToken(TStar, "*")
 	case '.':
+		if t.Index+1 < t.Length && lo.Contains(lo.NumbersCharset, t.SourceText[t.Index+1]) {
+			return t.number()
+		}
 		t.step()
 		if t.match('.') {
 			if t.match('.') {

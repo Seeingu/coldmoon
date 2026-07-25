@@ -247,10 +247,16 @@ func ToUint8Clamp(value Value, agent *Agent) (co Completion[uint8]) {
 // ToBigInt
 // spec: 7.1.13
 func ToBigInt(agent *Agent, value Value) (co Completion[*BigIntValue]) {
-	prim := ReturnAssertNormal(value.ToPrimitive(agent, PreferredTypeNumber))
+	if value == nil {
+		value = UndefinedValue
+	}
+	prim, isAbrupt, rt := ReturnIfAbrupt(value.ToPrimitive(agent, PreferredTypeNumber), co)
+	if isAbrupt {
+		return rt
+	}
 	switch p := prim.(type) {
 	case *undefinedValue, *nullValue, *NumberValue, *SymbolValue:
-		panic("TypeError")
+		return co.ThrowTypeError(agent, "Cannot convert value to BigInt")
 	case *BooleanValue:
 		co.value = NewBigIntFromBoolean(p.Data)
 		return
@@ -259,7 +265,9 @@ func ToBigInt(agent *Agent, value Value) (co Completion[*BigIntValue]) {
 		return
 	case *StringValue:
 		n, ok := StringToBigInt(p)
-		Assert(ok)
+		if !ok {
+			return co.ThrowError(agent, SyntaxError, "Cannot convert string to BigInt")
+		}
 		co.value = n
 		return
 	default:
@@ -320,15 +328,18 @@ func StringToNumber(value *StringValue) *NumberValue {
 func StringToBigInt(value *StringValue) (*BigIntValue, bool) {
 	bigInt := new(big.Int)
 	base := 10
-	rawString := value.Data
-	if strings.HasPrefix(value.Data, "0x") || strings.HasPrefix(value.Data, "0X") {
-		rawString = value.Data[2:]
+	rawString := strings.TrimSpace(value.Data)
+	if rawString == "" {
+		return NewBigIntValue(bigInt), true
+	}
+	if strings.HasPrefix(rawString, "0x") || strings.HasPrefix(rawString, "0X") {
+		rawString = rawString[2:]
 		base = 16
-	} else if strings.HasPrefix(value.Data, "0b") || strings.HasPrefix(value.Data, "0B") {
-		rawString = value.Data[2:]
+	} else if strings.HasPrefix(rawString, "0b") || strings.HasPrefix(rawString, "0B") {
+		rawString = rawString[2:]
 		base = 2
-	} else if strings.HasPrefix(value.Data, "0o") || strings.HasSuffix(value.Data, "0O") {
-		rawString = value.Data[2:]
+	} else if strings.HasPrefix(rawString, "0o") || strings.HasPrefix(rawString, "0O") {
+		rawString = rawString[2:]
 		base = 8
 	}
 	if _, ok := bigInt.SetString(rawString, base); !ok {

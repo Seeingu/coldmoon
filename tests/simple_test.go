@@ -957,6 +957,19 @@ func TestBigIntWidthTruncation(t *testing.T) {
 assert(BigInt.asUintN(8, 0xabcdef0123456789abcdef0183n) === 0x83n);`)
 }
 
+func TestBigIntStringAndReceiverConversions(t *testing.T) {
+	testSource(t, `assert(BigInt("") === 0n);
+assert(BigInt("  0o12  ") === 10n);
+assert((100n).toString() === "100");
+let caught = null;
+try {
+  BigInt.prototype.valueOf.call({});
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);`)
+}
+
 // TestNumberToStringRadixDigits verifies lowercase digits a-z are used for
 // integer radices through 36.
 func TestNumberToStringRadixDigits(t *testing.T) {

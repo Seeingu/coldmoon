@@ -32,7 +32,7 @@ func NewBigIntFromBoolean(b bool) *BigIntValue {
 }
 
 func (b *BigIntValue) ToString() CMString {
-	return CMString(b.Data.String() + "n")
+	return CMString(b.Data.String())
 }
 
 func (b *BigIntValue) String() string {
@@ -137,7 +137,10 @@ func NewBigIntObject(agent *Agent, v *BigIntValue, prototype ObjectType) *BigInt
 func NewBigIntConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := argumentsList[0]
+		value := pkg.SliceSafeGet(argumentsList, 0)
+		if value == nil {
+			value = UndefinedValue
+		}
 
 		if newTarget != nil {
 			return agent.ThrowTypeError("BigInt is not a constructor.")
@@ -150,7 +153,11 @@ func NewBigIntConstructor(realm *Realm) ObjectType {
 		}
 
 		if num, ok := prim.(*NumberValue); ok {
-			return NumberToBigInt(agent, num)
+			bigint, isAbrupt, rt := ReturnIfAbrupt(NumberToBigInt(agent, num), co)
+			if isAbrupt {
+				return rt
+			}
+			return bigint
 		}
 
 		v, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, prim), co)
@@ -224,10 +231,13 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 		var co CompletionValue
 		radix := pkg.SliceSafeGet(arguments, 0)
 
-		x := thisBigIntValue(this)
+		x, isAbrupt, rt := ReturnIfAbrupt(thisBigIntValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
 
 		var radixMV JSInt
-		if radix == nil {
+		if radix == nil || radix == UndefinedValue {
 			radixMV = 10
 		} else {
 			_radixMV, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, radix), co)
@@ -241,13 +251,23 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 			return agent.ThrowRangeError("Radix must be an integer between 2 and 36, inclusive.")
 		}
 
-		return x.ToString().ToValue()
+		return NewStringValue(x.Data.Text(int(radixMV)))
 	}
 	valueOf := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		return thisBigIntValue(this)
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisBigIntValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		return x
 	}
 	toLocaleString := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		return toString(thisBigIntValue(this), nil, nil)
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisBigIntValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		return toString(x, nil, nil)
 	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
@@ -258,25 +278,28 @@ func NewBigIntPrototype(realm *Realm) ObjectType {
 	return object
 }
 
-func thisBigIntValue(value Value) *BigIntValue {
+func thisBigIntValue(agent *Agent, value Value) (co Completion[*BigIntValue]) {
 	if bigint, ok := value.(*BigIntValue); ok {
-		return bigint
+		co.value = bigint
+		return
 	}
 	if object, ok := value.(*ObjectValue); ok {
 		bigInt, ok := object.Object.(*BigIntObject)
 		if ok {
-			return bigInt.Data
+			co.value = bigInt.Data
+			return
 		}
 	}
 
-	panic("TypeError")
+	return co.ThrowTypeError(agent, "BigInt method called on incompatible receiver")
 }
 
 // 21.2.1.1.1
-func NumberToBigInt(agent *Agent, number *NumberValue) *BigIntValue {
+func NumberToBigInt(agent *Agent, number *NumberValue) (co Completion[*BigIntValue]) {
 	if !IsIntegralNumber(number) {
-		panic("RangeError")
+		return co.ThrowRangeError(agent, "Cannot convert non-integer Number to BigInt")
 	}
 
-	return NewBigIntValue(big.NewInt(int64(number.Data)))
+	co.value = NewBigIntValue(big.NewInt(int64(number.Data)))
+	return
 }
