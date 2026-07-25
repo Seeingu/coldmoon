@@ -489,7 +489,10 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		var co CompletionValue
 		radix := pkg.SliceSafeGet(arguments, 0)
 
-		x := thisNumberValue(agent, this)
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
 		var radixMV JSInt = 10
 		if radix != nil {
 			_radixMV, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, radix), co)
@@ -507,11 +510,20 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 	}
 
 	var valueOf BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		x := thisNumberValue(agent, this)
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
 		return x
 	}
 	var toLocaleString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		return toString(thisNumberValue(agent, this), nil, nil)
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		return toString(x, nil, nil)
 	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 1)
@@ -521,15 +533,17 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 	return object
 }
 
-func thisNumberValue(agent *Agent, this Value) *NumberValue {
+func thisNumberValue(agent *Agent, this Value) (co Completion[*NumberValue]) {
 	switch v := this.(type) {
 	case *NumberValue:
-		return v
+		co.value = v
+		return
 	case *ObjectValue:
 		numberObject, ok := v.Object.(*NumberObject)
 		if ok {
-			return NewNumberValue(numberObject.Data)
+			co.value = NewNumberValue(numberObject.Data)
+			return
 		}
 	}
-	panic("TypeError")
+	return co.ThrowTypeError(agent, "Not a Number")
 }

@@ -859,6 +859,21 @@ assert(object.toString() === "[object Boolean]");
 Boolean.prototype.toString = original;`)
 }
 
+// TestNumberPrototypeMethodsRejectOtherObjects verifies incompatible receiver
+// failures are catchable JavaScript TypeErrors.
+func TestNumberPrototypeMethodsRejectOtherObjects(t *testing.T) {
+	testSource(t, `const values = [new String(), new Boolean(), new Date(), {}, []];
+values.forEach(function(value) {
+  let caught = null;
+  try {
+    Number.prototype.valueOf.call(value);
+  } catch (error) {
+    caught = error;
+  }
+  assert(caught instanceof TypeError);
+});`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
