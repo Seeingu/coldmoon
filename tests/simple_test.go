@@ -768,6 +768,27 @@ values.forEach(function(value) {
 });`)
 }
 
+// TestArrayConcatRejectsRevokedProxy verifies IsArray propagates the
+// catchable TypeError produced by a revoked Proxy.
+func TestArrayConcatRejectsRevokedProxy(t *testing.T) {
+	testSource(t, `const record = Proxy.revocable([], {});
+let constructorCalls = 0;
+Object.defineProperty(record.proxy, "constructor", {
+  get: function() {
+    constructorCalls++;
+  }
+});
+record.revoke();
+let caught = null;
+try {
+  Array.prototype.concat.call(record.proxy);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);
+assert(constructorCalls === 0);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

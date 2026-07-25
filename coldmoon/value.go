@@ -410,19 +410,27 @@ func RequireObjectCoercible(agent *Agent, value Value) Value {
 
 // 7.2.2
 func IsArray(value Value) bool {
+	return ReturnAssertNormal(IsArrayCompletion(value))
+}
+
+func IsArrayCompletion(value Value) (co Completion[bool]) {
 	o, ok := value.(*ObjectValue)
 	if !ok {
-		return false
+		return
 	}
 	if _, ok = o.Object.(*ArrayObject); ok {
-		return true
+		co.value = true
+		return
 	}
 	if proxy, ok := o.Object.(*ProxyObject); ok {
-		proxy.validateNonRevokedProxy()
+		if proxy.Target == nil {
+			return co.ThrowTypeError(proxy.Agent(), "IsArray called on a revoked Proxy")
+		}
+		Assert(proxy.Handler != nil)
 		proxyTarget := proxy.Target
-		return IsArray(proxyTarget.ToValue())
+		return IsArrayCompletion(proxyTarget.ToValue())
 	}
-	return false
+	return
 }
 
 // 7.2.3

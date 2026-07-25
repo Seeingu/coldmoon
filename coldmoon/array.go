@@ -86,7 +86,10 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
 
 // 10.4.2.3
 func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) (co Completion[ObjectType]) {
-	isArray := IsArray(originalArray.ToValue())
+	isArray, isAbrupt, rt := ReturnIfAbrupt(IsArrayCompletion(originalArray.ToValue()), co)
+	if isAbrupt {
+		return rt
+	}
 	if !isArray {
 		co.value = ArrayCreate(agent, length, nil)
 		return
@@ -1917,8 +1920,7 @@ func IsConcatSpreadable(agent *Agent, value Value) (co Completion[bool]) {
 		co.value = spreadable.ToBoolean()
 		return
 	}
-	co.value = IsArray(value)
-	return
+	return IsArrayCompletion(value)
 }
 
 type SortCompare struct {
