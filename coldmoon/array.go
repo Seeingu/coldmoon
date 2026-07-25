@@ -1269,7 +1269,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if kPresent {
 				kValue := o.Get(pk)
 				accumulator, isAbrupt, rt = ReturnIfAbrupt(
-					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
+					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), o.ToValue()}),
 					co,
 				)
 				if isAbrupt {
@@ -1328,7 +1328,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if kPresent {
 				kValue := o.Get(pk)
 				accumulator, isAbrupt, rt = ReturnIfAbrupt(
-					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
+					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), o.ToValue()}),
 					co,
 				)
 				if isAbrupt {

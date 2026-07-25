@@ -560,7 +560,29 @@ func (s *SourceTextModule) InitializeEnvironment() (co CompletionValue) {
 		}
 	}
 
-	// TODO:
+	for _, item := range code.ModuleItemList {
+		moduleItem, ok := item.(*ModuleItemStatementListItem)
+		if !ok {
+			continue
+		}
+		declarationItem, ok := moduleItem.StatementListItem.(*StatementListItemDeclaration)
+		if !ok {
+			continue
+		}
+		hoistable, ok := declarationItem.Declaration.(*DeclarationHoistableFunction)
+		if !ok {
+			continue
+		}
+		functionDeclaration := hoistable.FunctionDeclaration
+		name := string(functionDeclaration.Identifier)
+		function := functionDeclaration.instantiateOrdinaryFunctionObject(agent, env, nil)
+		if env.HasBinding(name) {
+			env.SetMutableBinding(name, function.ToValue(), false)
+		} else {
+			env.CreateMutableBinding(name, false)
+			env.InitializeBinding(name, function.ToValue())
+		}
+	}
 
 	agent.ExecutionContextStack.Pop()
 	co.value = UndefinedValue

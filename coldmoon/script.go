@@ -69,6 +69,22 @@ func (s *ScriptRecord) Evaluate() Value {
 		}
 	}
 
+	for _, item := range script.StatementList {
+		declarationItem, ok := item.(*StatementListItemDeclaration)
+		if !ok {
+			continue
+		}
+		hoistable, ok := declarationItem.Declaration.(*DeclarationHoistableFunction)
+		if !ok {
+			continue
+		}
+		functionDeclaration := hoistable.FunctionDeclaration
+		name := string(functionDeclaration.Identifier)
+		function := functionDeclaration.instantiateOrdinaryFunctionObject(agent, globalEnv, nil)
+		globalEnv.CreateGlobalVarBinding(name, true)
+		globalEnv.SetMutableBinding(name, function.ToValue(), false)
+	}
+
 	result := RunNode(agent, s.ECMAScriptCode)
 	if result.IsError() {
 		return result.Error()

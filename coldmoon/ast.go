@@ -1091,7 +1091,7 @@ func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM, prope
 			privateEnv,
 		)
 		SetFunctionName(closure, NewStringPropertyKey(name), "")
-		MakeConstructor(closure, false, nil)
+		MakeConstructor(closure, true, nil)
 
 		funcEnv.InitializeBinding(name, closure.ToValue())
 		return closure
@@ -1116,7 +1116,7 @@ func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM, prope
 			privateEnv,
 		)
 		SetFunctionName(closure, name, "")
-		MakeConstructor(closure, false, nil)
+		MakeConstructor(closure, true, nil)
 		return closure
 	}
 }
@@ -5915,7 +5915,7 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 	)
 
 	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
-	MakeConstructor(function, false, nil)
+	MakeConstructor(function, true, nil)
 	return function
 }
 

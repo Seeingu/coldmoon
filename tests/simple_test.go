@@ -336,6 +336,13 @@ try { new AggregateError(); } catch (error) { caught = error instanceof TypeErro
 assert(caught);`)
 }
 
+func TestTopLevelFunctionDeclarationsAreHoisted(t *testing.T) {
+	testSource(t, `Hoisted.prototype = { value: 42 };
+const instance = new Hoisted();
+function Hoisted() {}
+assert(instance.value === 42);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,
