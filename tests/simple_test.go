@@ -45,6 +45,15 @@ func TestObjectLiteralDataPropertyNamedReservedWord(t *testing.T) {
 assertEqual(iterator.return(), 1);`)
 }
 
+func TestArrayPredicateMethodsDefaultThisArgument(t *testing.T) {
+	testSource(t, `const arrayLike = { 0: 1, length: 1 };
+assert(Array.prototype.every.call(arrayLike, function(value, index, object) {
+  return value === 1 && index === 0 && object === arrayLike;
+}));
+assert(Array.prototype.some.call(arrayLike, function(value) { return value === 1; }));
+assert(Array.prototype.filter.call(arrayLike, function(value) { return value === 1; })[0] === 1);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

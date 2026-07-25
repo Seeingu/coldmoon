@@ -855,27 +855,44 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return o.Get(NewIntegerIndexPropertyKey(k))
 	}
 	var every BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callbackFn := args[0]
-		thisArg := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		if !IsCallable(callbackFn) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "every: callback is not callable")
 		}
 
+		callbackObject := this
+		if !this.IsObject() {
+			callbackObject = o.ToValue()
+		}
 		for k := JSInt(0); k < length; k++ {
 			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				testResult := ReturnAssertNormal(
-					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+				testResult, isAbrupt, rt := ReturnIfAbrupt(
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), callbackObject}),
+					co,
 				)
+				if isAbrupt {
+					return rt
+				}
 				if !testResult.ToBoolean() {
 					return FalseValue
 				}
@@ -884,27 +901,44 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return TrueValue
 	}
 	var some BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callbackFn := args[0]
-		thisArg := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		if !IsCallable(callbackFn) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "some: callback is not callable")
 		}
 
+		callbackObject := this
+		if !this.IsObject() {
+			callbackObject = o.ToValue()
+		}
 		for k := JSInt(0); k < length; k++ {
 			pk := NewIntegerIndexPropertyKey(k)
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				testResult := ReturnAssertNormal(
-					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+				testResult, isAbrupt, rt := ReturnIfAbrupt(
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), callbackObject}),
+					co,
 				)
+				if isAbrupt {
+					return rt
+				}
 				if testResult.ToBoolean() {
 					return TrueValue
 				}
@@ -1040,20 +1074,33 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(newLength)
 	}
 	var filter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callbackFn := args[0]
-		thisArg := args[1]
-		o := this.ToObject(agent).value
 		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 		if !IsCallable(callbackFn) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "filter: callback is not callable")
 		}
 		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
 		if isAbrupt {
 			return rt
+		}
+		callbackObject := this
+		if !this.IsObject() {
+			callbackObject = o.ToValue()
 		}
 		k := JSInt(0)
 		to := JSInt(0)
@@ -1062,9 +1109,13 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				selected := ReturnAssertNormal(
-					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), this}),
+				selected, isAbrupt, rt := ReturnIfAbrupt(
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), callbackObject}),
+					co,
 				)
+				if isAbrupt {
+					return rt
+				}
 				if selected.ToBoolean() {
 					A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(to), kValue)
 					to++
