@@ -789,6 +789,20 @@ assert(caught instanceof TypeError);
 assert(constructorCalls === 0);`)
 }
 
+// TestArrayConcatRejectsRevokedSpreadabilityProxy verifies a revoked Proxy
+// throws while concat reads Symbol.isConcatSpreadable.
+func TestArrayConcatRejectsRevokedSpreadabilityProxy(t *testing.T) {
+	testSource(t, `const record = Proxy.revocable({}, {});
+record.revoke();
+let caught = null;
+try {
+  [].concat(record.proxy);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

@@ -250,8 +250,12 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		return
 	}
 	get := func(o ObjectType, pk PropertyKey, receiver Value) CompletionValue {
+		var co CompletionValue
 		proxy := o.(*ProxyObject)
-		proxy.validateNonRevokedProxy()
+		if proxy.Target == nil {
+			return co.ThrowTypeError(agent, "Proxy has been revoked")
+		}
+		Assert(proxy.Handler != nil)
 		t := proxy.Target
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("get"))
@@ -259,10 +263,16 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().Get(t, pk, receiver)
 		}
 
-		trapResult := trap.Call(
-			h.ToValue(),
-			[]Value{t.ToValue(), pk.ToValue(), receiver},
-		).value
+		trapResult, isAbrupt, rt := ReturnIfAbrupt(
+			trap.Call(
+				h.ToValue(),
+				[]Value{t.ToValue(), pk.ToValue(), receiver},
+			),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
 		if targetDesc != nil && !targetDesc.Configurable {
 			if targetDesc.IsDataDescriptor() && !targetDesc.Writable {
