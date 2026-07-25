@@ -62,6 +62,13 @@ assert(Array.prototype.lastIndexOf.call(arrayLike, "a") === 2);
 assert(Array.prototype.lastIndexOf.call(arrayLike, "a", -2) === 0);`)
 }
 
+func TestArrayReduceDistinguishesMissingInitialValue(t *testing.T) {
+	testSource(t, `assert([1, 2, 3].reduce(function(a, b) { return a + b; }) === 6);
+assert([1].reduce(function(a) { return a; }, undefined) === undefined);
+assert([1, 2, 3].reduceRight(function(a, b) { return a - b; }) === 0);
+assert([1].reduceRight(function(a) { return a; }, undefined) === undefined);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

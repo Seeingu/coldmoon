@@ -1148,23 +1148,30 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var reduce BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callbackFn := args[0]
-		initialValue := args[1]
-		o := this.ToObject(agent).value
 		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		hasInitialValue := len(args) > 1
+		initialValue := pkg.SliceSafeGet(args, 1)
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 		if !IsCallable(callbackFn) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "reduce: callback is not callable")
 		}
-		if length == 0 && initialValue == UndefinedValue {
-			panic("TypeError")
+		if length == 0 && !hasInitialValue {
+			return co.ThrowTypeError(agent, "reduce of empty array with no initial value")
 		}
 		k := JSInt(0)
 		var accumulator Value
-		if initialValue == UndefinedValue {
+		if !hasInitialValue {
 			kPresent := false
 			for {
 				pk := NewIntegerIndexPropertyKey(k)
@@ -1176,7 +1183,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				}
 				k++
 				if k >= length {
-					panic("TypeError")
+					return co.ThrowTypeError(agent, "reduce of empty array with no initial value")
 				}
 			}
 		} else {
@@ -1187,32 +1194,43 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				accumulator = ReturnAssertNormal(
+				accumulator, isAbrupt, rt = ReturnIfAbrupt(
 					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
+					co,
 				)
+				if isAbrupt {
+					return rt
+				}
 			}
 			k++
 		}
 		return accumulator
 	}
 	var reduceRight BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callbackFn := args[0]
-		initialValue := args[1]
-		o := this.ToObject(agent).value
 		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		hasInitialValue := len(args) > 1
+		initialValue := pkg.SliceSafeGet(args, 1)
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 		if !IsCallable(callbackFn) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "reduceRight: callback is not callable")
 		}
-		if length == 0 && initialValue == UndefinedValue {
-			panic("TypeError")
+		if length == 0 && !hasInitialValue {
+			return co.ThrowTypeError(agent, "reduceRight of empty array with no initial value")
 		}
 		k := JSInt(length) - 1
 		var accumulator Value
-		if initialValue == UndefinedValue {
+		if !hasInitialValue {
 			kPresent := false
 			for {
 				pk := NewIntegerIndexPropertyKey(k)
@@ -1224,7 +1242,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				}
 				k--
 				if k < 0 {
-					panic("TypeError")
+					return co.ThrowTypeError(agent, "reduceRight of empty array with no initial value")
 				}
 			}
 		} else {
@@ -1235,9 +1253,13 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			kPresent := o.HasProperty(pk)
 			if kPresent {
 				kValue := o.Get(pk)
-				accumulator = ReturnAssertNormal(
+				accumulator, isAbrupt, rt = ReturnIfAbrupt(
 					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), this}),
+					co,
 				)
+				if isAbrupt {
+					return rt
+				}
 			}
 			k--
 		}
