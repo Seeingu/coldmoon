@@ -774,18 +774,26 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	startsWith := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		searchString := argumentsList[0]
-		var position Value
-		if len(argumentsList) > 1 {
-			position = argumentsList[1]
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String.prototype.startsWith called on null or undefined")
 		}
-		o := RequireObjectCoercible(agent, this)
-		s := ToString(agent, o)
+		searchString := pkg.SliceSafeGet(argumentsList, 0)
+		position := pkg.SliceSafeGet(argumentsList, 1)
+		if searchString == nil {
+			searchString = UndefinedValue
+		}
 		isRegExp := IsRegExp(searchString)
 		if isRegExp {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "startsWith search string cannot be a RegExp")
 		}
-		searchStr := ToString(agent, searchString)
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		searchStr, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, searchString), co)
+		if isAbrupt {
+			return rt
+		}
 		length := len(s.Data)
 		var pos int
 		if position == nil {
@@ -819,18 +827,26 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	endsWith := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		searchString := argumentsList[0]
-		var position Value
-		if len(argumentsList) > 1 {
-			position = argumentsList[1]
+		if IsUndefinedOrNull(thisArgument) {
+			return co.ThrowTypeError(agent, "String.prototype.endsWith called on null or undefined")
 		}
-		o := RequireObjectCoercible(agent, thisArgument)
-		s := ToString(agent, o)
+		searchString := pkg.SliceSafeGet(argumentsList, 0)
+		position := pkg.SliceSafeGet(argumentsList, 1)
+		if searchString == nil {
+			searchString = UndefinedValue
+		}
 		isRegExp := IsRegExp(searchString)
 		if isRegExp {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "endsWith search string cannot be a RegExp")
 		}
-		searchStr := ToString(agent, searchString)
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, thisArgument), co)
+		if isAbrupt {
+			return rt
+		}
+		searchStr, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, searchString), co)
+		if isAbrupt {
+			return rt
+		}
 		length := len(s.Data)
 		var pos int
 		if position == nil {
@@ -864,18 +880,26 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	var includes BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		searchString := argumentsList[0]
-		var position Value
-		if len(argumentsList) > 1 {
-			position = argumentsList[1]
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String.prototype.includes called on null or undefined")
 		}
-		o := RequireObjectCoercible(agent, this)
-		s := ToString(agent, o)
+		searchString := pkg.SliceSafeGet(argumentsList, 0)
+		position := pkg.SliceSafeGet(argumentsList, 1)
+		if searchString == nil {
+			searchString = UndefinedValue
+		}
 		isRegExp := IsRegExp(searchString)
 		if isRegExp {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "includes search string cannot be a RegExp")
 		}
-		searchStr := ToString(agent, searchString)
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		searchStr, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, searchString), co)
+		if isAbrupt {
+			return rt
+		}
 		length := len(s.Data)
 		var pos int
 		if position == nil {

@@ -308,6 +308,21 @@ assert("abc".substring() === "abc");
 assert("abc".substring(2, 1) === "b");`)
 }
 
+func TestStringContainmentMethodsCoerceArguments(t *testing.T) {
+	testSource(t, `assert("abc".startsWith("a"));
+assert("abc".endsWith("c"));
+assert("abc".includes("b"));
+assert("undefined value".startsWith());
+assert(String.prototype.includes.call(123, "2"));
+let caught = null;
+try {
+  "abc".startsWith(/a/);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
