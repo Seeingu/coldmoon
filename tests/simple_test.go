@@ -600,6 +600,15 @@ assert("inherited" in object);
 assertEqual("missing" in object, false);`)
 }
 
+// TestObjectConstructorWithoutArguments verifies both call and construct forms
+// allocate an ordinary object when no value is supplied.
+func TestObjectConstructorWithoutArguments(t *testing.T) {
+	testSource(t, `const called = Object();
+const constructed = new Object();
+assert(Object.getPrototypeOf(called) === Object.prototype);
+assert(Object.getPrototypeOf(constructed) === Object.prototype);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

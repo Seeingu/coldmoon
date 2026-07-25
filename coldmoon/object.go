@@ -578,7 +578,10 @@ func (o *Object) InitializeInstanceElements(constructor ObjectType) {
 func NewObjectConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := argumentsList[0]
+		var value Value
+		if len(argumentsList) > 0 {
+			value = argumentsList[0]
+		}
 		if newTarget != nil && newTarget != agent.ActiveFunctionObject() {
 			return OrdinaryCreateFromConstructor(
 				agent, newTarget, "%Object.prototype%", []string{},
