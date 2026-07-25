@@ -689,6 +689,17 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayForEachDefaultsThisArgument verifies the optional thisArg is
+// undefined and all present elements are visited.
+func TestArrayForEachDefaultsThisArgument(t *testing.T) {
+	testSource(t, `let count = 0;
+[1, 2, 3].forEach(function(value, index) {
+  assertEqual(value, index + 1);
+  count += 1;
+});
+assertEqual(count, 3);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

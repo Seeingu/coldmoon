@@ -544,13 +544,16 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 
 	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		callbackFn := args[0]
-		thisArg := args[1]
+		var thisArg Value = UndefinedValue
+		if len(args) > 1 {
+			thisArg = args[1]
+		}
 
 		array := MustGetObject(this)
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		if !IsCallable(callbackFn) {
