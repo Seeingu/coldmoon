@@ -45,14 +45,16 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 		}
 		return StringGetOwnProperty(o.(*StringObject), p)
 	}
-	var defineOwnProperty DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
+	var defineOwnProperty DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
 		s := o.(*StringObject)
 		stringDesc := StringGetOwnProperty(s, p)
 		if stringDesc != nil {
 			extensible := s.Extensible()
-			return IsCompatiblePropertyDescriptor(extensible, desc, stringDesc)
+			co.value = IsCompatiblePropertyDescriptor(extensible, desc, stringDesc)
+			return
 		}
-		return OrdinaryDefineOwnProperty(o, p, desc)
+		co.value = OrdinaryDefineOwnProperty(o, p, desc)
+		return
 	}
 	// 10.4.3.3
 	ownPropertyKeys := func(o ObjectType) []PropertyKey {

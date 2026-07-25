@@ -38,30 +38,32 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 		return true
 	}
 	internalMethods.GetOwnProperty = moduleNamespaceGetOwnProperty
-	internalMethods.DefineOwnProperty = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
+	internalMethods.DefineOwnProperty = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
 		if _, ok := p.(SymbolPropertyKey); ok {
-			return OrdinaryDefineOwnProperty(o, p, desc)
+			co.value = OrdinaryDefineOwnProperty(o, p, desc)
+			return
 		}
 		current := o.InternalMethods().GetOwnProperty(o, p)
 		if current == nil {
-			return false
+			return
 		}
 		if desc.Configurable {
-			return false
+			return
 		}
 		if !desc.Enumerable {
-			return false
+			return
 		}
 		if desc.IsAccessorDescriptor() {
-			return false
+			return
 		}
 		if !desc.Writable {
-			return false
+			return
 		}
 		if !SameValue(desc.Value, current.Value) {
-			return false
+			return
 		}
-		return true
+		co.value = true
+		return
 	}
 	internalMethods.HasProperty = func(o ObjectType, p PropertyKey) bool {
 		if _, ok := p.(SymbolPropertyKey); ok {

@@ -10,7 +10,7 @@ const (
 type (
 	SetFn               = func(o ObjectType, p PropertyKey, v Value, receiver Value) Completion[bool]
 	GetOwnPropertyFn    = func(o ObjectType, p PropertyKey) *PropertyDescriptor
-	DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool
+	DefineOwnPropertyFn = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) Completion[bool]
 	GetPrototypeOfFn    = func(o ObjectType) ObjectType
 	SetPrototypeOfFn    = func(o ObjectType, v ObjectType) bool
 )

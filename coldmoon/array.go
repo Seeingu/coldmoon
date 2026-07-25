@@ -24,14 +24,15 @@ func getArrayLength(array ObjectType) JSInt {
 func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
 	realm := agent.CurrentRealm()
 	// 10.4.2.1
-	defineOwnProperty := func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
+	defineOwnProperty := func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
 		propertyKeyString, ok := p.(StringPropertyKey)
 		if ok && propertyKeyString.Value == "length" {
-			return ReturnAssertNormal(ArraySetLength(agent, array, desc))
+			return ArraySetLength(agent, array, desc)
 		}
 		index, err := p.GetIndex()
 		if err != nil {
-			return OrdinaryDefineOwnProperty(array, p, desc)
+			co.value = OrdinaryDefineOwnProperty(array, p, desc)
+			return
 		}
 		lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
 		Assert(lengthDesc.IsDataDescriptor())
@@ -42,13 +43,13 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
 		Assert(length.IsInf() || length >= 0)
 
 		if index >= length && !lengthDesc.Writable {
-			return false
+			return
 		}
 
 		succeeded := OrdinaryDefineOwnProperty(array, p, desc)
 
 		if !succeeded {
-			return false
+			return
 		}
 
 		if index >= length {
@@ -57,7 +58,8 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
 			succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), lengthDesc)
 			Assert(succeeded)
 		}
-		return true
+		co.value = true
+		return
 	}
 
 	if float64(length) > POW_2_32-1 {

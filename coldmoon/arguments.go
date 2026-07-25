@@ -21,7 +21,7 @@ func argumentsGetOwnProperty(object ObjectType, key PropertyKey) (co Completion[
 }
 
 // 10.4.4.2
-func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
+func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
 	_map := object.(*ArgumentsObject).ParameterMap
 	isMapped := ObjectHasOwnProperty(_map, key)
 	newArgDesc := desc
@@ -32,7 +32,7 @@ func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *Proper
 	}
 	allowed := OrdinaryDefineOwnProperty(object, key, newArgDesc)
 	if !allowed {
-		return false
+		return
 	}
 	if isMapped {
 		if desc.IsAccessorDescriptor() {
@@ -46,7 +46,8 @@ func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *Proper
 			}
 		}
 	}
-	return true
+	co.value = true
+	return
 }
 
 // 10.4.4.3

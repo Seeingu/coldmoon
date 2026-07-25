@@ -312,6 +312,26 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayOfPropagatesProxyDefinePropertyError verifies that an abrupt
+// defineProperty trap completion is not converted into a host panic.
+func TestArrayOfPropagatesProxyDefinePropertyError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const C = function() {
+  return new Proxy({}, {
+    defineProperty: function() {
+      throw sentinel;
+    }
+  });
+};
+let caught = null;
+try {
+  Array.of.call(C, "Bob");
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

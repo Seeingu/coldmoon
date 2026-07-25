@@ -95,8 +95,9 @@ func OrdinaryGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescrip
 	return d
 }
 
-func InternalDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
-	return OrdinaryDefineOwnProperty(object, key, desc)
+func InternalDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
+	co.value = OrdinaryDefineOwnProperty(object, key, desc)
+	return
 }
 
 func OrdinaryDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
@@ -375,10 +376,9 @@ func OrdinarySetWithOwnDescriptor(
 			valueDesc := &PropertyDescriptor{
 				Value: value,
 			}
-			co.value = receiverObject.InternalMethods().DefineOwnProperty(
+			return receiverObject.InternalMethods().DefineOwnProperty(
 				receiverObject, key, valueDesc,
 			)
-			return
 		} else {
 			Assert(!receiverObject.PropertyStorage().Has(key))
 

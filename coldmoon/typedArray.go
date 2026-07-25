@@ -861,10 +861,10 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		}
 		return OrdinaryHasProperty(o.(*TypedArrayObject).Object, p)
 	}
-	internalMethods.DefineOwnProperty = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) bool {
+	internalMethods.DefineOwnProperty = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
 		if i, err := p.GetIndex(); err == nil {
 			if !o.(*TypedArrayObject).IsValidIntegerIndex(agent, i) {
-				return false
+				return
 			}
 			// TODO: Only check for undefined
 			//if !desc.Enumerable {
@@ -883,7 +883,8 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 				TypedArraySetElement(agent, o.(*TypedArrayObject), i, desc.Value)
 			}
 		}
-		return true
+		co.value = true
+		return
 	}
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) CompletionValue {
 		if i, err := p.GetIndex(); err == nil {

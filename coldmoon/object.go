@@ -225,13 +225,24 @@ func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 		Enumerable:   true,
 		Configurable: true,
 	})
-	return newDesc
+	return ReturnAssertNormal(newDesc)
 }
 
 // 7.3.6
 
 func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) (co Completion[bool]) {
-	success := o.Ref().CreateDataProperty(key, value)
+	success, isAbrupt, rt := ReturnIfAbrupt(
+		o.InternalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
+			Value:        value,
+			Writable:     true,
+			Enumerable:   true,
+			Configurable: true,
+		}),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if !success {
 		return co.ThrowTypeError(o.Agent(), "CreateDataPropertyOrThrow failed")
 	}
@@ -256,7 +267,7 @@ func (o *Object) CreateNonEnumerableDataProperty(key PropertyKey, value Value) b
 
 // 7.3.8
 func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
-	success := o.InternalMethods().DefineOwnProperty(o.Ref(), key, desc)
+	success := ReturnAssertNormal(o.InternalMethods().DefineOwnProperty(o.Ref(), key, desc))
 	if !success {
 		o.Agent().ThrowException(TypeError, "DefinePropertyOrThrow failed")
 	}
