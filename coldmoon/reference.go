@@ -130,13 +130,20 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) (co CompletionValu
 			referencedName = NewStringPropertyKey(r.ReferencedName.String)
 		}
 
-		succeeded := baseObj.InternalMethods().Set(
-			baseObj,
-			referencedName,
-			value,
-			r.GetThisValue())
+		succeeded, isAbrupt, rt := ReturnIfAbrupt(
+			baseObj.InternalMethods().Set(
+				baseObj,
+				referencedName,
+				value,
+				r.GetThisValue(),
+			),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if !succeeded && r.Strict {
-			agent.ThrowTypeError("Failed to set value")
+			return co.ThrowTypeError(agent, "Failed to set value")
 		}
 		return
 	}

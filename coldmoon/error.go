@@ -8,7 +8,7 @@ type ErrorObject struct {
 	Message string
 }
 
-var errorInternalSet SetFn = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool {
+var errorInternalSet SetFn = func(o ObjectType, p PropertyKey, v Value, receiver Value) Completion[bool] {
 	switch pp := p.(type) {
 	case StringPropertyKey:
 		if pp.Value == "name" {

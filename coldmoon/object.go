@@ -204,7 +204,13 @@ func (o *Object) Get(key PropertyKey) Value {
 // spec: 7.3.4
 // returns UNUSED or throw
 func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) (co CompletionValue) {
-	success := o.InternalMethods().Set(o.Ref(), key, value, (o).ToValue())
+	success, isAbrupt, rt := ReturnIfAbrupt(
+		o.InternalMethods().Set(o.Ref(), key, value, o.ToValue()),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if !success && throw == setThrowTypeThrow {
 		return co.ThrowTypeError(o.Agent(), "SetObject failed")
 	}

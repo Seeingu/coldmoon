@@ -345,7 +345,13 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 					return rt
 				}
 				if isDone {
-					a.Set(NewStringPropertyKey("length"), NewNumberValue(k.ToNumber()), setThrowTypeThrow)
+					_, isAbrupt, rt := ReturnIfAbrupt(
+						a.Set(NewStringPropertyKey("length"), NewNumberValue(k.ToNumber()), setThrowTypeThrow),
+						co,
+					)
+					if isAbrupt {
+						return rt
+					}
 					return a.ToValue()
 				}
 

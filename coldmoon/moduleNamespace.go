@@ -73,8 +73,8 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 	internalMethods.Get = func(o ObjectType, p PropertyKey, receiver Value) CompletionValue {
 		return moduleNamespaceGet(agent, o, p, receiver)
 	}
-	internalMethods.Set = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool {
-		return false
+	internalMethods.Set = func(o ObjectType, p PropertyKey, v Value, receiver Value) (co Completion[bool]) {
+		return
 	}
 	internalMethods.Delete = func(o ObjectType, p PropertyKey) bool {
 		if _, ok := p.(SymbolPropertyKey); ok {

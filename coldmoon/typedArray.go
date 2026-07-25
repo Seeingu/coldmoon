@@ -891,10 +891,11 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		}
 		return OrdinaryGet(o.(*TypedArrayObject).Object, p, receiver)
 	}
-	internalMethods.Set = func(o ObjectType, p PropertyKey, v Value, receiver Value) bool {
+	internalMethods.Set = func(o ObjectType, p PropertyKey, v Value, receiver Value) (co Completion[bool]) {
 		if i, err := p.GetIndex(); err == nil {
 			TypedArraySetElement(agent, o.(*TypedArrayObject), i, v)
-			return true
+			co.value = true
+			return
 		}
 		return OrdinarySet(o.(*TypedArrayObject).Object, p, v, receiver)
 	}

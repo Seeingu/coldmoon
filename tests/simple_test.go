@@ -137,6 +137,33 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayFromPropagatesLengthSetterError verifies that the iterable path
+// observes an abrupt completion while finalizing a custom result object.
+func TestArrayFromPropagatesLengthSetterError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const C = function() {};
+Object.defineProperty(C.prototype, "length", {
+  set: function(_) {
+    throw sentinel;
+  }
+});
+const items = {};
+items[Symbol.iterator] = function() {
+  return {
+    next: function() {
+      return { done: true };
+    }
+  };
+};
+let caught = null;
+try {
+  Array.from.call(C, items);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

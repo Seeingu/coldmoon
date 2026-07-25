@@ -316,11 +316,11 @@ func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) CompletionV
 	return getter.ToValue().CallNoArgs(receiver)
 }
 
-func InternalSet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
+func InternalSet(object ObjectType, key PropertyKey, value Value, receiver Value) Completion[bool] {
 	return OrdinarySet(object, key, value, receiver)
 }
 
-func OrdinarySet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
+func OrdinarySet(object ObjectType, key PropertyKey, value Value, receiver Value) Completion[bool] {
 	ownDesc := object.InternalMethods().GetOwnProperty(object, key)
 	return OrdinarySetWithOwnDescriptor(object, key, value, receiver, ownDesc)
 }
@@ -332,7 +332,7 @@ func OrdinarySetWithOwnDescriptor(
 	value Value,
 	receiver Value,
 	ownDesc *PropertyDescriptor,
-) bool {
+) (co Completion[bool]) {
 	if ownDesc == nil {
 		parent := object.InternalMethods().GetPrototypeOf(object)
 		if parent != nil {
@@ -349,12 +349,12 @@ func OrdinarySetWithOwnDescriptor(
 
 	if ownDesc.IsDataDescriptor() {
 		if !ownDesc.Writable {
-			return false
+			return
 		}
 
 		r, isObject := receiver.(*ObjectValue)
 		if !isObject {
-			return false
+			return
 		}
 		receiverObject := r.Object
 
@@ -362,22 +362,24 @@ func OrdinarySetWithOwnDescriptor(
 
 		if existingDescriptor != nil {
 			if existingDescriptor.IsAccessorDescriptor() {
-				return false
+				return
 			}
 			if !existingDescriptor.Writable {
-				return false
+				return
 			}
 
 			valueDesc := &PropertyDescriptor{
 				Value: value,
 			}
-			return receiverObject.InternalMethods().DefineOwnProperty(
+			co.value = receiverObject.InternalMethods().DefineOwnProperty(
 				receiverObject, key, valueDesc,
 			)
+			return
 		} else {
 			Assert(!receiverObject.PropertyStorage().Has(key))
 
-			return receiverObject.CreateDataProperty(key, value)
+			co.value = receiverObject.CreateDataProperty(key, value)
+			return
 		}
 	}
 
@@ -385,10 +387,14 @@ func OrdinarySetWithOwnDescriptor(
 
 	setter := ownDesc.Set
 	if setter == nil {
-		return false
+		return
 	}
-	_ = setter.Call(receiver, []Value{value})
-	return true
+	setResult := setter.Call(receiver, []Value{value})
+	if setResult.IsAbrupt() {
+		return CompletionFrom(co, setResult)
+	}
+	co.value = true
+	return
 }
 
 func InternalDelete(object ObjectType, key PropertyKey) bool {

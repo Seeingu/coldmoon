@@ -227,7 +227,13 @@ func NewReflectObject(realm *Realm) ObjectType {
 			receiver = target
 		}
 
-		ret := targetObject.InternalMethods().Set(targetObject, key, value, receiver)
+		ret, isAbrupt, rt := ReturnIfAbrupt(
+			targetObject.InternalMethods().Set(targetObject, key, value, receiver),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		return NewBooleanValue(ret)
 	}
 	var setPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {

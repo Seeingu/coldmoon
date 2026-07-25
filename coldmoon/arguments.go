@@ -63,12 +63,15 @@ func argumentsGet(object ObjectType, key PropertyKey, receiver Value) (co Comple
 }
 
 // 10.4.4.4
-func argumentsSet(object ObjectType, key PropertyKey, value Value, receiver Value) bool {
+func argumentsSet(object ObjectType, key PropertyKey, value Value, receiver Value) (co Completion[bool]) {
 	if SameValue(object.ToValue(), receiver) {
 		_map := object.(*ArgumentsObject).ParameterMap
 		isMapped := ObjectHasOwnProperty(_map, key)
 		if isMapped {
-			_map.Set(key, value, setThrowTypeIgnore)
+			setResult := _map.Set(key, value, setThrowTypeIgnore)
+			if setResult.IsAbrupt() {
+				return CompletionFrom(co, setResult)
+			}
 		}
 	}
 	return OrdinarySet(object, key, value, receiver)

@@ -265,7 +265,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		return trapResult.ToCompletion()
 	}
-	set := func(o ObjectType, pk PropertyKey, v Value, receiver Value) bool {
+	set := func(o ObjectType, pk PropertyKey, v Value, receiver Value) (co Completion[bool]) {
 		proxy := o.(*ProxyObject)
 		proxy.validateNonRevokedProxy()
 		t := proxy.Target
@@ -275,27 +275,35 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return t.InternalMethods().Set(t, pk, v, receiver)
 		}
 
-		booleanTrapResult := trap.Call(
-			h.ToValue(),
-			[]Value{t.ToValue(), pk.ToValue(), v, receiver},
-		).value.ToBoolean()
+		trapResult, isAbrupt, rt := ReturnIfAbrupt(
+			trap.Call(
+				h.ToValue(),
+				[]Value{t.ToValue(), pk.ToValue(), v, receiver},
+			),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		booleanTrapResult := trapResult.ToBoolean()
 		if !booleanTrapResult {
-			return false
+			return
 		}
 		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
 		if targetDesc != nil && !targetDesc.Configurable {
 			if targetDesc.IsDataDescriptor() && !targetDesc.Writable {
 				if !SameValue(v, targetDesc.Value) {
-					panic("TypeError")
+					return co.ThrowTypeError(agent, "proxy set changed a non-writable property")
 				}
 			}
 			if targetDesc.IsAccessorDescriptor() && targetDesc.Set == nil {
 				if v != UndefinedValue {
-					panic("TypeError")
+					return co.ThrowTypeError(agent, "proxy set changed a setter-less property")
 				}
 			}
 		}
-		return true
+		co.value = true
+		return
 	}
 	proxyDelete := func(o ObjectType, pk PropertyKey) bool {
 		proxy := o.(*ProxyObject)
