@@ -6,6 +6,7 @@ import (
 
 	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/samber/lo"
+	"golang.org/x/text/unicode/norm"
 )
 
 // MARK: - String Object
@@ -561,6 +562,101 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	var replaceAll BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return replaceString(this, argumentsList, true)
 	}
+	stringPad := func(this Value, argumentsList []Value, atStart bool) CompletionConvertable[Value] {
+		var co CompletionValue
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String padding called on null or undefined")
+		}
+		source, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		targetLengthValue := pkg.SliceSafeGet(argumentsList, 0)
+		if targetLengthValue == nil {
+			targetLengthValue = UndefinedValue
+		}
+		targetLength, isAbrupt, rt := ReturnIfAbrupt(ToLength(agent, targetLengthValue), co)
+		if isAbrupt {
+			return rt
+		}
+		if targetLength <= JSInt(len(source.Data)) {
+			return source
+		}
+		fillValue := pkg.SliceSafeGet(argumentsList, 1)
+		fillString := " "
+		if fillValue != nil && fillValue != UndefinedValue {
+			fill, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, fillValue), co)
+			if isAbrupt {
+				return rt
+			}
+			fillString = fill.Data
+		}
+		if fillString == "" {
+			return source
+		}
+		fillLength := int(targetLength) - len(source.Data)
+		repeated := strings.Repeat(fillString, (fillLength/len(fillString))+1)[:fillLength]
+		if atStart {
+			return NewStringValue(repeated + source.Data)
+		}
+		return NewStringValue(source.Data + repeated)
+	}
+	var padStart BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return stringPad(this, argumentsList, true)
+	}
+	var padEnd BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return stringPad(this, argumentsList, false)
+	}
+	var localeCompare BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String.prototype.localeCompare called on null or undefined")
+		}
+		source, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		that := pkg.SliceSafeGet(argumentsList, 0)
+		if that == nil {
+			that = UndefinedValue
+		}
+		other, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, that), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewNumberValue(JSNumber(strings.Compare(source.Data, other.Data)))
+	}
+	var normalizeString BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String.prototype.normalize called on null or undefined")
+		}
+		source, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		formValue := pkg.SliceSafeGet(argumentsList, 0)
+		form := "NFC"
+		if formValue != nil && formValue != UndefinedValue {
+			converted, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, formValue), co)
+			if isAbrupt {
+				return rt
+			}
+			form = converted.Data
+		}
+		switch form {
+		case "NFC":
+			return NewStringValue(norm.NFC.String(source.Data))
+		case "NFD":
+			return NewStringValue(norm.NFD.String(source.Data))
+		case "NFKC":
+			return NewStringValue(norm.NFKC.String(source.Data))
+		case "NFKD":
+			return NewStringValue(norm.NFKD.String(source.Data))
+		default:
+			return co.ThrowRangeError(agent, "invalid normalization form")
+		}
+	}
 	var search BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		regexp := argumentsList[0]
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -810,6 +906,10 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("split"), split, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("replace"), replace, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("replaceAll"), replaceAll, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("padStart"), padStart, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("padEnd"), padEnd, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("localeCompare"), localeCompare, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("normalize"), normalizeString, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
@@ -836,6 +936,10 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("split"), split, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("replace"), replace, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("replaceAll"), replaceAll, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("padStart"), padStart, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("padEnd"), padEnd, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("localeCompare"), localeCompare, 1)
+	stringPrototype.defineBuiltinFunction(realm, CMString("normalize"), normalizeString, 0)
 	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)

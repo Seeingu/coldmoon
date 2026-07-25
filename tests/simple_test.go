@@ -201,6 +201,16 @@ search[Symbol.replace] = function(value, replacement) {
 assert("left".replace(search, "right") === "leftright");`)
 }
 
+func TestStringFormattingAndNormalizationHelpers(t *testing.T) {
+	testSource(t, `assert("x".padStart(3, "ab") === "abx");
+assert("x".padEnd(4, "ab") === "xaba");
+assert("a".localeCompare("b") < 0);
+assert("b".localeCompare("a") > 0);
+assert("same".localeCompare("same") === 0);
+assert("é".normalize("NFD").normalize("NFC") === "é");
+assert("é".normalize("NFC") === "é");`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
