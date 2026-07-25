@@ -125,6 +125,7 @@ var StringCreate = NewStringObject
 
 func NewStringConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		var s string
 		if len(argumentsList) > 0 {
 			value := argumentsList[0]
@@ -132,7 +133,11 @@ func NewStringConstructor(realm *Realm) ObjectType {
 			if newTarget == nil && isSymbol {
 				return NewStringValue(symbolValue.SymbolDescriptiveString())
 			}
-			s = value.String()
+			stringValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(realm.Agent, value), co)
+			if isAbrupt {
+				return rt
+			}
+			s = stringValue.Data
 		}
 
 		if newTarget == nil {
@@ -329,10 +334,19 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		return NewStringValue(strings.Repeat(s, int(n)))
 	}
 	var concat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		o := RequireObjectCoercible(agent, thisArgument)
-		s := o.String()
+		stringValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, o), co)
+		if isAbrupt {
+			return rt
+		}
+		s := stringValue.Data
 		for _, arg := range argumentsList {
-			s += arg.String()
+			stringValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, arg), co)
+			if isAbrupt {
+				return rt
+			}
+			s += stringValue.Data
 		}
 		return NewStringValue(s)
 	}

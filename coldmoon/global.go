@@ -130,28 +130,36 @@ func NewEval(realm *Realm) ObjectType {
 }
 
 // 7.1.17
-func ToString(agent *Agent, v Value) *StringValue {
+func ToStringCompletion(agent *Agent, v Value) (co Completion[*StringValue]) {
 	switch v.(type) {
 	case *StringValue:
-		return v.(*StringValue)
+		co.value = v.(*StringValue)
 	case *NumberValue:
-		return NewStringValue(v.String())
+		co.value = NewStringValue(v.String())
 	case *BooleanValue:
-		return NewStringValue(v.String())
+		co.value = NewStringValue(v.String())
 	case *SymbolValue:
-		return NewStringValue(v.String())
+		return co.ThrowTypeError(agent, "Cannot convert a Symbol value to a string")
 	case *BigIntValue:
-		return NewStringValue(v.String())
+		co.value = NewStringValue(v.String())
 	case *undefinedValue:
-		return NewStringValue("undefined")
+		co.value = NewStringValue("undefined")
 	case *nullValue:
-		return NewStringValue("null")
+		co.value = NewStringValue("null")
 	default:
 		Assert(v.IsObject())
-		primValue := ReturnAssertNormal(v.ToPrimitive(agent, PreferredTypeString))
+		primValue, isAbrupt, rt := ReturnIfAbrupt(v.ToPrimitive(agent, PreferredTypeString), co)
+		if isAbrupt {
+			return rt
+		}
 		Assert(!primValue.IsObject())
-		return ToString(agent, primValue)
+		return ToStringCompletion(agent, primValue)
 	}
+	return
+}
+
+func ToString(agent *Agent, v Value) *StringValue {
+	return ReturnAssertNormal(ToStringCompletion(agent, v))
 }
 
 // 19.2.5

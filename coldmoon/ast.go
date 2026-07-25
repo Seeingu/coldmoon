@@ -1857,7 +1857,11 @@ func (t *TemplateLiteral) Evaluation(vm *VM) (co CompletionValue) {
 			if isAbrupt {
 				return rt
 			}
-			middle := sub.ToString()
+			middleValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(vm.agent, sub), co)
+			if isAbrupt {
+				return rt
+			}
+			middle := CMString(middleValue.Data)
 			tail := span.TV()
 			sb += middle + tail
 		}

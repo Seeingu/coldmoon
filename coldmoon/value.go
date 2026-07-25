@@ -662,11 +662,19 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) (co Completion[bool]) {
 	}
 
 	if (xIsString || xIsNumber || xIsBigInt || xIsSymbol) && yIsObject {
-		return IsLooselyEqual(agent, x, ReturnAssertNormal(y.ToPrimitive(agent, PreferredTypeDefault)))
+		yPrimitive, isAbrupt, rt := ReturnIfAbrupt(y.ToPrimitive(agent, PreferredTypeDefault), co)
+		if isAbrupt {
+			return rt
+		}
+		return IsLooselyEqual(agent, x, yPrimitive)
 	}
 
 	if xIsObject && (yIsString || yIsNumber || yIsBigInt || yIsSymbol) {
-		return IsLooselyEqual(agent, ReturnAssertNormal(x.ToPrimitive(agent, PreferredTypeDefault)), y)
+		xPrimitive, isAbrupt, rt := ReturnIfAbrupt(x.ToPrimitive(agent, PreferredTypeDefault), co)
+		if isAbrupt {
+			return rt
+		}
+		return IsLooselyEqual(agent, xPrimitive, y)
 	}
 
 	if (xIsBigInt && yIsNumber) || (xIsNumber && yIsBigInt) {

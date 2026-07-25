@@ -198,14 +198,26 @@ func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOper
 	finalLval := lhs
 	finalRval := rhs
 	if op == BinaryOperatorAddition {
-		lprim := ReturnAssertNormal(lhs.ToPrimitive(agent, PreferredTypeDefault))
-		rprim := ReturnAssertNormal(rhs.ToPrimitive(agent, PreferredTypeDefault))
+		lprim, isAbrupt, rt := ReturnIfAbrupt(lhs.ToPrimitive(agent, PreferredTypeDefault), co)
+		if isAbrupt {
+			return rt
+		}
+		rprim, isAbrupt, rt := ReturnIfAbrupt(rhs.ToPrimitive(agent, PreferredTypeDefault), co)
+		if isAbrupt {
+			return rt
+		}
 		_, lprimIsString := lprim.(*StringValue)
 		_, rprimIsString := rprim.(*StringValue)
 		if lprimIsString || rprimIsString {
-			lstr := lprim.String()
-			rstr := rprim.String()
-			return NewStringValue(lstr + rstr).ToCompletion()
+			lstr, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, lprim), co)
+			if isAbrupt {
+				return rt
+			}
+			rstr, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, rprim), co)
+			if isAbrupt {
+				return rt
+			}
+			return NewStringValue(lstr.Data + rstr.Data).ToCompletion()
 		}
 
 		finalLval = lprim

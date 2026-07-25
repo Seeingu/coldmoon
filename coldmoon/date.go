@@ -963,13 +963,18 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			value := args[0]
 			var tv JSNumber
 
+			isDateObject := false
 			if o, ok := value.GetObject(); ok {
 				if date, ok := o.(*DateObject); ok {
 					tv = date.Data
-				} else {
+					isDateObject = true
 				}
-			} else {
-				v := ReturnAssertNormal(value.ToPrimitive(agent, PreferredTypeNumber))
+			}
+			if !isDateObject {
+				v, isAbrupt, rt := ReturnIfAbrupt(value.ToPrimitive(agent, PreferredTypeDefault), co)
+				if isAbrupt {
+					return rt
+				}
 				if sv, ok := ValueGet[*StringValue](v); ok {
 					tv = DateTimeStringFormat(sv.Data)
 				} else {

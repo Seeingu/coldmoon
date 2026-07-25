@@ -1008,6 +1008,16 @@ assert(Symbol("").description === "");
 assert(Object(Symbol("test")).description === "test");`)
 }
 
+// TestSymbolWrapperOrdinaryStringConversion verifies deleting @@toPrimitive
+// falls back to the ordinary toString/valueOf path.
+func TestSymbolWrapperOrdinaryStringConversion(t *testing.T) {
+	testSource(t, `const method = Symbol.prototype[Symbol.toPrimitive];
+delete Symbol.prototype[Symbol.toPrimitive];
+assert("".concat(Object(Symbol())) === "Symbol()");
+assert(String(Object(Symbol("test"))) === "Symbol(test)");
+Symbol.prototype[Symbol.toPrimitive] = method;`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
