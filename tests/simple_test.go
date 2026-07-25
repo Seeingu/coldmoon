@@ -297,6 +297,17 @@ assert("é".normalize("NFD").normalize("NFC") === "é");
 assert("é".normalize("NFC") === "é");`)
 }
 
+func TestStringSearchAndSliceDefaults(t *testing.T) {
+	testSource(t, `assert("abcabc".indexOf("b") === 1);
+assert("abcabc".lastIndexOf("b") === 4);
+assert("abc".indexOf() === -1);
+assert("undefined".indexOf() === 0);
+assert("abc".slice() === "abc");
+assert("abc".slice(1) === "bc");
+assert("abc".substring() === "abc");
+assert("abc".substring(2, 1) === "b");`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {

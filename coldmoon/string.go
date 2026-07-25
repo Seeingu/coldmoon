@@ -306,18 +306,36 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	var slice BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		intStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if IsUndefinedOrNull(thisArgument) {
+			return co.ThrowTypeError(agent, "String.prototype.slice called on null or undefined")
+		}
+		start := pkg.SliceSafeGet(argumentsList, 0)
+		end := pkg.SliceSafeGet(argumentsList, 1)
+		if start == nil {
+			start = UndefinedValue
+		}
+		if end == nil {
+			end = UndefinedValue
+		}
+		stringValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, thisArgument), co)
 		if isAbrupt {
 			return rt
 		}
-		intEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[1]), co)
+		intStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
 		if isAbrupt {
 			return rt
 		}
-
-		o := RequireObjectCoercible(agent, thisArgument)
-		s := o.String()
+		s := stringValue.Data
 		length := JSInt(len(s))
+		var intEnd JSInt
+		if end == UndefinedValue {
+			intEnd = length
+		} else {
+			intEnd, isAbrupt, rt = ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+			if isAbrupt {
+				return rt
+			}
+		}
 
 		var from JSInt
 		if intStart.IsNegInf() {
@@ -694,36 +712,65 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	indexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		searchString := argumentsList[0]
-		position, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[1]), co)
+		if IsUndefinedOrNull(thisArgument) {
+			return co.ThrowTypeError(agent, "String.prototype.indexOf called on null or undefined")
+		}
+		searchString := pkg.SliceSafeGet(argumentsList, 0)
+		positionValue := pkg.SliceSafeGet(argumentsList, 1)
+		if searchString == nil {
+			searchString = UndefinedValue
+		}
+		if positionValue == nil {
+			positionValue = UndefinedValue
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, thisArgument), co)
 		if isAbrupt {
 			return rt
 		}
-		o := RequireObjectCoercible(agent, thisArgument)
-		s := o.String()
-		searchStr := ToString(agent, searchString)
+		searchStr, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, searchString), co)
+		if isAbrupt {
+			return rt
+		}
+		position, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, positionValue), co)
+		if isAbrupt {
+			return rt
+		}
 		pos := int(position)
-		length := len(s)
+		length := len(s.Data)
 		start := lo.Clamp(pos, 0, length)
-		return NewNumberValue(JSNumber(StringIndexOf(s, searchStr.Data, start)))
+		return NewNumberValue(JSNumber(StringIndexOf(s.Data, searchStr.Data, start)))
 	}
 	lastIndexOf := func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		searchString := argumentsList[0]
-		position, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[1]), co)
+		if IsUndefinedOrNull(thisArgument) {
+			return co.ThrowTypeError(agent, "String.prototype.lastIndexOf called on null or undefined")
+		}
+		searchString := pkg.SliceSafeGet(argumentsList, 0)
+		positionValue := pkg.SliceSafeGet(argumentsList, 1)
+		if searchString == nil {
+			searchString = UndefinedValue
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, thisArgument), co)
 		if isAbrupt {
 			return rt
 		}
-		o := RequireObjectCoercible(agent, thisArgument)
-		s := o.String()
-		searchStr := ToString(agent, searchString).Data
-		pos := int(position)
-		searchLen := len(s)
-		start := lo.Clamp(pos, 0, searchLen)
-		if len(searchStr) == 0 {
+		searchStr, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, searchString), co)
+		if isAbrupt {
+			return rt
+		}
+		position := JSInt(len(s.Data))
+		if positionValue != nil && positionValue != UndefinedValue {
+			position, isAbrupt, rt = ReturnIfAbrupt(ToIntegerOrInfinity(agent, positionValue), co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		start := lo.Clamp(int(position), 0, len(s.Data))
+		if len(searchStr.Data) == 0 {
 			return NewNumberValue(JSNumber(start))
 		}
-		return NewNumberValue(JSNumber(strings.LastIndex(s[start:], searchStr)))
+		end := min(start+len(searchStr.Data), len(s.Data))
+		return NewNumberValue(JSNumber(strings.LastIndex(s.Data[:end], searchStr.Data)))
 	}
 	startsWith := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
@@ -876,17 +923,30 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	substring := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		start, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String.prototype.substring called on null or undefined")
+		}
+		startValue := pkg.SliceSafeGet(argumentsList, 0)
+		endValue := pkg.SliceSafeGet(argumentsList, 1)
+		if startValue == nil {
+			startValue = UndefinedValue
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
 		if isAbrupt {
 			return rt
 		}
-		end, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[1]), co)
+		start, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, startValue), co)
 		if isAbrupt {
 			return rt
 		}
-		o := RequireObjectCoercible(agent, this)
-		s := ToString(agent, o)
 		length := JSInt(len(s.Data))
+		end := length
+		if endValue != nil && endValue != UndefinedValue {
+			end, isAbrupt, rt = ReturnIfAbrupt(ToIntegerOrInfinity(agent, endValue), co)
+			if isAbrupt {
+				return rt
+			}
+		}
 		finalStart := lo.Clamp(start, 0, length)
 		finalEnd := lo.Clamp(end, 0, length)
 		from := finalStart.Min(finalEnd)
@@ -965,5 +1025,9 @@ func StringIndexOf(s string, searchString string, position int) int {
 	if position > len(s) {
 		return -1
 	}
-	return strings.Index(s[position:], searchString)
+	index := strings.Index(s[position:], searchString)
+	if index < 0 {
+		return -1
+	}
+	return position + index
 }
