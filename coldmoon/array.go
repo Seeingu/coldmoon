@@ -700,13 +700,22 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return NewStringValue(strings.Join(elements, separator))
 	}
 	var includes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		searchElement := args[0]
-		fromIndex := args[1]
-		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
+		searchElement := pkg.SliceSafeGet(args, 0)
+		fromIndex := pkg.SliceSafeGet(args, 1)
+		if searchElement == nil {
+			searchElement = UndefinedValue
+		}
+		if fromIndex == nil {
+			fromIndex = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 		if length == 0 {
 			return FalseValue
@@ -714,9 +723,6 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
 		if isAbrupt {
 			return rt
-		}
-		if fromIndex == UndefinedValue {
-			Assert(n == 0)
 		}
 		if n.IsPositiveInf() {
 			return FalseValue

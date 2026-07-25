@@ -140,6 +140,13 @@ assert(!(0 in sliced));
 assert(sliced[1] === "c");`)
 }
 
+func TestArrayIncludesSupportsOmittedArgumentsAndGenericReceivers(t *testing.T) {
+	testSource(t, `assert([undefined].includes());
+assert([NaN].includes(NaN));
+assert([1, 2, 3].includes(2, -2));
+assert(Array.prototype.includes.call({ 0: "x", length: 1 }, "x"));`)
+}
+
 func TestFunctionInvocationHelpersDefaultArguments(t *testing.T) {
 	testSource(t, `function count() { return arguments.length; }
 assert(count.apply() === 0);
