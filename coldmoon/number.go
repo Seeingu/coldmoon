@@ -196,7 +196,7 @@ func (n *NumberValue) IsFinite() bool {
 }
 
 func (n *NumberValue) Truncate() JSNumber {
-	return n.Data
+	return JSNumber(math.Trunc(n.Data.ToFloat()))
 }
 
 func (n *NumberValue) Round() JSNumber {

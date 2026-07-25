@@ -961,6 +961,13 @@ func TestBigIntStringAndReceiverConversions(t *testing.T) {
 	testSource(t, `assert(BigInt("") === 0n);
 assert(BigInt("  0o12  ") === 10n);
 assert((100n).toString() === "100");
+let rangeCaught = null;
+try {
+  BigInt(1.1);
+} catch (error) {
+  rangeCaught = error;
+}
+assert(rangeCaught instanceof RangeError);
 let caught = null;
 try {
   BigInt.prototype.valueOf.call({});
