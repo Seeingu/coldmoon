@@ -195,11 +195,19 @@ func NewStringPrototype(realm *Realm) *StringObject {
 
 	agent := realm.Agent
 	var toString BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		s := thisArgument.ThisStringValue()
-		return NewStringValue(s)
+		var co CompletionValue
+		switch value := thisArgument.(type) {
+		case *StringValue:
+			return value
+		case *ObjectValue:
+			if stringObject, ok := value.Object.(*StringObject); ok {
+				return NewStringValue(stringObject.Data)
+			}
+		}
+		return co.ThrowTypeError(agent, "String.prototype.toString receiver is not a String")
 	}
 	var valueOf BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		return NewStringValue(thisArgument.ThisStringValue())
+		return toString(thisArgument, argumentsList, newTarget)
 	}
 	toLowerCase := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
@@ -263,33 +271,51 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	var charAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		o := RequireObjectCoercible(agent, thisArgument)
-		s := o.String()
-		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if IsUndefinedOrNull(thisArgument) {
+			return co.ThrowTypeError(agent, "String.prototype.charAt called on null or undefined")
+		}
+		positionValue := pkg.SliceSafeGet(argumentsList, 0)
+		if positionValue == nil {
+			positionValue = UndefinedValue
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, thisArgument), co)
+		if isAbrupt {
+			return rt
+		}
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, positionValue), co)
 		if isAbrupt {
 			return rt
 		}
 		position := int(n)
-		size := len(s)
+		size := len(s.Data)
 		if position < 0 || position >= size {
 			return NewStringValue("")
 		}
-		return NewStringValue(string(s[position]))
+		return NewStringValue(string(s.Data[position]))
 	}
 	var charCodeAt BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		o := RequireObjectCoercible(agent, thisArgument)
-		s := o.String()
-		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if IsUndefinedOrNull(thisArgument) {
+			return co.ThrowTypeError(agent, "String.prototype.charCodeAt called on null or undefined")
+		}
+		positionValue := pkg.SliceSafeGet(argumentsList, 0)
+		if positionValue == nil {
+			positionValue = UndefinedValue
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, thisArgument), co)
+		if isAbrupt {
+			return rt
+		}
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, positionValue), co)
 		if isAbrupt {
 			return rt
 		}
 		position := int(n)
-		size := len(s)
+		size := len(s.Data)
 		if position < 0 || position >= size {
 			return NaNValue
 		}
-		return NewNumberValue(JSNumber(s[position]))
+		return NewNumberValue(JSNumber(s.Data[position]))
 	}
 	var iterator BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -375,19 +401,28 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	var repeat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentsList[0]), co)
+		if IsUndefinedOrNull(thisArgument) {
+			return co.ThrowTypeError(agent, "String.prototype.repeat called on null or undefined")
+		}
+		count := pkg.SliceSafeGet(argumentsList, 0)
+		if count == nil {
+			count = UndefinedValue
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, thisArgument), co)
 		if isAbrupt {
 			return rt
 		}
-		o := RequireObjectCoercible(agent, thisArgument)
-		s := o.String()
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, count), co)
+		if isAbrupt {
+			return rt
+		}
 		if n < 0 || n.IsInf() {
-			panic("RangeError")
+			return co.ThrowRangeError(agent, "repeat count must be finite and non-negative")
 		}
 		if n == 0 {
 			return NewStringValue("")
 		}
-		return NewStringValue(strings.Repeat(s, int(n)))
+		return NewStringValue(strings.Repeat(s.Data, int(n)))
 	}
 	var concat BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
@@ -976,9 +1011,17 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	var codePointAt BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		pos := argumentsList[0]
-		o := RequireObjectCoercible(agent, this)
-		s := ToString(agent, o)
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String.prototype.codePointAt called on null or undefined")
+		}
+		pos := pkg.SliceSafeGet(argumentsList, 0)
+		if pos == nil {
+			pos = UndefinedValue
+		}
+		s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
 		position, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, pos), co)
 		if isAbrupt {
 			return rt

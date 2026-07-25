@@ -341,6 +341,16 @@ matcher[Symbol.match] = function(value) { return value + "!"; };
 assert("value".match(matcher) === "value!");`)
 }
 
+func TestStringCharacterAndRepeatMethodsUseDefaults(t *testing.T) {
+	testSource(t, `assert("abc".charAt() === "a");
+assert("abc".charCodeAt() === 97);
+assert("abc".codePointAt() === 97);
+assert("x".repeat() === "");
+assert("x".repeat(3) === "xxx");
+assert(String.prototype.charAt.call(123, 1) === "2");
+assert(String.prototype.toString.call(new String("value")) === "value");`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
