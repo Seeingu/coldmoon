@@ -86,11 +86,25 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 	}
 
 	a.ExecutionContextStack.Push(calleeContext)
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			switch recovered {
+			case "TypeError":
+				co = co.ThrowTypeError(a, "")
+			case "RangeError":
+				co = co.ThrowRangeError(a, "")
+			default:
+				a.ExecutionContextStack.Pop()
+				panic(recovered)
+			}
+		}
+		a.ExecutionContextStack.Pop()
+	}()
 
 	r := b.Behavior(thisArgument, argumentsList, newTarget)
 	result := CompletionHandleV2(r)
 
-	a.ExecutionContextStack.Pop()
 	return result
 }
 

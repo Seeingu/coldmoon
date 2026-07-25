@@ -353,6 +353,14 @@ func TestTest262IncludesAreLoadedFromFrontmatter(t *testing.T) {
 	Evaluate(`assert(typeof assertNativeFunction === "function");`, realm)
 }
 
+func TestBuiltinTypeErrorPanicsBecomeCatchableCompletions(t *testing.T) {
+	testSource(t, `let dateError = false;
+try { Date.prototype.getDate.call({}); } catch (error) {
+  dateError = error instanceof TypeError;
+}
+assert(dateError);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,
