@@ -643,7 +643,17 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			return rt
 		}
 		desc := attributes.ToPropertyDescriptor(agent)
-		MustGetObject(o).DefinePropertyOrThrow(key, desc)
+		target := MustGetObject(o)
+		success, isAbrupt, rt := ReturnIfAbrupt(
+			target.InternalMethods().DefineOwnProperty(target, key, desc),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		if !success {
+			return co.ThrowTypeError(agent, "Object.defineProperty failed")
+		}
 
 		return o
 	}

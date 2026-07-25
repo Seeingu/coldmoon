@@ -413,6 +413,37 @@ assertEqual(coercions, 2);
 assertEqual(array.length, 3);`)
 }
 
+// TestArrayLengthDescriptorValidationAfterCoercion verifies Object and Reflect
+// surface the same failed [[DefineOwnProperty]] with their distinct APIs.
+func TestArrayLengthDescriptorValidationAfterCoercion(t *testing.T) {
+	testSource(t, `let array = [1, 2];
+let calls = 0;
+const length = {
+  valueOf: function() {
+    calls += 1;
+    if (calls === 2) {
+      Object.defineProperty(array, "length", { writable: false });
+    }
+    return array.length;
+  }
+};
+let caught = null;
+try {
+  Object.defineProperty(array, "length", { value: length, writable: true });
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);
+assertEqual(calls, 2);
+array = [1, 2];
+calls = 0;
+assertEqual(
+  Reflect.defineProperty(array, "length", { value: length, writable: true }),
+  false
+);
+assertEqual(calls, 2);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
