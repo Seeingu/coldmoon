@@ -316,7 +316,7 @@ func StringToNumber(value *StringValue) *NumberValue {
 		return NewNumberValue(0)
 	}
 
-	n, err := strconv.ParseFloat(strings.Trim(value.Data, " "), 64)
+	n, err := strconv.ParseFloat(strings.TrimFunc(value.Data, isECMAScriptWhitespace), 64)
 	if err != nil && !math.IsInf(n, 0) {
 		return NaNValue
 	}

@@ -11,6 +11,13 @@ type DateObject struct {
 	Data JSNumber
 }
 
+func dateArgument(args []Value, index int) Value {
+	if index >= len(args) {
+		return UndefinedValue
+	}
+	return args[index]
+}
+
 func NewDatePrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "DatePrototype")
 	agent := realm.Agent
@@ -22,7 +29,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	}
 	// 21.4.4.45
 	var toPrimitive BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		hintValue := args[0]
+		hintValue := dateArgument(args, 0)
 		if !this.IsObject() {
 			return agent.ThrowTypeError("is not an object")
 		}
@@ -245,7 +252,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		var date JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			date = n.Data
@@ -265,7 +272,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		tv := dateObject.Data
 		var year JSNumber
 
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			year = n.Data
@@ -302,7 +309,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		tv := dateObject.Data
 		t := LocalTime(tv)
 		var hour JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			hour = n.Data
@@ -343,7 +350,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		tv := dateObject.Data
 		t := LocalTime(tv)
 		var ms JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), CompletionValue{}); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), CompletionValue{}); isAbrupt {
 			return rt
 		} else {
 			ms = n.Data
@@ -361,7 +368,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		tv := dateObject.Data
 		t := LocalTime(tv)
 		var minute JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			minute = n.Data
@@ -396,7 +403,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		tv := dateObject.Data
 		t := LocalTime(tv)
 		var month JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			month = n.Data
@@ -421,7 +428,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		tv := dateObject.Data
 		t := LocalTime(tv)
 		var sec JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			sec = n.Data
@@ -445,7 +452,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		var co CompletionValue
 		var t JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			t = n.Data
@@ -457,7 +464,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		var date JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), CompletionValue{}); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), CompletionValue{}); isAbrupt {
 			return rt
 		} else {
 			date = n.Data
@@ -473,7 +480,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		var hour JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			hour = n.Data
@@ -513,7 +520,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		var ms JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), CompletionValue{}); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), CompletionValue{}); isAbrupt {
 			return rt
 		} else {
 			ms = n.Data
@@ -530,7 +537,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		var minute JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			minute = n.Data
@@ -563,7 +570,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		var month JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			month = n.Data
@@ -587,7 +594,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
 		var sec JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(dateArgument(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			sec = n.Data

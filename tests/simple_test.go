@@ -380,6 +380,11 @@ assert(date.getMonth() === 7);
 assert(date.getDate() === 10);`)
 }
 
+func TestStringToNumberUsesECMAScriptWhitespace(t *testing.T) {
+	testSource(t, `assert(Number(" 	+00200.000E-0002	") === 2);
+assert(Number("`+"\uFEFF"+`42　") === 42);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,

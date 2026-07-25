@@ -17,6 +17,16 @@ type StringObject struct {
 	Data string
 }
 
+func isECMAScriptWhitespace(r rune) bool {
+	switch r {
+	case '\u0009', '\u000A', '\u000B', '\u000C', '\u000D', '\u0020',
+		'\u00A0', '\u1680', '\u2028', '\u2029', '\u202F', '\u205F',
+		'\u3000', '\uFEFF':
+		return true
+	}
+	return r >= '\u2000' && r <= '\u200A'
+}
+
 func canonicalStringIndex(p PropertyKey) (JSInt, bool) {
 	key, ok := p.(StringPropertyKey)
 	if !ok || key.Value == "" {
@@ -241,15 +251,6 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return NewStringValue(strings.ToUpper(s.Data))
 	}
-	isTrimWhiteSpace := func(r rune) bool {
-		switch r {
-		case '\u0009', '\u000A', '\u000B', '\u000C', '\u000D', '\u0020',
-			'\u00A0', '\u1680', '\u2028', '\u2029', '\u202F', '\u205F',
-			'\u3000', '\uFEFF':
-			return true
-		}
-		return r >= '\u2000' && r <= '\u200A'
-	}
 	trimString := func(this Value, where string) CompletionConvertable[Value] {
 		var co CompletionValue
 		if IsUndefinedOrNil(this) || this == NullValue {
@@ -262,11 +263,11 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		s := stringValue.Data
 		switch where {
 		case "start":
-			s = strings.TrimLeftFunc(s, isTrimWhiteSpace)
+			s = strings.TrimLeftFunc(s, isECMAScriptWhitespace)
 		case "end":
-			s = strings.TrimRightFunc(s, isTrimWhiteSpace)
+			s = strings.TrimRightFunc(s, isECMAScriptWhitespace)
 		default:
-			s = strings.TrimFunc(s, isTrimWhiteSpace)
+			s = strings.TrimFunc(s, isECMAScriptWhitespace)
 		}
 		return NewStringValue(s)
 	}
