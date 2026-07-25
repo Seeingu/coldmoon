@@ -197,6 +197,16 @@ assert(caught instanceof TypeError);
 assertEqual(closeCount, 1);`)
 }
 
+// TestArrayFromArrayBuffer verifies that omitting ArrayBuffer's options
+// argument is valid and that the buffer is treated as an empty array-like.
+func TestArrayFromArrayBuffer(t *testing.T) {
+	testSource(t, `const buffer = new ArrayBuffer(7);
+const result = Array.from(buffer);
+assertEqual(result.length, 0);
+assertEqual(new Array(0).length, 0);
+assertEqual(new Array("0").length, 1);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

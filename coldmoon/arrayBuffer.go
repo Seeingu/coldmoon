@@ -260,7 +260,10 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
 		length := argumentsList[0]
-		options := argumentsList[1]
+		var options Value = UndefinedValue
+		if len(argumentsList) > 1 {
+			options = argumentsList[1]
+		}
 		if newTarget == nil {
 			return agent.ThrowTypeError("TypeError")
 		}

@@ -212,15 +212,24 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 			array := ArrayCreate(agent, 0, proto)
 
 			var intLen JSNumber
-			if _, ok := length.(*NumberValue); ok {
-				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(0), length)
-				intLen = 1
-			} else {
-				n, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, length), co)
+			if number, ok := length.(*NumberValue); ok {
+				n, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, number), co)
 				if isAbrupt {
 					return rt
 				}
+				if number.Data != n.ToNumber() {
+					return co.ThrowRangeError(agent, "invalid array length")
+				}
 				intLen = n.ToNumber()
+			} else {
+				_, isAbrupt, rt := ReturnIfAbrupt(
+					array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(0), length),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				intLen = 1
 			}
 
 			_, isAbrupt, rt := ReturnIfAbrupt(array.Set(
