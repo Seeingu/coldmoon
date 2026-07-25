@@ -343,7 +343,7 @@ func (p *Parser) acceptContext(t TokenType) *acceptContext {
 		return &acceptContext{
 			precedence: 15,
 		}
-	case TWave, TTypeof, TDelete, TNot:
+	case TWave, TTilde, TVoid, TTypeof, TDelete, TNot:
 		return &acceptContext{
 			precedence: 14,
 		}

@@ -615,7 +615,30 @@ func TestVoidAndSequenceExpressionEvaluation(t *testing.T) {
 	testSource(t, `let value = 0;
 assert((value = 1, value = 2, value) === 2);
 assert((void (value = 3)) === undefined);
-assertEqual(value, 3);`)
+assertEqual(value, 3);
+const values = [void 0, void 0, void 0];
+assertEqual(values.length, 3);`)
+}
+
+// TestFunctionLengthDoesNotChangeWithIndexedProperties verifies the formal
+// parameter count remains the array-like length used by concat.
+func TestFunctionLengthDoesNotChangeWithIndexedProperties(t *testing.T) {
+	testSource(t, `const functionObject = function(a, b, c) {};
+assertEqual(functionObject.length, 3);
+functionObject[0] = 1;
+functionObject[1] = 2;
+functionObject[2] = 3;
+assertEqual(functionObject.length, 3);
+assertEqual((function(a, b, c) {}).length, 3);
+Function.prototype[Symbol.isConcatSpreadable] = true;
+const inherited = function(a, b, c) {};
+assertEqual(inherited[Symbol.isConcatSpreadable], true);
+const result = [].concat(inherited);
+assertEqual(result.length, 3);
+assertEqual(0 in result, false);
+assertEqual(1 in result, false);
+assertEqual(2 in result, false);
+delete Function.prototype[Symbol.isConcatSpreadable];`)
 }
 
 func TestBaselineNew(t *testing.T) {
