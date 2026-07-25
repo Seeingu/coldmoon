@@ -891,6 +891,8 @@ assert((new Number(1)).toFixed(1) === "1.0");
 assert((123.456).toFixed(2) === "123.46");
 assert((-0).toFixed(2) === "0.00");
 assert(NaN.toFixed(1) === "NaN");
+assert(String(1e21) === "1e+21");
+assert(String(-0) === "0");
 let caught = null;
 try {
   (3).toFixed(101);

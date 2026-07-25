@@ -1,9 +1,9 @@
 package coldmoon
 
 import (
-	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/Seeingu/coldmoon/pkg"
 )
@@ -97,10 +97,7 @@ var (
 )
 
 func (n *NumberValue) String() string {
-	if n.Data.IsFloatInt() {
-		return fmt.Sprintf("%d", int64(n.Data))
-	}
-	return fmt.Sprintf("%f", n.Data)
+	return string(n.ToString())
 }
 
 func (n *NumberValue) ToString() CMString {
@@ -114,10 +111,25 @@ func (n *NumberValue) ToString() CMString {
 		return "-Infinity"
 	}
 	if n.IsZero() {
-		if math.Signbit(n.Data.ToFloat()) {
-			return "-0"
-		}
 		return "0"
+	}
+	absolute := math.Abs(n.Data.ToFloat())
+	if absolute >= 1e21 || absolute < 1e-6 {
+		formatted := strconv.FormatFloat(n.Data.ToFloat(), 'e', -1, 64)
+		parts := strings.SplitN(formatted, "e", 2)
+		exponent := parts[1]
+		sign := "+"
+		if strings.HasPrefix(exponent, "-") {
+			sign = "-"
+			exponent = exponent[1:]
+		} else if strings.HasPrefix(exponent, "+") {
+			exponent = exponent[1:]
+		}
+		exponent = strings.TrimLeft(exponent, "0")
+		if exponent == "" {
+			exponent = "0"
+		}
+		return CMString(parts[0] + "e" + sign + exponent)
 	}
 	return CMString(strconv.FormatFloat(n.Data.ToFloat(), 'f', -1, 64))
 }
