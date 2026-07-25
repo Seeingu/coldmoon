@@ -427,6 +427,140 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 		return result.ToValue()
 	}
+	getStringSubstitution := func(matched, source string, position int, replacement string) string {
+		var result strings.Builder
+		for index := 0; index < len(replacement); index++ {
+			if replacement[index] != '$' || index+1 >= len(replacement) {
+				result.WriteByte(replacement[index])
+				continue
+			}
+			switch replacement[index+1] {
+			case '$':
+				result.WriteByte('$')
+				index++
+			case '&':
+				result.WriteString(matched)
+				index++
+			case '`':
+				result.WriteString(source[:position])
+				index++
+			case '\'':
+				result.WriteString(source[position+len(matched):])
+				index++
+			default:
+				result.WriteByte('$')
+			}
+		}
+		return result.String()
+	}
+	replaceString := func(this Value, argumentsList []Value, replaceAll bool) CompletionConvertable[Value] {
+		var co CompletionValue
+		searchValue := pkg.SliceSafeGet(argumentsList, 0)
+		replaceValue := pkg.SliceSafeGet(argumentsList, 1)
+		if searchValue == nil {
+			searchValue = UndefinedValue
+		}
+		if replaceValue == nil {
+			replaceValue = UndefinedValue
+		}
+		if IsUndefinedOrNull(this) {
+			return co.ThrowTypeError(agent, "String replacement called on null or undefined")
+		}
+		if !IsUndefinedOrNull(searchValue) {
+			if replaceAll && IsRegExp(searchValue) {
+				flags := MustGetObject(searchValue).Get(NewStringPropertyKey("flags"))
+				flagsString, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, flags), co)
+				if isAbrupt {
+					return rt
+				}
+				if !strings.Contains(flagsString.Data, "g") {
+					return co.ThrowTypeError(agent, "replaceAll requires a global RegExp")
+				}
+			}
+			replacer := GetMethod(agent, searchValue, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsReplace]))
+			if replacer != nil {
+				return replacer.Call(searchValue, []Value{this, replaceValue})
+			}
+		}
+		sourceValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		searchString, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, searchValue), co)
+		if isAbrupt {
+			return rt
+		}
+		functionalReplace := IsCallable(replaceValue)
+		replacement := ""
+		if !functionalReplace {
+			replacementValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, replaceValue), co)
+			if isAbrupt {
+				return rt
+			}
+			replacement = replacementValue.Data
+		}
+		source := sourceValue.Data
+		search := searchString.Data
+		positions := []int{}
+		if replaceAll {
+			if search == "" {
+				for position := 0; position <= len(source); position++ {
+					positions = append(positions, position)
+				}
+			} else {
+				for start := 0; start <= len(source)-len(search); {
+					offset := strings.Index(source[start:], search)
+					if offset < 0 {
+						break
+					}
+					position := start + offset
+					positions = append(positions, position)
+					start = position + len(search)
+				}
+			}
+		} else if position := strings.Index(source, search); position >= 0 {
+			positions = append(positions, position)
+		}
+		if len(positions) == 0 {
+			return sourceValue
+		}
+		var result strings.Builder
+		endOfLastMatch := 0
+		for _, position := range positions {
+			result.WriteString(source[endOfLastMatch:position])
+			replacementText := replacement
+			if functionalReplace {
+				replaced, isAbrupt, rt := ReturnIfAbrupt(
+					replaceValue.Call(
+						agent,
+						UndefinedValue,
+						[]Value{searchString, NewNumberValue(JSNumber(position)), sourceValue},
+					),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				replacedString, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, replaced), co)
+				if isAbrupt {
+					return rt
+				}
+				replacementText = replacedString.Data
+			} else {
+				replacementText = getStringSubstitution(search, source, position, replacement)
+			}
+			result.WriteString(replacementText)
+			endOfLastMatch = position + len(search)
+		}
+		result.WriteString(source[endOfLastMatch:])
+		return NewStringValue(result.String())
+	}
+	var replace BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return replaceString(this, argumentsList, false)
+	}
+	var replaceAll BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return replaceString(this, argumentsList, true)
+	}
 	var search BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		regexp := argumentsList[0]
 		o := RequireObjectCoercible(agent, thisArgument)
@@ -674,6 +808,8 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("repeat"), repeat, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("concat"), concat, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("split"), split, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("replace"), replace, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("replaceAll"), replaceAll, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
@@ -698,6 +834,8 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	stringPrototype.defineBuiltinFunction(realm, CMString("repeat"), repeat, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("concat"), concat, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("split"), split, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("replace"), replace, 2)
+	stringPrototype.defineBuiltinFunction(realm, CMString("replaceAll"), replaceAll, 2)
 	stringPrototype.defineBuiltinFunction(realm, CMString("search"), search, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("matchAll"), matchAll, 1)
 	stringPrototype.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)

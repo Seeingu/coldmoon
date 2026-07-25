@@ -187,6 +187,20 @@ assert(custom[0] === "value");
 assert(custom[1] === 3);`)
 }
 
+func TestStringReplacementSupportsTemplatesFunctionsAndCustomDispatch(t *testing.T) {
+	testSource(t, `assert("one one".replace("one", "two") === "two one");
+assert("one one".replaceAll("one", "two") === "two two");
+assert("abc".replace("b", "[$&]") === "a[b]c");
+assert("aba".replaceAll("a", function(match, position, source) {
+  return source + position;
+}) === "aba0baba2");
+const search = {};
+search[Symbol.replace] = function(value, replacement) {
+  return value + replacement;
+};
+assert("left".replace(search, "right") === "leftright");`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
