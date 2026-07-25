@@ -158,7 +158,9 @@ func evaluate(fileName string, realm *Realm) (err error) {
 			err = errors.New("panic" + fmt.Sprint(r))
 		}
 	}()
-	Evaluate(pkg.MustReadFile(fileName), realm)
+	source := pkg.MustReadFile(fileName)
+	runtime.RegisterTest262Includes(realm, source)
+	Evaluate(source, realm)
 	return
 }
 
@@ -173,7 +175,9 @@ func evaluateAsync(ctx context.Context, fileName string, realm *Realm) (err erro
 				evaluateChan <- struct{}{}
 			}
 		}()
-		Evaluate(pkg.MustReadFile(fileName), realm)
+		source := pkg.MustReadFile(fileName)
+		runtime.RegisterTest262Includes(realm, source)
+		Evaluate(source, realm)
 	}()
 	select {
 	case <-ctx.Done():

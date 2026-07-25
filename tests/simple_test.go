@@ -343,6 +343,16 @@ function Hoisted() {}
 assert(instance.value === 42);`)
 }
 
+func TestTest262IncludesAreLoadedFromFrontmatter(t *testing.T) {
+	agent := NewAgent()
+	InitializeConstants()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	cr.RegisterTest262Runtime(realm)
+	cr.RegisterTest262Includes(realm, "/*---\nincludes: [nativeFunctionMatcher.js]\n---*/")
+	Evaluate(`assert(typeof assertNativeFunction === "function");`, realm)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,

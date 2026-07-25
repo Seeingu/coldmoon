@@ -3,12 +3,22 @@ package runtime
 import (
 	"os"
 	"path"
+	"regexp"
+	"strings"
+	"sync"
 
 	"github.com/Seeingu/coldmoon/coldmoon"
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
 var test262Path string
+var test262IncludesPattern = regexp.MustCompile(`(?m)^includes:\s*\[([^\]]*)\]`)
+var loadedTest262Includes = struct {
+	sync.Mutex
+	byRealm map[*coldmoon.Realm]map[string]bool
+}{
+	byRealm: make(map[*coldmoon.Realm]map[string]bool),
+}
 
 func initPath() {
 	if test262Path == "" {
@@ -88,5 +98,47 @@ func RegisterTest262Runtime(realm *coldmoon.Realm) {
 		println("Harness file: ", f)
 		content := pkg.MustReadFile(MakeTest262Path("./harness/" + f))
 		coldmoon.ParseScript(content, realm, nil).Evaluate()
+	}
+	loadedTest262Includes.Lock()
+	loaded := make(map[string]bool, len(files))
+	for _, file := range files {
+		loaded[file] = true
+	}
+	loadedTest262Includes.byRealm[realm] = loaded
+	loadedTest262Includes.Unlock()
+}
+
+// RegisterTest262Includes evaluates the optional harness files declared by a
+// test's frontmatter. Harnesses are loaded once per realm because many of them
+// declare top-level lexical bindings.
+func RegisterTest262Includes(realm *coldmoon.Realm, source string) {
+	match := test262IncludesPattern.FindStringSubmatch(source)
+	if len(match) != 2 {
+		return
+	}
+	for _, entry := range strings.Split(match[1], ",") {
+		file := strings.Trim(strings.TrimSpace(entry), `"'`)
+		if file == "" {
+			continue
+		}
+
+		loadedTest262Includes.Lock()
+		loaded := loadedTest262Includes.byRealm[realm]
+		if loaded == nil {
+			loaded = make(map[string]bool)
+			loadedTest262Includes.byRealm[realm] = loaded
+		}
+		alreadyLoaded := loaded[file]
+		loadedTest262Includes.Unlock()
+		if alreadyLoaded {
+			continue
+		}
+
+		println("Harness file: ", file)
+		content := pkg.MustReadFile(MakeTest262Path("./harness/" + file))
+		coldmoon.ParseScript(content, realm, nil).Evaluate()
+		loadedTest262Includes.Lock()
+		loadedTest262Includes.byRealm[realm][file] = true
+		loadedTest262Includes.Unlock()
 	}
 }

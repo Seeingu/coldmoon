@@ -9,6 +9,7 @@ import (
 	"github.com/Seeingu/coldmoon/runtime"
 
 	. "github.com/Seeingu/coldmoon/coldmoon"
+	"github.com/Seeingu/coldmoon/pkg"
 )
 
 func main() {
@@ -32,6 +33,9 @@ func main() {
 	// else run as repl
 	args := flag.Args()
 	if len(args) > 0 {
+		if *isTest262 {
+			runtime.RegisterTest262Includes(realm, pkg.MustReadFile(args[0]))
+		}
 		EvaluateModule(args[0], realm)
 		eventLoop.Poll()
 		agent.WG.Wait()
