@@ -207,6 +207,21 @@ assertEqual(new Array(0).length, 0);
 assertEqual(new Array("0").length, 1);`)
 }
 
+// TestArrayFromUsesCrossRealmConstructorPrototype verifies the test262 realm
+// hook and GetPrototypeFromConstructor's realm fallback.
+func TestArrayFromUsesCrossRealmConstructorPrototype(t *testing.T) {
+	agent := NewAgent()
+	InitializeConstants()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	cr.RegisterTest262Runtime(realm)
+	Evaluate(`const other = $262.createRealm().global;
+const C = new other.Function();
+C.prototype = null;
+const result = Array.from.call(C, []);
+assert(Object.getPrototypeOf(result) === other.Object.prototype);`, realm)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

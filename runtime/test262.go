@@ -35,6 +35,44 @@ func RegisterTest262Runtime(realm *coldmoon.Realm) {
 	console := CreateConsole(realm)
 	global.CreateDataProperty(coldmoon.CMString("console").ToPropertyKey(), console.ToValue())
 
+	test262 := coldmoon.OrdinaryObjectCreate(realm.Agent, realm.Intrinsics.ObjectPrototype, nil)
+	var createRealm coldmoon.BehaviorFn = func(
+		_ coldmoon.Value,
+		_ []coldmoon.Value,
+		_ coldmoon.ObjectType,
+	) coldmoon.CompletionConvertable[coldmoon.Value] {
+		otherRealm := coldmoon.CreateRealm(realm.Agent)
+		otherGlobal := coldmoon.OrdinaryObjectCreate(
+			realm.Agent,
+			otherRealm.Intrinsics.ObjectPrototype,
+			nil,
+		)
+		otherRealm.SetRealmGlobalObject(otherGlobal, nil)
+		otherRealm.SetDefaultGlobalBindings()
+
+		record := coldmoon.OrdinaryObjectCreate(
+			realm.Agent,
+			realm.Intrinsics.ObjectPrototype,
+			nil,
+		)
+		record.CreateDataPropertyOrThrow(
+			coldmoon.CMString("global").ToPropertyKey(),
+			otherGlobal.ToValue(),
+		)
+		return record.ToValue()
+	}
+	coldmoon.DefineBuiltinFunction(
+		realm,
+		coldmoon.CMString("createRealm"),
+		test262,
+		createRealm,
+		0,
+	)
+	global.CreateDataProperty(
+		coldmoon.CMString("$262").ToPropertyKey(),
+		test262.ToValue(),
+	)
+
 	files := []string{
 		"sta.js",
 		"assert.js",

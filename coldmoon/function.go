@@ -1,10 +1,6 @@
 package coldmoon
 
-import (
-	"math"
-
-	"github.com/samber/lo"
-)
+import "math"
 
 func NewFunctionPrototypeWithIntrinsicsBinding(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -228,7 +224,7 @@ func CreateDynamicFunction(
 	}
 
 	bodyString := bodyArg.String()
-	sourceString := prefix + " " + P + " " + bodyString
+	sourceString := prefix + " anonymous(" + P + "\n) {\n" + bodyString + "\n}"
 	sourceText := sourceString
 
 	parser := NewParser(P, ParserContext{
@@ -267,7 +263,7 @@ func CreateDynamicFunction(
 	SetFunctionName(function, NewStringPropertyKey("anonymous"), "")
 	switch kind {
 	case dynamicFunctionKindNormal:
-		MakeConstructor(function, false, nil)
+		MakeConstructor(function, true, nil)
 	case dynamicFunctionKindGenerator:
 		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
 		function.defineBuiltinProperty(CMString("prototype"), &PropertyDescriptor{
@@ -293,14 +289,15 @@ func CreateDynamicFunction(
 func NewFunctionConstructor(realm *Realm) ObjectType {
 	// 20.2.1.1
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		parameters := argumentsList[0 : len(argumentsList)-1]
 		agent := realm.Agent
 
 		constructor := agent.ActiveFunctionObject()
 
-		bodyArg, ok := lo.Last(argumentsList)
-		if !ok {
-			bodyArg = NewStringValue("")
+		var parameters []Value
+		var bodyArg Value = NewStringValue("")
+		if len(argumentsList) > 0 {
+			parameters = argumentsList[:len(argumentsList)-1]
+			bodyArg = argumentsList[len(argumentsList)-1]
 		}
 
 		return CreateDynamicFunction(

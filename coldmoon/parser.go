@@ -674,7 +674,7 @@ func (p *Parser) formalParameters() *FormalParameters {
 	var items []FormalParametersItem
 	for {
 		t := p.tokenizer.CurrentToken
-		if t.Type == TRightParen {
+		if t.Type == TRightParen || t.Type == TEOF {
 			break
 		}
 		if b, ok := p.bindingRestElement(); ok {
