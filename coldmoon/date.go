@@ -105,7 +105,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		if tv.IsNaN() {
 			return NaNValue
 		}
-		return NewNumberValue(tv - LocalTime(tv)/MS_PER_MIN.ToNumber())
+		return NewNumberValue((tv - LocalTime(tv)) / MS_PER_MIN.ToNumber())
 	}
 	var getDate BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
@@ -113,7 +113,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		if tv.IsNaN() {
 			return NaNValue
 		}
-		return NewNumberValue(DateFromTime(tv))
+		return NewNumberValue(DateFromTime(LocalTime(tv)))
 	}
 	var getDay BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
@@ -121,7 +121,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		if tv.IsNaN() {
 			return NaNValue
 		}
-		return NewNumberValue(WeekDay(tv))
+		return NewNumberValue(WeekDay(LocalTime(tv)))
 	}
 	var getFullYear BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
@@ -270,8 +270,12 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		} else {
 			year = n.Data
 		}
-		month := JSNumber(0.0)
-		date := JSNumber(1.0)
+		t := LocalTime(tv)
+		if tv.IsNaN() {
+			t = 0
+		}
+		month := MonthFromTime(t)
+		date := DateFromTime(t)
 		if len(args) >= 2 {
 			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
 			if isAbrupt {
@@ -286,9 +290,8 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			}
 			date = n.Data
 		}
-		year = MakeFullYear(year)
 		day := MakeDay(year, month, date)
-		newDate := MakeDate(day, TimeWithinDay(tv))
+		newDate := MakeDate(day, TimeWithinDay(t))
 		u := TimeClip(UTC(newDate))
 		dateObject.Data = u
 		return NewNumberValue(u)
@@ -297,15 +300,16 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
+		t := LocalTime(tv)
 		var hour JSNumber
 		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			hour = n.Data
 		}
-		minute := JSNumber(0.0)
-		sec := JSNumber(0.0)
-		ms := JSNumber(0.0)
+		minute := MinFromTime(t)
+		sec := SecFromTime(t)
+		ms := msFromTime(t)
 		if len(args) >= 2 {
 			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
 			if isAbrupt {
@@ -327,7 +331,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			}
 			ms = n.Data
 		}
-		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
+		day := MakeDay(YearFromTime(t), MonthFromTime(t), DateFromTime(t))
 		newTime := MakeTime(hour, minute, sec, ms)
 		newDate := MakeDate(day, newTime)
 		u := TimeClip(UTC(newDate))
@@ -337,14 +341,15 @@ func NewDatePrototype(realm *Realm) ObjectType {
 	var setMilliseconds BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
+		t := LocalTime(tv)
 		var ms JSNumber
 		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), CompletionValue{}); isAbrupt {
 			return rt
 		} else {
 			ms = n.Data
 		}
-		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
-		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms)
+		day := MakeDay(YearFromTime(t), MonthFromTime(t), DateFromTime(t))
+		newTime := MakeTime(HourFromTime(t), MinFromTime(t), SecFromTime(t), ms)
 		newDate := MakeDate(day, newTime)
 		u := TimeClip(UTC(newDate))
 		dateObject.Data = u
@@ -354,6 +359,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
+		t := LocalTime(tv)
 		var minute JSNumber
 		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
 			return rt
@@ -361,8 +367,8 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			minute = n.Data
 		}
 
-		sec := JSNumber(0.0)
-		ms := JSNumber(0.0)
+		sec := SecFromTime(t)
+		ms := msFromTime(t)
 		if len(args) >= 2 {
 			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
 			if isAbrupt {
@@ -377,8 +383,8 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			}
 			ms = n.Data
 		}
-		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
-		newTime := MakeTime(HourFromTime(tv), minute, sec, ms)
+		day := MakeDay(YearFromTime(t), MonthFromTime(t), DateFromTime(t))
+		newTime := MakeTime(HourFromTime(t), minute, sec, ms)
 		newDate := MakeDate(day, newTime)
 		u := TimeClip(UTC(newDate))
 		dateObject.Data = u
@@ -388,13 +394,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
+		t := LocalTime(tv)
 		var month JSNumber
 		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			month = n.Data
 		}
-		date := JSNumber(1.0)
+		date := DateFromTime(t)
 		if len(args) >= 2 {
 			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
 			if isAbrupt {
@@ -402,8 +409,8 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			}
 			date = n.Data
 		}
-		day := MakeDay(YearFromTime(tv), month, date)
-		newDate := MakeDate(day, TimeWithinDay(tv))
+		day := MakeDay(YearFromTime(t), month, date)
+		newDate := MakeDate(day, TimeWithinDay(t))
 		u := TimeClip(UTC(newDate))
 		dateObject.Data = u
 		return NewNumberValue(u)
@@ -412,13 +419,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
+		t := LocalTime(tv)
 		var sec JSNumber
 		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			sec = n.Data
 		}
-		ms := JSNumber(0.0)
+		ms := msFromTime(t)
 		if len(args) >= 2 {
 			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
 			if isAbrupt {
@@ -426,8 +434,8 @@ func NewDatePrototype(realm *Realm) ObjectType {
 			}
 			ms = n.Data
 		}
-		day := MakeDay(YearFromTime(tv), MonthFromTime(tv), DateFromTime(tv))
-		newTime := MakeTime(HourFromTime(tv), MinFromTime(tv), sec, ms)
+		day := MakeDay(YearFromTime(t), MonthFromTime(t), DateFromTime(t))
+		newTime := MakeTime(HourFromTime(t), MinFromTime(t), sec, ms)
 		newDate := MakeDate(day, newTime)
 		u := TimeClip(UTC(newDate))
 		dateObject.Data = u
@@ -658,13 +666,15 @@ const (
 
 // 21.4.1.3
 func Day(t JSNumber) JSNumber {
-	// FIXME: use time package
-	msPerDay := MS_PER_DAY
-	return t / msPerDay.ToNumber()
+	return (t / MS_PER_DAY.ToNumber()).Floor()
 }
 
 func TimeWithinDay(t JSNumber) JSNumber {
-	return t.Mod(MS_PER_DAY.ToNumber())
+	result := t.Mod(MS_PER_DAY.ToNumber())
+	if result < 0 {
+		result += MS_PER_DAY.ToNumber()
+	}
+	return result
 }
 
 func DaysInYear(y JSNumber) JSNumber {
@@ -689,15 +699,10 @@ func TimeFromYear(y JSNumber) JSNumber {
 }
 
 func YearFromTime(t JSNumber) JSNumber {
-	year := t / ((365.2425 * MS_PER_DAY.ToNumber()) + 1970)
-	t2 := TimeFromYear(year)
-	if t2 > t {
-		return year - 1
+	if t.IsNaN() || t.IsInf() {
+		return JSNumberNaN
 	}
-	if t2+(DaysInYear(year)*MS_PER_DAY.ToNumber()) <= t {
-		return year + 1
-	}
-	return year
+	return JSNumber(time.UnixMilli(int64(t)).UTC().Year())
 }
 
 func DayWithinYear(t JSNumber) JSNumber {
@@ -712,134 +717,52 @@ func InLeapYear(t JSNumber) bool {
 }
 
 func MonthFromTime(t JSNumber) JSNumber {
-	day := DayWithinYear(t)
-	if InLeapYear(t) {
-		if day < 31 {
-			return 0
-		}
-		if day < 60 {
-			return 1
-		}
-		if day < 91 {
-			return 2
-		}
-		if day < 121 {
-			return 3
-		}
-		if day < 152 {
-			return 4
-		}
-		if day < 182 {
-			return 5
-		}
-		if day < 213 {
-			return 6
-		}
-		if day < 244 {
-			return 7
-		}
-		if day < 274 {
-			return 8
-		}
-		if day < 305 {
-			return 9
-		}
-		if day < 335 {
-			return 10
-		}
-		return 11
+	if t.IsNaN() || t.IsInf() {
+		return JSNumberNaN
 	}
-	if day < 31 {
-		return 0
-	}
-	if day < 59 {
-		return 1
-	}
-	if day < 90 {
-		return 2
-	}
-	if day < 120 {
-		return 3
-	}
-	if day < 151 {
-		return 4
-	}
-	if day < 181 {
-		return 5
-	}
-	if day < 212 {
-		return 6
-	}
-	if day < 243 {
-		return 7
-	}
-	if day < 273 {
-		return 8
-	}
-	if day < 304 {
-		return 9
-	}
-	if day < 334 {
-		return 10
-	}
-	return 11
+	return JSNumber(time.UnixMilli(int64(t)).UTC().Month() - 1)
 }
 
 func DateFromTime(t JSNumber) JSNumber {
-	day := DayWithinYear(t)
-	month := MonthFromTime(t)
-
-	var inLeapYear JSNumber = 0
-	if InLeapYear(t) {
-		inLeapYear = 1
+	if t.IsNaN() || t.IsInf() {
+		return JSNumberNaN
 	}
-	switch month {
-	case 0:
-		return day + 1
-	case 1:
-		return day - 30
-	case 2:
-		return day - 58 - inLeapYear
-	case 3:
-		return day - 89 - inLeapYear
-	case 4:
-		return day - 119 - inLeapYear
-	case 5:
-		return day - 150 - inLeapYear
-	case 6:
-		return day - 180 - inLeapYear
-	case 7:
-		return day - 211 - inLeapYear
-	case 8:
-		return day - 242 - inLeapYear
-	case 9:
-		return day - 272 - inLeapYear
-	case 10:
-		return day - 303 - inLeapYear
-	case 11:
-		return day - 333 - inLeapYear
-	}
-	return 0
+	return JSNumber(time.UnixMilli(int64(t)).UTC().Day())
 }
 
 func WeekDay(t JSNumber) JSNumber {
-	return (Day(t) + 4).Mod(7)
+	if t.IsNaN() || t.IsInf() {
+		return JSNumberNaN
+	}
+	return JSNumber(time.UnixMilli(int64(t)).UTC().Weekday())
 }
 
 func HourFromTime(t JSNumber) JSNumber {
-	return (t / 3600000).Floor().Mod(24)
+	if t.IsNaN() || t.IsInf() {
+		return JSNumberNaN
+	}
+	return JSNumber(time.UnixMilli(int64(t)).UTC().Hour())
 }
 
 func MinFromTime(t JSNumber) JSNumber {
-	return (t / MS_PER_MIN.ToNumber()).Floor().Mod(60)
+	if t.IsNaN() || t.IsInf() {
+		return JSNumberNaN
+	}
+	return JSNumber(time.UnixMilli(int64(t)).UTC().Minute())
 }
 
 func SecFromTime(t JSNumber) JSNumber {
-	return JSNumber(math.Mod(math.Floor(t.ToFloat()/1000), 60))
+	if t.IsNaN() || t.IsInf() {
+		return JSNumberNaN
+	}
+	return JSNumber(time.UnixMilli(int64(t)).UTC().Second())
 }
 
 func msFromTime(t JSNumber) JSNumber {
-	return t.Mod(1000)
+	if t.IsNaN() || t.IsInf() {
+		return JSNumberNaN
+	}
+	return JSNumber(time.UnixMilli(int64(t)).UTC().Nanosecond() / int(time.Millisecond))
 }
 
 func GetNamedTimeZoneOffsetNanoseconds(tz string, t float64) int {
@@ -873,33 +796,36 @@ func daysFromCivil(year, month, day JSInt) JSInt {
 		y -= 1
 	}
 	era := y / 400
-	yoe := y - era*400
-	var doy JSInt
-	if month > 2 {
-		doy = (153*(month-3) + 2) / (5 + day - 1)
-	} else {
-		doy = (153*(month+9) + 2) / (5 + day - 1)
+	if y < 0 && y%400 != 0 {
+		era--
 	}
-	// const doe = yoe * 365 + @divTrunc(yoe, 4) - @divTrunc(yoe, 100) + doy;
+	yoe := y - era*400
+	var adjustedMonth JSInt
+	if month > 2 {
+		adjustedMonth = month - 3
+	} else {
+		adjustedMonth = month + 9
+	}
+	doy := (153*adjustedMonth+2)/5 + day - 1
 	doe := yoe*365 + yoe/4 - yoe/100 + doy
 	return era*146097 + doe - 719468
 }
 
 // 21.4.1.28
 func MakeDay(year, month, date JSNumber) JSNumber {
-	if year.IsNaN() || month.IsNaN() || date.IsNaN() {
+	if year.IsNaN() || year.IsInf() || month.IsNaN() || month.IsInf() || date.IsNaN() || date.IsInf() {
 		return JSNumberNaN
 	}
-	y := year
-	m := month
-	dt := date
-	ym := (y + m/12).ToInt()
-	if ym.IsInf() {
-		return JSNumberNaN
+	y := JSInt(math.Trunc(float64(year)))
+	m := JSInt(math.Trunc(float64(month)))
+	dt := JSInt(math.Trunc(float64(date)))
+	yearOffset := m / 12
+	if m < 0 && m%12 != 0 {
+		yearOffset--
 	}
-	mn := JSNumber(math.Mod(float64(m), 12)).ToInt()
-	t := daysFromCivil(ym, mn+1, 1) * MS_PER_DAY
-	return Day(t.ToNumber()) + dt - 1
+	normalizedYear := y + yearOffset
+	normalizedMonth := m - yearOffset*12
+	return JSNumber(daysFromCivil(normalizedYear, normalizedMonth+1, 1) + dt - 1)
 }
 
 // 21.4.1.29
@@ -986,38 +912,40 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			} else {
 				month = n.Data
 			}
-			var date JSNumber
-			if n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co); isAbrupt {
-				return rt
-			} else {
-				date = n.Data
+			date := JSNumber(1)
+			if numberOfArgs >= 3 {
+				if n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co); isAbrupt {
+					return rt
+				} else {
+					date = n.Data
+				}
 			}
 			hour := JSNumber(0.0)
 			minute := JSNumber(0.0)
 			sec := JSNumber(0.0)
 			ms := JSNumber(0.0)
-			if numberOfArgs >= 3 {
+			if numberOfArgs >= 4 {
 				n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
 				if isAbrupt {
 					return rt
 				}
 				hour = n.Data
 			}
-			if numberOfArgs >= 4 {
+			if numberOfArgs >= 5 {
 				n, isAbrupt, rt := ReturnIfAbrupt(args[4].ToNumber(agent), co)
 				if isAbrupt {
 					return rt
 				}
 				minute = n.Data
 			}
-			if numberOfArgs >= 5 {
+			if numberOfArgs >= 6 {
 				n, isAbrupt, rt := ReturnIfAbrupt(args[5].ToNumber(agent), co)
 				if isAbrupt {
 					return rt
 				}
 				sec = n.Data
 			}
-			if numberOfArgs >= 6 {
+			if numberOfArgs >= 7 {
 				n, isAbrupt, rt := ReturnIfAbrupt(args[6].ToNumber(agent), co)
 				if isAbrupt {
 					return rt

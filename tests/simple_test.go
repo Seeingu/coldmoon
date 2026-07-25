@@ -361,6 +361,25 @@ try { Date.prototype.getDate.call({}); } catch (error) {
 assert(dateError);`)
 }
 
+func TestDateLocalSettersPreserveOmittedComponents(t *testing.T) {
+	testSource(t, `const date = new Date(2020, 5, 10, 12, 34, 56, 789);
+date.setHours(8);
+assert(date.getHours() === 8);
+assert(date.getMinutes() === 34);
+assert(date.getSeconds() === 56);
+assert(date.getMilliseconds() === 789);
+date.setMinutes(20);
+assert(date.getSeconds() === 56);
+assert(date.getMilliseconds() === 789);
+date.setSeconds(10);
+assert(date.getMilliseconds() === 789);
+date.setMonth(7);
+assert(date.getDate() === 10);
+date.setFullYear(2022);
+assert(date.getMonth() === 7);
+assert(date.getDate() === 10);`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,
