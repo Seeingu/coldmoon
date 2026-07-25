@@ -34,9 +34,12 @@ func main() {
 	args := flag.Args()
 	if len(args) > 0 {
 		if *isTest262 {
-			runtime.RegisterTest262Includes(realm, pkg.MustReadFile(args[0]))
+			source := pkg.MustReadFile(args[0])
+			runtime.RegisterTest262Includes(realm, source)
+			Evaluate(runtime.PrepareTest262Source(source), realm)
+		} else {
+			EvaluateModule(args[0], realm)
 		}
-		EvaluateModule(args[0], realm)
 		eventLoop.Poll()
 		agent.WG.Wait()
 		return

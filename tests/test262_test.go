@@ -160,7 +160,7 @@ func evaluate(fileName string, realm *Realm) (err error) {
 	}()
 	source := pkg.MustReadFile(fileName)
 	runtime.RegisterTest262Includes(realm, source)
-	Evaluate(source, realm)
+	Evaluate(runtime.PrepareTest262Source(source), realm)
 	return
 }
 
@@ -177,7 +177,7 @@ func evaluateAsync(ctx context.Context, fileName string, realm *Realm) (err erro
 		}()
 		source := pkg.MustReadFile(fileName)
 		runtime.RegisterTest262Includes(realm, source)
-		Evaluate(source, realm)
+		Evaluate(runtime.PrepareTest262Source(source), realm)
 	}()
 	select {
 	case <-ctx.Done():

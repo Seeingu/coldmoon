@@ -353,6 +353,21 @@ func TestTest262IncludesAreLoadedFromFrontmatter(t *testing.T) {
 	Evaluate(`assert(typeof assertNativeFunction === "function");`, realm)
 }
 
+func TestTest262OnlyStrictFlagEnablesStrictMode(t *testing.T) {
+	agent := NewAgent()
+	InitializeConstants()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	cr.RegisterTest262Runtime(realm)
+	source := `/*---
+flags: [onlyStrict]
+---*/
+var receiver;
+(function() { receiver = this; })();
+assert(receiver === undefined);`
+	Evaluate(cr.PrepareTest262Source(source), realm)
+}
+
 func TestBuiltinTypeErrorPanicsBecomeCatchableCompletions(t *testing.T) {
 	testSource(t, `let dateError = false;
 try { Date.prototype.getDate.call({}); } catch (error) {

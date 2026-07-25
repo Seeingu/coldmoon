@@ -13,6 +13,7 @@ import (
 
 var test262Path string
 var test262IncludesPattern = regexp.MustCompile(`(?m)^includes:\s*\[([^\]]*)\]`)
+var test262OnlyStrictPattern = regexp.MustCompile(`(?m)^flags:\s*\[[^\]]*\bonlyStrict\b`)
 var loadedTest262Includes = struct {
 	sync.Mutex
 	byRealm map[*coldmoon.Realm]map[string]bool
@@ -141,4 +142,12 @@ func RegisterTest262Includes(realm *coldmoon.Realm, source string) {
 		loadedTest262Includes.byRealm[realm][file] = true
 		loadedTest262Includes.Unlock()
 	}
+}
+
+// PrepareTest262Source applies execution-mode flags from test262 frontmatter.
+func PrepareTest262Source(source string) string {
+	if test262OnlyStrictPattern.MatchString(source) {
+		return "\"use strict\";\n" + source
+	}
+	return source
 }
