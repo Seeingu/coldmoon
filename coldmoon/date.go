@@ -46,28 +46,15 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		return NewStringValue(ToDateString(date.Data))
 	}
 	var toISOString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		dateObject := RequireInternalSlot[*DateObject](this)
 		tv := dateObject.Data
-		if !tv.IsInf() {
-			panic("RangeError")
+		if tv.IsNaN() || tv.IsInf() {
+			return co.ThrowRangeError(agent, "invalid date value")
 		}
 
-		// Use go standard formatter
-		//_ = YearFromTime(tv)
-		//_ = MonthFromTime(tv)
-		//_= DateFromTime(tv)
-		//_= HourFromTime(tv)
-		//_= MinFromTime(tv)
-		//_ = SecFromTime(tv)
-		//_= msFromTime(tv)
-
-		t, err := time.Parse(time.RFC3339, time.Unix(int64(tv), 0).Format(time.RFC3339))
-		if err != nil {
-			panic("RangeError")
-		}
-		return NewStringValue(
-			t.Format("2006-01-02T15:04:05.999Z"),
-		)
+		t := time.UnixMilli(int64(tv)).UTC()
+		return NewStringValue(t.Format("2006-01-02T15:04:05.000Z"))
 	}
 	var toJSON BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := MustGetObject(this)

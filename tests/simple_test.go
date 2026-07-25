@@ -351,6 +351,18 @@ assert(String.prototype.charAt.call(123, 1) === "2");
 assert(String.prototype.toString.call(new String("value")) === "value");`)
 }
 
+func TestDateToISOStringUsesMillisecondsAndUTC(t *testing.T) {
+	testSource(t, `assert(new Date(0).toISOString() === "1970-01-01T00:00:00.000Z");
+assert(new Date(123).toISOString() === "1970-01-01T00:00:00.123Z");
+let caught = null;
+try {
+  new Date(NaN).toISOString();
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof RangeError);`)
+}
+
 // TestArrayFromPropagatesIteratorGetterError covers the abrupt GetMethod path
 // before Array.from chooses between iterator and array-like processing.
 func TestArrayFromPropagatesIteratorGetterError(t *testing.T) {
