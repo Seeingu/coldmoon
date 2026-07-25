@@ -292,6 +292,23 @@ assert(result.alpha === 2);
 assert(result.beta === 3);`)
 }
 
+func TestObjectMethodsHandleMissingArgumentsAndPrototypeChains(t *testing.T) {
+	testSource(t, `assert(Object.is());
+assert(Object.freeze() === undefined);
+assert(Object.seal() === undefined);
+assert(Object.preventExtensions() === undefined);
+let caughtCreate = false;
+let caughtKeys = false;
+try { Object.create(); } catch (error) { caughtCreate = error instanceof TypeError; }
+try { Object.keys(); } catch (error) { caughtKeys = error instanceof TypeError; }
+assert(caughtCreate);
+assert(caughtKeys);
+const prototype = {};
+const object = Object.create(prototype);
+assert(prototype.isPrototypeOf(object));
+assert(!object.isPrototypeOf(prototype));`)
+}
+
 func TestStringTrimCoercesReceiverAndUsesECMAScriptWhitespace(t *testing.T) {
 	tests := map[string]string{
 		"boolean":    `assert(String.prototype.trim.call(false) === "false");`,

@@ -630,13 +630,19 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		},
 	)
 
-	var create BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		var o Value
-		if len(arguments) > 0 {
-			o = arguments[0]
+	argument := func(arguments []Value, index int) Value {
+		value := pkg.SliceSafeGet(arguments, index)
+		if value == nil {
+			return UndefinedValue
 		}
-		if o == nil || (!o.IsObject() && o != NullValue) {
-			return agent.ThrowTypeError("is not an object")
+		return value
+	}
+
+	var create BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o := argument(arguments, 0)
+		if !o.IsObject() && o != NullValue {
+			return co.ThrowTypeError(agent, "is not an object")
 		}
 
 		var proto ObjectType
@@ -721,23 +727,24 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 	// 20.1.2.6
 	var freeze BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
-		obj, ok := objectValue.(*ObjectValue)
-		if !ok {
-			return obj
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return objectValue
 		}
+		obj := MustGetObject(objectValue)
 
-		status := SetIntegrityLevel(obj.Object, IntegrityLevelFrozen)
+		status := SetIntegrityLevel(obj, IntegrityLevelFrozen)
 		if !status {
-			realm.Agent.ThrowException(TypeError, "SetIntegrityLevel failed")
+			return co.ThrowTypeError(agent, "SetIntegrityLevel failed")
 		}
-		return obj
+		return objectValue
 	}
 
 	// 20.1.2.8
 	var getOwnPropertyDescriptor BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := args[0]
-		p := args[1]
+		o := argument(args, 0)
+		p := argument(args, 1)
 		var co CompletionValue
 		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
 		if isAbrupt {
@@ -756,7 +763,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 	// 20.1.2.9
 	var getOwnPropertyDescriptors BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := args[0]
+		o := argument(args, 0)
 		var co CompletionValue
 		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
 		if isAbrupt {
@@ -778,7 +785,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 	// 20.1.2.12
 	var getPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		o := args[0]
+		o := argument(args, 0)
 
 		var co CompletionValue
 		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
@@ -794,101 +801,101 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 
 	// 20.1.2.15
 	var objectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		arg1 := args[0]
-		arg2 := args[1]
+		arg1 := argument(args, 0)
+		arg2 := argument(args, 1)
 		return NewBooleanValue(SameValue(arg1, arg2))
 	}
 
 	// 20.1.2.16
 	var isExtensible BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
-		obj, ok := objectValue.(*ObjectValue)
-		if !ok {
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
 			return NewBooleanValue(false)
 		}
-		return NewBooleanValue(obj.Object.IsExtensible())
+		return NewBooleanValue(MustGetObject(objectValue).IsExtensible())
 	}
 
 	// 20.1.2.17
 	var isFrozen BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
-		obj, ok := objectValue.(*ObjectValue)
-		if !ok {
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
 			return NewBooleanValue(true)
 		}
-		return NewBooleanValue(TestIntegrityLevel(obj.Object, IntegrityLevelFrozen))
+		return NewBooleanValue(TestIntegrityLevel(MustGetObject(objectValue), IntegrityLevelFrozen))
 	}
 
 	// 20.1.2.18
 	var isSealed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
-		obj, ok := objectValue.(*ObjectValue)
-		if !ok {
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
 			return NewBooleanValue(true)
 		}
-		return NewBooleanValue(TestIntegrityLevel(obj.Object, IntegrityLevelSealed))
+		return NewBooleanValue(TestIntegrityLevel(MustGetObject(objectValue), IntegrityLevelSealed))
 	}
 
 	// 20.1.2.20
 	var preventExtensions BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
-		obj, ok := objectValue.(*ObjectValue)
-		if !ok {
-			return obj
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return objectValue
 		}
+		obj := MustGetObject(objectValue)
 
-		status := obj.Object.InternalMethods().PreventExtensions(obj.Object)
+		status := obj.InternalMethods().PreventExtensions(obj)
 		if !status {
-			realm.Agent.ThrowException(TypeError, "PreventExtensions failed")
+			return co.ThrowTypeError(agent, "PreventExtensions failed")
 		}
-		return obj
+		return objectValue
 	}
 
 	// 20.1.2.22
 	var seal BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
-		obj, ok := objectValue.(*ObjectValue)
-		if !ok {
-			return obj
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return objectValue
 		}
+		obj := MustGetObject(objectValue)
 
-		status := SetIntegrityLevel(obj.Object, IntegrityLevelSealed)
+		status := SetIntegrityLevel(obj, IntegrityLevelSealed)
 		if !status {
-			realm.Agent.ThrowException(TypeError, "SetIntegrityLevel failed")
+			return co.ThrowTypeError(agent, "SetIntegrityLevel failed")
 		}
-		return obj
+		return objectValue
 	}
 
 	// 20.1.2.23
 	var setPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
-		proto := args[1]
-
-		RequireObjectCoercible(agent, objectValue)
-
-		obj, ok := objectValue.(*ObjectValue)
-		if !ok && proto != nil {
-			return agent.ThrowTypeError("")
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		proto := argument(args, 1)
+		if objectValue == UndefinedValue || objectValue == NullValue {
+			return co.ThrowTypeError(agent, "cannot convert undefined or null to object")
 		}
-		if !ok {
-			return obj
+		if !proto.IsObject() && proto != NullValue {
+			return co.ThrowTypeError(agent, "prototype must be an object or null")
+		}
+		if !objectValue.IsObject() {
+			return objectValue
 		}
 
 		var protoObj ObjectType
-		if po, ok := proto.(*ObjectValue); ok {
-			protoObj = po.Object
+		if proto.IsObject() {
+			protoObj = MustGetObject(proto)
 		}
-		status := obj.Object.InternalMethods().SetPrototypeOf(obj.Object, protoObj)
+		obj := MustGetObject(objectValue)
+		status := obj.InternalMethods().SetPrototypeOf(obj, protoObj)
 		if !status {
-			return agent.ThrowTypeError("setPrototypeOf failed")
+			return co.ThrowTypeError(agent, "setPrototypeOf failed")
 		}
 
-		return obj
+		return objectValue
 	}
 
 	var hasOwn BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
-		key := args[1]
+		objectValue := argument(args, 0)
+		key := argument(args, 1)
 
 		var co CompletionValue
 		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
@@ -903,7 +910,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 
 	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
+		objectValue := argument(args, 0)
 		var co CompletionValue
 		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
 		if isAbrupt {
@@ -913,7 +920,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return CreateArrayFromList(agent, entryList).ToValue()
 	}
 	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
+		objectValue := argument(args, 0)
 		var co CompletionValue
 		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
 		if isAbrupt {
@@ -924,7 +931,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	}
 	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		objectValue := args[0]
+		objectValue := argument(args, 0)
 		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
 		if isAbrupt {
 			return rt
@@ -971,7 +978,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return (to).ToValue()
 	}
 	var getOwnPropertyNames BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
+		objectValue := argument(args, 0)
 		var co CompletionValue
 		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
 		if isAbrupt {
@@ -988,7 +995,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return CreateArrayFromList(agent, keyValues).ToValue()
 	}
 	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		objectValue := args[0]
+		objectValue := argument(args, 0)
 		var co CompletionValue
 		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
 		if isAbrupt {
@@ -1005,8 +1012,11 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		return (CreateArrayFromList(agent, symbolValues)).ToValue()
 	}
 	fromEntries := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		iterable := args[0]
-		RequireObjectCoercible(agent, iterable)
+		var co CompletionValue
+		iterable := argument(args, 0)
+		if iterable == UndefinedValue || iterable == NullValue {
+			return co.ThrowTypeError(agent, "cannot convert undefined or null to object")
+		}
 		obj := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
 		type Captures struct {
 			object ObjectType
@@ -1138,7 +1148,10 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		return NewBooleanValue(ObjectHasOwnProperty(o, p))
 	}
 	isPrototypeOf := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		v := args[0]
+		v := pkg.SliceSafeGet(args, 0)
+		if v == nil {
+			v = UndefinedValue
+		}
 		var co CompletionValue
 		if !v.IsObject() {
 			return NewBooleanValue(false)
@@ -1147,7 +1160,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		target, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		target, isAbrupt, rt := ReturnIfAbrupt(v.ToObject(agent), co)
 		if isAbrupt {
 			return rt
 		}
