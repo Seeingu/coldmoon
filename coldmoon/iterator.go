@@ -92,9 +92,15 @@ func IteratorComplete(iterResult ObjectType) (co Completion[bool]) {
 	return
 }
 
-// 7.4.6
-func IteratorValue(iterResult ObjectType) Value {
-	return iterResult.Get(NewStringPropertyKey("value"))
+// IteratorValue returns the iterator result's value while preserving an
+// abrupt completion produced by an accessor.
+// spec: 7.4.6
+func IteratorValue(iterResult ObjectType) CompletionValue {
+	return iterResult.InternalMethods().Get(
+		iterResult,
+		NewStringPropertyKey("value"),
+		iterResult.ToValue(),
+	)
 }
 
 // IteratorStep
@@ -137,8 +143,11 @@ func (i *IteratorRecord) IteratorStepValue() (co CompletionValue, isDone bool) {
 		i.Done = true
 		return co, true
 	}
-	value := result.value.Get(CMString("value").ToPropertyKey())
-	// TODO(BM): value is throw
+	value, isAbrupt, rt := ReturnIfAbrupt(IteratorValue(result.value), co)
+	if isAbrupt {
+		i.Done = true
+		return rt, false
+	}
 	co.value = value
 	return
 }

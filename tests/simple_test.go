@@ -57,6 +57,33 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayFromPropagatesIteratorValueGetterError verifies that IteratorValue
+// does not turn a JavaScript accessor exception into a host assertion panic.
+func TestArrayFromPropagatesIteratorValueGetterError(t *testing.T) {
+	testSource(t, `const sentinel = {};
+const poisonedValue = {};
+Object.defineProperty(poisonedValue, "value", {
+  get: function() {
+    throw sentinel;
+  }
+});
+const items = {};
+items[Symbol.iterator] = function() {
+  return {
+    next: function() {
+      return poisonedValue;
+    }
+  };
+};
+let caught = null;
+try {
+  Array.from(items);
+} catch (error) {
+  caught = error;
+}
+assert(caught === sentinel);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

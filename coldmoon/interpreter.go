@@ -474,7 +474,10 @@ func (v *VM) ForInOfBodyEvaluation(
 			co.value = V
 			return
 		}
-		nextValue := IteratorValue(nextResult)
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(IteratorValue(nextResult), co)
+		if isAbrupt {
+			return rt
+		}
 		if lhsKind == ForInOfLhsKindAssignment || lhsKind == ForInOfLhsKindVarBinding {
 			if destructuring {
 				if lhsKind == ForInOfLhsKindAssignment {
