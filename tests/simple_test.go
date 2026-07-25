@@ -173,6 +173,20 @@ assert(mapped[0] === 2);
 assert(mapped[1] === 3);`)
 }
 
+func TestArraySpliceSupportsOmittedArguments(t *testing.T) {
+	testSource(t, `const untouched = [1, 2];
+const none = untouched.splice();
+assert(none.length === 0);
+assert(untouched.length === 2);
+const values = [1, 2, 3];
+const removed = values.splice(1);
+assert(removed.length === 2);
+assert(removed[0] === 2);
+assert(removed[1] === 3);
+assert(values.length === 1);
+assert(values[0] === 1);`)
+}
+
 func TestFunctionInvocationHelpersDefaultArguments(t *testing.T) {
 	testSource(t, `function count() { return arguments.length; }
 assert(count.apply() === 0);

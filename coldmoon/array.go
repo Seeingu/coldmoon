@@ -1874,17 +1874,20 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var splice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		start := args[0]
-		deleteCount := args[1]
+		var co CompletionValue
+		start := pkg.SliceSafeGet(args, 0)
+		deleteCount := pkg.SliceSafeGet(args, 1)
 		var items []Value
 		if len(args) > 2 {
 			items = args[2:]
 		}
-		o := this.ToObject(agent).value
-		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
 		if isAbrupt {
-			panic(rt)
+			return rt
 		}
 
 		var relativeStart JSInt = 0
@@ -1914,11 +1917,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			if isAbrupt {
 				return rt
 			}
-			actualDeleteCount = _actualDeleteCount
+			actualDeleteCount = _actualDeleteCount.Max(0).Min(length - actualStart)
 		}
 
 		if float64(length+itemCount-actualDeleteCount) > POW_2_53-1 {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "splice result exceeds maximum safe length")
 		}
 
 		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, actualDeleteCount), co)
