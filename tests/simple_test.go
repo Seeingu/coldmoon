@@ -995,6 +995,19 @@ values.forEach(function(value) {
 });`)
 }
 
+// TestSymbolDescriptionAccessor verifies descriptor shape and the distinction
+// between an absent description and an empty string.
+func TestSymbolDescriptionAccessor(t *testing.T) {
+	testSource(t, `const descriptor = Object.getOwnPropertyDescriptor(Symbol.prototype, "description");
+assert(typeof descriptor.get === "function");
+assert(descriptor.set === undefined);
+assert(descriptor.writable === undefined);
+assert(Symbol().description === undefined);
+assert(Symbol(undefined).description === undefined);
+assert(Symbol("").description === "");
+assert(Object(Symbol("test")).description === "test");`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

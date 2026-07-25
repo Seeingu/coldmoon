@@ -51,18 +51,25 @@ func (p *PropertyDescriptor) FromPropertyDescriptor(agent *Agent, desc *Property
 	obj := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
 	Assert(obj.IsExtensible())
 
-	if p.Value != nil {
-		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("value"), p.Value)
-	}
+	if desc.IsDataDescriptor() {
+		value := desc.Value
+		if value == nil {
+			value = UndefinedValue
+		}
+		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("value"), value)
+		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("writable"), NewBooleanValue(desc.Writable))
+	} else if desc.IsAccessorDescriptor() {
+		getter := Value(UndefinedValue)
+		if desc.Get != nil {
+			getter = desc.Get.ToValue()
+		}
+		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("get"), getter)
 
-	obj.CreateDataPropertyOrThrow(NewStringPropertyKey("writable"), NewBooleanValue(p.Writable))
-
-	if p.Get != nil {
-		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("get"), (p.Get).ToValue())
-	}
-
-	if p.Set != nil {
-		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("set"), (p.Set).ToValue())
+		setter := Value(UndefinedValue)
+		if desc.Set != nil {
+			setter = desc.Set.ToValue()
+		}
+		obj.CreateDataPropertyOrThrow(NewStringPropertyKey("set"), setter)
 	}
 
 	obj.CreateDataPropertyOrThrow(NewStringPropertyKey("enumerable"), NewBooleanValue(p.Enumerable))

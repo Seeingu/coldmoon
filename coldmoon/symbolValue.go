@@ -4,15 +4,17 @@ import "fmt"
 
 type SymbolValue struct {
 	Value
-	Id          uint64
-	Description string
-	IsPrivate   bool
+	Id             uint64
+	Description    string
+	HasDescription bool
+	IsPrivate      bool
 }
 
 func (a *Agent) CreateSymbol(desc string) *SymbolValue {
 	s := &SymbolValue{
-		Id:          a.symbolId,
-		Description: desc,
+		Id:             a.symbolId,
+		Description:    desc,
+		HasDescription: true,
 	}
 	a.symbolId += 1
 	s.Value = NewBaseValue(s)
@@ -31,19 +33,20 @@ func (s *SymbolValue) SymbolDescriptiveString() string {
 }
 
 // 20.4.3.4.1
-func ThisSymbolValue(v Value) *SymbolValue {
+func ThisSymbolValue(agent *Agent, v Value) (co Completion[*SymbolValue]) {
 	if symbol, ok := v.(*SymbolValue); ok {
-		return symbol
+		co.value = symbol
+		return
 	}
 	if object, ok := v.(*ObjectValue); ok {
 		s, ok := object.Object.(*SymbolObject)
 		if ok {
-			return s.Data
+			co.value = s.Data
+			return
 		}
 	}
 
-	// TODO: throw TypeError by agent
-	panic("TypeError")
+	return co.ThrowTypeError(agent, "Not a Symbol")
 }
 
 // 20.4.5.1

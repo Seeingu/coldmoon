@@ -29,11 +29,14 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 		}
 
 		var descriptionString string
-		if description != nil {
+		hasDescription := description != nil && description != UndefinedValue
+		if hasDescription {
 			descriptionString = description.String()
 		}
 
-		return agent.CreateSymbol(descriptionString)
+		symbol := agent.CreateSymbol(descriptionString)
+		symbol.HasDescription = hasDescription
+		return symbol
 	}
 
 	object := CreateBuiltinFunction(realm.Agent, behavior, 0, CMString("Symbol"), builtinFunctionArgs{
@@ -154,22 +157,49 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 
 func NewSymbolPrototype(realm *Realm) ObjectType {
 	object := NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "SymbolPrototype")
+	agent := realm.Agent
 
 	toString := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		symbol := ThisSymbolValue(this)
-
+		var co CompletionValue
+		symbol, isAbrupt, rt := ReturnIfAbrupt(ThisSymbolValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
 		return NewStringValue(symbol.SymbolDescriptiveString())
 	}
 	valueOf := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		symbol := ThisSymbolValue(this)
+		var co CompletionValue
+		symbol, isAbrupt, rt := ReturnIfAbrupt(ThisSymbolValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
 		return symbol
 	}
 	toPrimitive := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		return this
+		var co CompletionValue
+		symbol, isAbrupt, rt := ReturnIfAbrupt(ThisSymbolValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		return symbol
+	}
+	description := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		symbol, isAbrupt, rt := ReturnIfAbrupt(ThisSymbolValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		if !symbol.HasDescription {
+			return UndefinedValue
+		}
+		return NewStringValue(symbol.Description)
 	}
 
 	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
 	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
+	object.defineBuiltinAccessor(realm, CMString("description"), builtinAccessorParams{
+		Getter: description,
+	})
 	object.defineBuiltinFunctionWithAttributes(
 		realm,
 		WellKnownSymbolsToPrimitive, toPrimitive, 0,
