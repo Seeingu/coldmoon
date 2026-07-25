@@ -13,7 +13,7 @@ type ObjectType interface {
 	InitializeInstanceElements(constructor ObjectType)
 	CreateDataProperty(key PropertyKey, value Value) bool
 	DeletePropertyOrThrow(key PropertyKey) bool
-	CreateDataPropertyOrThrow(key PropertyKey, value Value) bool
+	CreateDataPropertyOrThrow(key PropertyKey, value Value) Completion[bool]
 	EnumerableOwnProperties(kind objectOwnPropertiesKind) []Value
 	OrdinaryToPrimitive(hint PreferredType) (co CompletionValue)
 	CopyDataProperties(source Value, excludedItems []PropertyKey)

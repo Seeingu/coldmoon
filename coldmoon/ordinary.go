@@ -137,8 +137,12 @@ func ValidateAndApplyPropertyDescriptor(
 				Configurable: desc.Configurable,
 			})
 		} else {
+			value := desc.Value
+			if value == nil {
+				value = UndefinedValue
+			}
 			object.PropertyStorage().Set(key, &PropertyDescriptor{
-				Value:        desc.Value,
+				Value:        value,
 				Writable:     desc.Writable,
 				Enumerable:   desc.Enumerable,
 				Configurable: desc.Configurable,

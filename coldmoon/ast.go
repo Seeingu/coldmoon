@@ -519,8 +519,13 @@ func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSI
 				return rt
 			}
 
-			ok := array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue)
-			Assert(ok)
+			_, isAbrupt, rt = ReturnIfAbrupt(
+				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
 			nextIndex++
 		case *ArrayElementSpread:
 			panic("unimplemented")
@@ -684,7 +689,13 @@ func (p *PropertyDefinitionIdentifierReference) PropertyDefinitionEvaluation(vm 
 	if isAbrupt {
 		return rt
 	}
-	Assert(obj.CreateDataPropertyOrThrow(NewStringPropertyKey(propName), propValue))
+	_, isAbrupt, rt = ReturnIfAbrupt(
+		obj.CreateDataPropertyOrThrow(NewStringPropertyKey(propName), propValue),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	return
 }
 

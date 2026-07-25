@@ -230,12 +230,13 @@ func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 
 // 7.3.6
 
-func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) bool {
+func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) (co Completion[bool]) {
 	success := o.Ref().CreateDataProperty(key, value)
 	if !success {
-		o.Agent().ThrowException(TypeError, "CreateDataPropertyOrThrow failed")
+		return co.ThrowTypeError(o.Agent(), "CreateDataPropertyOrThrow failed")
 	}
-	return success
+	co.value = true
+	return
 }
 
 // 7.3.7

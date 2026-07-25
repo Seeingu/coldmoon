@@ -368,7 +368,13 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 				} else {
 					mappedValue = nextValue
 				}
-				a.CreateDataPropertyOrThrow(pk, mappedValue)
+				_, isAbrupt, rt = ReturnIfAbrupt(
+					a.CreateDataPropertyOrThrow(pk, mappedValue),
+					co,
+				)
+				if isAbrupt {
+					return iteratorRecord.IteratorClose(rt)
+				}
 			}
 
 		}

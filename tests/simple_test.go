@@ -164,6 +164,39 @@ try {
 assert(caught === sentinel);`)
 }
 
+// TestArrayFromClosesIteratorOnElementDefinitionError verifies that failure to
+// create an indexed result property becomes a TypeError after iterator close.
+func TestArrayFromClosesIteratorOnElementDefinitionError(t *testing.T) {
+	testSource(t, `const C = function() {
+  Object.defineProperty(this, "0", {
+    writable: true,
+    configurable: false
+  });
+};
+let closeCount = 0;
+let nextCount = 0;
+const items = {};
+items[Symbol.iterator] = function() {
+  return {
+    return: function() {
+      closeCount += 1;
+    },
+    next: function() {
+      nextCount += 1;
+      return { done: nextCount > 1 };
+    }
+  };
+};
+let caught = null;
+try {
+  Array.from.call(C, items);
+} catch (error) {
+  caught = error;
+}
+assert(caught instanceof TypeError);
+assertEqual(closeCount, 1);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`
