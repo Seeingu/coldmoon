@@ -75,7 +75,7 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) (co Completion[*Ite
 func (i *IteratorRecord) IteratorNext(value Value) (co Completion[ObjectType]) {
 	var result CompletionValue
 	if value == nil {
-		result = i.NextMethod.CallNoArgs(i.Iterator.ToValue())
+		result = i.NextMethod.Call(i.Iterator.Agent(), i.Iterator.ToValue(), nil)
 	} else {
 		result = i.NextMethod.Call(i.Iterator.Agent(), i.Iterator.ToValue(), []Value{value})
 	}
