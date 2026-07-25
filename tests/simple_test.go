@@ -952,6 +952,20 @@ assert(Number(-(2n ** 53n + 3n)) === -9007199254740996);
 assert(~0n === -1n);`)
 }
 
+// TestNumberToStringRadixDigits verifies lowercase digits a-z are used for
+// integer radices through 36.
+func TestNumberToStringRadixDigits(t *testing.T) {
+	testSource(t, `assert((10).toString(11) === "a");
+assert((35).toString(36) === "z");
+assert((31).toString(16) === "1f");
+assert((-0).toString(2) === "0");
+let total = 0;
+for (let index = 0; index < 3; index++) {
+  total += index;
+}
+assert(total === 3);`)
+}
+
 func TestBaselineNew(t *testing.T) {
 	sourceTexts := []string{
 		`

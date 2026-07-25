@@ -557,7 +557,16 @@ func NewNumberPrototype(realm *Realm) *NumberObject {
 		if radixMV < 2 || radixMV > 36 {
 			return agent.ThrowRangeError("Radix must be an integer between 2 and 36, inclusive.")
 		}
-		// TODO: pass radix
+		if radixMV != 10 &&
+			!x.IsNaN() &&
+			!x.IsPositiveInf() &&
+			!x.IsNegativeInf() &&
+			x.Data.IsFloatInt() {
+			if x.IsZero() {
+				return NewStringValue("0")
+			}
+			return NewStringValue(strconv.FormatInt(int64(x.Data), int(radixMV)))
+		}
 		return x.ToString().ToValue()
 	}
 

@@ -4449,7 +4449,34 @@ func (s *ForStatement) ForLoopEvaluation(vm *VM) (co CompletionValue) {
 		var perIterationBindings []string
 		return vm.ForBodyEvaluation(test, increment, s.Body, perIterationBindings, nil)
 	} else if s.isLexicalDeclaration() {
-		panic("unimplemented")
+		initializer := s.Initializer.(*ForStatementInitializerLexicalDeclaration).LexicalDeclaration
+		oldEnv := vm.RunningLexicalEnvironment()
+		loopEnv := NewDeclarativeEnvironment(oldEnv)
+		for _, name := range initializer.BoundNames() {
+			if initializer.IsConstantDeclaration() {
+				loopEnv.CreateImmutableBinding(name, true)
+			} else {
+				loopEnv.CreateMutableBinding(name, false)
+			}
+		}
+		vm.SetRunningLexicalEnvironment(loopEnv)
+		defer vm.SetRunningLexicalEnvironment(oldEnv)
+
+		status := initializer.Evaluation(vm)
+		if status.IsAbrupt() {
+			return status
+		}
+		var perIterationBindings []string
+		if !initializer.IsConstantDeclaration() {
+			perIterationBindings = initializer.BoundNames()
+		}
+		return vm.ForBodyEvaluation(
+			s.Condition,
+			s.Increment,
+			s.Body,
+			perIterationBindings,
+			nil,
+		)
 	} else {
 		if s.Initializer != nil {
 			_, _, isAbrupt, rt := vm.EvalAndGetValue(s.Initializer, co)
