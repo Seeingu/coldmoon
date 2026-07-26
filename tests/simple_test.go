@@ -4,12 +4,31 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	goruntime "runtime"
 	"testing"
 
 	cr "github.com/Seeingu/coldmoon/runtime"
 
 	. "github.com/Seeingu/coldmoon/coldmoon"
 )
+
+func newTest262Runtime(t *testing.T, realm *Realm) *cr.Test262Runtime {
+	t.Helper()
+	_, sourceFile, _, ok := goruntime.Caller(0)
+	if !ok {
+		t.Fatal("locate tests source file")
+	}
+	suite, err := cr.NewTest262Suite(filepath.Join(filepath.Dir(sourceFile), "..", "test262"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	testRuntime, err := suite.NewRuntime(realm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return testRuntime
+}
 
 func testSource(t *testing.T, source string) {
 	agent := NewAgent()
@@ -438,8 +457,10 @@ func TestTest262IncludesAreLoadedFromFrontmatter(t *testing.T) {
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	cr.RegisterTest262Runtime(realm)
-	cr.RegisterTest262Includes(realm, "/*---\nincludes: [nativeFunctionMatcher.js]\n---*/")
+	testRuntime := newTest262Runtime(t, realm)
+	if err := testRuntime.RegisterIncludes("/*---\nincludes: [nativeFunctionMatcher.js]\n---*/"); err != nil {
+		t.Fatal(err)
+	}
 	Evaluate(`assert(typeof assertNativeFunction === "function");`, realm)
 }
 
@@ -448,7 +469,7 @@ func TestTest262OnlyStrictFlagEnablesStrictMode(t *testing.T) {
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	cr.RegisterTest262Runtime(realm)
+	newTest262Runtime(t, realm)
 	source := `/*---
 flags: [onlyStrict]
 ---*/
@@ -793,7 +814,7 @@ func TestArrayFromUsesCrossRealmConstructorPrototype(t *testing.T) {
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	cr.RegisterTest262Runtime(realm)
+	newTest262Runtime(t, realm)
 	Evaluate(`const other = $262.createRealm().global;
 const C = new other.Function();
 C.prototype = null;
@@ -1952,12 +1973,12 @@ const hugeBin = BigInt(
     "0b11111111111111111111111111111111111111111111111111111",
 );
 
-assertEqual(previouslyMaxSafeInteger.toString(), "9007199254740991n");
-assertEqual(alsoHuge.toString(), "9007199254740991n");
-assertEqual(hugeString.toString(), "9007199254740991n");
-assertEqual(hugeHex.toString(), "9007199254740991n");
-assertEqual(hugeOctal.toString(), "9007199254740991n");
-assertEqual(hugeBin.toString(), "9007199254740991n");
+assertEqual(previouslyMaxSafeInteger.toString(), "9007199254740991");
+assertEqual(alsoHuge.toString(), "9007199254740991");
+assertEqual(hugeString.toString(), "9007199254740991");
+assertEqual(hugeHex.toString(), "9007199254740991");
+assertEqual(hugeOctal.toString(), "9007199254740991");
+assertEqual(hugeBin.toString(), "9007199254740991");
 assert(typeof 1n === "bigint");
 assert(typeof BigInt("1") === "bigint")
 `,

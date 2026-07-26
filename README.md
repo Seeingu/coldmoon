@@ -28,6 +28,16 @@ make build-all
 make test
 ```
 
+The regular test command is bounded and skips the full Test262 coverage scan.
+Run that suite explicitly with:
+
+```bash
+make test262
+```
+
+The CLI Test262 host also requires an explicit checkout root through
+`-test262-root` or `TEST262_ROOT`.
+
 ## Architecture
 
 See [docs/architecture.md](docs/architecture.md) for runtime ownership,

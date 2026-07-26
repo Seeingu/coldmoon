@@ -1,48 +1,97 @@
 package runtime
 
 import (
+	"context"
+	"crypto/sha256"
+	"errors"
+	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/Seeingu/coldmoon/coldmoon"
-	"github.com/Seeingu/coldmoon/pkg"
 )
 
-var test262Path string
-var test262IncludesPattern = regexp.MustCompile(`(?m)^includes:\s*\[([^\]]*)\]`)
-var test262OnlyStrictPattern = regexp.MustCompile(`(?m)^flags:\s*\[[^\]]*\bonlyStrict\b`)
-var loadedTest262Includes = struct {
-	sync.Mutex
-	byRealm map[*coldmoon.Realm]map[string]bool
-}{
-	byRealm: make(map[*coldmoon.Realm]map[string]bool),
+const test262RunnerVersion = "2"
+
+var (
+	test262IncludesPattern   = regexp.MustCompile(`(?m)^includes:\s*\[([^\]]*)\]`)
+	test262OnlyStrictPattern = regexp.MustCompile(`(?m)^flags:\s*\[[^\]]*\bonlyStrict\b`)
+)
+
+var baseTest262Harnesses = []string{
+	"sta.js",
+	"assert.js",
+	"isConstructor.js",
+	"nans.js",
+	"assertRelativeDateMs.js",
+	"propertyHelper.js",
+	"testTypedArray.js",
+	"testAtomics.js",
+	"compareArray.js",
 }
 
-func initPath() {
-	if test262Path == "" {
-		dir, _ := os.Getwd()
-		test262Path = path.Join(dir, "..", "test262")
-		if _, err := os.Stat(test262Path); os.IsNotExist(err) {
-			test262Path = path.Join(dir, "test262")
+// Test262Suite is an explicitly located Test262 checkout.
+type Test262Suite struct {
+	Root string
+}
+
+// NewTest262Suite validates and canonicalizes root. Callers choose the root;
+// the runtime never guesses it from the process working directory.
+func NewTest262Suite(root string) (*Test262Suite, error) {
+	if root == "" {
+		return nil, errors.New("test262 root is required")
+	}
+	absolute, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+	for _, required := range []string{"harness", "test"} {
+		info, statErr := os.Stat(filepath.Join(absolute, required))
+		if statErr != nil {
+			return nil, fmt.Errorf("invalid test262 root %q: %w", absolute, statErr)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("invalid test262 root %q: %s is not a directory", absolute, required)
 		}
 	}
+	return &Test262Suite{Root: absolute}, nil
 }
 
-func MakeTest262Path(p string) string {
-	initPath()
-	return path.Join(test262Path, p)
+// Path returns an absolute path inside the suite.
+func (s *Test262Suite) Path(relative string) string {
+	return filepath.Join(s.Root, filepath.FromSlash(relative))
 }
 
-func GetTest262Path() string {
-	initPath()
-	return test262Path
+// Test262Runtime owns harness state for exactly one Realm. Dropping this value
+// drops the state; no global Realm-keyed registry or manual release is needed.
+type Test262Runtime struct {
+	suite  *Test262Suite
+	realm  *coldmoon.Realm
+	loaded map[string]struct{}
 }
 
-func RegisterTest262Runtime(realm *coldmoon.Realm) {
+// NewRuntime installs the Test262 host globals and base harnesses in realm.
+func (s *Test262Suite) NewRuntime(realm *coldmoon.Realm) (*Test262Runtime, error) {
+	runtime := &Test262Runtime{
+		suite:  s,
+		realm:  realm,
+		loaded: make(map[string]struct{}),
+	}
 	RegisterFilesystemModuleLoader(realm)
+	runtime.installGlobals()
+	for _, file := range baseTest262Harnesses {
+		if err := runtime.loadHarness(file); err != nil {
+			return nil, err
+		}
+	}
+	return runtime, nil
+}
+
+func (r *Test262Runtime) installGlobals() {
+	realm := r.realm
 	global := realm.GlobalObject
 	console := CreateConsole(realm)
 	global.CreateDataProperty(coldmoon.CMString("console").ToPropertyKey(), console.ToValue())
@@ -84,72 +133,107 @@ func RegisterTest262Runtime(realm *coldmoon.Realm) {
 		coldmoon.CMString("$262").ToPropertyKey(),
 		test262.ToValue(),
 	)
-
-	files := []string{
-		"sta.js",
-		"assert.js",
-		"isConstructor.js",
-		"nans.js",
-		"assertRelativeDateMs.js",
-		"propertyHelper.js",
-		"testTypedArray.js",
-		"testAtomics.js",
-		"compareArray.js",
-	}
-	for _, f := range files {
-		println("Harness file: ", f)
-		content := pkg.MustReadFile(MakeTest262Path("./harness/" + f))
-		coldmoon.ParseScript(content, realm, nil).Evaluate()
-	}
-	loadedTest262Includes.Lock()
-	loaded := make(map[string]bool, len(files))
-	for _, file := range files {
-		loaded[file] = true
-	}
-	loadedTest262Includes.byRealm[realm] = loaded
-	loadedTest262Includes.Unlock()
 }
 
-// ReleaseTest262Runtime removes per-realm harness bookkeeping after a test.
-func ReleaseTest262Runtime(realm *coldmoon.Realm) {
-	loadedTest262Includes.Lock()
-	delete(loadedTest262Includes.byRealm, realm)
-	loadedTest262Includes.Unlock()
+func (r *Test262Runtime) loadHarness(file string) error {
+	if _, ok := r.loaded[file]; ok {
+		return nil
+	}
+	content, err := os.ReadFile(r.suite.Path(filepath.Join("harness", file)))
+	if err != nil {
+		return fmt.Errorf("load test262 harness %q: %w", file, err)
+	}
+	coldmoon.ParseScript(string(content), r.realm, nil).Evaluate()
+	r.loaded[file] = struct{}{}
+	return nil
 }
 
-// RegisterTest262Includes evaluates the optional harness files declared by a
-// test's frontmatter. Harnesses are loaded once per realm because many of them
-// declare top-level lexical bindings.
-func RegisterTest262Includes(realm *coldmoon.Realm, source string) {
+// RegisterIncludes evaluates optional harness files declared by frontmatter.
+func (r *Test262Runtime) RegisterIncludes(source string) error {
 	match := test262IncludesPattern.FindStringSubmatch(source)
 	if len(match) != 2 {
-		return
+		return nil
 	}
 	for _, entry := range strings.Split(match[1], ",") {
 		file := strings.Trim(strings.TrimSpace(entry), `"'`)
 		if file == "" {
 			continue
 		}
-
-		loadedTest262Includes.Lock()
-		loaded := loadedTest262Includes.byRealm[realm]
-		if loaded == nil {
-			loaded = make(map[string]bool)
-			loadedTest262Includes.byRealm[realm] = loaded
+		if err := r.loadHarness(file); err != nil {
+			return err
 		}
-		alreadyLoaded := loaded[file]
-		loadedTest262Includes.Unlock()
-		if alreadyLoaded {
-			continue
-		}
-
-		println("Harness file: ", file)
-		content := pkg.MustReadFile(MakeTest262Path("./harness/" + file))
-		coldmoon.ParseScript(content, realm, nil).Evaluate()
-		loadedTest262Includes.Lock()
-		loadedTest262Includes.byRealm[realm][file] = true
-		loadedTest262Includes.Unlock()
 	}
+	return nil
+}
+
+// Test262Runner executes isolated test files with bounded waiting and
+// content-addressed cache keys.
+type Test262Runner struct {
+	Suite   *Test262Suite
+	Timeout time.Duration
+}
+
+// NewTest262Runner creates a runner with a five-second per-file timeout.
+func NewTest262Runner(suite *Test262Suite) *Test262Runner {
+	return &Test262Runner{Suite: suite, Timeout: 5 * time.Second}
+}
+
+// CacheKey hashes runner semantics, the portable suite-relative path, and file
+// contents so stale or machine-specific path-only successes cannot be reused.
+func (r *Test262Runner) CacheKey(filePath string) (string, error) {
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+	relative, err := filepath.Rel(r.Suite.Root, filePath)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256([]byte(test262RunnerVersion + "\x00" + filepath.ToSlash(relative) + "\x00" + string(source)))
+	return fmt.Sprintf("%x", sum[:]), nil
+}
+
+// Run executes one file in a new Agent and Realm. The worker owns all mutable
+// state, so returning on context cancellation cannot race with another case.
+func (r *Test262Runner) Run(ctx context.Context, filePath string) error {
+	if r.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.Timeout)
+		defer cancel()
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- r.run(filePath)
+	}()
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("test262 timeout: %s: %w", filePath, ctx.Err())
+	case err := <-done:
+		return err
+	}
+}
+
+func (r *Test262Runner) run(filePath string) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("panic: %v", recovered)
+		}
+	}()
+	source, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+	agent := coldmoon.NewAgent()
+	coldmoon.InitializeHostDefinedRealm(agent, nil)
+	realmRuntime, err := r.Suite.NewRuntime(agent.CurrentRealm())
+	if err != nil {
+		return err
+	}
+	if err := realmRuntime.RegisterIncludes(string(source)); err != nil {
+		return err
+	}
+	coldmoon.Evaluate(PrepareTest262Source(string(source)), agent.CurrentRealm())
+	return nil
 }
 
 // PrepareTest262Source applies execution-mode flags from test262 frontmatter.

@@ -945,7 +945,6 @@ func (p *Parser) classElement() ClassElement {
 			}
 		}
 	}
-	return &ClassElementEmpty{}
 }
 
 func (p *Parser) fieldDefinition() *FieldDefinition {
@@ -1287,10 +1286,8 @@ func (p *Parser) forBinding() *ForBinding {
 }
 
 func (p *Parser) bindingPattern() *BindingPattern {
-	b := &BindingPattern{}
 	// TODO:
 	panic("unimplemented")
-	return b
 }
 
 func (p *Parser) forStatement() *ForStatement {
@@ -1713,7 +1710,6 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 	default:
 		panic("secondaryExpression: unexpected token " + t.Value + " after " + left.String())
 	}
-	return left
 }
 
 func (p *Parser) optionalExpression(left Expression) *OptionalExpression {

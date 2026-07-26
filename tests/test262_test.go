@@ -1,27 +1,23 @@
 package tests
 
 import (
+	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
+	"sort"
 	"strings"
 	"testing"
 
 	. "github.com/Seeingu/coldmoon/coldmoon"
-	"github.com/Seeingu/coldmoon/pkg"
 	"github.com/Seeingu/coldmoon/runtime"
 )
 
-// MARK: - Coverage config
-
-// expectedCoverage is the expected coverage rate.
 const expectedCoverage = 0.95
 
-// supportFeatures is a list of features that are tested
-// and gather coverage information.
 var supportFeatures = []string{
 	"built-ins/Array",
 	"built-ins/Boolean",
@@ -32,159 +28,135 @@ var supportFeatures = []string{
 	"built-ins/Date",
 	"built-ins/Function",
 	"built-ins/Object",
-	// "built-ins/RegExp",
-	// "built-ins/DataView",
-	// "built-ins/TypedArray",
-	// "built-ins/SharedArrayBuffer",
-	// "built-ins/TypedArrayConstructors",
-	// "built-ins",
-	// "harness",
-	// "language",
 }
 
 func Test262WithCoverage(t *testing.T) {
-	passedFiles := loadPassedResultFiles()
-	skipped := getSkippedFiles()
+	if os.Getenv("COLDMOON_RUN_TEST262") != "1" {
+		t.Skip("set COLDMOON_RUN_TEST262=1 to run the bounded Test262 coverage suite")
+	}
 	InitializeConstants()
+	suite := repositoryTest262Suite(t)
+	runner := runtime.NewTest262Runner(suite)
+	cachePath := filepath.Join(currentTestDirectory(t), ".passed.v2.txt")
+	passedCache := loadTest262Cache(t, cachePath)
+	skipped := map[string]struct{}{
+		"test/built-ins/Array/from/elements-deleted-after.js": {},
+	}
 
 	var passed []string
 	var failedLog strings.Builder
 	var failedCount int
-	var skippedCount int
-	var visitor fs.WalkDirFunc = func(path string, d fs.DirEntry, err error) error {
+	visitor := func(filePath string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || filepath.Ext(filePath) != ".js" {
+			return nil
+		}
+		relative, err := filepath.Rel(suite.Root, filePath)
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
+		relative = filepath.ToSlash(relative)
+		if _, ok := skipped[relative]; ok {
 			return nil
 		}
-		if _, ok := skipped[path]; ok {
-			// fmt.Println("Skip testing file: ", path)
-			skippedCount++
-			return nil
-		}
-		if _, ok := passedFiles[path]; ok {
-			// fmt.Println("Skip testing passed file: ", path)
-			passed = append(passed, path)
-			skippedCount++
-			return nil
-		}
-		fmt.Println("Testing file: ", path)
-		agent := NewAgent()
-		InitializeHostDefinedRealm(agent, nil)
-		realm := agent.CurrentRealm()
-		runtime.RegisterTest262Runtime(realm)
-		err = evaluate(path, realm)
-		runtime.ReleaseTest262Runtime(realm)
+		cacheKey, err := runner.CacheKey(filePath)
 		if err != nil {
-			failedCount++
-			msg := fmt.Sprintf("Failed : %v", err)
-			fmt.Println(msg)
-			failedLog.WriteString(
-				fmt.Sprintf(`%s, %s`, path, msg) + "\n")
-		} else {
-			passed = append(passed, path)
+			return err
 		}
+		if passedCache[relative] == cacheKey {
+			passed = append(passed, relative)
+			return nil
+		}
+
+		t.Logf("Testing file: %s", relative)
+		if err := runner.Run(context.Background(), filePath); err != nil {
+			failedCount++
+			fmt.Fprintf(&failedLog, "%s, Failed: %v\n", relative, err)
+			return nil
+		}
+		passedCache[relative] = cacheKey
+		passed = append(passed, relative)
 		return nil
 	}
+
 	for _, feature := range supportFeatures {
-		dir := runtime.MakeTest262Path("test/" + feature)
-		err := filepath.WalkDir(dir, visitor)
-		if err != nil {
+		if err := filepath.WalkDir(suite.Path("test/"+feature), visitor); err != nil {
 			t.Error(err)
 		}
 	}
-	writePassedResultFiles(passed)
-	writeFailedLog(failedLog)
-	coverage := float64(len(passed)) / float64(len(passed)+failedCount)
-	fmt.Printf("Coverage: %.2f%%\n", coverage*100)
+	writeTest262Cache(t, cachePath, passedCache)
+	if err := os.WriteFile(filepath.Join(currentTestDirectory(t), ".failed.v2.txt"), []byte(failedLog.String()), 0o644); err != nil {
+		t.Error(err)
+	}
+
+	total := len(passed) + failedCount
+	if total == 0 {
+		t.Fatal("Test262 runner found no cases")
+	}
+	coverage := float64(len(passed)) / float64(total)
+	t.Logf("Coverage: %.2f%%", coverage*100)
 	if coverage < expectedCoverage {
-		t.Errorf("Coverage is less than expected: %.2f%% < %.2f%%", coverage*100, expectedCoverage*100)
+		t.Errorf("coverage is less than expected: %.2f%% < %.2f%%", coverage*100, expectedCoverage*100)
 	}
 }
 
-// MARK: - utils
-
-const (
-	PassedResultsFile = ".passed.txt"
-	FailedResultsFile = ".failed.txt"
-)
-
-var skippedFiles = []string{
-	// global this reference is not supported
-	runtime.MakeTest262Path("test/built-ins/Array/from/elements-deleted-after.js"),
-}
-
-func loadResultFile(fileName string) map[string]bool {
-	m := make(map[string]bool)
-	_, err := os.Stat(fileName)
+func repositoryTest262Suite(t *testing.T) *runtime.Test262Suite {
+	t.Helper()
+	suite, err := runtime.NewTest262Suite(filepath.Join(currentTestDirectory(t), "..", "test262"))
 	if err != nil {
-		return nil
+		t.Fatal(err)
 	}
-	content := pkg.MustReadFile(fileName)
-	for _, f := range strings.Split(content, "\n") {
-		m[f] = true
+	return suite
+}
+
+func currentTestDirectory(t *testing.T) string {
+	t.Helper()
+	_, sourceFile, _, ok := goruntime.Caller(0)
+	if !ok {
+		t.Fatal("locate Test262 test source")
 	}
-	return m
+	return filepath.Dir(sourceFile)
 }
 
-func getSkippedFiles() map[string]bool {
-	m := make(map[string]bool)
-	for _, f := range skippedFiles {
-		m[f] = true
+func loadTest262Cache(t *testing.T, filePath string) map[string]string {
+	t.Helper()
+	cache := make(map[string]string)
+	file, err := os.Open(filePath)
+	if os.IsNotExist(err) {
+		return cache
 	}
-	return m
-}
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
 
-func loadPassedResultFiles() map[string]bool {
-	return loadResultFile(PassedResultsFile)
-}
-
-func loadFailedResultFiles() map[string]bool {
-	return loadResultFile(FailedResultsFile)
-}
-
-func writePassedResultFiles(files []string) {
-	content := strings.Join(files, "\n")
-	os.WriteFile(PassedResultsFile, []byte(content), 0o644)
-}
-
-func writeFailedLog(log strings.Builder) {
-	os.WriteFile(FailedResultsFile, []byte(log.String()), 0o644)
-}
-
-func evaluate(fileName string, realm *Realm) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("panic" + fmt.Sprint(r))
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		key, relative, ok := strings.Cut(scanner.Text(), "\t")
+		if ok && key != "" && relative != "" {
+			cache[relative] = key
 		}
-	}()
-	source := pkg.MustReadFile(fileName)
-	runtime.RegisterTest262Includes(realm, source)
-	Evaluate(runtime.PrepareTest262Source(source), realm)
-	return
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return cache
 }
 
-// TODO: performance
-func evaluateAsync(ctx context.Context, fileName string, realm *Realm) (err error) {
-	evaluateChan := make(chan struct{}, 1)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				err = errors.New("panic" + fmt.Sprint(r))
-			} else {
-				evaluateChan <- struct{}{}
-			}
-		}()
-		source := pkg.MustReadFile(fileName)
-		runtime.RegisterTest262Includes(realm, source)
-		Evaluate(runtime.PrepareTest262Source(source), realm)
-	}()
-	select {
-	case <-ctx.Done():
-		err = errors.New("timeout")
-		return
-	case <-evaluateChan:
-		return
+func writeTest262Cache(t *testing.T, filePath string, cache map[string]string) {
+	t.Helper()
+	paths := make([]string, 0, len(cache))
+	for relative := range cache {
+		paths = append(paths, relative)
+	}
+	sort.Strings(paths)
+	var content strings.Builder
+	for _, relative := range paths {
+		fmt.Fprintf(&content, "%s\t%s\n", cache[relative], relative)
+	}
+	if err := os.WriteFile(filePath, []byte(content.String()), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

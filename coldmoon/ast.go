@@ -6765,7 +6765,11 @@ func Await(agent *Agent, value Value) (co CompletionValue) {
 	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, CMString(""), builtinFunctionArgs{})
 	PerformPromiseThen(agent, promise, onFulfilled.ToValue(), onRejected.ToValue(), nil)
 
-	agent.Scheduler.StartTask(asyncContext.Resume)
+	agent.suspendExecutionContext(asyncContext)
+	if !asyncContext.asyncCallerResumed {
+		asyncContext.asyncCallerResumed = true
+		agent.Scheduler.StartTask(asyncContext.Resume)
+	}
 	<-asyncContext.awaitCh
 	agent.resumeExecutionContext(asyncContext)
 	Assert(asyncContext == agent.RunningExecutionContext())

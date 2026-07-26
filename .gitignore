@@ -32,3 +32,5 @@ main.exe
 
 .passed.txt
 .failed.txt
+.passed.v2.txt
+.failed.v2.txt

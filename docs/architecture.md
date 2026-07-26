@@ -130,11 +130,24 @@ through scattered AST assertions.
 structs explicitly implement their runtime methods; they no longer anonymously
 embed `ASTNode` merely to satisfy the interface through nil method promotion.
 
-## Planned deep modules
+## Test262 lifecycle
 
-The remaining architecture work is sequenced by dependency:
+`Test262Suite` requires an explicit, validated checkout root. A
+`Test262Runtime` owns the harness set for one Realm, so its lifetime is ordinary
+Go ownership rather than a global Realm-keyed map with manual release.
 
-1. collapse the Test262 lifecycle into one runner.
+`Test262Runner` creates an isolated Agent/Realm per case and returns through a
+buffered result channel with a per-file context deadline. Its cache keys include
+the runner version, portable suite-relative path, and test contents. The full
+coverage scan is opt-in through `make test262`; ordinary `go test ./...` remains
+bounded.
+
+## Verification policy
+
+Each deep module has focused contract tests and participates in the ordinary
+package regression and race checks. The Test262 coverage suite is a separate,
+explicit compatibility run because its thousands of cases and persistent cache
+have a different lifecycle from unit and integration tests.
 
 Each module should expose a small interface, keep implementation details local,
 and add an adapter seam only when at least two real implementations exist.

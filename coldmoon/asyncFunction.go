@@ -78,6 +78,10 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 
 	agent.resumeExecutionContext(asyncContext)
 	closure()
-	asyncContext.Resume()
-	Assert(runningContext == agent.RunningExecutionContext())
+	callerAlreadyResumed := asyncContext.asyncCallerResumed
+	if !callerAlreadyResumed {
+		asyncContext.asyncCallerResumed = true
+		asyncContext.Resume()
+		Assert(runningContext == agent.RunningExecutionContext())
+	}
 }

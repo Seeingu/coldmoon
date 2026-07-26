@@ -9,20 +9,28 @@ import (
 	"github.com/Seeingu/coldmoon/runtime"
 
 	. "github.com/Seeingu/coldmoon/coldmoon"
-	"github.com/Seeingu/coldmoon/pkg"
 )
 
 func main() {
 	isTest262 := flag.Bool("test262", false, "register test262 runtime")
+	test262Root := flag.String("test262-root", os.Getenv("TEST262_ROOT"), "explicit Test262 checkout root")
 	flag.Parse()
 	InitializeConstants()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 
+	var test262Runtime *runtime.Test262Runtime
 	if *isTest262 {
 		fmt.Println("register test262 runtime")
-		runtime.RegisterTest262Runtime(realm)
+		suite, err := runtime.NewTest262Suite(*test262Root)
+		if err != nil {
+			panic(err)
+		}
+		test262Runtime, err = suite.NewRuntime(realm)
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		runtime.RegisterTerminalRuntime(realm)
 	}
@@ -33,9 +41,14 @@ func main() {
 	args := flag.Args()
 	if len(args) > 0 {
 		if *isTest262 {
-			source := pkg.MustReadFile(args[0])
-			runtime.RegisterTest262Includes(realm, source)
-			Evaluate(runtime.PrepareTest262Source(source), realm)
+			source, err := os.ReadFile(args[0])
+			if err != nil {
+				panic(err)
+			}
+			if err := test262Runtime.RegisterIncludes(string(source)); err != nil {
+				panic(err)
+			}
+			Evaluate(runtime.PrepareTest262Source(string(source)), realm)
 		} else {
 			EvaluateModule(args[0], realm)
 		}

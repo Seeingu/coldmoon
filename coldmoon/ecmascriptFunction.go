@@ -623,7 +623,6 @@ func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, c
 		return
 	}
 	panic("unreachable")
-	return
 }
 
 // 10.2.9

@@ -43,7 +43,10 @@ type ExecutionContext struct {
 	// TODO: unify with yieldCh
 	awaitCh     chan struct{}
 	isSuspended bool
-	Result      CompletionValue
+	// asyncCallerResumed records the one-time handoff from an async function
+	// body back to its synchronous caller.
+	asyncCallerResumed bool
+	Result             CompletionValue
 }
 
 func (e *ExecutionContext) Resume() {

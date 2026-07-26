@@ -42,8 +42,6 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 		v := MustGetObject(nextItem).Get(NewStringPropertyKey("1"))
 		adder.Call(target.ToValue(), []Value{k, v})
 	}
-	co.value = target.ToValue()
-	return
 }
 
 func NewMapConstructor(realm *Realm) ObjectType {
