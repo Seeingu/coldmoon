@@ -41,7 +41,9 @@ func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
 func AsyncFunctionStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction) {
 	runningContext := agent.RunningExecutionContext()
 	asyncContext := runningContext
-	go AsyncBlockStart(agent, promiseCapability, asyncFunction, asyncContext)
+	agent.Scheduler.StartTask(func() {
+		AsyncBlockStart(agent, promiseCapability, asyncFunction, asyncContext)
+	})
 	asyncContext.Suspend()
 }
 
@@ -52,10 +54,6 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 	runningContext := agent.RunningExecutionContext()
 
 	closure := func() {
-		agent.WG.Add(1)
-		defer func() {
-			agent.WG.Done()
-		}()
 		result := asyncFunction.EvaluateBody()
 		agent.ExecutionContextStack.Pop()
 

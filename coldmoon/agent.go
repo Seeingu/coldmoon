@@ -1,8 +1,6 @@
 package coldmoon
 
 import (
-	"sync"
-
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
@@ -16,12 +14,10 @@ type Agent struct {
 	ExecutionContextStack pkg.Stack[*ExecutionContext]
 	ExecutionContextMap   map[uint64]*ExecutionContext
 	HostHooks             *HostHooks
+	Scheduler             *Scheduler
 	GlobalSymbolRegistry  map[string]*SymbolValue
-	QueuedPromiseJobs     pkg.Stack[*QueuedPromiseJob]
 	// [[IsLittleEndian]]
 	IsLittleEndian bool
-	// WG is used to wait for all async functions to finish
-	WG sync.WaitGroup
 }
 
 type HostHooks struct {
@@ -39,10 +35,17 @@ type HostHooks struct {
 }
 
 func NewAgent() *Agent {
+	return NewAgentWithClock(nil)
+}
+
+// NewAgentWithClock creates an Agent whose scheduler uses clock. Tests use this
+// constructor to control time without changing runtime semantics.
+func NewAgentWithClock(clock Clock) *Agent {
 	a := &Agent{
 		ExecutionContextMap:  make(map[uint64]*ExecutionContext),
 		GlobalSymbolRegistry: make(map[string]*SymbolValue),
 	}
+	a.Scheduler = NewScheduler(a, clock)
 	initWellKnownSymbols(a)
 	a.HostHooks = &HostHooks{
 		HostEnsureCanCompileStrings: HostEnsureCanCompileStrings,
@@ -74,15 +77,6 @@ func (a *Agent) UniqueObjectId() uint64 {
 
 func (a *Agent) FindExecutionContextById(id uint64) *ExecutionContext {
 	return a.ExecutionContextMap[id]
-}
-
-func (a *Agent) RunJobs() {
-	for _, job := range a.QueuedPromiseJobs.Data() {
-		previousRealm := a.RunningExecutionContext().Realm
-		a.RunningExecutionContext().Realm = job.realm
-		job.job.Fun(job.job.Captures)
-		a.RunningExecutionContext().Realm = previousRealm
-	}
 }
 
 func (a *Agent) CurrentRealm() *Realm {

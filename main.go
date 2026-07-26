@@ -20,12 +20,11 @@ func main() {
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 
-	eventLoop := runtime.NewEventLoop(agent)
 	if *isTest262 {
 		fmt.Println("register test262 runtime")
 		runtime.RegisterTest262Runtime(realm)
 	} else {
-		runtime.RegisterTerminalRuntime(eventLoop, realm)
+		runtime.RegisterTerminalRuntime(realm)
 	}
 	Debug.IsReady = true
 
@@ -40,8 +39,6 @@ func main() {
 		} else {
 			EvaluateModule(args[0], realm)
 		}
-		eventLoop.Poll()
-		agent.WG.Wait()
 		return
 	}
 
@@ -53,8 +50,6 @@ func main() {
 		}
 		input := scanner.Text()
 		Evaluate(input, realm)
-		eventLoop.Poll()
-		agent.WG.Wait()
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "error reading input:", err)

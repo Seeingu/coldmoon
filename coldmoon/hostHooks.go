@@ -32,10 +32,7 @@ const (
 
 // 9.5.5
 func HostEnqueuePromiseJob(agent *Agent, job *Job, realm *Realm) {
-	agent.QueuedPromiseJobs.Push(&QueuedPromiseJob{
-		job:   job,
-		realm: realm,
-	})
+	agent.Scheduler.EnqueuePromiseJob(job, realm)
 }
 
 func HostPromiseRejectionTracker(promise *PromiseObject, operation PromiseRejectionTrackerOperation) {

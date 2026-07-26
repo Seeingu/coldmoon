@@ -28,6 +28,11 @@ make build-all
 make test
 ```
 
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for runtime ownership,
+scheduler invariants, and the deep-module roadmap.
+
 ## Inspiration
 
 This project is highly inspired by [kiesel](https://codeberg.org/kiesel-js/kiesel).

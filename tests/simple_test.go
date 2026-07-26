@@ -14,10 +14,9 @@ import (
 func testSource(t *testing.T, source string) {
 	agent := NewAgent()
 	InitializeConstants()
-	el := cr.NewEventLoop(agent)
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	cr.RegisterTerminalRuntime(el, realm)
+	cr.RegisterTerminalRuntime(realm)
 	Evaluate(source, realm)
 }
 
@@ -26,9 +25,41 @@ func testModule(t *testing.T, f string) {
 	InitializeConstants()
 	InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
-	el := cr.NewEventLoop(agent)
-	cr.RegisterTerminalRuntime(el, realm)
+	cr.RegisterTerminalRuntime(realm)
 	EvaluateModule(resolveTestdataPath(f), realm)
+}
+
+func TestSchedulerRunsTimerBeforeEvaluateReturns(t *testing.T) {
+	agent := NewAgent()
+	InitializeConstants()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	cr.RegisterTerminalRuntime(realm)
+
+	Evaluate(`var timerRan = false;
+setTimeout(function () { timerRan = true; }, 0);`, realm)
+
+	timerRan := realm.GlobalObject.Get(NewStringPropertyKey("timerRan"))
+	if !timerRan.ToBoolean() {
+		t.Fatal("timer callback did not run before Evaluate returned")
+	}
+}
+
+func TestSchedulerDoesNotReplayPromiseJobsAcrossEvaluations(t *testing.T) {
+	agent := NewAgent()
+	InitializeConstants()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	cr.RegisterTerminalRuntime(realm)
+
+	Evaluate(`var promiseRuns = 0;
+Promise.resolve(1).then(function () { promiseRuns += 1; });`, realm)
+	Evaluate(`0;`, realm)
+
+	promiseRuns := realm.GlobalObject.Get(NewStringPropertyKey("promiseRuns"))
+	if promiseRuns.String() != "1" {
+		t.Fatalf("promise job ran %s times, want 1", promiseRuns.String())
+	}
 }
 
 // TestObjectLiteralDataPropertyNamedGet verifies that contextual accessor

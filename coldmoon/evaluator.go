@@ -46,7 +46,7 @@ func EvaluateModule(filePath string, realm *Realm) {
 		result = p.PromiseResult
 	}
 	fatalOnError(result)
-	agent.RunJobs()
+	agent.Scheduler.RunUntilIdle()
 }
 
 func Evaluate(source string, realm *Realm) {
@@ -58,5 +58,5 @@ func Evaluate(source string, realm *Realm) {
 			panic(e)
 		}
 	}
-	agent.RunJobs()
+	agent.Scheduler.RunUntilIdle()
 }
