@@ -21,7 +21,6 @@ type GraphLoadingState struct {
 	PendingModulesCount int
 	PromiseCapability   *PromiseCapability
 	Visited             []ModuleRecord
-	HostDefined         HostDefined
 }
 
 // ImportedModuleReferrer Enum
@@ -29,6 +28,18 @@ type ImportedModuleReferrer struct {
 	Script *ScriptRecord
 	Module *SourceTextModule
 	Realm  *Realm
+}
+
+// RealmRecord returns the Realm that owns the referrer.
+func (r ImportedModuleReferrer) RealmRecord() *Realm {
+	switch {
+	case r.Script != nil:
+		return r.Script.Realm
+	case r.Module != nil:
+		return r.Module.Realm
+	default:
+		return r.Realm
+	}
 }
 
 // ImportedModulePayload Enum
@@ -66,7 +77,7 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 	}
 
 	module := moduleCompletion.Data().(*SourceTextModule)
-	loadPromise := module.LoadRequestedModules(module.HostDefined)
+	loadPromise := module.LoadRequestedModules()
 
 	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		capability.Reject.Call(UndefinedValue, []Value{argumentAt(argumentsList, 0)})

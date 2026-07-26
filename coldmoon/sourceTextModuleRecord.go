@@ -32,6 +32,8 @@ const (
 
 type SourceTextModule struct {
 	ScriptOrModule
+	// Identity is the host-canonical module identifier used by ModuleGraph.
+	Identity string
 	// [[Realm]]
 	Realm *Realm
 	// [[Environment]]
@@ -482,7 +484,7 @@ func ContinueModuleLoading(agent *Agent, state *GraphLoadingState, moduleComplet
 }
 
 // 16.2.1.5.1
-func (s *SourceTextModule) LoadRequestedModules(hostDefined HostDefined) *PromiseObject {
+func (s *SourceTextModule) LoadRequestedModules() *PromiseObject {
 	realm := s.Realm
 	pc := NewPromiseCapability(s.agent(), realm.Intrinsics.Promise.ToValue())
 
@@ -491,7 +493,6 @@ func (s *SourceTextModule) LoadRequestedModules(hostDefined HostDefined) *Promis
 		PendingModulesCount: 1,
 		Visited:             make([]ModuleRecord, 0),
 		PromiseCapability:   pc,
-		HostDefined:         hostDefined,
 	}
 
 	s.InnerModuleLoading(state)
@@ -637,9 +638,10 @@ func (s *SourceTextModule) InnerModuleLoading(state *GraphLoadingState) {
 			if record, ok := module.LoadedModules[required]; ok {
 				record.(*SourceTextModule).InnerModuleLoading(state)
 			} else {
-				HostLoadImportedModule(s.agent(), module.ToReferrer(), required, state.HostDefined, ImportedModulePayload{
+				result := s.agent().ModuleGraph.Load(module.ToReferrer(), required, module.HostDefined)
+				FinishLoadingImportedModule(s.agent(), module.ToReferrer(), required, ImportedModulePayload{
 					GraphLoadingState: state,
-				})
+				}, result)
 			}
 		}
 		if !state.IsLoading {

@@ -15,6 +15,7 @@ type Agent struct {
 	ExecutionContextMap   map[uint64]*ExecutionContext
 	HostHooks             *HostHooks
 	Scheduler             *Scheduler
+	ModuleGraph           *ModuleGraph
 	GlobalSymbolRegistry  map[string]*SymbolValue
 	// [[IsLittleEndian]]
 	IsLittleEndian bool
@@ -31,7 +32,7 @@ type HostHooks struct {
 	HostEnsureCanAddPrivateElement func()
 	HostGetImportMetaProperties    func(module *SourceTextModule) ImportMetaProperties
 	HostFinalizeImportMeta         func(meta ObjectType, module *SourceTextModule)
-	HostLoadImportedModule         func(agent *Agent, referrer ImportedModuleReferrer, specifier string, hostDefined HostDefined, payload ImportedModulePayload)
+	HostLoadModule                 ModuleLoader
 }
 
 func NewAgent() *Agent {
@@ -46,6 +47,7 @@ func NewAgentWithClock(clock Clock) *Agent {
 		GlobalSymbolRegistry: make(map[string]*SymbolValue),
 	}
 	a.Scheduler = NewScheduler(a, clock)
+	a.ModuleGraph = NewModuleGraph(a)
 	initWellKnownSymbols(a)
 	a.HostHooks = &HostHooks{
 		HostEnsureCanCompileStrings: HostEnsureCanCompileStrings,
@@ -60,7 +62,6 @@ func NewAgentWithClock(clock Clock) *Agent {
 		},
 		HostGetImportMetaProperties: HostGetImportMetaProperties,
 		HostFinalizeImportMeta:      HostFinalizeImportMeta,
-		HostLoadImportedModule:      HostLoadImportedModule,
 	}
 	return a
 }

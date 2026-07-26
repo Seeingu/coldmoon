@@ -10,7 +10,6 @@ type Realm struct {
 	GlobalObject   *Object
 	GlobalEnv      *GlobalEnvironment
 	TemplateMap    any
-	LoadedModules  any
 	HostDefined    any
 	Agent          *Agent
 	Rng            rand.Rand

@@ -73,15 +73,31 @@ Completion conversion preserves the completion type, target, and error while
 changing only its generic payload type. This keeps `return`, `break`,
 `continue`, and `throw` intact across helper boundaries.
 
+## Module graph
+
+Each Agent owns one `ModuleGraph`. The host first resolves a referrer and
+specifier to a canonical identity; the graph checks its Realm-local cache; only
+a cache miss asks the host to load source and invokes the parser. Records enter
+the cache before dependency loading, so every edge in a cyclic graph converges
+on the same record.
+
+The language core knows neither filesystem paths nor file-reading APIs.
+`runtime.FilesystemModuleLoader` implements the terminal/Test262 host seam and
+uses absolute cleaned paths as identities. Other hosts can supply embedded or
+network-backed loaders without changing parsing, linking, or evaluation.
+
+Per-module `LoadedModules` maps retain specifier edges required by ECMAScript
+algorithms, while canonical ownership and deduplication live only in
+`ModuleGraph`.
+
 ## Planned deep modules
 
 The remaining architecture work is sequenced by dependency:
 
-1. consolidate module graph loading and identity;
-2. make Realm and intrinsic construction atomic;
-3. internalize the property model and narrow object dispatch;
-4. give static and runtime syntax semantics explicit owners;
-5. collapse the Test262 lifecycle into one runner.
+1. make Realm and intrinsic construction atomic;
+2. internalize the property model and narrow object dispatch;
+3. give static and runtime syntax semantics explicit owners;
+4. collapse the Test262 lifecycle into one runner.
 
 Each module should expose a small interface, keep implementation details local,
 and add an adapter seam only when at least two real implementations exist.

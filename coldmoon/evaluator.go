@@ -1,11 +1,5 @@
 package coldmoon
 
-import (
-	"path"
-
-	"github.com/Seeingu/coldmoon/pkg"
-)
-
 func fatalOnError(result Value) {
 	if o, ok := result.GetObject(); ok {
 		if e, ok := o.(*ErrorObject); ok {
@@ -15,16 +9,16 @@ func fatalOnError(result Value) {
 	}
 }
 
-// TODO: resolve path
 func EvaluateModule(filePath string, realm *Realm) {
 	agent := realm.Agent
-	hostDefined := HostDefined{
-		FileName: path.Base(filePath),
-		BaseDir:  path.Dir(filePath),
+	loaded := agent.ModuleGraph.Load(realm.ToReferrer(), filePath, HostDefined{})
+	if loaded.IsAbrupt() {
+		fatalOnError(loaded.Error())
+		return
 	}
-	module := ParseModule(pkg.MustReadFile(filePath), realm, hostDefined)
+	module := loaded.Data().(*SourceTextModule)
 	var result Value
-	p := module.LoadRequestedModules(hostDefined)
+	p := module.LoadRequestedModules()
 	switch p.PromiseState {
 	case PromiseStatePending:
 		panic("unreachable")

@@ -42,6 +42,7 @@ func GetTest262Path() string {
 }
 
 func RegisterTest262Runtime(realm *coldmoon.Realm) {
+	RegisterFilesystemModuleLoader(realm)
 	global := realm.GlobalObject
 	console := CreateConsole(realm)
 	global.CreateDataProperty(coldmoon.CMString("console").ToPropertyKey(), console.ToValue())

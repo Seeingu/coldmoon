@@ -30,6 +30,7 @@ func ParseScript(sourceText string, realm *Realm, hostDefined *HostDefined) *Scr
 		Realm:          realm,
 		HostDefined:    hostDefined,
 		ECMAScriptCode: script,
+		LoadedModules:  make(map[string]ModuleRecord),
 	}
 
 	if Debug.PrintAST {
