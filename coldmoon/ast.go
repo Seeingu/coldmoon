@@ -12,7 +12,7 @@ import (
 
 type ASTNode interface {
 	String() string
-	RuntimeSemanticsEvaluation
+	Evaluation(vm *VM) (co CompletionValue)
 }
 
 // MARK: - AnalyzeQuery
@@ -639,7 +639,6 @@ func (p *PrimaryExpressionObjectLiteral) String() string {
 // PropertyDefinition[?Yield, ?Await]
 // PropertyDefinitionList[?Yield, ?Await] , PropertyDefinition[?Yield, ?Await]
 type PropertyDefinitionList struct {
-	ASTNode
 	Items []PropertyDefinition
 }
 
@@ -3350,7 +3349,6 @@ func (s *VariableStatement) String() string {
 // VariableDeclaration[?In, ?Yield, ?Await]
 // VariableDeclarationList[?In, ?Yield, ?Await] , VariableDeclaration[?In, ?Yield, ?Await]
 type VariableDeclarationList struct {
-	ASTNode
 	Items []*VariableDeclaration
 }
 
@@ -3387,7 +3385,6 @@ func (v *VariableDeclarationList) String() string {
 // VariableDeclaration [In] :
 // - BindingIdentifier Initializer[?In]
 type VariableDeclaration struct {
-	ASTNode
 	BindingIdentifier IdentifierName
 	Initializer       Expression
 }
@@ -3703,7 +3700,6 @@ const (
 // FunctionStatementList[Yield, Await] :
 // - StatementList[?Yield, ?Await, +Return] opt
 type FunctionBody struct {
-	ASTNode
 	StatementList StatementList
 	Strict        bool
 	Type          FunctionType
@@ -3878,7 +3874,6 @@ func (f *FormalParameter) String() string {
 // SingleNameBinding [Yield, Await] :
 // - BindingIdentifier[?Yield, ?Await] Initializer[+In, ?Yield, ?Await] opt
 type SingleNameBinding struct {
-	ASTNode
 	BindingIdentifier IdentifierName
 	Initializer       Expression
 }
@@ -3899,7 +3894,6 @@ func (s *SingleNameBinding) String() string {
 // - SingleNameBinding[?Yield, ?Await]
 // - PropertyName[?Yield, ?Await] : BindingElement[?Yield, ?Await]
 type BindingProperty struct {
-	ASTNode
 	SingleNameBinding             *SingleNameBinding
 	PropertyNameAndBindingElement *struct {
 		PropertyName   PropertyName
@@ -3917,7 +3911,6 @@ func (b *BindingProperty) String() string {
 // BindingRestProperty [Yield, Await] :
 // - ... BindingIdentifier[?Yield, ?Await]
 type BindingRestProperty struct {
-	ASTNode
 	BindingIdentifier IdentifierName
 }
 
@@ -4852,7 +4845,6 @@ func (f *ForInOfStatementInitializer) String() string {
 // - BindingIdentifier[?Yield, ?Await]
 // - BindingPattern[?Yield, ?Await]
 type ForBinding struct {
-	ASTNode
 	BindingIdentifier IdentifierName
 	BindingPattern    *BindingPattern
 }
@@ -4864,6 +4856,10 @@ func (f *ForBinding) String() string {
 		return f.BindingPattern.String()
 	}
 	return string(f.BindingIdentifier)
+}
+
+func (f *ForBinding) Evaluation(vm *VM) CompletionValue {
+	panic("ForBinding is a static binding and has no direct runtime evaluation")
 }
 
 func (f *ForBinding) BoundNames() (l []IdentifierName) {
@@ -5087,7 +5083,6 @@ func (d *DeclarationHoistableAsyncFunction) String() string {
 }
 
 type AsyncFunctionDeclaration struct {
-	ASTNode
 	Identifier       IdentifierName
 	FormalParameters *FormalParameters
 	Body             *FunctionBody
@@ -5142,7 +5137,6 @@ func (d *DeclarationHoistableAsyncGenerator) String() string {
 }
 
 type AsyncGeneratorDeclaration struct {
-	ASTNode
 	Identifier       IdentifierName
 	FormalParameters *FormalParameters
 	Body             *FunctionBody
@@ -5206,7 +5200,6 @@ func (d *DeclarationHoistableGenerator) String() string {
 }
 
 type GeneratorDeclaration struct {
-	ASTNode
 	Identifier       IdentifierName
 	FormalParameters *FormalParameters
 	Body             *FunctionBody
@@ -5563,7 +5556,6 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 }
 
 type ClassBody struct {
-	ASTNode
 	ClassElementList *ClassElementList
 }
 
@@ -5614,7 +5606,6 @@ func (c *ClassBody) String() string {
 // MARK: - ClassElementList
 
 type ClassElementList struct {
-	ASTNode
 	Items []ClassElement
 }
 
@@ -5862,7 +5853,6 @@ func (d *LexicalDeclaration) BoundNames() (l []IdentifierName) {
 // - LexicalBinding[?In, ?Yield, ?Await]
 // - BindingList[?In, ?Yield, ?Await] , LexicalBinding[?In, ?Yield, ?Await]
 type BindingList struct {
-	ASTNode
 	Items []*LexicalBinding
 }
 
@@ -5896,7 +5886,6 @@ func (b *BindingList) String() string {
 // - BindingIdentifier[?Yield, ?Await] Initializer[?In, ?Yield, ?Await] opt
 // - BindingPattern[?Yield, ?Await] Initializer[?In, ?Yield, ?Await]
 type LexicalBinding struct {
-	ASTNode
 	// BindingIdentifier
 	Identifier     IdentifierName
 	BindingPattern *BindingPattern
@@ -5953,7 +5942,6 @@ func (l *LexicalBinding) String() string {
 // - [+Default] function ( FormalParameters[~Yield, ~Await] ) {
 // - FunctionBody[~Yield, ~Await] }
 type FunctionDeclaration struct {
-	ASTNode
 	Identifier       IdentifierName
 	Body             *FunctionBody
 	FormalParameters *FormalParameters
@@ -6265,7 +6253,6 @@ func (e *ExpressionStatement) String() string {
 // MARK: - Script
 
 type Script struct {
-	ASTNode
 	StatementList StatementList
 }
 

@@ -117,12 +117,24 @@ strings sort numerically, other strings retain insertion order, and Symbols
 retain insertion order after all strings. Deleting and redefining a string or
 Symbol gives it a new insertion position.
 
+## Syntax semantics
+
+`StaticSemantics` owns parse-time whole-program queries. Scripts cache
+declaration snapshots, functions analyze parameters and declarations through
+the same owner, and modules compute requests/imports/exports once when parsed.
+Runtime instantiation consumes those records instead of rediscovering facts
+through scattered AST assertions.
+
+`RuntimeSemantics` owns Evaluation for the current execution context and its VM.
+`RunNode` applies temporary strictness and delegates to that owner. Concrete AST
+structs explicitly implement their runtime methods; they no longer anonymously
+embed `ASTNode` merely to satisfy the interface through nil method promotion.
+
 ## Planned deep modules
 
 The remaining architecture work is sequenced by dependency:
 
-1. give static and runtime syntax semantics explicit owners;
-2. collapse the Test262 lifecycle into one runner.
+1. collapse the Test262 lifecycle into one runner.
 
 Each module should expose a small interface, keep implementation details local,
 and add an adapter seam only when at least two real implementations exist.

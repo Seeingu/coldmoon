@@ -8,6 +8,7 @@ type ScriptRecord struct {
 	ScriptOrModule
 	Realm          *Realm
 	ECMAScriptCode *Script
+	Static         ScriptStaticSemantics
 	LoadedModules  map[string]ModuleRecord
 	HostDefined    *HostDefined
 }
@@ -30,6 +31,7 @@ func ParseScript(sourceText string, realm *Realm, hostDefined *HostDefined) *Scr
 		Realm:          realm,
 		HostDefined:    hostDefined,
 		ECMAScriptCode: script,
+		Static:         (StaticSemantics{}).AnalyzeScript(script),
 		LoadedModules:  make(map[string]ModuleRecord),
 	}
 
@@ -76,12 +78,8 @@ func (s *ScriptRecord) evaluateInCurrentContext() CompletionValue {
 	variableEnv := context.ECMAScriptCode.VariableEnvironment
 	script := s.ECMAScriptCode
 
-	for _, item := range script.StatementList {
-		declarationItem, ok := item.(*StatementListItemDeclaration)
-		if !ok {
-			continue
-		}
-		switch declaration := declarationItem.Declaration.(type) {
+	for _, declaration := range s.Static.LexicalDeclarations {
+		switch declaration := declaration.(type) {
 		case *LexicalDeclaration:
 			for _, name := range declaration.BoundNames() {
 				if declaration.IsConstantDeclaration() {
@@ -97,9 +95,8 @@ func (s *ScriptRecord) evaluateInCurrentContext() CompletionValue {
 		}
 	}
 
-	varScopedDeclarations := script.StatementList.VarScopedDeclarations()
 	seen := make(map[IdentifierName]bool)
-	for _, decl := range varScopedDeclarations {
+	for _, decl := range s.Static.VarDeclarations {
 		varName := decl.BindingIdentifier
 		if _, ok := seen[varName]; !ok {
 			createVariableBinding(variableEnv, string(varName))

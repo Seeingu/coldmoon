@@ -42,6 +42,8 @@ type SourceTextModule struct {
 	Namespace ObjectType
 	// [[ECMAScriptCode]]
 	ECMAScriptCode *Module
+	// Static contains parse-time module requests and declarations.
+	Static ModuleStaticSemantics
 	// [[Context]]
 	Context *ExecutionContext
 	// [[ImportMeta]]
@@ -416,12 +418,13 @@ func ParseModule(sourceText string, realm *Realm, hostDefined HostDefined) *Sour
 		BaseDir:  hostDefined.BaseDir,
 	}).ParseModule()
 
-	requestedModules := body.moduleRequests()
-	importEntries := body.importEntries()
+	static := (StaticSemantics{}).AnalyzeModule(body)
+	requestedModules := static.RequestedModules
+	importEntries := static.ImportEntries
 	var indirectExportEntries []ExportEntry
 	var localExportEntries []ExportEntry
 	var starExportEntries []ExportEntry
-	exportEntries := body.exportEntries()
+	exportEntries := static.ExportEntries
 
 	for _, ee := range exportEntries {
 		if ee.ModuleRequest == "" {
@@ -463,6 +466,7 @@ func ParseModule(sourceText string, realm *Realm, hostDefined HostDefined) *Sour
 		IndirectExportEntries: indirectExportEntries,
 		StarExportEntries:     starExportEntries,
 		ECMAScriptCode:        body,
+		Static:                static,
 		LoadedModules:         make(map[string]ModuleRecord),
 		// TODO
 		// HasTLA: body.HasTLA()
@@ -549,7 +553,7 @@ func (s *SourceTextModule) InitializeEnvironment() (co CompletionValue) {
 	defer scope.Leave()
 	code := s.ECMAScriptCode
 
-	varDeclarations := code.ModuleItemList.VarScopedDeclarations()
+	varDeclarations := s.Static.VarDeclarations
 
 	declaredVarNames := make(map[string]bool)
 

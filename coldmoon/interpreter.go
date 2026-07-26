@@ -636,9 +636,8 @@ func UpdateEmpty(result CompletionValue, V Value) CompletionValue {
 }
 
 func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {
-	context := agent.RunningExecutionContext()
-	Assert(context.VM != nil)
-	vm2 := context.VM
+	runtimeSemantics := newRuntimeSemantics(agent)
+	vm2 := runtimeSemantics.vm
 	previousStrict := vm2.containedInStrictCode
 	defer func() {
 		vm2.containedInStrictCode = previousStrict
@@ -646,5 +645,5 @@ func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {
 	if functionBody, ok := node.(*FunctionBody); ok {
 		vm2.containedInStrictCode = functionBody.Strict
 	}
-	return node.Evaluation(vm2)
+	return runtimeSemantics.Evaluate(node)
 }

@@ -229,7 +229,8 @@ func FunctionDeclarationInstantiation(agent *Agent, function *ECMAScriptFunction
 	code := function.ECMAScriptCode
 	strict := function.Strict
 	formals := function.FormalParameters
-	parameterNames := formals.BoundNames()
+	static := (StaticSemantics{}).AnalyzeFunctionBody(code, formals)
+	parameterNames := static.ParameterNames
 	var hasDuplicates bool
 	uniqueNames := make(map[IdentifierName]bool)
 loop:
@@ -244,9 +245,8 @@ loop:
 	simpleParameterList := formals.IsSimpleParameterList()
 	hasParameterExpressions := formals.ContainsExpression()
 
-	// varNames := code.VarDeclaredNames()
-	varDeclarations := code.VarScopedDeclarations()
-	lexicalNames := code.LexicallyDeclaredNames()
+	varDeclarations := static.VarDeclarations
+	lexicalNames := static.LexicalNames
 	var functionNames []IdentifierName
 
 	argumentsObjectNeeded := true
