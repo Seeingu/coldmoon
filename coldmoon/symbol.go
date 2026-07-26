@@ -127,7 +127,7 @@ func NewSymbolConstructor(realm *Realm) ObjectType {
 	})
 
 	var symbolFor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		key := arguments[0]
+		key := argumentAt(arguments, 0)
 		stringKey := key.String()
 		if agent.GlobalSymbolRegistry[stringKey] != nil {
 			return agent.GlobalSymbolRegistry[stringKey]

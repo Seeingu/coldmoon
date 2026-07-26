@@ -121,14 +121,14 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	}
 	// 24.2.3.4
 	var setDelete BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
-		value := argumentsList[0]
+		value := argumentAt(argumentsList, 0)
 		set := RequireInternalSlot[*SetObject](thisValue)
 		set.delete(value)
 		return TrueValue
 	}
 	// 24.2.3.7
 	var setHas BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
-		value := argumentsList[0]
+		value := argumentAt(argumentsList, 0)
 		set := RequireInternalSlot[*SetObject](thisValue)
 		return NewBooleanValue(set.has(value))
 	}
@@ -137,7 +137,7 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(JSNumber(set.size()))
 	}
 	var setAdd BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
-		value := argumentsList[0]
+		value := argumentAt(argumentsList, 0)
 		set := RequireInternalSlot[*SetObject](thisValue)
 		set.add(value)
 		return thisValue
@@ -151,8 +151,8 @@ func NewSetPrototype(realm *Realm) ObjectType {
 		return iterator.ToValue()
 	}
 	var forEach BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
-		callbackFn := argumentsList[0]
-		thisArg := argumentsList[1]
+		callbackFn := argumentAt(argumentsList, 0)
+		thisArg := argumentAt(argumentsList, 1)
 		set := RequireInternalSlot[*SetObject](thisValue)
 		if !IsCallable(callbackFn) {
 			return agent.ThrowTypeError("callback is not callable")

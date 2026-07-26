@@ -181,33 +181,33 @@ func NewAtomics(realm *Realm) ObjectType {
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "Atomics")
 
 	atomicsAdd := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
-		value := argumentsList[2]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
+		value := argumentAt(argumentsList, 2)
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpAdd)
 	}
 	atomicsAnd := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
-		value := argumentsList[2]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
+		value := argumentAt(argumentsList, 2)
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpAnd)
 	}
 	atomicsCompareExchange := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
-		expectedValue := argumentsList[2]
-		replacementValue := argumentsList[3]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
+		expectedValue := argumentAt(argumentsList, 2)
+		replacementValue := argumentAt(argumentsList, 3)
 		return atomicsCompareExchange(agent, typedArray, index, expectedValue, replacementValue)
 	}
 	atomicsExchange := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
-		value := argumentsList[2]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
+		value := argumentAt(argumentsList, 2)
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpExchange)
 	}
 	atomicsIsLockFree := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		size := argumentsList[0]
+		size := argumentAt(argumentsList, 0)
 		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, size), co)
 		if isAbrupt {
 			return rt
@@ -218,8 +218,8 @@ func NewAtomics(realm *Realm) ObjectType {
 		return FalseValue
 	}
 	atomicsLoad := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
 		byteIndexInBuffer := ValidateAtomicAccessOnIntegerTypedArray(
 			agent,
 			typedArray,
@@ -240,21 +240,21 @@ func NewAtomics(realm *Realm) ObjectType {
 		return JSNumber(v).ToValue()
 	}
 	atomicsOr := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
-		value := argumentsList[2]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
+		value := argumentAt(argumentsList, 2)
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpOr)
 	}
 	atomicsStore := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
-		value := argumentsList[2]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
+		value := argumentAt(argumentsList, 2)
 		return atomicStore(agent, typedArray, index, value)
 	}
 	atomicsSub := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
-		value := argumentsList[2]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
+		value := argumentAt(argumentsList, 2)
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpSub)
 	}
 	atomicsWait := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -264,9 +264,9 @@ func NewAtomics(realm *Realm) ObjectType {
 		panic("not implemented")
 	}
 	atomicsXor := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		typedArray := argumentsList[0]
-		index := argumentsList[1]
-		value := argumentsList[2]
+		typedArray := argumentAt(argumentsList, 0)
+		index := argumentAt(argumentsList, 1)
+		value := argumentAt(argumentsList, 2)
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpXor)
 	}
 	object.defineBuiltinFunction(realm, CMString("add"), atomicsAdd, 3)

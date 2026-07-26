@@ -284,14 +284,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		month := MonthFromTime(t)
 		date := DateFromTime(t)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			month = n.Data
 		}
 		if len(args) >= 3 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 2).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -318,21 +318,21 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		sec := SecFromTime(t)
 		ms := msFromTime(t)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			minute = n.Data
 		}
 		if len(args) >= 3 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 2).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			sec = n.Data
 		}
 		if len(args) >= 4 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 3).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -377,14 +377,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		sec := SecFromTime(t)
 		ms := msFromTime(t)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			sec = n.Data
 		}
 		if len(args) >= 3 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 2).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -410,7 +410,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		date := DateFromTime(t)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -435,7 +435,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		ms := msFromTime(t)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -489,21 +489,21 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			minute = n.Data
 		}
 		if len(args) >= 3 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 2).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			sec = n.Data
 		}
 		if len(args) >= 4 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 3).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -545,14 +545,14 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			sec = n.Data
 		}
 		if len(args) >= 3 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 2).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -577,7 +577,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		date := JSNumber(1.0)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -601,7 +601,7 @@ func NewDatePrototype(realm *Realm) ObjectType {
 		}
 		ms := JSNumber(0.0)
 		if len(args) >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -880,7 +880,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		if numberOfArgs == 0 {
 			dv = JSNumber(time.Now().UnixNano())
 		} else if numberOfArgs == 1 {
-			value := args[0]
+			value := argumentAt(args, 0)
 			var tv JSNumber
 
 			isDateObject := false
@@ -908,20 +908,20 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			dv = TimeClip(tv)
 		} else {
 			var year JSNumber
-			if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+			if n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 0).ToNumber(agent), co); isAbrupt {
 				return rt
 			} else {
 				year = n.Data
 			}
 			var month JSNumber
-			if n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co); isAbrupt {
+			if n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co); isAbrupt {
 				return rt
 			} else {
 				month = n.Data
 			}
 			date := JSNumber(1)
 			if numberOfArgs >= 3 {
-				if n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co); isAbrupt {
+				if n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 2).ToNumber(agent), co); isAbrupt {
 					return rt
 				} else {
 					date = n.Data
@@ -932,28 +932,28 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			sec := JSNumber(0.0)
 			ms := JSNumber(0.0)
 			if numberOfArgs >= 4 {
-				n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
+				n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 3).ToNumber(agent), co)
 				if isAbrupt {
 					return rt
 				}
 				hour = n.Data
 			}
 			if numberOfArgs >= 5 {
-				n, isAbrupt, rt := ReturnIfAbrupt(args[4].ToNumber(agent), co)
+				n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 4).ToNumber(agent), co)
 				if isAbrupt {
 					return rt
 				}
 				minute = n.Data
 			}
 			if numberOfArgs >= 6 {
-				n, isAbrupt, rt := ReturnIfAbrupt(args[5].ToNumber(agent), co)
+				n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 5).ToNumber(agent), co)
 				if isAbrupt {
 					return rt
 				}
 				sec = n.Data
 			}
 			if numberOfArgs >= 7 {
-				n, isAbrupt, rt := ReturnIfAbrupt(args[6].ToNumber(agent), co)
+				n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 6).ToNumber(agent), co)
 				if isAbrupt {
 					return rt
 				}
@@ -986,7 +986,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 			return NaNValue
 		}
 		var year JSNumber
-		if n, isAbrupt, rt := ReturnIfAbrupt(args[0].ToNumber(agent), co); isAbrupt {
+		if n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 0).ToNumber(agent), co); isAbrupt {
 			return rt
 		} else {
 			year = n.Data
@@ -998,42 +998,42 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		sec := JSNumber(0.0)
 		ms := JSNumber(0.0)
 		if numberOfArgs >= 2 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[1].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 1).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			month = n.Data
 		}
 		if numberOfArgs >= 3 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[2].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 2).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			date = n.Data
 		}
 		if numberOfArgs >= 4 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[3].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 3).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			hour = n.Data
 		}
 		if numberOfArgs >= 5 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[4].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 4).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			minute = n.Data
 		}
 		if numberOfArgs >= 6 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[5].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 5).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
 			sec = n.Data
 		}
 		if numberOfArgs >= 7 {
-			n, isAbrupt, rt := ReturnIfAbrupt(args[6].ToNumber(agent), co)
+			n, isAbrupt, rt := ReturnIfAbrupt(argumentAt(args, 6).ToNumber(agent), co)
 			if isAbrupt {
 				return rt
 			}
@@ -1050,7 +1050,7 @@ func NewDateConstructor(realm *Realm) ObjectType {
 		return NewNumberValue(JSNumber(time.Now().UnixNano()))
 	}
 	var parse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		s := args[0].String()
+		s := argumentAt(args, 0).String()
 		t, err := time.Parse(time.RFC3339, s)
 		if err != nil {
 			return NaNValue

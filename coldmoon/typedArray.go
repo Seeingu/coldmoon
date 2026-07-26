@@ -111,7 +111,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		O := this
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
-		relativeIndex, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, arguments[0]), co)
+		relativeIndex, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, argumentAt(arguments, 0)), co)
 		if isAbrupt {
 			return rt
 		}
@@ -150,8 +150,8 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return offset.ToValue()
 	}
 	taCopyWithin := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
-		start := arguments[1]
+		target := argumentAt(arguments, 0)
+		start := argumentAt(arguments, 1)
 		end := pkg.SliceSafeGet(arguments, 2)
 		return typedArrayCopyWith(agent, this, target, start, end)
 	}
@@ -161,24 +161,24 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return CreateArrayIterator(agent, ta.TypedArray, objectOwnPropertiesKindKeyAndValue).ToValue()
 	}
 	taEvery := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callback := arguments[0]
+		callback := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayEvery(agent, this, callback, thisArg)
 	}
 	taFill := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := arguments[0]
+		value := argumentAt(arguments, 0)
 		start := pkg.SliceSafeGet(arguments, 1)
 		end := pkg.SliceSafeGet(arguments, 2)
 		return typedArrayFill(agent, this, value, start, end)
 	}
 	taFilter := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callback := arguments[0]
+		callback := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayFilter(agent, this, callback, thisArg)
 	}
 	taFind := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
-		predicate := arguments[0]
+		predicate := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		taRecord := ValidateTypedArray(agent, this, SeqCst)
 		length := TypedArrayLength(taRecord)
@@ -187,7 +187,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	}
 	taFindIndex := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
-		predicate := arguments[0]
+		predicate := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
@@ -196,7 +196,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	}
 	taFindLast := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
-		predicate := arguments[0]
+		predicate := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
@@ -205,7 +205,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	}
 	taFindLastIndex := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
-		predicate := arguments[0]
+		predicate := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		taRecord := ValidateTypedArray(agent, O, SeqCst)
 		length := TypedArrayLength(taRecord)
@@ -213,17 +213,17 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return findRec.Index.ToValue()
 	}
 	taForEach := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callback := arguments[0]
+		callback := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayForEach(agent, this, callback, thisArg)
 	}
 	taIncludes := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		searchElement := arguments[0]
+		searchElement := argumentAt(arguments, 0)
 		fromIndex := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayIncludes(agent, this, searchElement, fromIndex)
 	}
 	taIndexOf := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		searchElement := arguments[0]
+		searchElement := argumentAt(arguments, 0)
 		fromIndex := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayIndexOf(agent, this, searchElement, fromIndex)
 	}
@@ -237,7 +237,7 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return CreateArrayIterator(agent, taRecord.TypedArray, objectOwnPropertiesKindKey).ToValue()
 	}
 	taLastIndexOf := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		searchElement := arguments[0]
+		searchElement := argumentAt(arguments, 0)
 		fromIndex := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayLastIndexOf(agent, this, searchElement, fromIndex)
 	}
@@ -251,17 +251,17 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return length.ToValue()
 	}
 	taMap := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callback := arguments[0]
+		callback := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayMap(agent, this, callback, thisArg)
 	}
 	taReduce := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callback := arguments[0]
+		callback := argumentAt(arguments, 0)
 		initialValue := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayReduce(agent, this, callback, initialValue)
 	}
 	taReduceRight := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callback := arguments[0]
+		callback := argumentAt(arguments, 0)
 		initialValue := pkg.SliceSafeGet(arguments, 1)
 		return typedArrayReduceRight(agent, this, callback, initialValue)
 	}
@@ -298,17 +298,17 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	taSet := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		source := arguments[0]
+		source := argumentAt(arguments, 0)
 		offset := pkg.SliceSafeGet(arguments, 1)
 		return typedArraySet(agent, this, source, offset)
 	}
 	taSlice := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		start := arguments[0]
+		start := argumentAt(arguments, 0)
 		end := pkg.SliceSafeGet(arguments, 1)
 		return typedArraySlice(agent, this, start, end)
 	}
 	taSome := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		callback := arguments[0]
+		callback := argumentAt(arguments, 0)
 		thisArg := pkg.SliceSafeGet(arguments, 1)
 		return typedArraySome(agent, this, callback, thisArg)
 	}
@@ -317,11 +317,11 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return typedArraySort(agent, this, compareFn)
 	}
 	taToSorted := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		compareFn := arguments[0]
+		compareFn := argumentAt(arguments, 0)
 		return typedArrayToSorted(agent, this, compareFn)
 	}
 	taSubarray := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		start := arguments[0]
+		start := argumentAt(arguments, 0)
 		end := pkg.SliceSafeGet(arguments, 1)
 		return typedArraySubarray(agent, this, start, end)
 	}
@@ -334,8 +334,8 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return CreateArrayIterator(agent, taRecord.TypedArray, objectOwnPropertiesKindValue).ToValue()
 	}
 	taWith := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		index := arguments[0]
-		value := arguments[1]
+		index := argumentAt(arguments, 0)
+		value := argumentAt(arguments, 1)
 		return typedArrayWith(agent, this, index, value)
 	}
 	typedArray.defineBuiltinFunction(realm, CMString("at"), taAt, 1)
@@ -694,7 +694,7 @@ func NewTypedArrayConstructor(realm *Realm) ObjectType {
 		prototype: realm.Intrinsics.FunctionPrototype,
 	})
 	from := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		source := arguments[0]
+		source := argumentAt(arguments, 0)
 		mapper := pkg.SliceSafeGet(arguments, 1)
 		thisArg := pkg.SliceSafeGet(arguments, 2)
 		return typedArrayFrom(agent, this, source, mapper, thisArg)
@@ -767,7 +767,7 @@ func typedArrayBehavior(agent *Agent, name TypedArrayName, thisArgument Value, a
 	if numberOfArgs == 0 {
 		return AllocateTypedArray(agent, constructorName, newTarget, proto, 0).ToValue().ToCompletion()
 	} else {
-		firstArgument := argumentsList[0]
+		firstArgument := argumentAt(argumentsList, 0)
 		if firstArgument.IsObject() {
 			O := AllocateTypedArray(agent, constructorName, newTarget, proto, 0)
 			firstArgumentObj := MustGetObject(firstArgument)

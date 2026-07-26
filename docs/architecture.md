@@ -57,16 +57,31 @@ entering the eval context, then evaluates the parsed script in that context.
 It does not call the top-level script entry point, which would replace those
 environments with the Realm global environment.
 
+## Builtin invocation and completions
+
+Every builtin call crosses one boundary that owns its execution context,
+normalizes an empty Go result to JavaScript `undefined`, and converts
+language-level panics into throw completions. Unexpected internal panics remain
+panics so implementation defects are not disguised as JavaScript exceptions.
+
+`BuiltinInvocation` describes the receiver, arguments, and optional new target.
+Its argument accessor implements the ECMAScript rule that an omitted argument
+is `undefined`. Builtin implementations use the same `argumentAt` primitive,
+eliminating direct constant-index reads that could leak a Go bounds panic.
+
+Completion conversion preserves the completion type, target, and error while
+changing only its generic payload type. This keeps `return`, `break`,
+`continue`, and `throw` intact across helper boundaries.
+
 ## Planned deep modules
 
 The remaining architecture work is sequenced by dependency:
 
-1. deepen builtin invocation and completion propagation;
-2. consolidate module graph loading and identity;
-3. make Realm and intrinsic construction atomic;
-4. internalize the property model and narrow object dispatch;
-5. give static and runtime syntax semantics explicit owners;
-6. collapse the Test262 lifecycle into one runner.
+1. consolidate module graph loading and identity;
+2. make Realm and intrinsic construction atomic;
+3. internalize the property model and narrow object dispatch;
+4. give static and runtime syntax semantics explicit owners;
+5. collapse the Test262 lifecycle into one runner.
 
 Each module should expose a small interface, keep implementation details local,
 and add an adapter seam only when at least two real implementations exist.

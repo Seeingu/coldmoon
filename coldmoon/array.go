@@ -244,7 +244,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 		if numberOfArgs == 0 {
 			return ArrayCreate(agent, 0, proto).ToValue()
 		} else if numberOfArgs == 1 {
-			length := args[0]
+			length := argumentAt(args, 0)
 			array := ArrayCreate(agent, 0, proto)
 
 			var intLen JSNumber
@@ -293,7 +293,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	}
 
 	var isArray BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		arg := args[0]
+		arg := argumentAt(args, 0)
 		return NewBooleanValue(IsArray(arg))
 	}
 	var of BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -356,7 +356,7 @@ func NewArrayConstructor(realm *Realm) ObjectType {
 	// 23.1.2.1
 	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		items := args[0]
+		items := argumentAt(args, 0)
 		mapFn := pkg.SliceSafeGet(args, 1)
 		thisArg := pkg.SliceSafeGet(args, 2)
 
@@ -564,7 +564,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		sep := ","
 		if len(args) > 0 {
-			sep = args[0].String()
+			sep = argumentAt(args, 0).String()
 		}
 
 		var elements []string
@@ -933,7 +933,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(-1)
 	}
 	var at BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		index := args[0]
+		index := argumentAt(args, 0)
 		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
@@ -1043,8 +1043,8 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return FalseValue
 	}
 	var with BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		index := args[0]
-		value := args[1]
+		index := argumentAt(args, 0)
+		value := argumentAt(args, 1)
 		o := ReturnAssertNormal(this.ToObject(agent))
 		var co CompletionValue
 		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
@@ -1557,13 +1557,13 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		var start Value = UndefinedValue
 		var end Value = UndefinedValue
 		if len(args) > 0 {
-			target = args[0]
+			target = argumentAt(args, 0)
 		}
 		if len(args) > 1 {
-			start = args[1]
+			start = argumentAt(args, 1)
 		}
 		if len(args) > 2 {
-			end = args[2]
+			end = argumentAt(args, 2)
 		}
 		o := this.ToObject(agent).value
 		var co CompletionValue
@@ -1995,8 +1995,8 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return A.ToValue()
 	}
 	var toSpliced BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		start := args[0]
-		skipCount := args[1]
+		start := argumentAt(args, 0)
+		skipCount := argumentAt(args, 1)
 		var items []Value
 		if len(args) > 2 {
 			items = args[2:]

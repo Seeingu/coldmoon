@@ -259,10 +259,10 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		length := argumentsList[0]
+		length := argumentAt(argumentsList, 0)
 		var options Value = UndefinedValue
 		if len(argumentsList) > 1 {
-			options = argumentsList[1]
+			options = argumentAt(argumentsList, 1)
 		}
 		if newTarget == nil {
 			return agent.ThrowTypeError("TypeError")
@@ -299,7 +299,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "ArrayBufferPrototype")
 
 	var isView BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		arg := arguments[0]
+		arg := argumentAt(arguments, 0)
 		if !arg.IsObject() {
 			return FalseValue
 		}
@@ -319,8 +319,8 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(length.ToNumber())
 	}
 	slice := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		start := arguments[0]
-		end := arguments[1]
+		start := argumentAt(arguments, 0)
+		end := argumentAt(arguments, 1)
 		o := RequireInternalSlot[*ArrayBufferLike](this)
 		if IsDetachedBuffer(o) {
 			panic("TypeError")
@@ -396,7 +396,7 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 	}
 	resize := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		newByteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, arguments[0]), co)
+		newByteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, argumentAt(arguments, 0)), co)
 		if isAbrupt {
 			return rt
 		}

@@ -1,7 +1,16 @@
 package coldmoon
 
+import "strings"
+
 type (
-	BehaviorFn      func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value]
+	BehaviorFn func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value]
+	// BuiltinInvocation is the normalized input to one builtin call or
+	// construction. Argument returns undefined for an omitted argument.
+	BuiltinInvocation struct {
+		This      Value
+		Arguments []Value
+		NewTarget ObjectType
+	}
 	BuiltinFunction struct {
 		*Object
 		InternalSlotPrivateMethods
@@ -14,6 +23,23 @@ type (
 		AdditionalFieldsV2 any
 	}
 )
+
+// Argument returns the argument at index, or undefined when it was omitted.
+func (i BuiltinInvocation) Argument(index int) Value {
+	return argumentAt(i.Arguments, index)
+}
+
+// IsConstruct reports whether the builtin was invoked through [[Construct]].
+func (i BuiltinInvocation) IsConstruct() bool {
+	return i.NewTarget != nil
+}
+
+func argumentAt(arguments []Value, index int) Value {
+	if index < 0 || index >= len(arguments) || arguments[index] == nil {
+		return UndefinedValue
+	}
+	return arguments[index]
+}
 
 var (
 	_ InternalSlotPrivateMethods = (*BuiltinFunction)(nil)
@@ -75,9 +101,6 @@ func BuiltinConstruct(
 // spec: 10.3.3
 func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsList []Value, newTarget ObjectType) (co CompletionValue) {
 	a := b.Agent()
-	callerContext := a.RunningExecutionContext()
-	_ = callerContext
-
 	calleeContext := &ExecutionContext{
 		Function:       b.Object,
 		Realm:          b.Realm,
@@ -90,21 +113,44 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 		scope.Leave()
 		recovered := recover()
 		if recovered != nil {
-			switch recovered {
-			case "TypeError":
-				co = co.ThrowTypeError(a, "")
-			case "RangeError":
-				co = co.ThrowRangeError(a, "")
+			switch value := recovered.(type) {
+			case Value:
+				co.t = CompletionTypeThrow
+				co.err = value
+			case CompletionValue:
+				co = value
+			case string:
+				switch {
+				case strings.HasPrefix(value, "TypeError"):
+					co = co.ThrowTypeError(a, panicMessage(value, "TypeError"))
+				case strings.HasPrefix(value, "RangeError"):
+					co = co.ThrowRangeError(a, panicMessage(value, "RangeError"))
+				default:
+					panic(recovered)
+				}
 			default:
 				panic(recovered)
 			}
 		}
 	}()
 
-	r := b.Behavior(thisArgument, argumentsList, newTarget)
-	result := CompletionHandleV2(r)
+	invocation := BuiltinInvocation{
+		This:      thisArgument,
+		Arguments: argumentsList,
+		NewTarget: newTarget,
+	}
+	r := b.Behavior(invocation.This, invocation.Arguments, invocation.NewTarget)
+	if r == nil {
+		return UndefinedValue.ToCompletion()
+	}
 
-	return result
+	return CompletionHandleV2(r)
+}
+
+func panicMessage(message string, prefix string) string {
+	message = strings.TrimPrefix(message, prefix)
+	message = strings.TrimPrefix(message, ":")
+	return strings.TrimSpace(message)
 }
 
 type builtinFunctionArgs struct {

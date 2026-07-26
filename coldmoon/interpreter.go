@@ -328,7 +328,7 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 		SameValue(fun, agent.CurrentRealm().Intrinsics.Eval.ToValue()) {
 		x := Value(UndefinedValue)
 		if len(arguments) > 0 {
-			x = arguments[0]
+			x = argumentAt(arguments, 0)
 		}
 		return PerformEval(agent, x, v.containedInStrictCode, true)
 	}

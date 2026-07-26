@@ -57,7 +57,7 @@ func NewSharedArrayBufferConstructor(realm *Realm) ObjectType {
 
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		length := argumentsList[0]
+		length := argumentAt(argumentsList, 0)
 		options := pkg.SliceSafeGet(argumentsList, 1)
 		if options == nil {
 			options = UndefinedValue
@@ -100,7 +100,7 @@ func NewSharedArrayBufferPrototype(realm *Realm) ObjectType {
 		return length.ToValue()
 	}
 	grow := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		newLength := argumentsList[0]
+		newLength := argumentAt(argumentsList, 0)
 		return sharedArrayBufferGrow(agent, this, newLength)
 	}
 	growable := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -121,8 +121,8 @@ func NewSharedArrayBufferPrototype(realm *Realm) ObjectType {
 		return length.ToValue()
 	}
 	slice := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		start := argumentsList[0]
-		end := argumentsList[1]
+		start := argumentAt(argumentsList, 0)
+		end := argumentAt(argumentsList, 1)
 		return sharedArrayBufferSlice(agent, this, start, end)
 	}
 	object.defineBuiltinAccessor(realm, CMString("byteLength"), builtinAccessorParams{

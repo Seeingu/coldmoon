@@ -88,7 +88,7 @@ func NewAsyncGeneratorPrototype(realm *Realm) ObjectType {
 
 	var returnFn BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		generatorValue := this
-		value := argumentsList[0]
+		value := argumentAt(argumentsList, 0)
 		promiseCapability := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
 		result := AsyncGeneratorValidate(generatorValue, "")
 		IfAbruptRejectPromise(agent, result, promiseCapability)
@@ -167,7 +167,7 @@ func AsyncGeneratorAwaitReturn(agent *Agent, generator *AsyncGeneratorObject) (c
 	Assert(completion.t == CompletionTypeReturn)
 	promise := PromiseResolve(agent, realm.Intrinsics.Promise, completion.value)
 	var fulfilledClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := argumentsList[0]
+		value := argumentAt(argumentsList, 0)
 		generator.AsyncGeneratorState = AsyncGeneratorStateCompleted
 		var result CompletionValue
 		result.value = value
@@ -177,7 +177,7 @@ func AsyncGeneratorAwaitReturn(agent *Agent, generator *AsyncGeneratorObject) (c
 	}
 	onFulfilled := CreateBuiltinFunction(agent, fulfilledClosure, 1, CMString("onFulfilled"), builtinFunctionArgs{})
 	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		reason := argumentsList[0]
+		reason := argumentAt(argumentsList, 0)
 		generator.AsyncGeneratorState = AsyncGeneratorStateCompleted
 		var result CompletionValue
 		result.value = reason

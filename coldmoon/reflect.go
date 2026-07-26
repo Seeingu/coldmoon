@@ -11,9 +11,9 @@ func NewReflectObject(realm *Realm) ObjectType {
 	agent := realm.Agent
 
 	var apply BehaviorFn = func(_ Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
-		thisArgument := arguments[1]
-		argumentsList := arguments[2]
+		target := argumentAt(arguments, 0)
+		thisArgument := argumentAt(arguments, 1)
+		argumentsList := argumentAt(arguments, 2)
 
 		var co CompletionValue
 		if !IsCallable(target) {
@@ -28,9 +28,9 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return target.Call(agent, thisArgument, args)
 	}
 	var construct BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
-		argumentsList := arguments[1]
-		newTarget := arguments[2]
+		target := argumentAt(arguments, 0)
+		argumentsList := argumentAt(arguments, 1)
+		newTarget := argumentAt(arguments, 2)
 
 		var co CompletionValue
 		if !IsConstructor(target) {
@@ -51,9 +51,9 @@ func NewReflectObject(realm *Realm) ObjectType {
 	}
 	var defineProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		target := arguments[0]
-		propertyKey := arguments[1]
-		attributes := arguments[2]
+		target := argumentAt(arguments, 0)
+		propertyKey := argumentAt(arguments, 1)
+		attributes := argumentAt(arguments, 2)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.defineProperty called on non-object")
@@ -79,8 +79,8 @@ func NewReflectObject(realm *Realm) ObjectType {
 	}
 	var deleteProperty BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		target := arguments[0]
-		propertyKey := arguments[1]
+		target := argumentAt(arguments, 0)
+		propertyKey := argumentAt(arguments, 1)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.deleteProperty called on non-object")
@@ -104,8 +104,8 @@ func NewReflectObject(realm *Realm) ObjectType {
 	}
 	var get BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		target := arguments[0]
-		propertyKey := arguments[1]
+		target := argumentAt(arguments, 0)
+		propertyKey := argumentAt(arguments, 1)
 		receiver := pkg.SliceSafeGet(arguments, 2)
 
 		if !target.IsObject() {
@@ -125,8 +125,8 @@ func NewReflectObject(realm *Realm) ObjectType {
 	}
 	var getOwnPropertyDescriptor BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		target := arguments[0]
-		propertyKey := arguments[1]
+		target := argumentAt(arguments, 0)
+		propertyKey := argumentAt(arguments, 1)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.getOwnPropertyDescriptor called on non-object")
@@ -147,7 +147,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return UndefinedValue
 	}
 	var getPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
+		target := argumentAt(arguments, 0)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.getPrototypeOf called on non-object")
@@ -159,8 +159,8 @@ func NewReflectObject(realm *Realm) ObjectType {
 	}
 	var has BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		target := arguments[0]
-		propertyKey := arguments[1]
+		target := argumentAt(arguments, 0)
+		propertyKey := argumentAt(arguments, 1)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.has called on non-object")
@@ -183,7 +183,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return NewBooleanValue(hasProperty)
 	}
 	var isExtensible BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
+		target := argumentAt(arguments, 0)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.isExtensible called on non-object")
@@ -194,7 +194,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return NewBooleanValue(targetObject.InternalMethods().IsExtensible(targetObject))
 	}
 	var ownKeys BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
+		target := argumentAt(arguments, 0)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.ownKeys called on non-object")
@@ -210,7 +210,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return (CreateArrayFromList(agent, keys)).ToValue()
 	}
 	var preventExtensions BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
+		target := argumentAt(arguments, 0)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.preventExtensions called on non-object")
@@ -224,9 +224,9 @@ func NewReflectObject(realm *Realm) ObjectType {
 	// 28.1.12
 	var set BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		target := arguments[0]
-		propertyKey := arguments[1]
-		value := arguments[2]
+		target := argumentAt(arguments, 0)
+		propertyKey := argumentAt(arguments, 1)
+		value := argumentAt(arguments, 2)
 		receiver := pkg.SliceSafeGet(arguments, 3)
 
 		if !target.IsObject() {
@@ -254,8 +254,8 @@ func NewReflectObject(realm *Realm) ObjectType {
 		return NewBooleanValue(ret)
 	}
 	var setPrototypeOf BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
-		proto := arguments[1]
+		target := argumentAt(arguments, 0)
+		proto := argumentAt(arguments, 1)
 
 		if !target.IsObject() {
 			return agent.ThrowTypeError("Reflect.setPrototypeOf called on non-object")

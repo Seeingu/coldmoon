@@ -416,7 +416,7 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 		var co CompletionValue
 		n := NewNumberValue(0)
 		if len(argumentsList) > 0 {
-			value := argumentsList[0]
+			value := argumentAt(argumentsList, 0)
 			prim, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, value), co)
 			if isAbrupt {
 				return rt

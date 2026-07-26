@@ -69,7 +69,7 @@ func ContinueDynamicImport(agent *Agent, capability *PromiseCapability, moduleCo
 	loadPromise := module.LoadRequestedModules(module.HostDefined)
 
 	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		capability.Reject.Call(UndefinedValue, []Value{argumentsList[0]})
+		capability.Reject.Call(UndefinedValue, []Value{argumentAt(argumentsList, 0)})
 		return nil
 	}
 	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, CMString("onRejected"), builtinFunctionArgs{})

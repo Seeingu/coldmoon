@@ -129,7 +129,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		if !ok {
 			return agent.ThrowException(TypeError, "RegExp.prototype.exec: 'this' is not a RegExp object")
 		}
-		s := ToString(agent, arguments[0])
+		s := ToString(agent, argumentAt(arguments, 0))
 		result := RegExpBuiltinExec(agent, r, s.Data)
 		if result.Data() == NullValue {
 			return NullValue
@@ -147,7 +147,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		if !ok {
 			return agent.ThrowException(TypeError, "RegExp.prototype.test: 'this' is not a RegExp object")
 		}
-		s := ToString(agent, arguments[0])
+		s := ToString(agent, argumentAt(arguments, 0))
 		m := RegExpExec(agent, r, s.Data)
 		if m.Data() == NullValue {
 			return FalseValue
@@ -160,7 +160,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		rxObject := MustGetObject(rx)
-		S := ToString(agent, arguments[0])
+		S := ToString(agent, argumentAt(arguments, 0))
 		previousLastIndex := rxObject.Get(NewStringPropertyKey("lastIndex"))
 		if !SameValue(previousLastIndex, NewNumberValue(0)) {
 			rxObject.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow)
@@ -256,7 +256,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 			panic("TypeError")
 		}
 		r := rx.Object
-		s := ToString(agent, arguments[0])
+		s := ToString(agent, argumentAt(arguments, 0))
 		c := r.SpeciesConstructor(realm.Intrinsics.RegExpConstructor)
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
 		matcher := c.Data().Construct([]Value{this, _flags}, nil).value

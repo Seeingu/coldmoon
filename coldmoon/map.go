@@ -96,7 +96,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	}
 	var mapDelete BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
-		key := arguments[0].Hash()
+		key := argumentAt(arguments, 0).Hash()
 		if _, ok := m.MapValue.Data[key]; !ok {
 			return FalseValue
 		}
@@ -105,7 +105,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	}
 	var mapGet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
-		key := arguments[0].Hash()
+		key := argumentAt(arguments, 0).Hash()
 		if v, ok := m.MapValue.Data[key]; ok {
 			return v
 		}
@@ -113,14 +113,14 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	}
 	var mapHas BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
-		key := arguments[0].Hash()
+		key := argumentAt(arguments, 0).Hash()
 		_, ok := m.MapValue.Data[key]
 		return NewBooleanValue(ok)
 	}
 	var mapSet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
-		key := arguments[0].Hash()
-		value := arguments[1]
+		key := argumentAt(arguments, 0).Hash()
+		value := argumentAt(arguments, 1)
 		m.MapValue.Data[key] = value
 		return this
 	}
@@ -139,8 +139,8 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	}
 	var forEach BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
-		callbackFn := arguments[0]
-		thisArg := arguments[1]
+		callbackFn := argumentAt(arguments, 0)
+		thisArg := argumentAt(arguments, 1)
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
 		}

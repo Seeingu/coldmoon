@@ -50,7 +50,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 	call := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		thisArg := Value(UndefinedValue)
 		if len(argumentsList) > 0 {
-			thisArg = argumentsList[0]
+			thisArg = argumentAt(argumentsList, 0)
 		}
 		var args []Value
 		if len(argumentsList) > 1 {
@@ -67,7 +67,7 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 		var co CompletionValue
 		thisArg := Value(UndefinedValue)
 		if len(argumentsList) > 0 {
-			thisArg = argumentsList[0]
+			thisArg = argumentAt(argumentsList, 0)
 		}
 		var args []Value
 		if len(argumentsList) > 1 {
@@ -115,11 +115,11 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 	apply := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		thisArg := Value(UndefinedValue)
 		if len(argumentsList) > 0 {
-			thisArg = argumentsList[0]
+			thisArg = argumentAt(argumentsList, 0)
 		}
 		argArray := Value(UndefinedValue)
 		if len(argumentsList) > 1 {
-			argArray = argumentsList[1]
+			argArray = argumentAt(argumentsList, 1)
 		}
 		fun := this
 		if !IsCallable(fun) {

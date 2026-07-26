@@ -150,7 +150,7 @@ func NewStringConstructor(realm *Realm) ObjectType {
 		var co CompletionValue
 		var s string
 		if len(argumentsList) > 0 {
-			value := argumentsList[0]
+			value := argumentAt(argumentsList, 0)
 			symbolValue, isSymbol := value.(*SymbolValue)
 			if newTarget == nil && isSymbol {
 				return NewStringValue(symbolValue.SymbolDescriptiveString())
@@ -340,7 +340,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 	}
 	var at BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		index := argumentsList[0]
+		index := argumentAt(argumentsList, 0)
 		o := RequireObjectCoercible(agent, thisArgument)
 		s := o.String()
 		length := len(s)
@@ -736,7 +736,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		}
 	}
 	var search BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		regexp := argumentsList[0]
+		regexp := argumentAt(argumentsList, 0)
 		o := RequireObjectCoercible(agent, thisArgument)
 		if regexp != UndefinedValue && regexp != NullValue {
 			searcher := GetMethod(agent, regexp, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSearch]))
@@ -780,7 +780,7 @@ func NewStringPrototype(realm *Realm) *StringObject {
 		)
 	}
 	var matchAll BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		regexp := argumentsList[0]
+		regexp := argumentAt(argumentsList, 0)
 		o := RequireObjectCoercible(agent, thisArgument)
 		if regexp != UndefinedValue && regexp != NullValue {
 			isRegExp := IsRegExp(regexp)

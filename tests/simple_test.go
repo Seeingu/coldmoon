@@ -441,6 +441,20 @@ try { Date.prototype.getDate.call({}); } catch (error) {
 assert(dateError);`)
 }
 
+func TestBuiltinsNormalizeMissingArgumentsToUndefined(t *testing.T) {
+	testSource(t, `
+assert(Number.isNaN(Math.abs()));
+assert(eval() === undefined);
+let reflectError = false;
+try {
+    Reflect.apply();
+} catch (error) {
+    reflectError = error instanceof TypeError;
+}
+assert(reflectError);
+`)
+}
+
 func TestDateLocalSettersPreserveOmittedComponents(t *testing.T) {
 	testSource(t, `const date = new Date(2020, 5, 10, 12, 34, 56, 789);
 date.setHours(8);

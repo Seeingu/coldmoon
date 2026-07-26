@@ -35,7 +35,7 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	behavior := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
-		bufferValue := args[0]
+		bufferValue := argumentAt(args, 0)
 		byteOffset := pkg.SliceSafeGet(args, 1)
 		byteLength := pkg.SliceSafeGet(args, 2)
 		if newTarget == nil {
@@ -138,83 +138,83 @@ func NewDataViewPrototype(realm *Realm) ObjectType {
 	})
 
 	getBigInt64 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 8)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 8)
 		return value
 	}
 	getBigUint64 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 8)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 8)
 		return value
 	}
 	getFloat32 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 4)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 4)
 		return value
 	}
 	getFloat64 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 8)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 8)
 		return value
 	}
 	getInt8 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 1)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 1)
 		return value
 	}
 	getInt16 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 2)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 2)
 		return value
 	}
 	getInt32 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 4)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 4)
 		return value
 	}
 	getUint8 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 1)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 1)
 		return value
 	}
 	getUint16 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 2)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 2)
 		return value
 	}
 	getUint32 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := GetViewValue(agent, this, args[0], 4)
+		value := GetViewValue(agent, this, argumentAt(args, 0), 4)
 		return value
 	}
 	setBigInt64 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 8)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 8)
 		return value
 	}
 	setBigUint64 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 8)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 8)
 		return value
 	}
 	setFloat32 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 4)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 4)
 		return value
 	}
 	setFloat64 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 8)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 8)
 		return value
 	}
 	setInt8 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 1)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 1)
 		return value
 	}
 	setInt16 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 2)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 2)
 		return value
 	}
 	setInt32 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 4)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 4)
 		return value
 	}
 	setUint8 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 1)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 1)
 		return value
 	}
 	setUint16 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 2)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 2)
 		return value
 	}
 	setUint32 := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := SetViewValue(agent, this, args[0], args[1], 4)
+		value := SetViewValue(agent, this, argumentAt(args, 0), argumentAt(args, 1), 4)
 		return value
 	}
 

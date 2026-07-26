@@ -523,8 +523,8 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 
 	var behavior BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		target := arguments[0]
-		handler := arguments[1]
+		target := argumentAt(arguments, 0)
+		handler := argumentAt(arguments, 1)
 		if newTarget == nil {
 			return agent.ThrowTypeError("Proxy is not a constructor")
 		}
@@ -538,8 +538,8 @@ func NewProxyConstructor(realm *Realm) ObjectType {
 	})
 
 	var revocable BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		target := argumentsList[0]
-		handler := argumentsList[1]
+		target := argumentAt(argumentsList, 0)
+		handler := argumentAt(argumentsList, 1)
 
 		proxy := ProxyCreate(agent, target, handler)
 

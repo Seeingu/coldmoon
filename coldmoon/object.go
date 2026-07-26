@@ -604,7 +604,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var value Value
 		if len(argumentsList) > 0 {
-			value = argumentsList[0]
+			value = argumentAt(argumentsList, 0)
 		}
 		if newTarget != nil && newTarget != agent.ActiveFunctionObject() {
 			return OrdinaryCreateFromConstructor(
@@ -657,8 +657,8 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		obj := OrdinaryObjectCreate(agent, proto, []string{})
 
-		if len(arguments) > 1 && arguments[1] != UndefinedValue {
-			properties := arguments[1]
+		if len(arguments) > 1 && argumentAt(arguments, 1) != UndefinedValue {
+			properties := argumentAt(arguments, 1)
 			var co CompletionValue
 			result, isAbrupt, rt := ReturnIfAbrupt(objectDefineProperties(agent, obj, properties), co)
 			if isAbrupt {
@@ -1030,8 +1030,8 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		var closure BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			f := agent.ActiveFunctionObject()
 			captures := f.(*BuiltinFunction).AdditionalFieldsV2.(*Captures)
-			k := args[0]
-			v := args[1]
+			k := argumentAt(args, 0)
+			v := argumentAt(args, 1)
 			var co CompletionValue
 			propertyKey, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, k), co)
 			if isAbrupt {
@@ -1147,7 +1147,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, args[0]), co)
+		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, argumentAt(args, 0)), co)
 		if isAbrupt {
 			return rt
 		}
@@ -1186,7 +1186,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, args[0]), co)
+		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, argumentAt(args, 0)), co)
 		if isAbrupt {
 			return rt
 		}
