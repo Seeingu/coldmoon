@@ -12,8 +12,65 @@ type constructorProperties struct {
 	PropertyDescriptor *PropertyDescriptor
 }
 
+var globalIntrinsicBindings = []struct {
+	name      string
+	intrinsic IntrinsicName
+}{
+	{"Boolean", IntrinsicNameBoolean},
+	{"isFinite", IntrinsicNameIsFinite},
+	{"isNaN", IntrinsicNameIsNaN},
+	{"eval", IntrinsicNameEval},
+	{"Object", IntrinsicNameObject},
+	{"Function", IntrinsicNameFunction},
+	{"Array", IntrinsicNameArray},
+	{"String", IntrinsicNameString},
+	{"Number", IntrinsicNameNumber},
+	{"Symbol", IntrinsicNameSymbol},
+	{"BigInt", IntrinsicNameBigInt},
+	{"Math", IntrinsicNameMath},
+	{"Error", IntrinsicNameError},
+	{"EvalError", IntrinsicNameEvalError},
+	{"RangeError", IntrinsicNameRangeError},
+	{"ReferenceError", IntrinsicNameReferenceError},
+	{"SyntaxError", IntrinsicNameSyntaxError},
+	{"TypeError", IntrinsicNameTypeError},
+	{"URIError", IntrinsicNameURIError},
+	{"Reflect", IntrinsicNameReflect},
+	{"Proxy", IntrinsicNameProxy},
+	{"AggregateError", IntrinsicNameAggregateError},
+	{"Date", IntrinsicNameDate},
+	{"Map", IntrinsicNameMap},
+	{"Set", IntrinsicNameSet},
+	{"Promise", IntrinsicNamePromise},
+	{"ArrayBuffer", IntrinsicNameArrayBuffer},
+	{"SharedArrayBuffer", IntrinsicNameSharedArrayBuffer},
+	{"parseInt", IntrinsicNameParseInt},
+	{"parseFloat", IntrinsicNameParseFloat},
+	{"RegExp", IntrinsicNameRegExp},
+	{"DataView", IntrinsicNameDataView},
+	{"decodeURI", IntrinsicNameDecodeURI},
+	{"decodeURIComponent", IntrinsicNameDecodeURIComponent},
+	{"encodeURI", IntrinsicNameEncodeURI},
+	{"encodeURIComponent", IntrinsicNameEncodeURIComponent},
+	{"Intl", IntrinsicNameIntl},
+	{"JSON", IntrinsicNameJSON},
+	{"BigInt64Array", IntrinsicNameBigInt64Array},
+	{"BigUint64Array", IntrinsicNameBigUint64Array},
+	{"Int8Array", IntrinsicNameInt8Array},
+	{"Uint8Array", IntrinsicNameUint8Array},
+	{"Uint8ClampedArray", IntrinsicNameUint8ClampedArray},
+	{"Int16Array", IntrinsicNameInt16Array},
+	{"Uint16Array", IntrinsicNameUint16Array},
+	{"Int32Array", IntrinsicNameInt32Array},
+	{"Uint32Array", IntrinsicNameUint32Array},
+	{"Float32Array", IntrinsicNameFloat32Array},
+	{"Float64Array", IntrinsicNameFloat64Array},
+	{"Atomics", IntrinsicNameAtomics},
+}
+
 // 19.1
 func GlobalObjectProperties(r *Realm) []constructorProperties {
+	Assert(r.IsReady())
 	propNameValues := []struct {
 		name  string
 		value Value
@@ -22,56 +79,15 @@ func GlobalObjectProperties(r *Realm) []constructorProperties {
 		{"Infinity", InfinityValue},
 		{"NaN", NaNValue},
 		{"undefined", UndefinedValue},
-		{"Boolean", r.Intrinsics.BooleanConstructor.ToValue()},
-		{"isFinite", r.Intrinsics.IsFinite.ToValue()},
-		{"isNaN", r.Intrinsics.IsNaN.ToValue()},
-		{"eval", r.Intrinsics.Eval.ToValue()},
-		{"Object", r.Intrinsics.ObjectConstructor.ToValue()},
-		{"Function", r.Intrinsics.FunctionConstructor.ToValue()},
-		{"Array", r.Intrinsics.ArrayConstructor.ToValue()},
-		{"String", r.Intrinsics.StringConstructor.ToValue()},
-		{"Number", r.Intrinsics.NumberConstructor.ToValue()},
-		{"Symbol", r.Intrinsics.SymbolConstructor.ToValue()},
-		{"BigInt", r.Intrinsics.BigIntConstructor.ToValue()},
-		{"Math", r.Intrinsics.Math.ToValue()},
-		{"Error", r.Intrinsics.ErrorConstructor.ToValue()},
-		{"EvalError", r.Intrinsics.EvalErrorConstructor.ToValue()},
-		{"RangeError", r.Intrinsics.RangeErrorConstructor.ToValue()},
-		{"ReferenceError", r.Intrinsics.ReferenceErrorConstructor.ToValue()},
-		{"SyntaxError", r.Intrinsics.SyntaxErrorConstructor.ToValue()},
-		{"TypeError", r.Intrinsics.TypeErrorConstructor.ToValue()},
-		{"URIError", r.Intrinsics.URIErrorConstructor.ToValue()},
-		{"Reflect", r.Intrinsics.Reflect.ToValue()},
-		{"Proxy", r.Intrinsics.Proxy.ToValue()},
-		{"AggregateError", r.Intrinsics.AggregateErrorConstructor.ToValue()},
-		{"Date", r.Intrinsics.DateConstructor.ToValue()},
-		{"Map", r.Intrinsics.Map.ToValue()},
-		{"Set", r.Intrinsics.Set.ToValue()},
-		{"Promise", r.Intrinsics.Promise.ToValue()},
-		{"ArrayBuffer", r.Intrinsics.ArrayBufferConstructor.ToValue()},
-		{"SharedArrayBuffer", r.Intrinsics.SharedArrayBufferConstructor.ToValue()},
-		{"parseInt", r.Intrinsics.ParseInt.ToValue()},
-		{"parseFloat", r.Intrinsics.ParseFloat.ToValue()},
-		{"RegExp", r.Intrinsics.RegExpConstructor.ToValue()},
-		{"DataView", r.Intrinsics.DataViewConstructor.ToValue()},
-		{"decodeURI", r.Intrinsics.DecodeURI.ToValue()},
-		{"decodeURIComponent", r.Intrinsics.DecodeURIComponent.ToValue()},
-		{"encodeURI", r.Intrinsics.EncodeURI.ToValue()},
-		{"encodeURIComponent", r.Intrinsics.EncodeURIComponent.ToValue()},
-		{"Intl", r.Intrinsics.Intl.ToValue()},
-		{"JSON", r.Intrinsics.JSON.ToValue()},
-		{"BigInt64Array", r.Intrinsics.BigInt64ArrayConstructor.ToValue()},
-		{"BigUint64Array", r.Intrinsics.BigUint64ArrayConstructor.ToValue()},
-		{"Int8Array", r.Intrinsics.Int8ArrayConstructor.ToValue()},
-		{"Uint8Array", r.Intrinsics.Uint8ArrayConstructor.ToValue()},
-		{"Uint8ClampedArray", r.Intrinsics.Uint8ClampedArrayConstructor.ToValue()},
-		{"Int16Array", r.Intrinsics.Int16ArrayConstructor.ToValue()},
-		{"Uint16Array", r.Intrinsics.Uint16ArrayConstructor.ToValue()},
-		{"Int32Array", r.Intrinsics.Int32ArrayConstructor.ToValue()},
-		{"Uint32Array", r.Intrinsics.Uint32ArrayConstructor.ToValue()},
-		{"Float32Array", r.Intrinsics.Float32ArrayConstructor.ToValue()},
-		{"Float64Array", r.Intrinsics.Float64ArrayConstructor.ToValue()},
-		{"Atomics", r.Intrinsics.Atomics.ToValue()},
+	}
+	for _, binding := range globalIntrinsicBindings {
+		propNameValues = append(propNameValues, struct {
+			name  string
+			value Value
+		}{
+			name:  binding.name,
+			value: r.Intrinsics.Get(binding.intrinsic).ToValue(),
+		})
 	}
 
 	var properties []constructorProperties

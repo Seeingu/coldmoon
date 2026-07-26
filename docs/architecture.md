@@ -90,14 +90,26 @@ Per-module `LoadedModules` maps retain specifier edges required by ECMAScript
 algorithms, while canonical ownership and deduplication live only in
 `ModuleGraph`.
 
+## Realm bootstrap
+
+A Realm has two internal states: building and ready. `CreateRealm` constructs
+all intrinsics on a private draft, reflects over the completed intrinsic record
+to reject any missing field, installs restricted function properties, and only
+then marks the Realm ready. Global object/environment publication and default
+global bindings reject a building Realm.
+
+Global constructor exposure is a declarative mapping from JavaScript names to
+`IntrinsicName`. This keeps global publication on the same lookup path used by
+the rest of the runtime instead of maintaining a second set of direct field
+references.
+
 ## Planned deep modules
 
 The remaining architecture work is sequenced by dependency:
 
-1. make Realm and intrinsic construction atomic;
-2. internalize the property model and narrow object dispatch;
-3. give static and runtime syntax semantics explicit owners;
-4. collapse the Test262 lifecycle into one runner.
+1. internalize the property model and narrow object dispatch;
+2. give static and runtime syntax semantics explicit owners;
+3. collapse the Test262 lifecycle into one runner.
 
 Each module should expose a small interface, keep implementation details local,
 and add an adapter seam only when at least two real implementations exist.

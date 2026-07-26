@@ -1,7 +1,17 @@
 package coldmoon
 
 import (
+	"fmt"
 	"math/rand"
+	"reflect"
+	"strings"
+)
+
+type realmState uint8
+
+const (
+	realmStateBuilding realmState = iota
+	realmStateReady
 )
 
 type Realm struct {
@@ -13,6 +23,12 @@ type Realm struct {
 	HostDefined    any
 	Agent          *Agent
 	Rng            rand.Rand
+	state          realmState
+}
+
+// IsReady reports whether intrinsic construction and validation completed.
+func (r *Realm) IsReady() bool {
+	return r != nil && r.state == realmStateReady
 }
 
 func (r *Realm) ToReferrer() ImportedModuleReferrer {
@@ -29,15 +45,21 @@ func CreateRealm(agent *Agent) *Realm {
 	r := &Realm{
 		Agent:      agent,
 		Intrinsics: &Intrinsics{},
+		state:      realmStateBuilding,
 	}
-	r.CreateIntrinsics()
+	r.createIntrinsics()
+	if missing := missingIntrinsicFields(r.Intrinsics); len(missing) > 0 {
+		panic(fmt.Sprintf("incomplete intrinsic bootstrap: %s", strings.Join(missing, ", ")))
+	}
 	AddRestrictedFunctionProperties(r.Intrinsics.FunctionPrototype, r)
+	r.state = realmStateReady
 
 	return r
 }
 
 // 9.3.2
-func (r *Realm) CreateIntrinsics() {
+func (r *Realm) createIntrinsics() {
+	Assert(r.state == realmStateBuilding)
 	r.Intrinsics.ObjectPrototype = NewObjectPrototypeSkeleton(r)
 	NewFunctionPrototypeWithIntrinsicsBinding(r)
 	r.Intrinsics.ObjectPrototype = NewObjectPrototypeWithObject(r, r.Intrinsics.ObjectPrototype)
@@ -147,8 +169,28 @@ func (r *Realm) CreateIntrinsics() {
 	r.Intrinsics.AggregateErrorConstructor = NewAggregateErrorConstructor(r)
 }
 
+func missingIntrinsicFields(intrinsics *Intrinsics) []string {
+	if intrinsics == nil {
+		return []string{"Intrinsics"}
+	}
+	value := reflect.ValueOf(intrinsics).Elem()
+	kind := value.Type()
+	var missing []string
+	for index := 0; index < value.NumField(); index++ {
+		field := value.Field(index)
+		switch field.Kind() {
+		case reflect.Interface, reflect.Pointer, reflect.Map, reflect.Slice, reflect.Func:
+			if field.IsNil() {
+				missing = append(missing, kind.Field(index).Name)
+			}
+		}
+	}
+	return missing
+}
+
 // 9.3.3
 func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue ObjectType) {
+	Assert(r.IsReady())
 	obj := globalObj
 	if obj == nil {
 		obj = OrdinaryObjectCreate(r.Agent, r.Intrinsics.ObjectPrototype, []string{})
@@ -166,6 +208,9 @@ func (r *Realm) SetRealmGlobalObject(globalObj *Object, thisValue ObjectType) {
 
 // 9.3.4
 func (r *Realm) SetDefaultGlobalBindings() *Object {
+	Assert(r.IsReady())
+	Assert(r.GlobalObject != nil)
+	Assert(r.GlobalEnv != nil)
 	global := r.GlobalObject
 
 	properties := GlobalObjectProperties(r)
