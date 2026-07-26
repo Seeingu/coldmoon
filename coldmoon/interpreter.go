@@ -177,7 +177,7 @@ func (v *VM) OrdinaryHasInstance(c Value, value Value) (co Completion[bool]) {
 
 	object := objectValue.Object
 	for {
-		object = object.InternalMethods().GetPrototypeOf(object)
+		object = object.internalMethods().GetPrototypeOf(object)
 		if object == nil {
 			co.value = false
 			return

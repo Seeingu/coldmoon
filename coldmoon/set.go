@@ -173,8 +173,8 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("values"), setValues, 0)
 	object.defineBuiltinFunction(realm, CMString("forEach"), forEach, 1)
 
-	object.defineBuiltinProperty(CMString("keys"), object.PropertyStorage().Get(NewStringPropertyKey("values")))
-	object.defineBuiltinProperty(WellKnownSymbolsIterator, object.PropertyStorage().Get(NewStringPropertyKey("values")))
+	object.defineBuiltinProperty(CMString("keys"), object.propertyStorage().Get(NewStringPropertyKey("values")))
+	object.defineBuiltinProperty(WellKnownSymbolsIterator, object.propertyStorage().Get(NewStringPropertyKey("values")))
 	object.defineToStringTag("Set")
 	return object
 }

@@ -69,7 +69,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		targetObject := MustGetObject(target)
 
 		ret, isAbrupt, rt := ReturnIfAbrupt(
-			targetObject.InternalMethods().DefineOwnProperty(targetObject, key, desc),
+			targetObject.internalMethods().DefineOwnProperty(targetObject, key, desc),
 			co,
 		)
 		if isAbrupt {
@@ -94,7 +94,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		targetObject := MustGetObject(target)
 
 		ret, isAbrupt, rt := ReturnIfAbrupt(
-			targetObject.InternalMethods().Delete(targetObject, key),
+			targetObject.internalMethods().Delete(targetObject, key),
 			co,
 		)
 		if isAbrupt {
@@ -120,7 +120,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		targetObject := MustGetObject(target)
 
 		return ReturnAssertNormal(
-			targetObject.InternalMethods().Get(targetObject, key, receiver),
+			targetObject.internalMethods().Get(targetObject, key, receiver),
 		)
 	}
 	var getOwnPropertyDescriptor BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
@@ -138,7 +138,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		}
 
 		targetObject := MustGetObject(target)
-		desc := targetObject.InternalMethods().GetOwnProperty(targetObject, key)
+		desc := targetObject.internalMethods().GetOwnProperty(targetObject, key)
 
 		if desc != nil {
 			return (desc.FromPropertyDescriptor(agent, desc)).ToValue()
@@ -155,7 +155,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		targetObject := MustGetObject(target)
 
-		return targetObject.InternalMethods().GetPrototypeOf(targetObject).ToValue()
+		return targetObject.internalMethods().GetPrototypeOf(targetObject).ToValue()
 	}
 	var has BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
@@ -174,7 +174,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		targetObject := MustGetObject(target)
 
 		hasProperty, isAbrupt, rt := ReturnIfAbrupt(
-			targetObject.InternalMethods().HasProperty(targetObject, key),
+			targetObject.internalMethods().HasProperty(targetObject, key),
 			co,
 		)
 		if isAbrupt {
@@ -191,7 +191,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		targetObject := MustGetObject(target)
 
-		return NewBooleanValue(targetObject.InternalMethods().IsExtensible(targetObject))
+		return NewBooleanValue(targetObject.internalMethods().IsExtensible(targetObject))
 	}
 	var ownKeys BehaviorFn = func(_ Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		target := argumentAt(arguments, 0)
@@ -201,7 +201,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		}
 
 		targetObject := MustGetObject(target)
-		propKeys := targetObject.InternalMethods().OwnPropertyKeys(targetObject)
+		propKeys := targetObject.internalMethods().OwnPropertyKeys(targetObject)
 		var keys []Value
 		for _, key := range propKeys {
 			keys = append(keys, key.ToValue())
@@ -218,7 +218,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 
 		targetObject := MustGetObject(target)
 
-		ret := targetObject.InternalMethods().PreventExtensions(targetObject)
+		ret := targetObject.internalMethods().PreventExtensions(targetObject)
 		return NewBooleanValue(ret)
 	}
 	// 28.1.12
@@ -245,7 +245,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 		}
 
 		ret, isAbrupt, rt := ReturnIfAbrupt(
-			targetObject.InternalMethods().Set(targetObject, key, value, receiver),
+			targetObject.internalMethods().Set(targetObject, key, value, receiver),
 			co,
 		)
 		if isAbrupt {
@@ -267,7 +267,7 @@ func NewReflectObject(realm *Realm) ObjectType {
 			return agent.ThrowTypeError("Reflect.setPrototypeOf called with non-object prototype")
 		}
 
-		ret := targetObject.InternalMethods().SetPrototypeOf(targetObject, MustGetObject(proto))
+		ret := targetObject.internalMethods().SetPrototypeOf(targetObject, MustGetObject(proto))
 		return NewBooleanValue(ret)
 	}
 

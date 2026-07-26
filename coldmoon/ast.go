@@ -2863,7 +2863,7 @@ func (e *RelationalExpression) Evaluation(vm *VM) (co CompletionValue) {
 		}
 		object := MustGetObject(rval)
 		hasProperty, isAbrupt, rt := ReturnIfAbrupt(
-			object.InternalMethods().HasProperty(object, propertyKey),
+			object.internalMethods().HasProperty(object, propertyKey),
 			co,
 		)
 		if isAbrupt {
@@ -3090,7 +3090,7 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 				referencedName = NewStringPropertyKey(ref.ReferencedName.String)
 			}
 			deleteStatus, isAbrupt, rt := ReturnIfAbrupt(
-				baseObj.InternalMethods().Delete(baseObj, referencedName),
+				baseObj.internalMethods().Delete(baseObj, referencedName),
 				co,
 			)
 			if isAbrupt {
@@ -5409,7 +5409,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 			classConstructorFields := ObjectAs[*BuiltinFunction](F).AdditionalFields.ClassConstructorFields
 			var result ObjectType
 			if classConstructorFields.ConstructorKind == ConstructorKindDerived {
-				fun := function.InternalMethods().GetPrototypeOf(function)
+				fun := function.internalMethods().GetPrototypeOf(function)
 				if !IsConstructor((fun).ToValue()) {
 					panic("TypeError: prototype is not a constructor")
 				}

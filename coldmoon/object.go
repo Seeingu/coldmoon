@@ -122,11 +122,11 @@ func (o *Object) Agent() *Agent {
 	return o.data.agent
 }
 
-func (o *Object) InternalMethods() *InternalMethods {
+func (o *Object) internalMethods() *InternalMethods {
 	return &o.data.internalMethods
 }
 
-func (o *Object) PropertyStorage() *PropertyStorage {
+func (o *Object) propertyStorage() *PropertyStorage {
 	return &o.data.propertyStorage
 }
 
@@ -164,7 +164,7 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) (co CompletionValue) {
 }
 
 func (o *Object) IsCallable() bool {
-	if o.Ref().InternalMethods().Call != nil {
+	if o.Ref().internalMethods().Call != nil {
 		return true
 	}
 
@@ -182,18 +182,18 @@ func (o *Object) Call(this Value, argumentsList ArgumentsList) (co CompletionVal
 		argumentsList = ArgumentsList{}
 	}
 	object := o.Ref()
-	return object.InternalMethods().Call(object, this, argumentsList)
+	return object.internalMethods().Call(object, this, argumentsList)
 }
 
 // 7.2.5
 func (o *Object) IsExtensible() bool {
-	return o.InternalMethods().IsExtensible(o)
+	return o.internalMethods().IsExtensible(o)
 }
 
 // TODO(BM): return CompletionValue
 // spec: 7.3.2
 func (o *Object) Get(key PropertyKey) Value {
-	r := o.InternalMethods().Get(o.Ref(), key, o.ToValue())
+	r := o.internalMethods().Get(o.Ref(), key, o.ToValue())
 	// FIXME: no need when return CompletionValue
 	if r.t == CompletionTypeReturn {
 		return r.value
@@ -206,7 +206,7 @@ func (o *Object) Get(key PropertyKey) Value {
 // returns UNUSED or throw
 func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) (co CompletionValue) {
 	success, isAbrupt, rt := ReturnIfAbrupt(
-		o.InternalMethods().Set(o.Ref(), key, value, o.ToValue()),
+		o.internalMethods().Set(o.Ref(), key, value, o.ToValue()),
 		co,
 	)
 	if isAbrupt {
@@ -220,7 +220,7 @@ func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) (co Compl
 
 // 7.3.5
 func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
-	newDesc := o.InternalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
+	newDesc := o.internalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
 		Value:           value,
 		Writable:        true,
 		WritableSet:     true,
@@ -236,7 +236,7 @@ func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
 
 func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) (co Completion[bool]) {
 	success, isAbrupt, rt := ReturnIfAbrupt(
-		o.InternalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
+		o.internalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
 			Value:           value,
 			Writable:        true,
 			WritableSet:     true,
@@ -259,7 +259,7 @@ func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) (co Com
 
 // 7.3.7
 func (o *Object) CreateNonEnumerableDataProperty(key PropertyKey, value Value) bool {
-	for _, p := range o.PropertyStorage().Properties {
+	for _, p := range o.propertyStorage().Descriptors() {
 		Assert(p.Configurable)
 	}
 
@@ -274,7 +274,7 @@ func (o *Object) CreateNonEnumerableDataProperty(key PropertyKey, value Value) b
 
 // 7.3.8
 func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
-	success := ReturnAssertNormal(o.InternalMethods().DefineOwnProperty(o.Ref(), key, desc))
+	success := ReturnAssertNormal(o.internalMethods().DefineOwnProperty(o.Ref(), key, desc))
 	if !success {
 		o.Agent().ThrowException(TypeError, "DefinePropertyOrThrow failed")
 	}
@@ -283,7 +283,7 @@ func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor
 
 // 7.3.9
 func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
-	success := ReturnAssertNormal(o.InternalMethods().Delete(o.Ref(), key))
+	success := ReturnAssertNormal(o.internalMethods().Delete(o.Ref(), key))
 	if !success {
 		o.Agent().ThrowException(TypeError, "DeletePropertyOrThrow failed")
 	}
@@ -292,12 +292,12 @@ func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
 
 // 7.3.11
 func (o *Object) HasProperty(key PropertyKey) bool {
-	return ReturnAssertNormal(o.InternalMethods().HasProperty(o.Ref(), key))
+	return ReturnAssertNormal(o.internalMethods().HasProperty(o.Ref(), key))
 }
 
 // 7.3.12
 func ObjectHasOwnProperty(o ObjectType, key PropertyKey) bool {
-	desc := o.InternalMethods().GetOwnProperty(o, key)
+	desc := o.internalMethods().GetOwnProperty(o, key)
 	return desc != nil
 }
 
@@ -311,7 +311,7 @@ func ObjectConstruct(
 	if newTarget == nil {
 		newTarget = o
 	}
-	return o.InternalMethods().Construct(o, _argumentLists, newTarget)
+	return o.internalMethods().Construct(o, _argumentLists, newTarget)
 }
 
 func (o *Object) Construct(
@@ -322,18 +322,18 @@ func (o *Object) Construct(
 	if newTarget == nil {
 		newTarget = object
 	}
-	return object.InternalMethods().Construct(object, argumentLists, newTarget)
+	return object.internalMethods().Construct(object, argumentLists, newTarget)
 }
 
 // 7.3.15
 func SetIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
-	status := o.InternalMethods().PreventExtensions(o)
+	status := o.internalMethods().PreventExtensions(o)
 
 	if !status {
 		return false
 	}
 
-	keys := o.InternalMethods().OwnPropertyKeys(o)
+	keys := o.internalMethods().OwnPropertyKeys(o)
 	switch level {
 	case IntegrityLevelSealed:
 		for _, k := range keys {
@@ -344,7 +344,7 @@ func SetIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 		}
 	case IntegrityLevelFrozen:
 		for _, k := range keys {
-			currentDesc := o.InternalMethods().GetOwnProperty(o, k)
+			currentDesc := o.internalMethods().GetOwnProperty(o, k)
 			var desc *PropertyDescriptor
 
 			if currentDesc != nil {
@@ -375,10 +375,10 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 		return false
 	}
 
-	keys := o.InternalMethods().OwnPropertyKeys(o)
+	keys := o.internalMethods().OwnPropertyKeys(o)
 
 	for _, k := range keys {
-		currentDesc := o.InternalMethods().GetOwnProperty(o, k)
+		currentDesc := o.internalMethods().GetOwnProperty(o, k)
 		if currentDesc == nil {
 			continue
 		}
@@ -400,7 +400,7 @@ func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
 // spec: 7.3.18
 func (o *Object) LengthOfArrayLike() (co Completion[JSInt]) {
 	length, isAbrupt, rt := ReturnIfAbrupt(
-		o.InternalMethods().Get(
+		o.internalMethods().Get(
 			o.Ref(),
 			NewStringPropertyKey("length"),
 			o.ToValue(),
@@ -455,13 +455,13 @@ const (
 
 func (o *Object) EnumerableOwnProperties(kind objectOwnPropertiesKind) (results []Value) {
 	object := o.Ref()
-	ownKeys := object.InternalMethods().OwnPropertyKeys(object)
+	ownKeys := object.internalMethods().OwnPropertyKeys(object)
 
 	for _, key := range ownKeys {
 		if _, isSymbol := key.(SymbolPropertyKey); isSymbol {
 			continue
 		}
-		desc := object.InternalMethods().GetOwnProperty(object, key)
+		desc := object.internalMethods().GetOwnProperty(object, key)
 		if desc != nil && desc.Enumerable {
 			switch kind {
 			case objectOwnPropertiesKindKey:
@@ -493,7 +493,7 @@ func (o *Object) CopyDataProperties(source Value, excludedItems []PropertyKey) {
 		return
 	}
 	from := ReturnAssertNormal(source.ToObject(o.Agent()))
-	keys := from.InternalMethods().OwnPropertyKeys(from)
+	keys := from.internalMethods().OwnPropertyKeys(from)
 
 	for _, key := range keys {
 		excluded := false
@@ -501,7 +501,7 @@ func (o *Object) CopyDataProperties(source Value, excludedItems []PropertyKey) {
 			excluded = true
 		}
 		if !excluded {
-			desc := from.InternalMethods().GetOwnProperty(from, key)
+			desc := from.internalMethods().GetOwnProperty(from, key)
 			if desc != nil && desc.Enumerable {
 				propValue := from.Get(key)
 				o.CreateDataPropertyOrThrow(key, propValue)
@@ -718,7 +718,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		target := MustGetObject(o)
 		success, isAbrupt, rt := ReturnIfAbrupt(
-			target.InternalMethods().DefineOwnProperty(target, key, desc),
+			target.internalMethods().DefineOwnProperty(target, key, desc),
 			co,
 		)
 		if isAbrupt {
@@ -760,7 +760,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		desc := obj.InternalMethods().GetOwnProperty(obj, key)
+		desc := obj.internalMethods().GetOwnProperty(obj, key)
 
 		if desc == nil {
 			return UndefinedValue
@@ -776,11 +776,11 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			return rt
 		}
 
-		ownKeys := obj.InternalMethods().OwnPropertyKeys(obj)
+		ownKeys := obj.internalMethods().OwnPropertyKeys(obj)
 
 		descriptors := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
 		for _, key := range ownKeys {
-			desc := obj.InternalMethods().GetOwnProperty(obj, key)
+			desc := obj.internalMethods().GetOwnProperty(obj, key)
 			if desc != nil {
 				descValue := (desc.FromPropertyDescriptor(agent, desc)).ToValue()
 				descriptors.CreateDataPropertyOrThrow(key, descValue)
@@ -798,7 +798,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		proto := obj.InternalMethods().GetPrototypeOf(obj)
+		proto := obj.internalMethods().GetPrototypeOf(obj)
 		if proto == nil {
 			return NullValue
 		}
@@ -848,7 +848,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		}
 		obj := MustGetObject(objectValue)
 
-		status := obj.InternalMethods().PreventExtensions(obj)
+		status := obj.internalMethods().PreventExtensions(obj)
 		if !status {
 			return co.ThrowTypeError(agent, "PreventExtensions failed")
 		}
@@ -891,7 +891,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 			protoObj = MustGetObject(proto)
 		}
 		obj := MustGetObject(objectValue)
-		status := obj.InternalMethods().SetPrototypeOf(obj, protoObj)
+		status := obj.internalMethods().SetPrototypeOf(obj, protoObj)
 		if !status {
 			return co.ThrowTypeError(agent, "setPrototypeOf failed")
 		}
@@ -965,9 +965,9 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 				if isAbrupt {
 					return rt
 				}
-				pKeys := from.InternalMethods().OwnPropertyKeys(from)
+				pKeys := from.internalMethods().OwnPropertyKeys(from)
 				for _, nextKey := range pKeys {
-					desc := from.InternalMethods().GetOwnProperty(from, nextKey)
+					desc := from.internalMethods().GetOwnProperty(from, nextKey)
 					if desc != nil && desc.Enumerable {
 						propValue := from.Get(nextKey)
 						_, isAbrupt, rt := ReturnIfAbrupt(
@@ -990,7 +990,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		keys := obj.InternalMethods().OwnPropertyKeys(obj)
+		keys := obj.internalMethods().OwnPropertyKeys(obj)
 		keyNames := lo.Filter(keys, func(key PropertyKey, _ int) bool {
 			_, ok := key.(SymbolPropertyKey)
 			return !ok
@@ -1007,7 +1007,7 @@ func NewObjectConstructor(realm *Realm) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		keys := obj.InternalMethods().OwnPropertyKeys(obj)
+		keys := obj.internalMethods().OwnPropertyKeys(obj)
 		symbols := lo.Filter(keys, func(key PropertyKey, _ int) bool {
 			_, ok := key.(SymbolPropertyKey)
 			return ok
@@ -1083,7 +1083,7 @@ func NewObjectPrototypeSkeleton(realm *Realm) ObjectType {
 
 func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 	agent := realm.Agent
-	object.InternalMethods().SetPrototypeOf = ImmutableSetPrototypeOf
+	object.internalMethods().SetPrototypeOf = ImmutableSetPrototypeOf
 	realm.Intrinsics.ObjectPrototype = object
 
 	valueOf := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -1112,7 +1112,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		var builtInTag string
 		if _isArray {
 			builtInTag = "Array"
-		} else if o.InternalMethods().Call != nil {
+		} else if o.internalMethods().Call != nil {
 			builtInTag = "Function"
 		} else if ObjectIs[*BooleanObject](o) {
 			builtInTag = "Boolean"
@@ -1171,7 +1171,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 			return rt
 		}
 		for {
-			target = target.InternalMethods().GetPrototypeOf(target)
+			target = target.internalMethods().GetPrototypeOf(target)
 			if target == nil {
 				return NewBooleanValue(false)
 			}
@@ -1190,7 +1190,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		if isAbrupt {
 			return rt
 		}
-		desc := o.InternalMethods().GetOwnProperty(o, p)
+		desc := o.internalMethods().GetOwnProperty(o, p)
 		if desc == nil {
 			return NewBooleanValue(false)
 		}
@@ -1256,7 +1256,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 			return rt
 		}
 		for o != nil {
-			desc := o.InternalMethods().GetOwnProperty(o, key)
+			desc := o.internalMethods().GetOwnProperty(o, key)
 			if desc != nil {
 				if !desc.IsAccessorDescriptor() {
 					return UndefinedValue
@@ -1269,7 +1269,7 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 				}
 				return UndefinedValue
 			}
-			o = o.InternalMethods().GetPrototypeOf(o)
+			o = o.internalMethods().GetPrototypeOf(o)
 		}
 		return UndefinedValue
 	}
@@ -1319,7 +1319,7 @@ func objectDefineProperties(agent *Agent, object ObjectType, properties Value) (
 		return rt
 	}
 
-	keys := props.InternalMethods().OwnPropertyKeys(props)
+	keys := props.internalMethods().OwnPropertyKeys(props)
 
 	type descriptorEntry struct {
 		key  PropertyKey
@@ -1327,10 +1327,10 @@ func objectDefineProperties(agent *Agent, object ObjectType, properties Value) (
 	}
 	var descriptors []descriptorEntry
 	for _, key := range keys {
-		propDesc := props.InternalMethods().GetOwnProperty(props, key)
+		propDesc := props.internalMethods().GetOwnProperty(props, key)
 		if propDesc != nil && propDesc.Enumerable {
 			descValue, isAbrupt, rt := ReturnIfAbrupt(
-				props.InternalMethods().Get(props, key, properties),
+				props.internalMethods().Get(props, key, properties),
 				co,
 			)
 			if isAbrupt {
@@ -1346,7 +1346,7 @@ func objectDefineProperties(agent *Agent, object ObjectType, properties Value) (
 
 	for _, entry := range descriptors {
 		success, isAbrupt, rt := ReturnIfAbrupt(
-			object.InternalMethods().DefineOwnProperty(object, entry.key, entry.desc),
+			object.internalMethods().DefineOwnProperty(object, entry.key, entry.desc),
 			co,
 		)
 		if isAbrupt {
@@ -1405,7 +1405,7 @@ func (o *Object) FindViaPredicate(
 		}
 		pk := NewIntegerIndexPropertyKey(k)
 		kValue, isAbrupt, rt := ReturnIfAbrupt(
-			o.InternalMethods().Get(o.Ref(), pk, o.ToValue()),
+			o.internalMethods().Get(o.Ref(), pk, o.ToValue()),
 			co,
 		)
 		if isAbrupt {
@@ -1448,7 +1448,7 @@ func SameObject(o1, o2 ObjectType) bool {
 
 func (o *Object) String() string {
 	var sb string = "keys: "
-	for key := range o.data.propertyStorage.Properties {
+	for _, key := range o.data.propertyStorage.OrderedKeys() {
 		if k, ok := key.(StringPropertyKey); ok {
 			sb += fmt.Sprintf("%s,", k.Value)
 		}

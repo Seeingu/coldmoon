@@ -38,7 +38,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 		obj := iterator.Obj
 		for {
 			if !iterator.ObjectWasVisited {
-				keys := obj.InternalMethods().OwnPropertyKeys(obj)
+				keys := obj.internalMethods().OwnPropertyKeys(obj)
 				for _, key := range keys {
 					if _, ok := key.(SymbolPropertyKey); !ok {
 						iterator.RemainingKeys = append(iterator.RemainingKeys, key)
@@ -52,7 +52,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 				iterator.RemainingKeys = iterator.RemainingKeys[1:]
 				if _, ok := iterator.VisitedKeys[r]; !ok {
 					// Let desc be ? object.[[GetOwnProperty]](r).
-					desc := obj.InternalMethods().GetOwnProperty(obj, r)
+					desc := obj.internalMethods().GetOwnProperty(obj, r)
 					if desc != nil {
 						iterator.VisitedKeys[r] = true
 						if desc.Enumerable {
@@ -62,7 +62,7 @@ func NewForInIteratorPrototype(realm *Realm) ObjectType {
 				}
 			}
 
-			obj = obj.InternalMethods().GetPrototypeOf(obj)
+			obj = obj.internalMethods().GetPrototypeOf(obj)
 			if obj == nil {
 				iterator.Done = true
 				return (CreateIterResultObject(agent, UndefinedValue, true)).ToValue()

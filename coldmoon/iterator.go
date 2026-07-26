@@ -99,7 +99,7 @@ func IteratorComplete(iterResult ObjectType) (co Completion[bool]) {
 // abrupt completion produced by an accessor.
 // spec: 7.4.6
 func IteratorValue(iterResult ObjectType) CompletionValue {
-	return iterResult.InternalMethods().Get(
+	return iterResult.internalMethods().Get(
 		iterResult,
 		NewStringPropertyKey("value"),
 		iterResult.ToValue(),

@@ -103,13 +103,26 @@ Global constructor exposure is a declarative mapping from JavaScript names to
 the rest of the runtime instead of maintaining a second set of direct field
 references.
 
+## Objects and properties
+
+Object property storage and internal-method tables are package-private
+implementation details. Host packages interact through `ObjectType` semantic
+operations and cannot mutate the backing map or replace dispatch functions.
+Exotic object constructors inside the core may still override the specific
+internal methods their ECMAScript semantics require.
+
+`PropertyStorage` records insertion order alongside descriptor lookup.
+`OrderedKeys` is the single ordinary-key ordering implementation: array-index
+strings sort numerically, other strings retain insertion order, and Symbols
+retain insertion order after all strings. Deleting and redefining a string or
+Symbol gives it a new insertion position.
+
 ## Planned deep modules
 
 The remaining architecture work is sequenced by dependency:
 
-1. internalize the property model and narrow object dispatch;
-2. give static and runtime syntax semantics explicit owners;
-3. collapse the Test262 lifecycle into one runner.
+1. give static and runtime syntax semantics explicit owners;
+2. collapse the Test262 lifecycle into one runner.
 
 Each module should expose a small interface, keep implementation details local,
 and add an adapter seam only when at least two real implementations exist.

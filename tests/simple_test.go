@@ -335,6 +335,31 @@ const entries = Object.entries(object);
 assert(entries.length === 2);`)
 }
 
+func TestOrdinaryOwnPropertyKeysUseECMAScriptOrder(t *testing.T) {
+	testSource(t, `
+const first = Symbol("first");
+const second = Symbol("second");
+const value = {};
+value.beta = 1;
+value[2] = 2;
+value[1] = 1;
+value.alpha = 2;
+value[first] = 3;
+value["01"] = 4;
+value[second] = 5;
+delete value.beta;
+value.beta = 6;
+const keys = Reflect.ownKeys(value);
+assertEqual(keys[0], "1");
+assertEqual(keys[1], "2");
+assertEqual(keys[2], "alpha");
+assertEqual(keys[3], "01");
+assertEqual(keys[4], "beta");
+assertEqual(keys[5], first);
+assertEqual(keys[6], second);
+`)
+}
+
 func TestObjectLegacyAccessorMethods(t *testing.T) {
 	testSource(t, `const object = {};
 function getter() { return 42; }

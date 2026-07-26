@@ -24,7 +24,7 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 		Module:  module,
 		Exports: sortedExports,
 	}
-	internalMethods := object.InternalMethods()
+	internalMethods := object.internalMethods()
 	internalMethods.GetPrototypeOf = func(o ObjectType) ObjectType {
 		return nil
 	}
@@ -43,7 +43,7 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 			co.value = OrdinaryDefineOwnProperty(o, p, desc)
 			return
 		}
-		current := o.InternalMethods().GetOwnProperty(o, p)
+		current := o.internalMethods().GetOwnProperty(o, p)
 		if current == nil {
 			return
 		}
@@ -113,7 +113,7 @@ func moduleNamespaceGetOwnProperty(o ObjectType, p PropertyKey) *PropertyDescrip
 	if !lo.Contains(exports, p.ToValue().String()) {
 		return nil
 	}
-	value := ReturnAssertNormal(o.InternalMethods().Get(o, p, o.ToValue()))
+	value := ReturnAssertNormal(o.internalMethods().Get(o, p, o.ToValue()))
 	return &PropertyDescriptor{
 		Value:        value,
 		Writable:     true,

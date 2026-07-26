@@ -12,7 +12,7 @@ func (b *BoundFunctionObject) GetFunctionRealm() *Realm {
 }
 
 func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Value) ObjectType {
-	proto := target.InternalMethods().GetPrototypeOf(target)
+	proto := target.internalMethods().GetPrototypeOf(target)
 	boundFunction := &BoundFunctionObject{
 		Object:              NewObject(agent, proto, "BoundFunction"),
 		BoundTargetFunction: target,
@@ -28,9 +28,9 @@ func BoundFunctionCreate(agent *Agent, target ObjectType, this Value, args []Val
 		_args := append(_boundArgs, arguments...)
 		return _target.Call(_boundThis, _args)
 	}
-	boundFunction.InternalMethods().Call = call
+	boundFunction.internalMethods().Call = call
 	if IsConstructor(target.ToValue()) {
-		boundFunction.InternalMethods().Construct = func(o ObjectType, arguments []Value, newTarget ObjectType) Completion[ObjectType] {
+		boundFunction.internalMethods().Construct = func(o ObjectType, arguments []Value, newTarget ObjectType) Completion[ObjectType] {
 			b := o.(*BoundFunctionObject)
 			_target := b.BoundTargetFunction
 			_boundArgs := b.BoundArguments

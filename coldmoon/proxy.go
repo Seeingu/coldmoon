@@ -32,7 +32,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("getPrototypeOf"))
 		if trap == nil {
-			return t.InternalMethods().GetPrototypeOf(t)
+			return t.internalMethods().GetPrototypeOf(t)
 		}
 
 		handlerPrototype := trap.Call(
@@ -54,7 +54,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			}
 		}
 
-		targetProto := t.InternalMethods().GetPrototypeOf(t)
+		targetProto := t.internalMethods().GetPrototypeOf(t)
 		if !SameValue(handlerPrototype, (targetProto).ToValue()) {
 			panic("TypeError")
 		}
@@ -68,7 +68,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("setPrototypeOf"))
 		if trap == nil {
-			return t.InternalMethods().SetPrototypeOf(t, prototype)
+			return t.internalMethods().SetPrototypeOf(t, prototype)
 		}
 
 		booleanTrapResult := trap.Call(
@@ -82,7 +82,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		if extensibleTarget {
 			return true
 		}
-		targetProto := t.InternalMethods().GetPrototypeOf(t)
+		targetProto := t.internalMethods().GetPrototypeOf(t)
 		if !SameValue((prototype).ToValue(), (targetProto).ToValue()) {
 			panic("TypeError")
 		}
@@ -95,7 +95,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, h.ToValue(), NewStringPropertyKey("isExtensible"))
 		if trap == nil {
-			return t.InternalMethods().IsExtensible(t)
+			return t.internalMethods().IsExtensible(t)
 		}
 
 		booleanTrapResult := trap.Call(
@@ -115,7 +115,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, h.ToValue(), NewStringPropertyKey("preventExtensions"))
 		if trap == nil {
-			return t.InternalMethods().PreventExtensions(t)
+			return t.internalMethods().PreventExtensions(t)
 		}
 
 		booleanTrapResult := trap.Call(
@@ -137,7 +137,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, h.ToValue(), NewStringPropertyKey("getOwnPropertyDescriptor"))
 		if trap == nil {
-			return t.InternalMethods().GetOwnProperty(t, pk)
+			return t.internalMethods().GetOwnProperty(t, pk)
 		}
 
 		trapResultObjValue := trap.Call(
@@ -148,7 +148,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		if !trapResultIsObject {
 			panic("TypeError")
 		}
-		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
+		targetDesc := t.internalMethods().GetOwnProperty(t, pk)
 		if trapResultObjValue == UndefinedValue {
 			if targetDesc == nil {
 				return nil
@@ -171,7 +171,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("defineProperty"))
 		if trap == nil {
-			return t.InternalMethods().DefineOwnProperty(t, pk, desc)
+			return t.internalMethods().DefineOwnProperty(t, pk, desc)
 		}
 
 		descObj := desc.FromPropertyDescriptor(agent, desc)
@@ -187,7 +187,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		if !booleanTrapResult {
 			return
 		}
-		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
+		targetDesc := t.internalMethods().GetOwnProperty(t, pk)
 		extensibleTarget := t.IsExtensible()
 		settingConfigFalse := desc.Configurable == false
 		if targetDesc == nil {
@@ -221,7 +221,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("has"))
 		if trap == nil {
-			return t.InternalMethods().HasProperty(t, pk)
+			return t.internalMethods().HasProperty(t, pk)
 		}
 
 		trapResult, isAbrupt, rt := ReturnIfAbrupt(
@@ -236,7 +236,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		booleanTrapResult := trapResult.ToBoolean()
 		if !booleanTrapResult {
-			targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
+			targetDesc := t.internalMethods().GetOwnProperty(t, pk)
 			if targetDesc != nil && !targetDesc.Configurable {
 				panic("TypeError")
 			}
@@ -260,7 +260,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("get"))
 		if trap == nil {
-			return t.InternalMethods().Get(t, pk, receiver)
+			return t.internalMethods().Get(t, pk, receiver)
 		}
 
 		trapResult, isAbrupt, rt := ReturnIfAbrupt(
@@ -273,7 +273,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		if isAbrupt {
 			return rt
 		}
-		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
+		targetDesc := t.internalMethods().GetOwnProperty(t, pk)
 		if targetDesc != nil && !targetDesc.Configurable {
 			if targetDesc.IsDataDescriptor() && !targetDesc.Writable {
 				if !SameValue(trapResult, targetDesc.Value) {
@@ -295,7 +295,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("set"))
 		if trap == nil {
-			return t.InternalMethods().Set(t, pk, v, receiver)
+			return t.internalMethods().Set(t, pk, v, receiver)
 		}
 
 		trapResult, isAbrupt, rt := ReturnIfAbrupt(
@@ -312,7 +312,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		if !booleanTrapResult {
 			return
 		}
-		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
+		targetDesc := t.internalMethods().GetOwnProperty(t, pk)
 		if targetDesc != nil && !targetDesc.Configurable {
 			if targetDesc.IsDataDescriptor() && !targetDesc.Writable {
 				if !SameValue(v, targetDesc.Value) {
@@ -335,7 +335,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("deleteProperty"))
 		if trap == nil {
-			return t.InternalMethods().Delete(t, pk)
+			return t.internalMethods().Delete(t, pk)
 		}
 
 		trapResult, isAbrupt, rt := ReturnIfAbrupt(
@@ -352,7 +352,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		if !booleanTrapResult {
 			return
 		}
-		targetDesc := t.InternalMethods().GetOwnProperty(t, pk)
+		targetDesc := t.internalMethods().GetOwnProperty(t, pk)
 		if targetDesc == nil {
 			co.value = true
 			return
@@ -374,7 +374,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, h.ToValue(), NewStringPropertyKey("ownKeys"))
 		if trap == nil {
-			return t.InternalMethods().OwnPropertyKeys(t)
+			return t.internalMethods().OwnPropertyKeys(t)
 		}
 
 		trapResultArray := trap.Call(
@@ -407,11 +407,11 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 
 		extensibleTarget := t.IsExtensible()
-		targetKeys := t.InternalMethods().OwnPropertyKeys(t)
+		targetKeys := t.internalMethods().OwnPropertyKeys(t)
 		var targetConfigurableKeys []PropertyKey
 		var targetNonConfigurableKeys []PropertyKey
 		for _, key := range targetKeys {
-			desc := t.InternalMethods().GetOwnProperty(t, key)
+			desc := t.internalMethods().GetOwnProperty(t, key)
 			if desc != nil && !desc.Configurable {
 				targetNonConfigurableKeys = append(targetNonConfigurableKeys, key)
 			} else {
@@ -457,7 +457,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("apply"))
 		if trap == nil {
-			return t.InternalMethods().Call(t, this, arguments)
+			return t.internalMethods().Call(t, this, arguments)
 		}
 
 		argArray := CreateArrayFromList(agent, arguments)
@@ -474,7 +474,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		h := proxy.Handler
 		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("construct"))
 		if trap == nil {
-			return t.InternalMethods().Construct(t, arguments, newTarget)
+			return t.internalMethods().Construct(t, arguments, newTarget)
 		}
 
 		argArray := CreateArrayFromList(agent, arguments)
@@ -488,22 +488,22 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		return MustGetObject(newObj).ToCompletion()
 	}
 
-	p.InternalMethods().GetPrototypeOf = getPrototypeOf
-	p.InternalMethods().SetPrototypeOf = setPrototypeOf
-	p.InternalMethods().IsExtensible = isExtensible
-	p.InternalMethods().PreventExtensions = preventExtensions
-	p.InternalMethods().GetOwnProperty = getOwnProperty
-	p.InternalMethods().DefineOwnProperty = defineOwnProperty
-	p.InternalMethods().HasProperty = hasProperty
-	p.InternalMethods().Get = get
-	p.InternalMethods().Set = set
-	p.InternalMethods().Delete = proxyDelete
-	p.InternalMethods().OwnPropertyKeys = ownPropertyKeys
+	p.internalMethods().GetPrototypeOf = getPrototypeOf
+	p.internalMethods().SetPrototypeOf = setPrototypeOf
+	p.internalMethods().IsExtensible = isExtensible
+	p.internalMethods().PreventExtensions = preventExtensions
+	p.internalMethods().GetOwnProperty = getOwnProperty
+	p.internalMethods().DefineOwnProperty = defineOwnProperty
+	p.internalMethods().HasProperty = hasProperty
+	p.internalMethods().Get = get
+	p.internalMethods().Set = set
+	p.internalMethods().Delete = proxyDelete
+	p.internalMethods().OwnPropertyKeys = ownPropertyKeys
 
 	if IsCallable(target) {
-		p.InternalMethods().Call = call
+		p.internalMethods().Call = call
 		if IsConstructor(target) {
-			p.InternalMethods().Construct = construct
+			p.internalMethods().Construct = construct
 		}
 	}
 	return p

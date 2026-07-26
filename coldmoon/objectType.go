@@ -3,7 +3,7 @@ package coldmoon
 type ObjectType interface {
 	IsExtensible() bool
 	LengthOfArrayLike() Completion[JSInt]
-	PropertyStorage() *PropertyStorage
+	propertyStorage() *PropertyStorage
 	DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool
 	DefineField(field *ClassFieldDefinition)
 	SetPrototype(p ObjectType)
@@ -32,7 +32,7 @@ type ObjectType interface {
 		argumentLists []Value,
 		newTarget ObjectType,
 	) Completion[ObjectType]
-	InternalMethods() *InternalMethods
+	internalMethods() *InternalMethods
 	Prototype() ObjectType
 	Extensible() bool
 	SetExtensible(bool)

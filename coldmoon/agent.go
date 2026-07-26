@@ -150,7 +150,7 @@ func (a *Agent) GetSuperConstructor() Value {
 	envRec := a.GetThisEnvironment()
 	funEnv := envRec.(*FunctionEnvironment)
 	activeFunction := funEnv.FunctionObject
-	superConstructor := activeFunction.InternalMethods().GetPrototypeOf(activeFunction)
+	superConstructor := activeFunction.internalMethods().GetPrototypeOf(activeFunction)
 	return superConstructor.ToValue()
 }
 

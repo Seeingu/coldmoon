@@ -65,7 +65,7 @@ func (b *BuiltinFunction) Construct(
 	if newTarget == nil {
 		newTarget = b
 	}
-	return b.InternalMethods().Construct(b, argumentLists, newTarget)
+	return b.internalMethods().Construct(b, argumentLists, newTarget)
 }
 
 func (b *BuiltinFunction) ToObject() *Object {
@@ -201,9 +201,9 @@ func CreateBuiltinFunction(
 		AdditionalFieldsV2: args.additionalFieldsV2,
 	}
 	function.ref = function
-	function.InternalMethods().Call = BuiltinCall
+	function.internalMethods().Call = BuiltinCall
 	if args.isConstructor {
-		function.InternalMethods().Construct = BuiltinConstruct
+		function.internalMethods().Construct = BuiltinConstruct
 	}
 
 	SetFunctionLength(function.Object, length)

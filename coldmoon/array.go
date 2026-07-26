@@ -74,7 +74,7 @@ func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
 		Object: NewObject(agent, proto, "Array"),
 	}
 	arr.ref = arr
-	arr.Object.InternalMethods().DefineOwnProperty = defineOwnProperty
+	arr.Object.internalMethods().DefineOwnProperty = defineOwnProperty
 	OrdinaryDefineOwnProperty(arr, NewStringPropertyKey("length"), &PropertyDescriptor{
 		Value:        NewNumberValue(length.ToNumber()),
 		Writable:     true,
@@ -96,7 +96,7 @@ func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) (c
 	}
 
 	c, isAbrupt, rt := ReturnIfAbrupt(
-		originalArray.InternalMethods().Get(
+		originalArray.internalMethods().Get(
 			originalArray,
 			NewStringPropertyKey("constructor"),
 			originalArray.ToValue(),
@@ -119,7 +119,7 @@ func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) (c
 
 	if isObject {
 		c, isAbrupt, rt = ReturnIfAbrupt(
-			constructorObject.Object.InternalMethods().Get(
+			constructorObject.Object.internalMethods().Get(
 				constructorObject.Object,
 				NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]),
 				c,
@@ -198,7 +198,7 @@ func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) (c
 
 	for k := oldLen - 1; k >= newLen; k-- {
 		deleteSucceeded, isAbrupt, rt := ReturnIfAbrupt(
-			array.InternalMethods().Delete(array, NewIntegerIndexPropertyKey(k)),
+			array.internalMethods().Delete(array, NewIntegerIndexPropertyKey(k)),
 			co,
 		)
 		if isAbrupt {
@@ -1375,7 +1375,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 					pk := NewIntegerIndexPropertyKey(k)
 					elementObject := MustGetObject(element)
 					kPresent, isAbrupt, rt := ReturnIfAbrupt(
-						elementObject.InternalMethods().HasProperty(elementObject, pk),
+						elementObject.internalMethods().HasProperty(elementObject, pk),
 						co,
 					)
 					if isAbrupt {
@@ -1383,7 +1383,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 					}
 					if kPresent {
 						kValue, isAbrupt, rt := ReturnIfAbrupt(
-							elementObject.InternalMethods().Get(elementObject, pk, element),
+							elementObject.internalMethods().Get(elementObject, pk, element),
 							co,
 						)
 						if isAbrupt {
@@ -1633,7 +1633,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			fromKey := NewIntegerIndexPropertyKey(from)
 			toKey := NewIntegerIndexPropertyKey(to)
 			fromPresent, isAbrupt, rt := ReturnIfAbrupt(
-				o.InternalMethods().HasProperty(o, fromKey),
+				o.internalMethods().HasProperty(o, fromKey),
 				co,
 			)
 			if isAbrupt {
@@ -1641,7 +1641,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 			}
 			if fromPresent {
 				fromValue, isAbrupt, rt := ReturnIfAbrupt(
-					o.InternalMethods().Get(o, fromKey, o.ToValue()),
+					o.internalMethods().Get(o, fromKey, o.ToValue()),
 					co,
 				)
 				if isAbrupt {
@@ -1653,7 +1653,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 				}
 			} else {
 				deleteSucceeded, isAbrupt, rt := ReturnIfAbrupt(
-					o.InternalMethods().Delete(o, toKey),
+					o.internalMethods().Delete(o, toKey),
 					co,
 				)
 				if isAbrupt {
@@ -2125,7 +2125,7 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 
 	object.defineUnscopables(unscopablesList.ToValue())
-	value := object.PropertyStorage().Get(NewStringPropertyKey("values"))
+	value := object.propertyStorage().Get(NewStringPropertyKey("values"))
 	object.defineBuiltinProperty(WellKnownSymbolsIterator, value)
 
 	return object
@@ -2138,7 +2138,7 @@ func IsConcatSpreadable(agent *Agent, value Value) (co Completion[bool]) {
 	}
 	object := MustGetObject(value)
 	spreadable, isAbrupt, rt := ReturnIfAbrupt(
-		object.InternalMethods().Get(
+		object.internalMethods().Get(
 			object,
 			NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable]),
 			value,

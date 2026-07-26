@@ -451,7 +451,7 @@ func IsCallable(value Value) bool {
 	if !isObject {
 		return false
 	}
-	if objectValue.Object.InternalMethods().Call != nil {
+	if objectValue.Object.internalMethods().Call != nil {
 		return true
 	}
 
@@ -465,7 +465,7 @@ func IsConstructor(value Value) bool {
 	if !isObject {
 		return false
 	}
-	if objectValue.Object.InternalMethods().Construct != nil {
+	if objectValue.Object.internalMethods().Construct != nil {
 		return true
 	}
 
@@ -714,7 +714,7 @@ func GetV(agent *Agent, value Value, key PropertyKey) CompletionValue {
 	if isAbrupt {
 		return rt
 	}
-	return object.InternalMethods().Get(object, key, value)
+	return object.internalMethods().Get(object, key, value)
 }
 
 // 7.3.11
@@ -951,7 +951,7 @@ func ValueGetLength(v Value) (l JSInt, ok bool) {
 		return
 	}
 	o := MustGetObject(v)
-	length := o.PropertyStorage().Get(NewStringPropertyKey("length"))
+	length := o.propertyStorage().Get(NewStringPropertyKey("length"))
 	l = JSInt(MustGetObject(length.Value).(*NumberObject).Data)
 	return l, true
 }

@@ -506,7 +506,7 @@ func OrdinaryFunctionCreate(
 		ConstructorKind:    ConstructorKindBase,
 	}
 	function.ref = function
-	function.InternalMethods().Call = func(o ObjectType, this Value, arguments []Value) CompletionValue {
+	function.internalMethods().Call = func(o ObjectType, this Value, arguments []Value) CompletionValue {
 		return o.(*ECMAScriptFunction).Call(this, arguments)
 	}
 
@@ -550,11 +550,11 @@ func MakeConstructor(F ObjectType, writable bool, prototype ObjectType) {
 		Assert(!IsConstructor((fun).ToValue()))
 
 		Assert(fun.IsExtensible() &&
-			!F.PropertyStorage().Has(NewStringPropertyKey("prototype")),
+			!F.propertyStorage().Has(NewStringPropertyKey("prototype")),
 		)
-		F.InternalMethods().Construct = ECMAScriptFunctionConstruct
+		F.internalMethods().Construct = ECMAScriptFunctionConstruct
 	} else {
-		F.InternalMethods().Construct = BuiltinConstruct
+		F.internalMethods().Construct = BuiltinConstruct
 	}
 
 	if isECMAScriptFunction {
@@ -629,7 +629,7 @@ func DefineMethodProperty(homeObject ObjectType, key PropertyKeyOrPrivateName, c
 // 10.2.9
 func SetFunctionName(function ObjectType, key PropertyKeyOrPrivateName, prefix string) {
 	Assert(function.IsExtensible())
-	Assert(!function.PropertyStorage().Has(NewStringPropertyKey("name")))
+	Assert(!function.propertyStorage().Has(NewStringPropertyKey("name")))
 
 	var name string
 	switch k := key.(type) {
@@ -666,7 +666,7 @@ func SetFunctionName(function ObjectType, key PropertyKeyOrPrivateName, prefix s
 // 10.2.10
 func SetFunctionLength(function ObjectType, length JSInt) {
 	Assert(function.IsExtensible())
-	Assert(!function.PropertyStorage().Has(NewStringPropertyKey("length")))
+	Assert(!function.propertyStorage().Has(NewStringPropertyKey("length")))
 
 	function.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{
 		Value:        NewNumberValue(length.ToNumber()),

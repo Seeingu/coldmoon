@@ -212,7 +212,7 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 					return rt
 				}
 				if newElement == UndefinedValue {
-					obj.InternalMethods().Delete(obj, prop)
+					obj.internalMethods().Delete(obj, prop)
 				} else {
 					obj.CreateDataProperty(prop, newElement)
 				}
@@ -229,7 +229,7 @@ func InternalizeJSONProperty(agent *Agent, holder ObjectType, name PropertyKey, 
 					return rt
 				}
 				if newElement == UndefinedValue {
-					obj.InternalMethods().Delete(obj, prop)
+					obj.internalMethods().Delete(obj, prop)
 				} else {
 					obj.CreateDataProperty(prop, newElement)
 				}

@@ -403,7 +403,7 @@ func NewTypedArrayNamePrototype(realm *Realm, name TypedArrayName) ObjectType {
 		Configurable: false,
 		Enumerable:   false,
 	})
-	object.InternalMethods().Get = func(o ObjectType, p PropertyKey, receiver Value) (co CompletionValue) {
+	object.internalMethods().Get = func(o ObjectType, p PropertyKey, receiver Value) (co CompletionValue) {
 		if s, ok := p.(StringPropertyKey); ok {
 			if s.Value == "buffer" {
 				return co.ThrowTypeError(agent, "Method get %TypedArray%.prototype.buffer called on incompatible receiver")
@@ -831,7 +831,7 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 		TypedArrayName:    name,
 	}
 	object.ref = object
-	internalMethods := object.InternalMethods()
+	internalMethods := object.internalMethods()
 	internalMethods.PreventExtensions = func(o ObjectType) bool {
 		oo := o.(*TypedArrayObject)
 		if !oo.IsTypedArrayFixedLength() {

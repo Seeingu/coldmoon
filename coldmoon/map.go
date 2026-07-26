@@ -165,7 +165,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("keys"), mapKeys, 0)
 	object.defineBuiltinFunction(realm, CMString("values"), mapValues, 0)
 	object.defineBuiltinFunction(realm, CMString("forEach"), forEach, 1)
-	object.defineBuiltinProperty(WellKnownSymbolsIterator, object.PropertyStorage().Get(NewStringPropertyKey("entries")))
+	object.defineBuiltinProperty(WellKnownSymbolsIterator, object.propertyStorage().Get(NewStringPropertyKey("entries")))
 	object.defineToStringTag("Map")
 	object.defineBuiltinAccessor(realm, CMString("size"), builtinAccessorParams{
 		Getter: size,

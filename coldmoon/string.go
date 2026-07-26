@@ -1,7 +1,6 @@
 package coldmoon
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -83,38 +82,31 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 	}
 	// 10.4.3.3
 	ownPropertyKeys := func(o ObjectType) []PropertyKey {
-		propertiesMap := o.PropertyStorage().Properties
+		storedKeys := o.propertyStorage().OrderedKeys()
 		str := o.(*StringObject).Data
 		length := JSInt(len(str))
-		keys := make([]PropertyKey, 0, length+JSInt(len(propertiesMap)))
+		keys := make([]PropertyKey, 0, length+JSInt(len(storedKeys)))
 		for i := range length {
 			keys = append(keys, NewIntegerIndexPropertyKey(i))
 		}
 
-		keysGreaterThanLength := lo.Filter(lo.Keys(propertiesMap), func(pk PropertyKey, index int) bool {
-			if index, ok := canonicalStringIndex(pk); ok {
-				return index >= length
-			}
-			return false
-		})
-		sort.Slice(keysGreaterThanLength, func(i, j int) bool {
-			ii, _ := canonicalStringIndex(keysGreaterThanLength[i])
-			jj, _ := canonicalStringIndex(keysGreaterThanLength[j])
-			return ii < jj
-		})
-		keys = append(keys, keysGreaterThanLength...)
-
-		for pk := range propertiesMap {
-			if _, ok := pk.(StringPropertyKey); ok {
-				if _, isIndex := canonicalStringIndex(pk); isIndex {
-					continue
+		for _, key := range storedKeys {
+			if index, ok := canonicalStringIndex(key); ok {
+				if index >= length {
+					keys = append(keys, key)
 				}
-				keys = append(keys, pk)
 			}
 		}
-		for pk := range propertiesMap {
-			if _, ok := pk.(SymbolPropertyKey); ok {
-				keys = append(keys, pk)
+		for _, key := range storedKeys {
+			if _, isString := key.(StringPropertyKey); isString {
+				if _, isIndex := canonicalStringIndex(key); !isIndex {
+					keys = append(keys, key)
+				}
+			}
+		}
+		for _, key := range storedKeys {
+			if _, isSymbol := key.(SymbolPropertyKey); isSymbol {
+				keys = append(keys, key)
 			}
 		}
 		return keys
@@ -125,9 +117,9 @@ func NewStringObject(agent *Agent, s string, prototype ObjectType) *StringObject
 		Data:   s,
 	}
 	stringObject.ref = stringObject
-	stringObject.InternalMethods().GetOwnProperty = getOwnProperty
-	stringObject.InternalMethods().DefineOwnProperty = defineOwnProperty
-	stringObject.InternalMethods().OwnPropertyKeys = ownPropertyKeys
+	stringObject.internalMethods().GetOwnProperty = getOwnProperty
+	stringObject.internalMethods().DefineOwnProperty = defineOwnProperty
+	stringObject.internalMethods().OwnPropertyKeys = ownPropertyKeys
 
 	length := JSInt(len(s))
 	stringObject.DefinePropertyOrThrow(NewStringPropertyKey("length"), &PropertyDescriptor{

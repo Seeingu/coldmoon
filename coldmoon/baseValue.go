@@ -54,7 +54,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	desc := &PropertyDescriptor{}
 
 	hasEnumerable, isAbrupt, rt := ReturnIfAbrupt(
-		object.InternalMethods().HasProperty(object, NewStringPropertyKey("enumerable")),
+		object.internalMethods().HasProperty(object, NewStringPropertyKey("enumerable")),
 		co,
 	)
 	if isAbrupt {
@@ -62,7 +62,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 	if hasEnumerable {
 		enumerableValue, isAbrupt, rt := ReturnIfAbrupt(
-			object.InternalMethods().Get(object, NewStringPropertyKey("enumerable"), value),
+			object.internalMethods().Get(object, NewStringPropertyKey("enumerable"), value),
 			co,
 		)
 		if isAbrupt {
@@ -74,7 +74,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 
 	hasConfigurable, isAbrupt, rt := ReturnIfAbrupt(
-		object.InternalMethods().HasProperty(object, NewStringPropertyKey("configurable")),
+		object.internalMethods().HasProperty(object, NewStringPropertyKey("configurable")),
 		co,
 	)
 	if isAbrupt {
@@ -82,7 +82,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 	if hasConfigurable {
 		configurableValue, isAbrupt, rt := ReturnIfAbrupt(
-			object.InternalMethods().Get(object, NewStringPropertyKey("configurable"), value),
+			object.internalMethods().Get(object, NewStringPropertyKey("configurable"), value),
 			co,
 		)
 		if isAbrupt {
@@ -94,7 +94,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 
 	hasValue, isAbrupt, rt := ReturnIfAbrupt(
-		object.InternalMethods().HasProperty(object, NewStringPropertyKey("value")),
+		object.internalMethods().HasProperty(object, NewStringPropertyKey("value")),
 		co,
 	)
 	if isAbrupt {
@@ -102,7 +102,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 	if hasValue {
 		desc.Value, isAbrupt, rt = ReturnIfAbrupt(
-			object.InternalMethods().Get(object, NewStringPropertyKey("value"), value),
+			object.internalMethods().Get(object, NewStringPropertyKey("value"), value),
 			co,
 		)
 		if isAbrupt {
@@ -111,7 +111,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 
 	hasWritable, isAbrupt, rt := ReturnIfAbrupt(
-		object.InternalMethods().HasProperty(object, NewStringPropertyKey("writable")),
+		object.internalMethods().HasProperty(object, NewStringPropertyKey("writable")),
 		co,
 	)
 	if isAbrupt {
@@ -119,7 +119,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 	if hasWritable {
 		writableValue, isAbrupt, rt := ReturnIfAbrupt(
-			object.InternalMethods().Get(object, NewStringPropertyKey("writable"), value),
+			object.internalMethods().Get(object, NewStringPropertyKey("writable"), value),
 			co,
 		)
 		if isAbrupt {
@@ -131,7 +131,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 
 	hasGet, isAbrupt, rt := ReturnIfAbrupt(
-		object.InternalMethods().HasProperty(object, NewStringPropertyKey("get")),
+		object.internalMethods().HasProperty(object, NewStringPropertyKey("get")),
 		co,
 	)
 	if isAbrupt {
@@ -140,7 +140,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	if hasGet {
 		desc.GetSet = true
 		get, isAbrupt, rt := ReturnIfAbrupt(
-			object.InternalMethods().Get(object, NewStringPropertyKey("get"), value),
+			object.internalMethods().Get(object, NewStringPropertyKey("get"), value),
 			co,
 		)
 		if isAbrupt {
@@ -155,7 +155,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	}
 
 	hasSet, isAbrupt, rt := ReturnIfAbrupt(
-		object.InternalMethods().HasProperty(object, NewStringPropertyKey("set")),
+		object.internalMethods().HasProperty(object, NewStringPropertyKey("set")),
 		co,
 	)
 	if isAbrupt {
@@ -164,7 +164,7 @@ func ToPropertyDescriptorCompletion(agent *Agent, value Value) (co Completion[*P
 	if hasSet {
 		desc.SetSet = true
 		set, isAbrupt, rt := ReturnIfAbrupt(
-			object.InternalMethods().Get(object, NewStringPropertyKey("set"), value),
+			object.internalMethods().Get(object, NewStringPropertyKey("set"), value),
 			co,
 		)
 		if isAbrupt {
@@ -356,7 +356,7 @@ func (b *BaseValue) TypeString() string {
 	case *BigIntValue:
 		return "bigint"
 	case *ObjectValue:
-		if v.Object.InternalMethods().Call != nil {
+		if v.Object.internalMethods().Call != nil {
 			return "function"
 		} else {
 			return "object"

@@ -7,7 +7,7 @@ func ImmutableSetPrototypeOf(obj ObjectType, proto ObjectType) bool {
 
 // 10.4.7.2
 func SetImmutablePrototype(obj ObjectType, proto ObjectType) bool {
-	current := obj.InternalMethods().GetPrototypeOf(obj)
+	current := obj.internalMethods().GetPrototypeOf(obj)
 
 	if ObjectSameValue(proto, current) {
 		return true

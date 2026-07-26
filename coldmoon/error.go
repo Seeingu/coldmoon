@@ -41,7 +41,7 @@ func NewErrorConstructor(realm *Realm) ObjectType {
 			Object: object,
 		}
 		errorObject.ref = errorObject
-		errorObject.InternalMethods().Set = errorInternalSet
+		errorObject.internalMethods().Set = errorInternalSet
 
 		if message != UndefinedValue {
 			msg := message.String()
@@ -161,7 +161,7 @@ func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
 			Name:   name,
 		}
 		errorObject.ref = errorObject
-		errorObject.InternalMethods().Set = errorInternalSet
+		errorObject.internalMethods().Set = errorInternalSet
 
 		if message != UndefinedValue {
 			msg := message.String()
@@ -220,7 +220,7 @@ func NewAggregateErrorConstructor(realm *Realm) ObjectType {
 			Name:    "AggregateError",
 			Message: "",
 		}
-		errorObject.InternalMethods().Set = errorInternalSet
+		errorObject.internalMethods().Set = errorInternalSet
 		if message != UndefinedValue {
 			msg := message.String()
 			errorObject.CreateNonEnumerableDataProperty(NewStringPropertyKey("message"), NewStringValue(msg))

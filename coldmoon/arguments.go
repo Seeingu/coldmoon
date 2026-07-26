@@ -37,7 +37,7 @@ func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *Proper
 	if isMapped {
 		if desc.IsAccessorDescriptor() {
 			deleted, isAbrupt, rt := ReturnIfAbrupt(
-				_map.InternalMethods().Delete(_map, key),
+				_map.internalMethods().Delete(_map, key),
 				co,
 			)
 			if isAbrupt {
@@ -50,7 +50,7 @@ func argumentsDefineOwnProperty(object ObjectType, key PropertyKey, desc *Proper
 			}
 			if !desc.Writable {
 				deleted, isAbrupt, rt := ReturnIfAbrupt(
-					_map.InternalMethods().Delete(_map, key),
+					_map.internalMethods().Delete(_map, key),
 					co,
 				)
 				if isAbrupt {
@@ -98,7 +98,7 @@ func argumentsDelete(object ObjectType, key PropertyKey) (co Completion[bool]) {
 	isMapped := ObjectHasOwnProperty(_map, key)
 	result := OrdinaryDelete(object, key)
 	if result && isMapped {
-		_map.InternalMethods().Delete(_map, key)
+		_map.internalMethods().Delete(_map, key)
 	}
 	co.value = result
 	return
@@ -151,7 +151,7 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 		Object: NewObject(agent, realm.Intrinsics.ObjectPrototype, "MappedArguments"),
 	}
 	obj.ref = obj
-	internalMethods := obj.InternalMethods()
+	internalMethods := obj.internalMethods()
 	internalMethods.GetOwnProperty = func(o ObjectType, p PropertyKey) *PropertyDescriptor {
 		pp := argumentsGetOwnProperty(obj, p)
 		return pp.Data()
@@ -189,7 +189,7 @@ func CreateMappedArgumentsObject(agent *Agent, function ObjectType, formals *For
 			if index < length {
 				g := MakeArgGetter(agent, string(name), env)
 				p := MakeArgSetter(agent, string(name), env)
-				_map.InternalMethods().DefineOwnProperty(
+				_map.internalMethods().DefineOwnProperty(
 					_map,
 					NewIntegerIndexPropertyKey(index),
 					&PropertyDescriptor{

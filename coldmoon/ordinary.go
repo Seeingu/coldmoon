@@ -36,7 +36,7 @@ func OrdinarySetPrototypeOf(object ObjectType, prototype ObjectType) bool {
 			done = true
 		} else if ObjectSameValue(p, object) {
 			return false
-		} else if !pkg.FuncEqual(p.InternalMethods().GetPrototypeOf, InternalGetPrototypeOf) {
+		} else if !pkg.FuncEqual(p.internalMethods().GetPrototypeOf, InternalGetPrototypeOf) {
 			done = true
 		} else {
 			p = p.Prototype()
@@ -70,13 +70,13 @@ func InternalGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescrip
 }
 
 func OrdinaryGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescriptor {
-	if !object.PropertyStorage().Has(key) {
+	if !object.propertyStorage().Has(key) {
 		return nil
 	}
 
 	d := &PropertyDescriptor{}
 
-	x := object.PropertyStorage().Get(key)
+	x := object.propertyStorage().Get(key)
 	if x.IsDataDescriptor() {
 		d.Value = x.Value
 		d.Writable = x.Writable
@@ -105,7 +105,7 @@ func InternalDefineOwnProperty(object ObjectType, key PropertyKey, desc *Propert
 }
 
 func OrdinaryDefineOwnProperty(object ObjectType, key PropertyKey, desc *PropertyDescriptor) bool {
-	current := object.PropertyStorage().Get(key)
+	current := object.propertyStorage().Get(key)
 
 	extensible := object.Extensible()
 
@@ -135,7 +135,7 @@ func ValidateAndApplyPropertyDescriptor(
 		}
 
 		if desc.IsAccessorDescriptor() {
-			object.PropertyStorage().Set(key, &PropertyDescriptor{
+			object.propertyStorage().Set(key, &PropertyDescriptor{
 				Get:             desc.Get,
 				GetSet:          true,
 				Set:             desc.Set,
@@ -150,7 +150,7 @@ func ValidateAndApplyPropertyDescriptor(
 			if value == nil {
 				value = UndefinedValue
 			}
-			object.PropertyStorage().Set(key, &PropertyDescriptor{
+			object.propertyStorage().Set(key, &PropertyDescriptor{
 				Value:           value,
 				Writable:        desc.Writable,
 				WritableSet:     true,
@@ -219,7 +219,7 @@ func ValidateAndApplyPropertyDescriptor(
 			}
 
 			// iii. Replace the property named P of O with an accessor property.
-			object.PropertyStorage().Set(key, &PropertyDescriptor{
+			object.propertyStorage().Set(key, &PropertyDescriptor{
 				Get:             desc.Get,
 				GetSet:          true,
 				Set:             desc.Set,
@@ -254,7 +254,7 @@ func ValidateAndApplyPropertyDescriptor(
 			if v == nil {
 				v = UndefinedValue
 			}
-			object.PropertyStorage().Set(key, &PropertyDescriptor{
+			object.propertyStorage().Set(key, &PropertyDescriptor{
 				Value:           v,
 				Writable:        desc.Writable,
 				WritableSet:     true,
@@ -283,7 +283,7 @@ func ValidateAndApplyPropertyDescriptor(
 				if !desc.SetSet {
 					s = current.Set
 				}
-				object.PropertyStorage().Set(key, &PropertyDescriptor{
+				object.propertyStorage().Set(key, &PropertyDescriptor{
 					Get:             g,
 					GetSet:          true,
 					Set:             s,
@@ -302,7 +302,7 @@ func ValidateAndApplyPropertyDescriptor(
 				if desc.WritableSet {
 					w = desc.Writable
 				}
-				object.PropertyStorage().Set(key, &PropertyDescriptor{
+				object.propertyStorage().Set(key, &PropertyDescriptor{
 					Value:           v,
 					Writable:        w,
 					WritableSet:     true,
@@ -323,15 +323,15 @@ func InternalHasProperty(object ObjectType, key PropertyKey) Completion[bool] {
 }
 
 func OrdinaryHasProperty(object ObjectType, key PropertyKey) (co Completion[bool]) {
-	hasOwn := object.InternalMethods().GetOwnProperty(object, key)
+	hasOwn := object.internalMethods().GetOwnProperty(object, key)
 	if hasOwn != nil {
 		co.value = true
 		return
 	}
 
-	parent := object.InternalMethods().GetPrototypeOf(object)
+	parent := object.internalMethods().GetPrototypeOf(object)
 	if parent != nil {
-		return parent.InternalMethods().HasProperty(parent, key)
+		return parent.internalMethods().HasProperty(parent, key)
 	}
 
 	return
@@ -344,15 +344,15 @@ func InternalGet(object ObjectType, key PropertyKey, receiver Value) CompletionV
 // OrdinaryGet
 // spec: 10.1.8.1
 func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) CompletionValue {
-	desc := object.InternalMethods().GetOwnProperty(object, key)
+	desc := object.internalMethods().GetOwnProperty(object, key)
 
 	if desc == nil {
-		parent := object.InternalMethods().GetPrototypeOf(object)
+		parent := object.internalMethods().GetPrototypeOf(object)
 		if parent == nil {
 			return UndefinedValue.ToCompletion()
 		}
 
-		return parent.InternalMethods().Get(parent, key, receiver)
+		return parent.internalMethods().Get(parent, key, receiver)
 	}
 
 	if desc.IsDataDescriptor() {
@@ -376,7 +376,7 @@ func InternalSet(object ObjectType, key PropertyKey, value Value, receiver Value
 }
 
 func OrdinarySet(object ObjectType, key PropertyKey, value Value, receiver Value) Completion[bool] {
-	ownDesc := object.InternalMethods().GetOwnProperty(object, key)
+	ownDesc := object.internalMethods().GetOwnProperty(object, key)
 	return OrdinarySetWithOwnDescriptor(object, key, value, receiver, ownDesc)
 }
 
@@ -389,9 +389,9 @@ func OrdinarySetWithOwnDescriptor(
 	ownDesc *PropertyDescriptor,
 ) (co Completion[bool]) {
 	if ownDesc == nil {
-		parent := object.InternalMethods().GetPrototypeOf(object)
+		parent := object.internalMethods().GetPrototypeOf(object)
 		if parent != nil {
-			return parent.InternalMethods().Set(parent, key, value, receiver)
+			return parent.internalMethods().Set(parent, key, value, receiver)
 		} else {
 			ownDesc = &PropertyDescriptor{
 				Value:        UndefinedValue,
@@ -413,7 +413,7 @@ func OrdinarySetWithOwnDescriptor(
 		}
 		receiverObject := r.Object
 
-		existingDescriptor := object.InternalMethods().GetOwnProperty(receiverObject, key)
+		existingDescriptor := object.internalMethods().GetOwnProperty(receiverObject, key)
 
 		if existingDescriptor != nil {
 			if existingDescriptor.IsAccessorDescriptor() {
@@ -426,11 +426,11 @@ func OrdinarySetWithOwnDescriptor(
 			valueDesc := &PropertyDescriptor{
 				Value: value,
 			}
-			return receiverObject.InternalMethods().DefineOwnProperty(
+			return receiverObject.internalMethods().DefineOwnProperty(
 				receiverObject, key, valueDesc,
 			)
 		} else {
-			Assert(!receiverObject.PropertyStorage().Has(key))
+			Assert(!receiverObject.propertyStorage().Has(key))
 
 			co.value = receiverObject.CreateDataProperty(key, value)
 			return
@@ -457,13 +457,13 @@ func InternalDelete(object ObjectType, key PropertyKey) (co Completion[bool]) {
 }
 
 func OrdinaryDelete(object ObjectType, key PropertyKey) bool {
-	desc := object.InternalMethods().GetOwnProperty(object, key)
+	desc := object.internalMethods().GetOwnProperty(object, key)
 	if desc == nil {
 		return true
 	}
 
 	if desc.Configurable {
-		object.PropertyStorage().Delete(key)
+		object.propertyStorage().Delete(key)
 		return true
 	}
 	return false
@@ -474,13 +474,7 @@ func InternalOwnPropertyKeys(object ObjectType) []PropertyKey {
 }
 
 func OrdinaryOwnPropertyKeys(object ObjectType) []PropertyKey {
-	var keys []PropertyKey
-
-	for key := range object.PropertyStorage().Properties {
-		keys = append(keys, key)
-	}
-
-	return keys
+	return object.propertyStorage().OrderedKeys()
 }
 
 func ObjectSameValue(x, y ObjectType) bool {

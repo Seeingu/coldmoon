@@ -90,7 +90,7 @@ func (r *ReferenceRecord) GetValue(agent *Agent) (co CompletionValue) {
 			propKey = NewStringPropertyKey(r.ReferencedName.String)
 		}
 		return baseObj.
-			InternalMethods().
+			internalMethods().
 			Get(baseObj, propKey, r.GetThisValue())
 	} else {
 		base, _ := r.Base.Env()
@@ -131,7 +131,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) (co CompletionValu
 		}
 
 		succeeded, isAbrupt, rt := ReturnIfAbrupt(
-			baseObj.InternalMethods().Set(
+			baseObj.internalMethods().Set(
 				baseObj,
 				referencedName,
 				value,
