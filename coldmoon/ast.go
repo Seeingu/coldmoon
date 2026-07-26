@@ -6768,7 +6768,7 @@ func Await(agent *Agent, value Value) (co CompletionValue) {
 	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		panic("unimplemented")
 		//prevContext := agent.RunningExecutionContext()
-		//agent.ExecutionContextStack.Push(asyncContext)
+		// agent.resumeExecutionContext(asyncContext)
 		//
 		//// TODO: Resume
 		//asyncContext.Suspend()
@@ -6780,7 +6780,7 @@ func Await(agent *Agent, value Value) (co CompletionValue) {
 
 	agent.Scheduler.StartTask(asyncContext.Resume)
 	<-asyncContext.awaitCh
-	agent.ExecutionContextStack.Push(asyncContext)
+	agent.resumeExecutionContext(asyncContext)
 	Assert(asyncContext == agent.RunningExecutionContext())
 	return asyncContext.Result
 }

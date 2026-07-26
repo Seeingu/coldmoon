@@ -38,17 +38,35 @@ These invariants are covered by scheduler contract tests in
 `coldmoon/scheduler_test.go` and host-level regression tests in
 `tests/simple_test.go`.
 
+## Execution contexts and VMs
+
+An execution context is entered through one Agent-owned transition. Ordinary
+script, function, builtin, eval, and module execution receives an
+`ExecutionContextScope` and defers `Leave`; early returns and panics therefore
+cannot silently leak a frame. Generator and async lifecycles use the matching
+resume and suspend transitions because their frame lifetime crosses a lexical
+call boundary.
+
+The transition creates the context's VM on first entry. `RunNode` reuses that
+VM and only applies node-local strictness for the duration of an evaluation.
+This gives mutable interpreter state one owner and preserves it across nested
+evaluation without allowing it to leak into the next context.
+
+Direct eval selects its lexical, variable, and private environments before
+entering the eval context, then evaluates the parsed script in that context.
+It does not call the top-level script entry point, which would replace those
+environments with the Realm global environment.
+
 ## Planned deep modules
 
 The remaining architecture work is sequenced by dependency:
 
-1. centralize execution-context and VM lifetime;
-2. deepen builtin invocation and completion propagation;
-3. consolidate module graph loading and identity;
-4. make Realm and intrinsic construction atomic;
-5. internalize the property model and narrow object dispatch;
-6. give static and runtime syntax semantics explicit owners;
-7. collapse the Test262 lifecycle into one runner.
+1. deepen builtin invocation and completion propagation;
+2. consolidate module graph loading and identity;
+3. make Realm and intrinsic construction atomic;
+4. internalize the property model and narrow object dispatch;
+5. give static and runtime syntax semantics explicit owners;
+6. collapse the Test262 lifecycle into one runner.
 
 Each module should expose a small interface, keep implementation details local,
 and add an adapter seam only when at least two real implementations exist.

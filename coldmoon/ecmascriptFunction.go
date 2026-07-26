@@ -86,7 +86,8 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) (co
 	agent := e.Agent()
 	function := e
 
-	calleeContext := PrepareForOrdinaryCall(agent, function, nil)
+	calleeContext, scope := PrepareForOrdinaryCall(agent, function, nil)
+	defer scope.Leave()
 	Assert(calleeContext == agent.RunningExecutionContext())
 
 	if function.IsClassConstructor {
@@ -96,8 +97,6 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) (co
 	OrdinaryCallBindThis(agent, function, calleeContext, thisArgument)
 
 	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
-
-	agent.ExecutionContextStack.Pop()
 
 	if result.IsAbrupt() {
 		if result.t != CompletionTypeThrow {
@@ -110,12 +109,11 @@ func (e *ECMAScriptFunction) Call(thisArgument Value, argumentsList []Value) (co
 
 // PrepareForOrdinaryCall
 // spec: 10.2.1.1
-func PrepareForOrdinaryCall(agent *Agent, function *ECMAScriptFunction, newTarget ObjectType) *ExecutionContext {
+func PrepareForOrdinaryCall(agent *Agent, function *ECMAScriptFunction, newTarget ObjectType) (*ExecutionContext, *ExecutionContextScope) {
 	localEnv := NewFunctionEnvironment(function, newTarget)
 	calleeContext := &ExecutionContext{
 		Function:       function,
 		Realm:          function.Realm,
-		VM:             NewVM2(agent),
 		ch:             make(chan struct{}),
 		ScriptOrModule: function.ScriptOrModule,
 		ECMAScriptCode: &ExecutionContextAdditionalState{
@@ -125,8 +123,8 @@ func PrepareForOrdinaryCall(agent *Agent, function *ECMAScriptFunction, newTarge
 		},
 	}
 
-	agent.ExecutionContextStack.Push(calleeContext)
-	return calleeContext
+	scope := agent.enterExecutionContext(calleeContext)
+	return calleeContext, scope
 }
 
 // 10.2.1.2
@@ -426,7 +424,8 @@ func (e *ECMAScriptFunction) Construct(
 		).ToValue()
 	}
 
-	calleeContext := PrepareForOrdinaryCall(agent, function, newTarget)
+	calleeContext, scope := PrepareForOrdinaryCall(agent, function, newTarget)
+	defer scope.Leave()
 	Assert(calleeContext == agent.RunningExecutionContext())
 
 	if kind == ConstructorKindBase {
@@ -438,8 +437,6 @@ func (e *ECMAScriptFunction) Construct(
 	constructorEnv := calleeContext.ECMAScriptCode.LexicalEnvironment
 
 	result := OrdinaryCallEvaluateBody(agent, function, argumentsList)
-
-	agent.ExecutionContextStack.Pop()
 
 	if result.t == CompletionTypeReturn {
 		if o, ok := result.value.(*ObjectValue); ok {

@@ -87,7 +87,7 @@ func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody Gene
 			panic("unreachable")
 		}
 		// TODO: Assert generator status
-		a.ExecutionContextStack.Pop()
+		a.suspendExecutionContext(genContext)
 		generator.GeneratorState = GeneratorStateCompleted
 
 		var completion CompletionValue
@@ -127,7 +127,7 @@ func GeneratorResume(agent *Agent, generator Value, value Value) CompletionValue
 	genContext := agent.FindExecutionContextById(g.GetId())
 	methodContext := agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
-	agent.ExecutionContextStack.Push(genContext)
+	agent.resumeExecutionContext(genContext)
 	if state == GeneratorStateSuspendedStart {
 		go g.Resume()
 	} else {
@@ -158,7 +158,7 @@ func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion Compl
 	genContext := agent.FindExecutionContextById(g.GetId())
 	methodContext := agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
-	agent.ExecutionContextStack.Push(genContext)
+	agent.resumeExecutionContext(genContext)
 	go g.closure()
 	genContext.Suspend()
 	Assert(methodContext == agent.RunningExecutionContext())
@@ -194,7 +194,7 @@ func GeneratorYield(agent *Agent, iterNextObj ObjectType) (co CompletionValue) {
 	generator := genContext.Generator
 	Assert(GetGeneratorKind(agent) == GeneratorKindSync)
 	generator.GeneratorState = GeneratorStateSuspendedYield
-	agent.ExecutionContextStack.Pop()
+	agent.suspendExecutionContext(genContext)
 	callerContext := agent.RunningExecutionContext()
 	co.value = iterNextObj.ToValue()
 

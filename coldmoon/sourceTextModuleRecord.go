@@ -544,7 +544,8 @@ func (s *SourceTextModule) InitializeEnvironment() (co CompletionValue) {
 		},
 	}
 	s.Context = moduleContext
-	agent.ExecutionContextStack.Push(moduleContext)
+	scope := agent.enterExecutionContext(moduleContext)
+	defer scope.Leave()
 	code := s.ECMAScriptCode
 
 	varDeclarations := code.ModuleItemList.VarScopedDeclarations()
@@ -584,7 +585,6 @@ func (s *SourceTextModule) InitializeEnvironment() (co CompletionValue) {
 		}
 	}
 
-	agent.ExecutionContextStack.Pop()
 	co.value = UndefinedValue
 	return
 }
@@ -604,7 +604,8 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 	}
 	if !s.HasTLA {
 		Assert(capability == nil)
-		agent.ExecutionContextStack.Push(moduleContext)
+		scope := agent.enterExecutionContext(moduleContext)
+		defer scope.Leave()
 		result := RunNode(agent, s.ECMAScriptCode)
 		// TODO: standardize
 		if result.IsAbrupt() {
@@ -618,7 +619,6 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) {
 			}
 			panic("execute module failed: " + result.err.String())
 		}
-		agent.ExecutionContextStack.Pop()
 	} else {
 		panic("unimplemented")
 	}

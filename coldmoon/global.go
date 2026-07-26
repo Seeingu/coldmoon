@@ -120,7 +120,7 @@ func NewIsNaN(realm *Realm) ObjectType {
 func NewEval(realm *Realm) ObjectType {
 	var eval BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		if len(args) == 0 {
-			return nil
+			return UndefinedValue
 		}
 		return PerformEval(realm.Agent, args[0], false, false)
 	}

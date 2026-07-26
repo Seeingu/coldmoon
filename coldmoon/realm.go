@@ -192,7 +192,7 @@ func InitializeHostDefinedRealm(
 		ScriptOrModule: nil,
 	}
 
-	agent.ExecutionContextStack.Push(newContext)
+	agent.resumeExecutionContext(newContext)
 
 	global := globalObject
 	if global == nil {

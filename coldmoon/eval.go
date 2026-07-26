@@ -1,14 +1,14 @@
 package coldmoon
 
 // 19.2.1.1
-func PerformEval(agent *Agent, x Value, strictCaller bool, direct bool) Value {
+func PerformEval(agent *Agent, x Value, strictCaller bool, direct bool) CompletionValue {
 	if !direct {
 		Assert(!strictCaller)
 	}
 
 	stringValue, ok := x.(*StringValue)
 	if !ok {
-		return x
+		return x.ToCompletion()
 	}
 
 	evalRealm := agent.CurrentRealm()
@@ -17,7 +17,7 @@ func PerformEval(agent *Agent, x Value, strictCaller bool, direct bool) Value {
 
 	script := ParseScript(stringValue.Data, evalRealm, nil)
 	if len(script.ECMAScriptCode.StatementList) == 0 {
-		return nil
+		return UndefinedValue.ToCompletion()
 	}
 
 	strictEval := strictCaller || script.ECMAScriptCode.IsStrict()
@@ -52,10 +52,8 @@ func PerformEval(agent *Agent, x Value, strictCaller bool, direct bool) Value {
 		},
 	}
 
-	agent.ExecutionContextStack.Push(evalContext)
+	scope := agent.enterExecutionContext(evalContext)
+	defer scope.Leave()
 
-	result := script.Evaluate()
-	agent.ExecutionContextStack.Pop()
-
-	return result
+	return script.evaluateInCurrentContext()
 }

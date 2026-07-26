@@ -62,6 +62,36 @@ Promise.resolve(1).then(function () { promiseRuns += 1; });`, realm)
 	}
 }
 
+func TestDirectEvalUsesCallerLexicalEnvironment(t *testing.T) {
+	testSource(t, `
+function updateThroughEval() {
+    let value = 41;
+    eval("value = value + 1");
+    return value;
+}
+assertEqual(updateThroughEval(), 42);
+`)
+}
+
+func TestClassCallErrorRestoresExecutionContext(t *testing.T) {
+	agent := NewAgent()
+	InitializeConstants()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	caller := agent.RunningExecutionContext()
+
+	Evaluate(`class Example { constructor() {} }`, realm)
+	class := ReturnAssertNormal(realm.GlobalEnv.GetBindingValue(agent, "Example", false))
+	result := class.Call(agent, UndefinedValue, nil)
+
+	if !result.IsAbrupt() {
+		t.Fatal("calling a class constructor without new did not throw")
+	}
+	if agent.RunningExecutionContext() != caller {
+		t.Fatal("class constructor early return leaked its execution context")
+	}
+}
+
 // TestObjectLiteralDataPropertyNamedGet verifies that contextual accessor
 // keywords remain valid ordinary property names when followed by a colon.
 func TestObjectLiteralDataPropertyNamedGet(t *testing.T) {

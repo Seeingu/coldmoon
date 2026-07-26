@@ -322,6 +322,16 @@ func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOper
 // spec: 13.3.6.2
 func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) (co CompletionValue) {
 	agent := v.agent
+	if rr, ok := ref.ReferenceRecord(); ok &&
+		!rr.IsPropertyReference() &&
+		rr.ReferencedName.String == "eval" &&
+		SameValue(fun, agent.CurrentRealm().Intrinsics.Eval.ToValue()) {
+		x := Value(UndefinedValue)
+		if len(arguments) > 0 {
+			x = arguments[0]
+		}
+		return PerformEval(agent, x, v.containedInStrictCode, true)
+	}
 	var thisValue Value
 	if rr, ok := ref.ReferenceRecord(); ok {
 		if rr.IsPropertyReference() {
@@ -626,7 +636,13 @@ func UpdateEmpty(result CompletionValue, V Value) CompletionValue {
 }
 
 func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {
-	vm2 := NewVM2(agent)
+	context := agent.RunningExecutionContext()
+	Assert(context.VM != nil)
+	vm2 := context.VM
+	previousStrict := vm2.containedInStrictCode
+	defer func() {
+		vm2.containedInStrictCode = previousStrict
+	}()
 	if functionBody, ok := node.(*FunctionBody); ok {
 		vm2.containedInStrictCode = functionBody.Strict
 	}

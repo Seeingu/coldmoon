@@ -42,7 +42,7 @@ func ParseScript(sourceText string, realm *Realm, hostDefined *HostDefined) *Scr
 func (s *ScriptRecord) Evaluate() Value {
 	agent := s.Realm.Agent
 
-	globalEnv := agent.CurrentRealm().GlobalEnv
+	globalEnv := s.Realm.GlobalEnv
 	scriptContext := &ExecutionContext{
 		Function:       nil,
 		Realm:          s.Realm,
@@ -54,17 +54,54 @@ func (s *ScriptRecord) Evaluate() Value {
 			PrivateEnvironment:  nil,
 		},
 	}
-	agent.ExecutionContextStack.Push(scriptContext)
-	defer agent.ExecutionContextStack.Pop()
+	scope := agent.enterExecutionContext(scriptContext)
+	defer scope.Leave()
 
+	result := s.evaluateInCurrentContext()
+	if result.IsError() {
+		return result.Error()
+	}
+	return result.Data()
+}
+
+// evaluateInCurrentContext evaluates the script using the lexical and variable
+// environments selected by its caller. PerformEval uses this entry point so it
+// does not accidentally create a second, global script context.
+func (s *ScriptRecord) evaluateInCurrentContext() CompletionValue {
+	agent := s.Realm.Agent
+	context := agent.RunningExecutionContext()
+	Assert(context.ECMAScriptCode != nil)
+	lexicalEnv := context.ECMAScriptCode.LexicalEnvironment
+	variableEnv := context.ECMAScriptCode.VariableEnvironment
 	script := s.ECMAScriptCode
+
+	for _, item := range script.StatementList {
+		declarationItem, ok := item.(*StatementListItemDeclaration)
+		if !ok {
+			continue
+		}
+		switch declaration := declarationItem.Declaration.(type) {
+		case *LexicalDeclaration:
+			for _, name := range declaration.BoundNames() {
+				if declaration.IsConstantDeclaration() {
+					lexicalEnv.CreateImmutableBinding(name, true)
+				} else {
+					lexicalEnv.CreateMutableBinding(name, false)
+				}
+			}
+		case *ClassDeclaration:
+			for _, name := range declaration.BoundNames() {
+				lexicalEnv.CreateMutableBinding(name, false)
+			}
+		}
+	}
 
 	varScopedDeclarations := script.StatementList.VarScopedDeclarations()
 	seen := make(map[IdentifierName]bool)
 	for _, decl := range varScopedDeclarations {
 		varName := decl.BindingIdentifier
 		if _, ok := seen[varName]; !ok {
-			globalEnv.CreateGlobalVarBinding(string(varName), true)
+			createVariableBinding(variableEnv, string(varName))
 			seen[varName] = true
 		}
 	}
@@ -80,14 +117,22 @@ func (s *ScriptRecord) Evaluate() Value {
 		}
 		functionDeclaration := hoistable.FunctionDeclaration
 		name := string(functionDeclaration.Identifier)
-		function := functionDeclaration.instantiateOrdinaryFunctionObject(agent, globalEnv, nil)
-		globalEnv.CreateGlobalVarBinding(name, true)
-		globalEnv.SetMutableBinding(name, function.ToValue(), false)
+		function := functionDeclaration.instantiateOrdinaryFunctionObject(agent, lexicalEnv, nil)
+		createVariableBinding(variableEnv, name)
+		variableEnv.SetMutableBinding(name, function.ToValue(), false)
 	}
 
-	result := RunNode(agent, s.ECMAScriptCode)
-	if result.IsError() {
-		return result.Error()
+	return RunNode(agent, s.ECMAScriptCode)
+}
+
+func createVariableBinding(environment EnvironmentRecord, name string) {
+	if global, ok := environment.(*GlobalEnvironment); ok {
+		global.CreateGlobalVarBinding(name, true)
+		return
 	}
-	return result.Data()
+	if environment.HasBinding(name) {
+		return
+	}
+	environment.CreateMutableBinding(name, false)
+	environment.InitializeBinding(name, UndefinedValue)
 }

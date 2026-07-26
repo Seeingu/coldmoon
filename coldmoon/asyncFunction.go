@@ -55,7 +55,7 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 
 	closure := func() {
 		result := asyncFunction.EvaluateBody()
-		agent.ExecutionContextStack.Pop()
+		agent.suspendExecutionContext(asyncContext)
 
 		if !result.IsAbrupt() && result.t == CompletionTypeNormal {
 			ReturnAssertNormal(
@@ -76,7 +76,7 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 		}
 	}
 
-	agent.ExecutionContextStack.Push(asyncContext)
+	agent.resumeExecutionContext(asyncContext)
 	closure()
 	asyncContext.Resume()
 	Assert(runningContext == agent.RunningExecutionContext())

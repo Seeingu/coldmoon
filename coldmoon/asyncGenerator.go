@@ -148,7 +148,7 @@ func AsyncGeneratorResume(agent *Agent, generator *AsyncGeneratorObject, value C
 	callerContext := agent.RunningExecutionContext()
 	generator.AsyncGeneratorState = AsyncGeneratorStateExecuting
 	fmt.Println("resume")
-	agent.ExecutionContextStack.Push(genContext)
+	agent.resumeExecutionContext(genContext)
 	go generator.closure()
 	genContext.Suspend()
 	fmt.Println("resume after suspended")
@@ -275,7 +275,7 @@ func AsyncGeneratorStart(
 		result := generatorBody.Evaluation(genVM)
 		fmt.Println("completed")
 		// TODO: Assert generator status
-		agent.ExecutionContextStack.Pop()
+		agent.suspendExecutionContext(genContext)
 		generator.AsyncGeneratorState = AsyncGeneratorStateCompleted
 
 		if result.t == CompletionTypeNormal {
@@ -313,7 +313,7 @@ func AsyncGeneratorYield(agent *Agent, value Value) (co CompletionValue) {
 	} else {
 		generator.AsyncGeneratorState = AsyncGeneratorStateSuspendedYield
 		fmt.Println("yield queue empty")
-		agent.ExecutionContextStack.Pop()
+		agent.suspendExecutionContext(genContext)
 		genContext.isSuspended = true
 		go genContext.Resume()
 		<-genContext.yieldCh

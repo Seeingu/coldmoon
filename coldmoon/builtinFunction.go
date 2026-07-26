@@ -85,8 +85,9 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 		ScriptOrModule: nil,
 	}
 
-	a.ExecutionContextStack.Push(calleeContext)
+	scope := a.enterExecutionContext(calleeContext)
 	defer func() {
+		scope.Leave()
 		recovered := recover()
 		if recovered != nil {
 			switch recovered {
@@ -95,11 +96,9 @@ func (b *BuiltinFunction) BuiltinCallOrConstruct(thisArgument Value, argumentsLi
 			case "RangeError":
 				co = co.ThrowRangeError(a, "")
 			default:
-				a.ExecutionContextStack.Pop()
 				panic(recovered)
 			}
 		}
-		a.ExecutionContextStack.Pop()
 	}()
 
 	r := b.Behavior(thisArgument, argumentsList, newTarget)
