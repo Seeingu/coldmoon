@@ -1,0 +1,59 @@
+package coldmoon
+
+// 19.2.1.1
+func PerformEval(agent *Agent, x Value, strictCaller bool, direct bool) CompletionValue {
+	if !direct {
+		Assert(!strictCaller)
+	}
+
+	stringValue, ok := x.(*StringValue)
+	if !ok {
+		return x.ToCompletion()
+	}
+
+	evalRealm := agent.CurrentRealm()
+
+	agent.HostHooks.HostEnsureCanCompileStrings(evalRealm)
+
+	script := ParseScript(stringValue.Data, evalRealm, nil)
+	if len(script.ECMAScriptCode.StatementList) == 0 {
+		return UndefinedValue.ToCompletion()
+	}
+
+	strictEval := strictCaller || script.ECMAScriptCode.IsStrict()
+
+	runningContext := agent.RunningExecutionContext()
+	var lexEnv EnvironmentRecord
+	var varEnv EnvironmentRecord
+	var privateEnv *PrivateEnvironment
+
+	if direct {
+		lexEnv = NewDeclarativeEnvironment(runningContext.ECMAScriptCode.LexicalEnvironment)
+		varEnv = runningContext.ECMAScriptCode.VariableEnvironment
+		privateEnv = runningContext.ECMAScriptCode.PrivateEnvironment
+	} else {
+		lexEnv = NewDeclarativeEnvironment(evalRealm.GlobalEnv)
+		varEnv = evalRealm.GlobalEnv
+		privateEnv = nil
+	}
+	if strictEval {
+		varEnv = lexEnv
+	}
+
+	evalContext := &ExecutionContext{
+		Realm:          evalRealm,
+		ScriptOrModule: runningContext.ScriptOrModule,
+		Function:       nil,
+		ch:             make(chan struct{}),
+		ECMAScriptCode: &ExecutionContextAdditionalState{
+			LexicalEnvironment:  lexEnv,
+			VariableEnvironment: varEnv,
+			PrivateEnvironment:  privateEnv,
+		},
+	}
+
+	scope := agent.enterExecutionContext(evalContext)
+	defer scope.Leave()
+
+	return script.evaluateInCurrentContext()
+}

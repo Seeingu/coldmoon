@@ -1,0 +1,6817 @@
+package coldmoon
+
+import (
+	"math"
+	"math/big"
+	"strconv"
+	"strings"
+
+	"github.com/Seeingu/coldmoon/pkg"
+	"github.com/samber/lo"
+)
+
+type ASTNode interface {
+	String() string
+	Evaluation(vm *VM) (co CompletionValue)
+}
+
+// MARK: - AnalyzeQuery
+
+type AnalyzeQuery int
+
+const (
+	AnalyzeQueryIsReference AnalyzeQuery = iota
+	AnalyzeQueryIsIdentifierReference
+	AnalyzeQueryIsStringLiteral
+)
+
+// MARK: - Scope Declaration
+
+// VarScopedDeclaration Enum
+type VarScopedDeclaration struct {
+	VariableDeclaration  *VariableDeclaration
+	HoistableDeclaration DeclarationHoistable
+}
+
+// LexicallyScopedDeclaration Enum
+type LexicallyScopedDeclaration struct {
+	HoistableDeclaration DeclarationHoistable
+	// TODO
+}
+
+// MARK: - PrimaryExpression
+
+type PrimaryExpression interface {
+	Expression
+}
+
+// MARK: - ClassExpression
+
+// ClassExpression [Yield, Await] :
+// - class BindingIdentifier[?Yield, ?Await] opt ClassTail[?Yield, ?Await]
+type ClassExpression struct {
+	PrimaryExpression
+	IdentifierName IdentifierName
+	ClassTail      *ClassTail
+	SourceText     string
+}
+
+func (p *ClassExpression) _primaryExpression() {}
+func (p *ClassExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *ClassExpression) astHasIdentifier() bool {
+	return p.IdentifierName != ""
+}
+
+// Evaluation
+// spec: 15.7.16
+func (p *ClassExpression) Evaluation(vm *VM) (co CompletionValue) {
+	if p.astHasIdentifier() {
+		className := p.IdentifierName
+		value, isAbrupt, rt := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)), co)
+		if isAbrupt {
+			return rt
+		}
+		// TODO: set sourceText
+		co.value = value.ToValue()
+		return
+	} else {
+		value, isAbrupt, rt := ReturnIfAbrupt(p.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("")), co)
+		if isAbrupt {
+			return rt
+		}
+		// TODO: set sourceText
+		co.value = value.ToValue()
+		return
+	}
+}
+
+func (p *ClassExpression) String() string {
+	return "ClassExpression"
+}
+
+// MARK: - RegularExpressionLiteral
+
+type PrimaryExpressionRegularExpressionLiteral struct {
+	PrimaryExpression
+	Pattern string
+	Flags   string
+}
+
+func (p *PrimaryExpressionRegularExpressionLiteral) _primaryExpression() {}
+func (p *PrimaryExpressionRegularExpressionLiteral) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *PrimaryExpressionRegularExpressionLiteral) Evaluation(vm *VM) (co CompletionValue) {
+	regexp, isAbrupt, rt := ReturnIfAbrupt(
+		RegExpCreate(vm.agent, NewStringValue(p.Pattern), NewStringValue(p.Flags)),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	return regexp.ToValue().ToCompletion()
+}
+
+func (p *PrimaryExpressionRegularExpressionLiteral) String() string {
+	return "/" + p.Pattern + "/" + p.Flags
+}
+
+func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLiteral() bool {
+	// TODO
+	return true
+}
+
+// BindingIdentifier [Yield, Await] :
+// - Identifier
+// - yield
+// - await
+type BindingIdentifier struct {
+	identifier IdentifierName
+	isYield    bool
+	isAwait    bool
+}
+
+var _ RuntimeSemanticsBindingInitialization = (*BindingIdentifier)(nil)
+
+func (b *BindingIdentifier) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
+	if b.identifier != "" {
+		name := b.identifier
+		return vm.InitializeBoundName(name, value, env)
+	} else {
+		panic("unimplemented")
+	}
+}
+
+// MARK: - IdentifierReference
+
+type (
+	IdentifierName        = string
+	PrivateIdentifierName string
+)
+
+// IdentifierReference [Yield, Await] :
+// Identifier
+// [~Yield] yield
+// [~Await] await
+type IdentifierReference struct {
+	PrimaryExpression
+	Identifier IdentifierName
+}
+
+func (p *IdentifierReference) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
+}
+
+// Evaluation 13.1.3
+func (p *IdentifierReference) Evaluation(vm *VM) CompletionValue {
+	return NewReferenceRecordValue(
+		vm.agent.ResolveBinding(
+			p.Identifier,
+			nil, vm.containedInStrictCode,
+		),
+	).ToCompletion()
+}
+
+func (p *IdentifierReference) String() string {
+	return string(p.Identifier)
+}
+
+// MARK: - AsyncFunctionExpression
+
+type AsyncFunctionExpression struct {
+	PrimaryExpression
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+var _ RuntimeSemanticsEvaluation = (*AsyncFunctionExpression)(nil)
+
+func (p *AsyncFunctionExpression) _primaryExpression() {}
+func (p *AsyncFunctionExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+// Evaluation
+// spec: 15.8.5
+func (p *AsyncFunctionExpression) Evaluation(vm *VM) (co CompletionValue) {
+	return p.InstantiateAsyncFunctionExpression(vm).ToValue().ToCompletion()
+}
+
+func (p *AsyncFunctionExpression) astHasBindingIdentifier() bool {
+	return p.Identifier != ""
+}
+
+// InstantiateAsyncFunctionExpression
+// spec: 15.8.3
+// returns function object
+func (p *AsyncFunctionExpression) InstantiateAsyncFunctionExpression(vm *VM) ObjectType {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	if p.astHasBindingIdentifier() {
+		panic("unimplemented")
+	} else {
+		name := ""
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.AsyncFunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		return closure
+	}
+}
+
+func (p *AsyncFunctionExpression) String() string {
+	return "AsyncFunctionExpression"
+}
+
+// MARK: - GeneratorExpression
+
+// GeneratorExpression :
+//   - function * BindingIdentifier[+Yield, ~Await] opt ( FormalParameters[+Yield, ~Await]
+//     ) { GeneratorBody }
+type GeneratorExpression struct {
+	PrimaryExpression
+	IdentifierName   IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+var _ RuntimeSemanticsInstantiateGeneratorFunctionExpression = (*GeneratorExpression)(nil)
+
+func (p *GeneratorExpression) _primaryExpression() {}
+func (p *GeneratorExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *GeneratorExpression) astHasIdentifierName() bool {
+	return p.IdentifierName != ""
+}
+
+// InstantiateGeneratorFunctionExpression
+// spec: 15.5.4
+func (p *GeneratorExpression) InstantiateGeneratorFunctionExpression(
+	vm *VM,
+	name PropertyKeyOrPrivateName,
+) (fun ObjectType) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	if p.astHasIdentifierName() {
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.GeneratorFunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		SetFunctionName(closure, name, "")
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        prototype.ToValue(),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+		return closure
+	} else {
+		outerEnv := vm.RunningLexicalEnvironment()
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(p.IdentifierName, false)
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.GeneratorFunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(p.IdentifierName), "")
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        prototype.ToValue(),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+		return closure
+	}
+}
+
+func (p *GeneratorExpression) Evaluation(vm *VM) CompletionValue {
+	// TODO: name
+	name := NewStringPropertyKey("")
+	return p.InstantiateGeneratorFunctionExpression(vm, name).ToValue().ToCompletion()
+}
+
+func (p *GeneratorExpression) String() string {
+	return "GeneratorExpression"
+}
+
+// MARK: - AsyncGeneratorExpression
+
+type PrimaryExpressionAsyncGeneratorExpression struct {
+	PrimaryExpression
+	IdentifierName   IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+func (p *PrimaryExpressionAsyncGeneratorExpression) _primaryExpression() {}
+func (p *PrimaryExpressionAsyncGeneratorExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *PrimaryExpressionAsyncGeneratorExpression) String() string {
+	return "AsyncGeneratorExpression"
+}
+
+// MARK: - ThisExpression
+
+// This keyword
+// spec: 13.2.1
+type PrimaryExpressionThis struct {
+	PrimaryExpression
+}
+
+func (p *PrimaryExpressionThis) _primaryExpression() {}
+func (p *PrimaryExpressionThis) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+// Evaluation
+// spec: 13.2.1.1
+func (p *PrimaryExpressionThis) Evaluation(vm *VM) CompletionValue {
+	return vm.agent.ResolveThisBinding().ToCompletion()
+}
+
+func (p *PrimaryExpressionThis) String() string {
+	return "this"
+}
+
+// MARK: - ParenthesizedExpression
+
+// ParenthesizedExpression [Yield, Await] :
+// - ( Expression[+In, ?Yield, ?Await] )
+type ParenthesizedExpression struct {
+	PrimaryExpression
+	Expression Expression
+}
+
+func (p *ParenthesizedExpression) _primaryExpression() {}
+func ParenthesizedExpressionAnalyze(p *ParenthesizedExpression, query AnalyzeQuery) bool {
+	switch query {
+	case AnalyzeQueryIsReference:
+		return ExpressionAnalyze(p.Expression, query)
+	default:
+		return false
+	}
+}
+
+func (p *ParenthesizedExpression) AssignmentTargetType() AssignmentTargetType {
+	return p.Expression.AssignmentTargetType()
+}
+
+// Evaluation
+// spec: 13.2.9.2
+func (p *ParenthesizedExpression) Evaluation(vm *VM) CompletionValue {
+	return p.Expression.Evaluation(vm)
+}
+
+func (p *ParenthesizedExpression) String() string {
+	return "(" + p.Expression.String() + ")"
+}
+
+// MARK: - ArrayLiteral
+
+type (
+	ArrayElement interface {
+		ASTNode
+	}
+)
+
+type ArrayElementElision struct {
+	ArrayElement
+}
+
+var _ RuntimeSemanticsIteratorDestructuringAssignmentEvaluation = (*ArrayElementElision)(nil)
+
+func (a *ArrayElementElision) IteratorDestructuringAssignmentEvaluation(vm *VM, iteratorRecord *IteratorRecord) (co CompletionValue) {
+	if !iteratorRecord.Done {
+		next, isFalse := iteratorRecord.IteratorStep()
+		if next.IsAbrupt() {
+			iteratorRecord.Done = true
+			return
+		}
+		if isFalse {
+			iteratorRecord.Done = true
+		}
+	}
+	return
+}
+
+type ArrayElementExpression struct {
+	ArrayElement
+	Expression Expression
+}
+
+var _ RuntimeSemanticsIteratorDestructuringAssignmentEvaluation = (*ArrayElementExpression)(nil)
+
+func (a *ArrayElementExpression) IteratorDestructuringAssignmentEvaluation(vm *VM, iteratorRecord *IteratorRecord) (co CompletionValue) {
+	// AssignmentElement : DestructuringAssignmentTarget Initializeropt
+
+	_, isObjectLiteral := a.Expression.(*PrimaryExpressionObjectLiteral)
+	_, isArrayLiteral := a.Expression.(*ArrayLiteral)
+	var lref Value
+	if !isObjectLiteral && !isArrayLiteral {
+		l, isAbrupt, rt := ReturnIfAbrupt(a.Expression.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		lref = l
+	}
+	var value Value = UndefinedValue
+	if !iteratorRecord.Done {
+		next, isDone := iteratorRecord.IteratorStepValue()
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		if !isDone {
+			value = nextValue
+		}
+	}
+	// TODO: check initializer
+	v := value
+	if isObjectLiteral || isArrayLiteral {
+		nextedAssignmentPattern := a.Expression
+		return nextedAssignmentPattern.(RuntimeSemanticsDestructuringAssignmentEvaluation).DestructuringAssignmentEvaluation(vm, v)
+	}
+	if ref, ok := lref.ReferenceRecord(); ok {
+		return ref.PutValue(vm.agent, v)
+	}
+	return
+}
+
+type ArrayElementSpread struct {
+	ArrayElement
+	Spread Expression
+}
+
+// TODO: handle elision
+// ElementList [Yield, Await] :
+// Elisionopt AssignmentExpression[+In, ?Yield, ?Await]
+// Elisionopt SpreadElement[?Yield, ?Await]
+// ElementList[?Yield, ?Await] , Elisionopt AssignmentExpression[+In, ?Yield, ?Await]
+// ElementList[?Yield, ?Await] , Elisionopt SpreadElement[?Yield, ?Await]
+type ElementList []ArrayElement
+
+var _ RuntimeSemanticsArrayAccumulation = ElementList{}
+
+// ElementList : Elisionopt AssignmentExpression
+func (e ElementList) astIsOnlyHasAssigmentExpression() (expr *ArrayElementExpression, ok bool) {
+	if len(e) != 1 {
+		return
+	}
+	expr, ok = e[0].(*ArrayElementExpression)
+	return
+}
+
+func (e ElementList) astHasElementListAndAssignmentExpression() (list ElementList, expr *ArrayElementExpression, ok bool) {
+	if len(e) < 2 {
+		return
+	}
+	list = e[:len(e)-1]
+	expr, ok = e[len(e)-1].(*ArrayElementExpression)
+	return
+}
+
+// ArrayAccumulation
+// spec: 13.2.4.1
+func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSInt) (co Completion[JSInt]) {
+	for _, elem := range e {
+		switch elem := elem.(type) {
+		// Elision : ,
+		case *ArrayElementElision:
+			length := nextIndex + 1
+			array.Set(NewStringPropertyKey("length"), NewNumberValue(JSNumber(length)), setThrowTypeThrow)
+			nextIndex = length
+		case *ArrayElementExpression:
+			initResult, isAbrupt, rt := ReturnIfAbrupt(elem.Expression.Evaluation(vm), co)
+			if isAbrupt {
+				return rt
+			}
+			initValue, isAbrupt, rt := ReturnIfAbrupt(initResult.GetValue(vm.agent), co)
+			if isAbrupt {
+				return rt
+			}
+
+			_, isAbrupt, rt = ReturnIfAbrupt(
+				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), initValue),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			nextIndex++
+		case *ArrayElementSpread:
+			panic("unimplemented")
+		default:
+			panic("unreachable")
+		}
+	}
+	co.value = nextIndex
+	return
+}
+
+// ArrayLiteral [Yield, Await] :
+// - [ Elisionopt ]
+// - [ ElementList[?Yield, ?Await] ]
+// - [ ElementList[?Yield, ?Await] , Elisionopt ]
+type ArrayLiteral struct {
+	PrimaryExpression
+	ElementList ElementList
+}
+
+// TODO: Elision
+func (p *ArrayLiteral) astHasElision() bool {
+	return false
+}
+
+func (p *ArrayLiteral) astElementListEmpty() bool {
+	return len(p.ElementList) == 0
+}
+
+// Evaluation
+// spec: 13.2.4.2
+func (p *ArrayLiteral) Evaluation(vm *VM) CompletionValue {
+	array := ArrayCreate(vm.agent, 0, nil)
+	if p.astElementListEmpty() {
+		return array.ToValue().ToCompletion()
+	}
+	if p.astHasElision() {
+	} else {
+		p.ElementList.ArrayAccumulation(vm, array, 0)
+	}
+	return array.ToValue().ToCompletion()
+}
+
+func (p *ArrayLiteral) String() string {
+	sb := "["
+	for i, element := range p.ElementList {
+		if i != 0 {
+			sb += ", "
+		}
+		switch element := element.(type) {
+		case *ArrayElementExpression:
+			sb += element.Expression.String()
+		case *ArrayElementElision:
+			sb += ","
+		}
+	}
+	sb += "]"
+	return sb
+}
+
+// MARK: - ObjectLiteral
+
+// ObjectLiteral [Yield, Await] :
+// - { }
+// - { PropertyDefinitionList[?Yield, ?Await] }
+// - { PropertyDefinitionList[?Yield, ?Await] , }
+type PrimaryExpressionObjectLiteral struct {
+	PrimaryExpression
+	PropertyList *PropertyDefinitionList
+}
+
+func (p *PrimaryExpressionObjectLiteral) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *PrimaryExpressionObjectLiteral) astIsEmpty() bool {
+	return len(p.PropertyList.Items) == 0
+}
+
+// 13.2.5.4
+func (p *PrimaryExpressionObjectLiteral) Evaluation(vm *VM) CompletionValue {
+	if p.astIsEmpty() {
+		return OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil).ToValue().ToCompletion()
+	}
+
+	obj := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
+	p.PropertyList.PropertyDefinitionEvaluation(vm, obj)
+	return obj.ToValue().ToCompletion()
+}
+
+func (p *PrimaryExpressionObjectLiteral) String() string {
+	sb := "{"
+	sb += p.PropertyList.String()
+	sb += "}"
+	return sb
+}
+
+// PropertyDefinitionList [Yield, Await] :
+// PropertyDefinition[?Yield, ?Await]
+// PropertyDefinitionList[?Yield, ?Await] , PropertyDefinition[?Yield, ?Await]
+type PropertyDefinitionList struct {
+	Items []PropertyDefinition
+}
+
+var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionList)(nil)
+
+// 13.2.5.4
+func (p *PropertyDefinitionList) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
+	for _, item := range p.Items {
+		item.PropertyDefinitionEvaluation(vm, obj)
+	}
+	return co
+}
+
+func (p *PropertyDefinitionList) String() string {
+	var sb string
+	for i, item := range p.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+// MARK: - PropertyDefinition
+
+// PropertyDefinition [Yield, Await] :
+// - IdentifierReference[?Yield, ?Await]
+// - CoverInitializedName[?Yield, ?Await]
+// - PropertyName[?Yield, ?Await] : AssignmentExpression[+In, ?Yield, ?Await]
+// - MethodDefinition[?Yield, ?Await]
+// - ... AssignmentExpression[+In, ?Yield, ?Await]
+type PropertyDefinition interface {
+	ASTNode
+	RuntimeSemanticsPropertyDefinitionEvaluation
+}
+
+type PropertyDefinitionMethodDefinition struct {
+	*MethodDefinition
+}
+
+var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionMethodDefinition)(nil)
+
+func (p *PropertyDefinitionMethodDefinition) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
+	p.MethodDefinition.MethodDefinitionEvaluation(vm, obj, true)
+	return co
+}
+
+type PropertyDefinitionIdentifierReference struct {
+	PropertyDefinition
+	IdentifierReference *IdentifierReference
+}
+
+var _ PropertyDefinition = (*PropertyDefinitionIdentifierReference)(nil)
+
+func (p *PropertyDefinitionIdentifierReference) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
+	propName := p.IdentifierReference.Identifier
+	propValue, _, isAbrupt, rt := vm.EvalAndGetValue(p.IdentifierReference, co)
+	if isAbrupt {
+		return rt
+	}
+	_, isAbrupt, rt = ReturnIfAbrupt(
+		obj.CreateDataPropertyOrThrow(NewStringPropertyKey(propName), propValue),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	return
+}
+
+func (p *PropertyDefinitionIdentifierReference) String() string {
+	return p.IdentifierReference.String()
+}
+
+// PropertyDefinition : PropertyName : AssignmentExpression
+type PropertyDefinitionNameAndExpression struct {
+	PropertyDefinition
+	Name       PropertyName
+	Expression Expression
+}
+
+func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *VM, object ObjectType) (co CompletionValue) {
+	propKey := p.Name.Evaluation(vm)
+	var isProtoSetter bool
+	if vm.IsJSONParse {
+		isProtoSetter = false
+	} else if propKey.value.String() == "__proto__" && !IsComputedPropertyKeyDefault(p.Name) {
+		isProtoSetter = true
+	} else {
+		isProtoSetter = false
+	}
+
+	var propValue Value
+	if IsAnonymousFunctionDefinition(p.Expression) {
+		panic("unimplemented")
+	} else {
+		pv, _, isAbrupt, rt := vm.EvalAndGetValue(p.Expression, co)
+		if isAbrupt {
+			return rt
+		}
+		propValue = pv
+	}
+	if isProtoSetter {
+		if propValue.IsObject() || propValue == NullValue {
+			object.SetPrototype(propValue.ToObject(vm.agent).value)
+		}
+		return co
+	}
+	// TODO: assert no non-configurable properties
+	Assert(object.IsOrdinary() && object.IsExtensible())
+	pk, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, propKey.value), co)
+	if isAbrupt {
+		return rt
+	}
+	object.CreateDataPropertyOrThrow(
+		pk,
+		propValue)
+	return co
+}
+
+func (p *PropertyDefinitionNameAndExpression) String() string {
+	return p.Name.String() + ": " + p.Expression.String()
+}
+
+type PropertyDefinitionSpread struct {
+	PropertyDefinition
+	Spread Expression
+}
+
+func (p *PropertyDefinitionSpread) String() string {
+	return "..." + p.Spread.String()
+}
+
+// MARK: - Method Definition
+
+type MethodDefinitionType int
+
+const (
+	MethodDefinitionTypeNil MethodDefinitionType = iota
+	MethodDefinitionTypeMethod
+	MethodDefinitionTypeGet
+	MethodDefinitionTypeSet
+	MethodDefinitionTypeGenerator
+	MethodDefinitionTypeAsync
+	MethodDefinitionTypeAsyncGenerator
+)
+
+// MethodDefinition [Yield, Await] :
+// - ClassElementName[?Yield, ?Await] ( UniqueFormalParameters[~Yield, ~Await] ) {
+// - FunctionBody[~Yield, ~Await] }
+// - GeneratorMethod[?Yield, ?Await]
+// - AsyncMethod[?Yield, ?Await]
+// - AsyncGeneratorMethod[?Yield, ?Await]
+// - get ClassElementName[?Yield, ?Await] ( ) { FunctionBody[~Yield, ~Await] }
+// - set ClassElementName[?Yield, ?Await] ( PropertySetParameterList ) {
+// - FunctionBody[~Yield, ~Await] }
+type MethodDefinition struct {
+	PropertyDefinition
+	Type                     MethodDefinitionType
+	PropertyName             PropertyName
+	FunctionExpression       *FunctionExpression
+	GeneratorExpression      *GeneratorExpression
+	AsyncFunctionExpression  *AsyncFunctionExpression
+	AsyncGeneratorExpression *PrimaryExpressionAsyncGeneratorExpression
+}
+
+var (
+	_ RuntimeSemanticsMethodDefinitionEvaluation = (*MethodDefinition)(nil)
+	_ RuntimeSemanticsDefineMethod               = (*MethodDefinition)(nil)
+)
+
+func (p *MethodDefinition) sourceText() string {
+	if p.FunctionExpression != nil {
+		return p.FunctionExpression.SourceText
+	} else if p.GeneratorExpression != nil {
+		return p.GeneratorExpression.SourceText
+	} else if p.AsyncFunctionExpression != nil {
+		return p.AsyncFunctionExpression.SourceText
+	} else if p.AsyncGeneratorExpression != nil {
+		return p.AsyncGeneratorExpression.SourceText
+	}
+	return ""
+}
+
+func (p *MethodDefinition) formalParameters() *FormalParameters {
+	if p.FunctionExpression != nil {
+		return p.FunctionExpression.FormalParameters
+	} else if p.GeneratorExpression != nil {
+		return p.GeneratorExpression.FormalParameters
+	} else if p.AsyncFunctionExpression != nil {
+		return p.AsyncFunctionExpression.FormalParameters
+	} else if p.AsyncGeneratorExpression != nil {
+		return p.AsyncGeneratorExpression.FormalParameters
+	}
+	return nil
+}
+
+func (p *MethodDefinition) astIsClassElementName() bool {
+	return p.PropertyName != nil
+}
+
+func (p *MethodDefinition) astIsGet() bool {
+	return p.Type == MethodDefinitionTypeGet
+}
+
+// DefineMethod
+// spec: 15.4.4
+func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (co Completion[*DefineMethodRecord]) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	if p.astIsClassElementName() {
+		propKey := p.PropertyName.Evaluation(vm)
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		var prototype ObjectType
+		if proto != nil {
+			prototype = proto
+		} else {
+			prototype = realm.Intrinsics.FunctionPrototype
+		}
+		sourceText := p.sourceText()
+		closure := OrdinaryFunctionCreate(
+			agent,
+			prototype,
+			sourceText,
+			p.FunctionExpression.FormalParameters,
+			p.FunctionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(closure, obj)
+		pk, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propKey.value), co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = &DefineMethodRecord{
+			Key:     pk,
+			Closure: closure,
+		}
+		return
+	} else {
+		panic("unreachable")
+	}
+}
+
+// MethodDefinitionEvaluation
+// spec: 15.4.5
+func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, enumerable bool) (co Completion[*PrivateElement]) {
+	agent := vm.agent
+	if p.astIsGet() {
+		propKey := p.PropertyName.Evaluation(vm)
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.sourceText()
+		formalParameterList := p.formalParameters()
+		closure := OrdinaryFunctionCreate(
+			agent,
+			agent.CurrentRealm().Intrinsics.FunctionPrototype,
+			sourceText,
+			formalParameterList,
+			p.FunctionExpression.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(closure, obj)
+		// TODO: check propKey is private name
+		SetFunctionName(closure, propKey.value.ToPropertyKey(), "get")
+		// TODO: check propKey is private name
+		isPrivateName := false
+		if isPrivateName {
+			panic("unimplemented")
+		} else {
+			desc := &PropertyDescriptor{
+				Get:          closure,
+				Enumerable:   enumerable,
+				Configurable: true,
+			}
+			obj.DefinePropertyOrThrow(propKey.value.ToPropertyKey(), desc)
+			// return UNUSED
+			return
+		}
+	} else if p.astIsClassElementName() {
+		if methodDef, isAbrupt, rt := ReturnIfAbrupt(p.DefineMethod(vm, obj, nil), co); isAbrupt {
+			return rt
+		} else {
+			SetFunctionName(methodDef.Closure, methodDef.Key, "")
+			return DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable)
+		}
+	} else {
+		panic("unimplemented")
+	}
+}
+
+func (p *MethodDefinition) String() string {
+	return "MethodDefinition " + p.PropertyName.String()
+}
+
+// MARK: - FieldDefinition
+
+type FieldDefinition struct {
+	PropertyName PropertyName
+	Initializer  Expression
+}
+
+// MARK: - PropertyName
+
+// PropertyName [Yield, Await] :
+// - LiteralPropertyName
+// - ComputedPropertyName[?Yield, ?Await]
+type PropertyName interface {
+	ASTNode
+}
+
+// LiteralPropertyName :
+// - IdentifierName
+// - StringLiteral
+// - NumericLiteral
+type LiteralPropertyName interface {
+	PropertyName
+	LiteralString() string
+}
+
+type PropertyNameLiteralIdentifier struct {
+	LiteralPropertyName
+	Identifier IdentifierName
+}
+
+func (p *PropertyNameLiteralIdentifier) LiteralString() string {
+	return string(p.Identifier)
+}
+
+func (p *PropertyNameLiteralIdentifier) String() string {
+	return string(p.Identifier)
+}
+
+func (p *PropertyNameLiteralIdentifier) Evaluation(vm *VM) CompletionValue {
+	return NewStringValue(p.Identifier).ToCompletion()
+}
+
+type PropertyNameLiteralString struct {
+	LiteralPropertyName
+	StringLiteral *StringLiteral
+}
+
+func (p *PropertyNameLiteralString) Evaluation(vm *VM) (co CompletionValue) {
+	return p.StringLiteral.Evaluation(vm)
+}
+
+func (p *PropertyNameLiteralString) LiteralString() string {
+	return p.StringLiteral.Value
+}
+
+func (p *PropertyNameLiteralString) String() string {
+	return p.StringLiteral.String()
+}
+
+type PropertyNameLiteralNumeric struct {
+	LiteralPropertyName
+	NumericLiteral *NumericLiteral
+}
+
+var _ RuntimeSemanticsEvaluation = (*PropertyNameLiteralNumeric)(nil)
+
+func (p *PropertyNameLiteralNumeric) Evaluation(vm *VM) (co CompletionValue) {
+	return p.NumericLiteral.Evaluation(vm)
+}
+
+func (p *PropertyNameLiteralNumeric) String() string {
+	return p.NumericLiteral.String()
+}
+
+func (p *PropertyNameLiteralNumeric) LiteralString() string {
+	return p.NumericLiteral.Value
+}
+
+// ComputedPropertyName [Yield, Await] :
+// - [ AssignmentExpression[+In, ?Yield, ?Await] ]
+type ComputedPropertyName struct {
+	PropertyName
+	Expression Expression
+}
+
+func (p *ComputedPropertyName) String() string {
+	return p.Expression.String()
+}
+
+// Evaluation
+// spec: 13.2.5.4
+func (p *ComputedPropertyName) Evaluation(vm *VM) (co CompletionValue) {
+	propName, _, isAbrupt, rt := vm.EvalAndGetValue(p.Expression, co)
+	if isAbrupt {
+		return rt
+	}
+	k, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, propName), co)
+	if isAbrupt {
+		return rt
+	}
+	return k.ToValue().ToCompletion()
+}
+
+// MARK: - FunctionExpression
+
+// FunctionExpression :
+//   - function BindingIdentifier[~Yield, ~Await] opt ( FormalParameters[~Yield, ~Await] )
+//     { FunctionBody[~Yield, ~Await] }
+type FunctionExpression struct {
+	PrimaryExpression
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+var _ RuntimeSemanticsInstantiateOrdinaryFunctionExpression = (*FunctionExpression)(nil)
+
+func (p *FunctionExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *FunctionExpression) astHasIdentifier() bool {
+	return p.Identifier != ""
+}
+
+// InstantiateOrdinaryFunctionExpression
+// spec: 15.2.5
+func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM, propertyKeyOrPrivateName PropertyKeyOrPrivateName) (fun ObjectType) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	if p.astHasIdentifier() {
+		// TODO: check Assert: name is not present.
+		// Assert(propertyKeyOrPrivateName == nil)
+		name := p.Identifier
+		outerEnv := vm.RunningLexicalEnvironment()
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(name, false)
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		MakeConstructor(closure, true, nil)
+
+		funcEnv.InitializeBinding(name, closure.ToValue())
+		return closure
+	} else {
+		var name PropertyKeyOrPrivateName
+		if propertyKeyOrPrivateName == nil {
+			name = NewStringPropertyKey("")
+		} else {
+			name = propertyKeyOrPrivateName
+		}
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		SetFunctionName(closure, name, "")
+		MakeConstructor(closure, true, nil)
+		return closure
+	}
+}
+
+// NamedEvaluation
+// spec: 8.4.5
+func (p *FunctionExpression) NamedEvaluation(vm *VM, name PropertyKeyOrPrivateName) Value {
+	return p.InstantiateOrdinaryFunctionExpression(vm, name).ToValue()
+}
+
+// TODO: non standard
+func (p *FunctionExpression) Evaluation(vm *VM) CompletionValue {
+	return p.NamedEvaluation(vm, NewStringPropertyKey("")).ToCompletion()
+}
+
+func (p *FunctionExpression) String() string {
+	return "FunctionExpression " + string(p.Identifier)
+}
+
+// MARK: - AsyncArrowFunction
+
+// AsyncArrowFunction [In, Yield, Await] :
+//   - async [no LineTerminator here] AsyncArrowBindingIdentifier[?Yield] [no LineTerminator
+//     here] => AsyncConciseBody[?In]
+//   - CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await] [no LineTerminator here] =>
+//     AsyncConciseBody[?In]
+type AsyncArrowFunction struct {
+	PrimaryExpression
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+var _ RuntimeSemanticsInstantiateAsyncArrowFunctionExpression = (*AsyncArrowFunction)(nil)
+
+func (p *AsyncArrowFunction) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *AsyncArrowFunction) Evaluation(vm *VM) CompletionValue {
+	return p.InstantiateAsyncArrowFunctionExpression(vm, NewStringPropertyKey("")).ToValue().ToCompletion()
+}
+
+func (p *AsyncArrowFunction) InstantiateAsyncArrowFunctionExpression(
+	vm *VM,
+	name PropertyKeyOrPrivateName,
+) ObjectType {
+	functionExpression := p
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := vm.RunningLexicalEnvironment()
+	privateEnv := vm.RunningPrivateEnvironment()
+	sourceText := functionExpression.SourceText
+	closure := OrdinaryFunctionCreate(
+		vm.agent,
+		realm.Intrinsics.AsyncFunctionPrototype,
+		sourceText,
+		functionExpression.FormalParameters,
+		functionExpression.Body,
+		functionCreateThisModeLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(closure, name, "")
+	return closure
+}
+
+func (p *AsyncArrowFunction) String() string {
+	return "AsyncArrowFunction"
+}
+
+// MARK: - ArrowFunction
+
+// ArrowFunction [In, Yield, Await] :
+// - ArrowParameters[?Yield, ?Await] [no LineTerminator here] => ConciseBody[?In]
+type ArrowFunction struct {
+	PrimaryExpression
+	// TODO: change to ArrowParameters
+	// ArrowParameters [Yield, Await] :
+	// - BindingIdentifier[?Yield, ?Await]
+	// - CoverParenthesizedExpressionAndArrowParameterList[?Yield, ?Await]
+	FormalParameters *FormalParameters
+	// ConciseBody[In] :
+	// - [lookahead ≠ {] ExpressionBody[?In, ~Await]
+	// - { FunctionBody[~Yield, ~Await] }
+	// ExpressionBody[In, Await] :
+	// - AssignmentExpression[?In, ~Yield, ?Await]
+	Body       *FunctionBody
+	SourceText string
+}
+
+var _ RuntimeSemanticsInstantiateArrowFunctionExpression = (*ArrowFunction)(nil)
+
+func (p *ArrowFunction) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (p *ArrowFunction) Evaluation(vm *VM) CompletionValue {
+	return p.InstantiateArrowFunctionExpression(vm, "").ToCompletion()
+}
+
+func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM, name string) Value {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := vm.RunningLexicalEnvironment()
+	privateEnv := vm.RunningPrivateEnvironment()
+	sourceText := p.SourceText
+	closure := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		p.FormalParameters,
+		p.Body,
+		functionCreateThisModeLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(closure, CMString(name).ToPropertyKey(), "")
+	return closure.ToValue()
+}
+
+func (p *ArrowFunction) String() string {
+	return "ArrowFunction"
+}
+
+// MARK: - MemberExpression
+
+type ASTProperty interface {
+	String() string
+}
+
+type ASTPropertyIdentifier struct {
+	ASTProperty
+	Identifier IdentifierName
+}
+
+func (a *ASTPropertyIdentifier) String() string {
+	return string(a.Identifier)
+}
+
+type ASTPropertyExpression struct {
+	ASTProperty
+	Expression Expression
+}
+
+func (a *ASTPropertyExpression) String() string {
+	return a.Expression.String()
+}
+
+// TODO(BM): refactor: match spec
+// MemberExpression [Yield, Await] :
+// - PrimaryExpression[?Yield, ?Await]
+// - MemberExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
+// - MemberExpression[?Yield, ?Await]. IdentifierName
+// - MemberExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+// - SuperProperty[?Yield, ?Await]
+// - MetaProperty
+// - new MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+// - MemberExpression[?Yield, ?Await]. PrivateIdentifier
+type MemberExpression struct {
+	Expression
+	Member   Expression
+	Property ASTProperty
+}
+
+func (m *MemberExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
+}
+
+// astIsMemberExpression check if Member is MemberExpression
+func (m *MemberExpression) astIsPropertyExpression() bool {
+	_, ok := m.Property.(*ASTPropertyExpression)
+	return ok
+}
+
+// Evaluation
+// spec: 13.3.2.1
+func (m *MemberExpression) Evaluation(vm *VM) (co CompletionValue) {
+	baseValue, _, isAbrupt, rt := vm.EvalAndGetValue(m.Member, co)
+	if isAbrupt {
+		return rt
+	}
+	strict := vm.containedInStrictCode
+
+	switch prop := m.Property.(type) {
+	case *ASTPropertyExpression:
+		// TODO: check source text is strict
+		r, isAbrupt, rt := ReturnIfAbrupt(vm.EvaluatePropertyAccessWithExpressionKey(baseValue, prop.Expression, strict), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewReferenceRecordValue(r).ToCompletion()
+	case *ASTPropertyIdentifier:
+		return NewReferenceRecordValue(
+			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, prop.Identifier, strict),
+		).ToCompletion()
+	}
+	panic("unimplemented")
+}
+
+func (m *MemberExpression) String() string {
+	return m.Member.String() + "." + m.Property.String()
+}
+
+// MARK: - Literal
+
+// Literal :
+// NullLiteral
+// BooleanLiteral
+// NumericLiteral
+// StringLiteral
+type Literal interface {
+	PrimaryExpression
+	Analyze(a AnalyzeQuery) bool
+	// 13.2.3.1
+}
+
+func LiteralAnalyze(l Literal, a AnalyzeQuery) bool {
+	switch a {
+	case AnalyzeQueryIsReference:
+		return false
+	case AnalyzeQueryIsStringLiteral:
+		_, ok := l.(*StringLiteral)
+		return ok
+	}
+	panic("unreachable")
+}
+
+type LiteralNull struct {
+	Literal
+}
+
+var _ Literal = (*LiteralNull)(nil)
+
+func (l *LiteralNull) Evaluation(vm *VM) CompletionValue {
+	return NullValue.ToCompletion()
+}
+
+func (l *LiteralNull) String() string {
+	return "null"
+}
+
+type LiteralUndefined struct {
+	Literal
+}
+
+var _ Literal = (*LiteralUndefined)(nil)
+
+// 13.2.3.1
+func (l *LiteralUndefined) Evaluation(vm *VM) CompletionValue {
+	return UndefinedValue.ToCompletion()
+}
+
+func (l *LiteralUndefined) String() string {
+	return "LiteralUndefined"
+}
+
+type LiteralBoolean struct {
+	Literal
+	Bool bool
+}
+
+var _ Literal = (*LiteralBoolean)(nil)
+
+func (l *LiteralBoolean) Evaluation(vm *VM) CompletionValue {
+	return NewBooleanValue(l.Bool).ToCompletion()
+}
+
+func (l *LiteralBoolean) String() string {
+	if l.Bool {
+		return "true"
+	}
+	return "false"
+}
+
+// MARK: - NumericLiteral
+
+type NumericSystem int
+
+const (
+	NumericSystemDecimal NumericSystem = iota
+	NumericSystemBinary
+	NumericSystemOctal
+	NumericSystemHex
+)
+
+type NumericProduction int
+
+const (
+	NumericProductionRegular NumericProduction = iota
+	NumericProductionLegacyOctal
+	NumericProductionNonOctalDecimalIntegerLiteral
+)
+
+type NumericType int
+
+const (
+	NumericTypeNumber NumericType = iota
+	NumericTypeBigInt
+)
+
+// NumericLiteral ::
+// - DecimalLiteral
+// - DecimalBigIntegerLiteral
+// - NonDecimalIntegerLiteral[+Sep]
+// - NonDecimalIntegerLiteral[+Sep] BigIntLiteralSuffix
+// - LegacyOctalIntegerLiteral
+type NumericLiteral struct {
+	Literal
+	Value string
+	Type  NumericType
+}
+
+var _ Literal = (*NumericLiteral)(nil)
+
+// 12.9.3.3
+func (l *NumericLiteral) NumericValue() (Value, error) {
+	if l.Type == NumericTypeBigInt {
+		bi := big.NewInt(0)
+		bi.SetString(l.Value, 10)
+		return NewBigIntValue(bi), nil
+	}
+	num, err := strconv.ParseFloat(l.Value, 64)
+	if err != nil && !math.IsInf(num, 0) {
+		return nil, err
+	}
+	return NewNumberValue(JSNumber(num)), nil
+}
+
+func (l *NumericLiteral) Evaluation(vm *VM) CompletionValue {
+	v, err := l.NumericValue()
+	if err != nil {
+		panic(err)
+	}
+	return v.ToCompletion()
+}
+
+func (l *NumericLiteral) String() string {
+	return l.Value
+}
+
+// MARK: - StringLiteral
+
+type StringLiteral struct {
+	Literal
+	Value string
+}
+
+var _ Literal = (*StringLiteral)(nil)
+
+// 12.9.4.2: SV
+func (l *StringLiteral) StringValue() Value {
+	return NewStringValue(l.Value)
+}
+
+// 13.2.3.1
+func (l *StringLiteral) Evaluation(vm *VM) CompletionValue {
+	return l.StringValue().ToCompletion()
+}
+
+func (l *StringLiteral) String() string {
+	return "StringLiteral: " + l.Value
+}
+
+// MARK: - Expression
+
+type AssignmentTargetType int
+
+const (
+	AssignmentTargetTypeSimple AssignmentTargetType = iota
+	AssignmentTargetTypeInvalid
+)
+
+type Expression interface {
+	ASTNode
+	AssignmentTargetType() AssignmentTargetType
+}
+
+type expressionDefaultImpl struct {
+	Expression
+}
+
+func (e *expressionDefaultImpl) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func ExpressionAnalyze(e Expression, a AnalyzeQuery) bool {
+	switch ee := e.(type) {
+	case PrimaryExpression:
+		return PrimaryExpressionAnalyze(ee, a)
+	case *ExpressionPrimary:
+		return PrimaryExpressionAnalyze(ee.PrimaryExpression, a)
+	}
+	switch a {
+	case AnalyzeQueryIsReference:
+		switch e.(type) {
+		case *MemberExpression, SuperProperty:
+			return true
+		default:
+			return false
+		}
+	case AnalyzeQueryIsStringLiteral:
+		switch e.(type) {
+		default:
+			return false
+		}
+	case AnalyzeQueryIsIdentifierReference:
+		return false
+	}
+	panic("unreachable")
+}
+
+// MARK: - ImportCall
+
+type ExpressionImportCall struct {
+	*expressionDefaultImpl
+	Expression Expression
+}
+
+func (i *ExpressionImportCall) String() string {
+	return "import(" + i.Expression.String() + ")"
+}
+
+// MARK: - OptionalExpression
+
+// OptionalExpression [Yield, Await] :
+// - MemberExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+// - CallExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+// - OptionalExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+//
+// OptionalChain[Yield, Await] :
+// - ?. Arguments[?Yield, ?Await]
+// - ?. [ Expression[+In, ?Yield, ?Await] ]
+// - ?. IdentifierName
+// - ?. TemplateLiteral[?Yield, ?Await, +Tagged]
+// - ?. PrivateIdentifier
+// - OptionalChain[?Yield, ?Await] Arguments[?Yield, ?Await]
+// - OptionalChain[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
+// - OptionalChain[?Yield, ?Await]. IdentifierName
+// - OptionalChain[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+// - OptionalChain[?Yield, ?Await]. PrivateIdentifier
+type OptionalExpression struct {
+	Expression
+	// Property is OptionalChain
+	Property *OptionalExpressionProperty
+	// Expr is MemberExpression, CallExpression, or OptionalExpression
+	Expr Expression
+}
+
+func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+// Evaluation
+// spec: 13.3.9.1
+func (o *OptionalExpression) Evaluation(vm *VM) (co CompletionValue) {
+	baseValue, baseReference, isAbrupt, rt := vm.EvalAndGetValue(o.Expr, co)
+	if isAbrupt {
+		return rt
+	}
+	if IsUndefinedOrNull(baseValue) {
+		return UndefinedValue.ToCompletion()
+	}
+	result, isAbrupt, rt := ReturnIfAbrupt(o.Property.ChainEvaluation(vm, baseValue, baseReference), co)
+	if isAbrupt {
+		return rt
+	}
+	return result.ToCompletion()
+}
+
+func (o *OptionalExpression) String() string {
+	return o.Expr.String() + "?." + o.Property.String()
+}
+
+// OptionalExpressionProperty Enum
+// TODO(BM): rename to OptionalChain
+// TODO: handle chaining
+// TODO: handle private identifier
+type OptionalExpressionProperty struct {
+	Arguments  Arguments
+	Expression Expression
+	Identifier IdentifierName
+}
+
+var _ RuntimeSemanticsChainEvaluation = (*OptionalExpressionProperty)(nil)
+
+func (o *OptionalExpressionProperty) astIsArguments() bool {
+	return o.Arguments != nil
+}
+
+func (o *OptionalExpressionProperty) astIsExpression() bool {
+	return o.Expression != nil
+}
+
+func (o *OptionalExpressionProperty) astIsIdentifier() bool {
+	return o.Identifier != ""
+}
+
+func (o *OptionalExpressionProperty) isStrict() bool {
+	// TODO: check strict
+	return true
+}
+
+func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (co CompletionValue) {
+	if o.astIsArguments() {
+		thisChain := o
+		// TODO
+		tailCall := false
+		arguments := thisChain.Arguments.Evaluation(vm)
+		return vm.EvaluateCall(baseValue, baseReference, arguments.value.(*ListValue).Values, tailCall)
+	} else if o.astIsExpression() {
+		strict := o.isStrict()
+		r, isAbrupt, rt := ReturnIfAbrupt(vm.EvaluatePropertyAccessWithExpressionKey(baseValue, o.Expression, strict), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewReferenceRecordValue(r).ToCompletion()
+	} else if o.astIsIdentifier() {
+		strict := o.isStrict()
+		return NewReferenceRecordValue(
+			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, o.Identifier, strict),
+		).ToCompletion()
+	} else {
+		panic("unimplemented")
+	}
+}
+
+func (o *OptionalExpressionProperty) String() string {
+	if o.Arguments != nil {
+		return "(" + o.Arguments.String() + ")"
+	}
+	if o.Expression != nil {
+		return "[" + o.Expression.String() + "]"
+	}
+	return string(o.Identifier)
+}
+
+// MARK: - MetaProperty
+
+type MetaProperty interface {
+	Expression
+}
+
+type MetaPropertyNewTarget struct {
+	MetaProperty
+}
+
+func (m *MetaPropertyNewTarget) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (m *MetaPropertyNewTarget) String() string {
+	return "new.target"
+}
+
+type MetaPropertyImportMeta struct {
+	MetaProperty
+}
+
+func (m *MetaPropertyImportMeta) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (m *MetaPropertyImportMeta) String() string {
+	return "import.meta"
+}
+
+// MARK: - SuperProperty
+
+type SuperProperty interface {
+	Expression
+	_superProperty()
+}
+
+type SuperPropertyExpression struct {
+	SuperProperty
+	Expression Expression
+}
+
+func (s *SuperPropertyExpression) _superProperty() {}
+
+func (s *SuperPropertyExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
+}
+
+func (s *SuperPropertyExpression) String() string {
+	return "super." + s.Expression.String()
+}
+
+type SuperPropertyIdentifier struct {
+	SuperProperty
+	IdentifierName IdentifierName
+}
+
+func (s *SuperPropertyIdentifier) _superProperty() {}
+func (s *SuperPropertyIdentifier) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
+}
+
+func (s *SuperPropertyIdentifier) String() string {
+	return "super." + string(s.IdentifierName)
+}
+
+// MARK: - SuperCall
+
+// SuperCall [Yield, Await] :
+// - super Arguments[?Yield, ?Await]
+type SuperCall struct {
+	Expression
+	Arguments Arguments
+}
+
+func (e *SuperCall) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+// Evaluation
+// spec: 13.3.7.1
+func (e *SuperCall) Evaluation(vm *VM) (co CompletionValue) {
+	agent := vm.agent
+	newTarget := agent.GetNewTarget()
+	// alias of func
+	f := agent.GetSuperConstructor()
+	argList, isAbrupt, rt := ReturnIfAbrupt(e.Arguments.ArgumentListEvaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	if !IsConstructor(f) {
+		return co.ThrowTypeError(agent, "SuperCall: not a constructor")
+	}
+	result := MustGetObject(f).Construct(argList, newTarget).value
+	thisER := agent.GetThisEnvironment().(*FunctionEnvironment)
+	thisER.BindThisValue(result.ToValue())
+	F := thisER.FunctionObject
+	result.InitializeInstanceElements(F)
+	return result.ToValue().ToCompletion()
+}
+
+func (e *SuperCall) String() string {
+	return "super(" + e.Arguments.String() + ")"
+}
+
+// MARK: - PrimaryExpression
+
+type ExpressionPrimary struct {
+	Expression
+	PrimaryExpression PrimaryExpression
+}
+
+func (e *ExpressionPrimary) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
+}
+
+func (e *ExpressionPrimary) String() string {
+	return e.PrimaryExpression.String()
+}
+
+func PrimaryExpressionAnalyze(e PrimaryExpression, a AnalyzeQuery) bool {
+	switch a {
+	case AnalyzeQueryIsReference, AnalyzeQueryIsIdentifierReference:
+		switch pe := e.(type) {
+		case *IdentifierReference:
+			return true
+		case *ParenthesizedExpression:
+			return ParenthesizedExpressionAnalyze(pe, a)
+		default:
+			return false
+		}
+
+	case AnalyzeQueryIsStringLiteral:
+		switch pe := e.(type) {
+		case Literal:
+			return LiteralAnalyze(pe, a)
+		default:
+			return false
+		}
+	default:
+		panic("unreachable")
+	}
+}
+
+// MARK: - TemplateLiteral
+
+type TemplateSpan struct {
+	Text       string
+	Expression Expression
+}
+
+// 12.9.6.1
+func (t *TemplateSpan) TV() CMString {
+	start := 0
+	end := len(t.Text)
+	if end == 0 {
+		return CMString("")
+	}
+	if t.Text[0] == '`' || t.Text[0] == '}' {
+		start = 1
+	}
+	if strings.HasSuffix(t.Text, "${") {
+		end -= 2
+	}
+	if strings.HasSuffix(t.Text, "}") || strings.HasSuffix(t.Text, "`") {
+		end--
+	}
+	if start > end {
+		return CMString("")
+	}
+	return cookTemplateText(t.Text[start:end])
+}
+
+func cookTemplateText(text string) CMString {
+	var value strings.Builder
+	for i := 0; i < len(text); i++ {
+		ch := text[i]
+		if ch == '\r' {
+			if i+1 < len(text) && text[i+1] == '\n' {
+				i++
+			}
+			value.WriteByte('\n')
+			continue
+		}
+		if ch != '\\' || i+1 >= len(text) {
+			value.WriteByte(ch)
+			continue
+		}
+
+		i++
+		escaped := text[i]
+		switch escaped {
+		case 'b':
+			value.WriteByte('\b')
+		case 'f':
+			value.WriteByte('\f')
+		case 'n':
+			value.WriteByte('\n')
+		case 'r':
+			value.WriteByte('\r')
+		case 't':
+			value.WriteByte('\t')
+		case 'v':
+			value.WriteByte('\v')
+		case '0':
+			value.WriteByte(0)
+		case '\n':
+			// A line continuation contributes no character.
+		case '\r':
+			if i+1 < len(text) && text[i+1] == '\n' {
+				i++
+			}
+		case 'x':
+			if i+2 < len(text) {
+				if code, err := strconv.ParseUint(text[i+1:i+3], 16, 8); err == nil {
+					value.WriteByte(byte(code))
+					i += 2
+					continue
+				}
+			}
+			value.WriteByte(escaped)
+		case 'u':
+			if i+1 < len(text) && text[i+1] == '{' {
+				if close := strings.IndexByte(text[i+2:], '}'); close >= 0 {
+					end := i + 2 + close
+					if code, err := strconv.ParseUint(text[i+2:end], 16, 32); err == nil {
+						value.WriteRune(rune(code))
+						i = end
+						continue
+					}
+				}
+			} else if i+4 < len(text) {
+				if code, err := strconv.ParseUint(text[i+1:i+5], 16, 16); err == nil {
+					value.WriteRune(rune(code))
+					i += 4
+					continue
+				}
+			}
+			value.WriteByte(escaped)
+		default:
+			value.WriteByte(escaped)
+		}
+	}
+	return CMString(value.String())
+}
+
+// TemplateLiteral [Yield, Await, Tagged] :
+// - NoSubstitutionTemplate
+// - SubstitutionTemplate[?Yield, ?Await, ?Tagged]
+type TemplateLiteral struct {
+	PrimaryExpression
+	// TemplateHead is string only
+	TemplateHead *TemplateSpan
+	Spans        []*TemplateSpan
+	SourceText   string
+}
+
+var _ ASTNode = (*TemplateLiteral)(nil)
+
+func (t *TemplateLiteral) astNoSubstitution() bool {
+	return t.TemplateHead == nil
+}
+
+// Evaluation
+// spec: 13.2.8.6
+func (t *TemplateLiteral) Evaluation(vm *VM) (co CompletionValue) {
+	if t.astNoSubstitution() {
+		// NoSubstitutionTemplate
+		span := t.Spans[0]
+		return span.TV().ToValue().ToCompletion()
+	} else {
+		var sb CMString
+		head := t.TemplateHead.TV()
+		sb += head
+		for _, span := range t.Spans {
+			sub, _, isAbrupt, rt := vm.EvalAndGetValue(span.Expression, co)
+			if isAbrupt {
+				return rt
+			}
+			middleValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(vm.agent, sub), co)
+			if isAbrupt {
+				return rt
+			}
+			middle := CMString(middleValue.Data)
+			tail := span.TV()
+			sb += middle + tail
+		}
+		return sb.ToValue().ToCompletion()
+	}
+}
+
+func (t *TemplateLiteral) String() string {
+	return t.SourceText
+}
+
+// MARK: - UpdateExpression
+
+type UpdateOperator int
+
+const (
+	UpdateOperatorIncrement UpdateOperator = iota
+	UpdateOperatorDecrement
+)
+
+func (u UpdateOperator) String() string {
+	switch u {
+	case UpdateOperatorIncrement:
+		return "++"
+	case UpdateOperatorDecrement:
+		return "--"
+	}
+	return ""
+}
+
+var UpdateOperatorMap = map[TokenType]UpdateOperator{
+	TPlusPlus:   UpdateOperatorIncrement,
+	TMinusMinus: UpdateOperatorDecrement,
+}
+
+type UpdateExpressionType int
+
+const (
+	UpdateExpressionTypePrefix UpdateExpressionType = iota
+	UpdateExpressionTypePostfix
+)
+
+func (u UpdateExpressionType) String() string {
+	switch u {
+	case UpdateExpressionTypePrefix:
+		return "prefix"
+	case UpdateExpressionTypePostfix:
+		return "postfix"
+	}
+	return ""
+}
+
+// UpdateExpression [Yield, Await] :
+// LeftHandSideExpression[?Yield, ?Await]
+// LeftHandSideExpression[?Yield, ?Await] [no LineTerminator here] ++
+// LeftHandSideExpression[?Yield, ?Await] [no LineTerminator here]--
+// ++ UnaryExpression[?Yield, ?Await]
+// -- UnaryExpression[?Yield, ?Await]
+type UpdateExpression struct {
+	Expression
+	Type     UpdateExpressionType
+	Operator UpdateOperator
+	Operand  Expression
+}
+
+func (e *UpdateExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeSimple
+}
+
+func (e *UpdateExpression) isPrefix() bool {
+	return e.Type == UpdateExpressionTypePrefix
+}
+
+// Evaluation
+// postfix: 13.4.2.1/13.4.3.1
+// prefix: 13.4.4.1/13.4.5.1
+func (e *UpdateExpression) Evaluation(vm *VM) (co CompletionValue) {
+	v, expr, isAbrupt, rt := vm.EvalAndGetValue(e.Operand, co)
+	if isAbrupt {
+		return rt
+	}
+	oldValue, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(vm.agent, v), co)
+	if isAbrupt {
+		return rt
+	}
+	var newValue Value
+	if n, bi, ok := oldValue.NumberOrBigInt(); ok {
+		if n != nil {
+			one := NewNumberValue(1)
+			if e.Operator == UpdateOperatorIncrement {
+				newValue = n.Add(one)
+			} else {
+				newValue = n.Subtract(one)
+			}
+		} else {
+			one := NewBigIntValue(big.NewInt(1))
+			if e.Operator == UpdateOperatorIncrement {
+				newValue = bi.Add(one)
+			} else {
+				newValue = bi.Subtract(one)
+			}
+		}
+	} else {
+		Assert(false)
+	}
+	if r, ok := expr.ReferenceRecord(); ok {
+		_, isAbrupt, rt := ReturnIfAbrupt(r.PutValue(vm.agent, newValue), co)
+		if isAbrupt {
+			return rt
+		}
+	} else {
+		panic("unreachable")
+	}
+	if e.isPrefix() {
+		return newValue.ToCompletion()
+	}
+	return oldValue.ToCompletion()
+}
+
+func (e *UpdateExpression) String() string {
+	if e.Type == UpdateExpressionTypePrefix {
+		return e.Operator.String() + e.Operand.String()
+	}
+	return e.Operand.String() + e.Operator.String()
+}
+
+// MARK: - AssignmentExpression
+
+// TODO: standardlize
+// AssignmentOperator : one of
+// *= /= %= += -= <<= >>= >>>= &= ^= |= **=
+type AssignmentOperator int
+
+func (a AssignmentOperator) ToBinaryOperator() BinaryOperator {
+	switch a {
+	case AssignmentOperatorAddition:
+		return BinaryOperatorAddition
+	case AssignmentOperatorSubtraction:
+		return BinaryOperatorSubtraction
+	case AssignmentOperatorMultiplication:
+		return BinaryOperatorMultiplication
+	case AssignmentOperatorDivision:
+		return BinaryOperatorDivision
+	case AssignmentOperatorRemainder:
+		return BinaryOperatorRemainder
+	case AssignmentOperatorLeftShift:
+		return BinaryOperatorLeftShift
+	case AssignmentOperatorRightShift:
+		return BinaryOperatorRightShift
+	case AssignmentOperatorUnsignedRightShift:
+		return BinaryOperatorUnsignedRightShift
+	case AssignmentOperatorBitwiseAnd:
+		return BinaryOperatorBitwiseAnd
+	case AssignmentOperatorBitwiseXor:
+		return BinaryOperatorBitwiseXor
+	case AssignmentOperatorBitwiseOr:
+		return BinaryOperatorBitwiseOr
+	case AssignmentOperatorExponentiation:
+		return BinaryOperatorExponentiation
+	}
+	panic("unreachable")
+}
+
+func (a AssignmentOperator) String() string {
+	switch a {
+	case AssignmentOperatorAssign:
+		return "="
+	case AssignmentOperatorAddition:
+		return "+="
+	case AssignmentOperatorSubtraction:
+		return "-="
+	case AssignmentOperatorMultiplication:
+		return "*="
+	case AssignmentOperatorDivision:
+		return "/="
+	case AssignmentOperatorRemainder:
+		return "%="
+	case AssignmentOperatorLeftShift:
+		return "<<="
+	case AssignmentOperatorRightShift:
+		return ">>="
+	case AssignmentOperatorUnsignedRightShift:
+		return ">>>="
+	case AssignmentOperatorBitwiseAnd:
+		return "&="
+	case AssignmentOperatorBitwiseXor:
+		return "^="
+	case AssignmentOperatorBitwiseOr:
+		return "|="
+	case AssignmentOperatorExponentiation:
+		return "**="
+	case AssignmentOperatorAnd:
+		return "&&="
+	case AssignmentOperatorOr:
+		return "||="
+	case AssignmentOperatorNullishCoalescing:
+		return "??="
+	}
+	return ""
+}
+
+const (
+	AssignmentOperatorAssign AssignmentOperator = iota
+	AssignmentOperatorAddition
+	AssignmentOperatorSubtraction
+	AssignmentOperatorMultiplication
+	AssignmentOperatorDivision
+	AssignmentOperatorRemainder
+	AssignmentOperatorLeftShift
+	AssignmentOperatorRightShift
+	AssignmentOperatorUnsignedRightShift
+	AssignmentOperatorBitwiseAnd
+	AssignmentOperatorBitwiseXor
+	AssignmentOperatorBitwiseOr
+	AssignmentOperatorExponentiation
+	AssignmentOperatorAnd
+	AssignmentOperatorOr
+	AssignmentOperatorNullishCoalescing
+)
+
+var operatorAssignmentMap = map[TokenType]AssignmentOperator{
+	TEquals:                   AssignmentOperatorAssign,
+	TPlusEquals:               AssignmentOperatorAddition,
+	TMinusEquals:              AssignmentOperatorSubtraction,
+	TStarEquals:               AssignmentOperatorMultiplication,
+	TDivideEquals:             AssignmentOperatorDivision,
+	TPercentEquals:            AssignmentOperatorRemainder,
+	TLeftShiftEquals:          AssignmentOperatorLeftShift,
+	TRightShiftEquals:         AssignmentOperatorRightShift,
+	TUnsignedRightShiftEquals: AssignmentOperatorUnsignedRightShift,
+	TBitwiseAndEquals:         AssignmentOperatorBitwiseAnd,
+	TBitwiseOrEquals:          AssignmentOperatorBitwiseOr,
+	TBitwiseXorEquals:         AssignmentOperatorBitwiseXor,
+	TStarStarEquals:           AssignmentOperatorExponentiation,
+	TAmpersandAmpersandEquals: AssignmentOperatorAnd,
+	TPipePipeEquals:           AssignmentOperatorOr,
+	TQuestionQuestionEquals:   AssignmentOperatorNullishCoalescing,
+}
+
+type LeftHandSideExpression struct {
+	Expression
+}
+
+var _ RuntimeSemanticsDestructuringAssignmentEvaluation = (*LeftHandSideExpression)(nil)
+
+func (l *LeftHandSideExpression) astIsArrayAssignmentPattern() bool {
+	_, ok := l.Expression.(*ArrayLiteral)
+	return ok
+}
+
+func (l *LeftHandSideExpression) DestructuringAssignmentEvaluation(vm *VM, value Value) (co CompletionValue) {
+	if l.astIsArrayAssignmentPattern() {
+		iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(vm.agent, value, IteratorKindSync), co)
+		if isAbrupt {
+			return rt
+		}
+		var result CompletionValue
+		for _, elem := range l.Expression.(*ArrayLiteral).ElementList {
+			switch e := elem.(type) {
+			case *ArrayElementExpression:
+				result = e.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
+				if result.IsAbrupt() {
+					return result
+				}
+				if !iteratorRecord.Done {
+					return iteratorRecord.IteratorClose(result)
+				}
+			case *ArrayElementElision:
+				result = e.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
+				if result.IsAbrupt() {
+					return result
+				}
+				if !iteratorRecord.Done {
+					return iteratorRecord.IteratorClose(result)
+				}
+			default:
+				panic("unimplemented")
+
+			}
+		}
+	} else {
+		panic("unimplemented")
+	}
+	panic("unreachable")
+}
+
+// AssignmentExpression [In, Yield, Await] :
+// - ConditionalExpression[?In, ?Yield, ?Await]
+// - [+Yield] YieldExpression[?In, ?Await]
+// - ArrowFunction[?In, ?Yield, ?Await]
+// - AsyncArrowFunction[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] = AssignmentExpression[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] AssignmentOperator
+// - AssignmentExpression[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] &&=
+// - AssignmentExpression[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] ||=
+// - AssignmentExpression[?In, ?Yield, ?Await]
+// - LeftHandSideExpression[?Yield, ?Await] ??=
+// - AssignmentExpression[?In, ?Yield, ?Await]
+type AssignmentExpression struct {
+	Expression
+	Left     *LeftHandSideExpression
+	Operator AssignmentOperator
+	Right    Expression
+}
+
+func (e *AssignmentExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+func (e *AssignmentExpression) astIsAssign() bool {
+	return e.Operator == AssignmentOperatorAssign
+}
+
+// Evaluation
+// spec: 13.15.2
+func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
+	if e.astIsAssign() {
+		_, isObjectLiteral := e.Left.Expression.(*PrimaryExpressionObjectLiteral)
+		_, isArrayLiteral := e.Left.Expression.(*ArrayLiteral)
+		if !isObjectLiteral && !isArrayLiteral {
+			lref := e.Left.Evaluation(vm)
+			var rval Value
+			if IsAnonymousFunctionDefinition(e.Right) {
+				// FIXME: handle named evaluation
+				panic("")
+			} else {
+				_rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+				rval = _rval
+				if isAbrupt {
+					return rt
+				}
+			}
+			if ref, ok := lref.value.ReferenceRecord(); ok {
+				_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(vm.agent, rval), co)
+				if isAbrupt {
+					return rt
+				}
+			} else {
+				panic("unreachable")
+			}
+			return rval.ToCompletion()
+		}
+		assignmentPattern := e.Left
+		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+		if isAbrupt {
+			return rt
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(assignmentPattern.DestructuringAssignmentEvaluation(vm, rval), co)
+		if isAbrupt {
+			return rt
+		}
+		return rval.ToCompletion()
+	} else {
+		// TODO: handle &&= ||=, ??=
+		lval, lref, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+		if isAbrupt {
+			return rt
+		}
+		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+		if isAbrupt {
+			return rt
+		}
+		r, isAbrupt, rt := ReturnIfAbrupt(
+			vm.ApplyStringOrNumericBinaryOperator(lval, rval, e.Operator.ToBinaryOperator()), co,
+		)
+		if isAbrupt {
+			return rt
+		}
+
+		if ref, ok := lref.ReferenceRecord(); ok {
+			_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(vm.agent, r), co)
+			if isAbrupt {
+				return rt
+			}
+		} else {
+			panic("unreachable")
+		}
+		return r.ToCompletion()
+	}
+}
+
+func (e *AssignmentExpression) String() string {
+	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
+}
+
+// MARK: - NewExpression
+
+// NewExpression [Yield, Await] :
+// MemberExpression[?Yield, ?Await]
+// new NewExpression[?Yield, ?Await]
+type NewExpression struct {
+	Expression
+	Callee    Expression
+	Arguments Arguments
+}
+
+func (e *NewExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+// Evaluation
+// spec: 13.3.5.1
+func (e *NewExpression) Evaluation(vm *VM) CompletionValue {
+	return e.EvaluateNew(vm)
+}
+
+// EvaluateNew
+// spec: 13.3.5.1.1
+func (e *NewExpression) EvaluateNew(vm *VM) (co CompletionValue) {
+	constructor, _, isAbrupt, rt := vm.EvalAndGetValue(e.Callee, co)
+	if isAbrupt {
+		return rt
+	}
+	var argList []Value
+	if len(e.Arguments) == 0 {
+		argList = []Value{}
+	} else {
+		list, isAbrupt, rt := ReturnIfAbrupt(e.Arguments.ArgumentListEvaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		argList = list
+	}
+	if !IsConstructor(constructor) {
+		return co.ThrowTypeError(vm.agent, "constructor is not a constructor")
+	}
+	o := MustGetObject(constructor)
+	v, isAbrupt, rt := ReturnIfAbrupt(o.Construct(argList, nil), co)
+	if isAbrupt {
+		return rt
+	}
+	return v.ToValue().ToCompletion()
+}
+
+func (e *NewExpression) String() string {
+	sb := "new " + e.Callee.String() + "("
+	for i, arg := range e.Arguments {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += arg.String()
+	}
+	sb += ")"
+	return sb
+}
+
+// MARK: - BinaryExpression
+
+type BinaryOperator int
+
+func (b BinaryOperator) String() string {
+	switch b {
+	case BinaryOperatorMultiplication:
+		return "*"
+	case BinaryOperatorExponentiation:
+		return "**"
+	case BinaryOperatorDivision:
+		return "/"
+	case BinaryOperatorRemainder:
+		return "%"
+	case BinaryOperatorAddition:
+		return "+"
+	case BinaryOperatorSubtraction:
+		return "-"
+	case BinaryOperatorLeftShift:
+		return "<<"
+	case BinaryOperatorRightShift:
+		return ">>"
+	case BinaryOperatorUnsignedRightShift:
+		return ">>>"
+	case BinaryOperatorBitwiseAnd:
+		return "&"
+	case BinaryOperatorBitwiseXor:
+		return "^"
+	case BinaryOperatorBitwiseOr:
+		return "|"
+	}
+	return ""
+}
+
+const (
+	BinaryOperatorMultiplication BinaryOperator = iota
+	BinaryOperatorExponentiation
+	BinaryOperatorDivision
+	BinaryOperatorRemainder
+	BinaryOperatorAddition
+	BinaryOperatorSubtraction
+	BinaryOperatorLeftShift
+	BinaryOperatorRightShift
+	BinaryOperatorUnsignedRightShift
+	BinaryOperatorBitwiseAnd
+	BinaryOperatorBitwiseXor
+	BinaryOperatorBitwiseOr
+)
+
+var operatorBinaryMap = map[TokenType]BinaryOperator{
+	TStar:               BinaryOperatorMultiplication,
+	TStarStar:           BinaryOperatorExponentiation,
+	TSlash:              BinaryOperatorDivision,
+	TPercent:            BinaryOperatorRemainder,
+	TPlus:               BinaryOperatorAddition,
+	TMinus:              BinaryOperatorSubtraction,
+	TLeftShift:          BinaryOperatorLeftShift,
+	TRightShift:         BinaryOperatorRightShift,
+	TUnsignedRightShift: BinaryOperatorUnsignedRightShift,
+	TAmpersand:          BinaryOperatorBitwiseAnd,
+	TCaret:              BinaryOperatorBitwiseXor,
+	TPipe:               BinaryOperatorBitwiseOr,
+}
+
+type ExpressionBinaryExpression struct {
+	Expression
+	Left     Expression
+	Operator BinaryOperator
+	Right    Expression
+}
+
+func (b *ExpressionBinaryExpression) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
+}
+
+// EvaluateStringOrNumericBinaryExpression
+// spec: 13.15.4
+func (b *ExpressionBinaryExpression) EvaluateStringOrNumericBinaryExpression(vm *VM) (co CompletionValue) {
+	lval, _, isAbrupt, rt := vm.EvalAndGetValue(b.Left, co)
+	if isAbrupt {
+		return rt
+	}
+
+	rval, _, isAbrupt, rt := vm.EvalAndGetValue(b.Right, co)
+	if isAbrupt {
+		return rt
+	}
+	return vm.ApplyStringOrNumericBinaryOperator(lval, rval, b.Operator).ToCompletion()
+}
+
+func (b *ExpressionBinaryExpression) Evaluation(vm *VM) CompletionValue {
+	return b.EvaluateStringOrNumericBinaryExpression(vm)
+}
+
+func (b *ExpressionBinaryExpression) String() string {
+	return b.Left.String() + " " + b.Operator.String() + " " + b.Right.String()
+}
+
+// MARK: - SequenceExpression
+
+type ExpressionSequenceExpression struct {
+	Expression
+	Expressions []Expression
+}
+
+func (e *ExpressionSequenceExpression) Evaluation(vm *VM) (co CompletionValue) {
+	for _, expression := range e.Expressions {
+		value, _, isAbrupt, rt := vm.EvalAndGetValue(expression, co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = value
+	}
+	return
+}
+
+func (e *ExpressionSequenceExpression) String() string {
+	var sb string
+	for i, expr := range e.Expressions {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += expr.String()
+	}
+	return sb
+}
+
+// MARK: - ConditionalExpression
+
+// ConditionalExpression [In, Yield, Await] :
+//   - ShortCircuitExpression[?In, ?Yield, ?Await]
+//   - ShortCircuitExpression[?In, ?Yield, ?Await] ?
+//     AssignmentExpression[+In, ?Yield, ?Await] :
+//     AssignmentExpression[?In, ?Yield, ?Await]
+type ConditionalExpression struct {
+	Expression
+	Test       Expression
+	Consequent Expression
+	Alternate  Expression
+}
+
+// Evaluation
+// spec: 13.14.1
+func (e *ConditionalExpression) Evaluation(vm *VM) (co CompletionValue) {
+	agent := vm.agent
+	lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Test, co)
+	if isAbrupt {
+		return rt
+	}
+	if lval.ToBoolean() {
+		trueRef, isAbrupt, rt := ReturnIfAbrupt(e.Consequent.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		return trueRef.GetValue(agent)
+	} else {
+		falseRef, isAbrupt, rt := ReturnIfAbrupt(e.Alternate.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		return falseRef.GetValue(agent)
+	}
+}
+
+func (e *ConditionalExpression) String() string {
+	return e.Test.String() + " ? " + e.Consequent.String() + " : " + e.Alternate.String()
+}
+
+// MARK: - LogicalExpression
+
+type LogicalOperator int
+
+const (
+	LogicalOperatorAnd LogicalOperator = iota
+	LogicalOperatorOr
+	LogicalOperatorNullishCoalescing
+)
+
+func (l LogicalOperator) String() string {
+	switch l {
+	case LogicalOperatorAnd:
+		return "&&"
+	case LogicalOperatorOr:
+		return "||"
+	case LogicalOperatorNullishCoalescing:
+		return "??"
+	}
+	return ""
+}
+
+var operatorLogicalMap = map[TokenType]LogicalOperator{
+	TAmpersandAmpersand: LogicalOperatorAnd,
+	TPipePipe:           LogicalOperatorOr,
+	TQuestionQuestion:   LogicalOperatorNullishCoalescing,
+}
+
+// LogicalANDExpression[In, Yield, Await] :
+//   - BitwiseORExpression[?In, ?Yield, ?Await]
+//   - LogicalANDExpression[?In, ?Yield, ?Await] &&
+//     BitwiseORExpression[?In, ?Yield, ?Await]
+//
+// LogicalORExpression[In, Yield, Await] :
+//   - LogicalANDExpression[?In, ?Yield, ?Await]
+//   - LogicalORExpression[?In, ?Yield, ?Await] ||
+//     LogicalANDExpression[?In, ?Yield, ?Await]
+//
+// CoalesceExpression[In, Yield, Await] :
+//   - CoalesceExpressionHead[?In, ?Yield, ?Await] ??
+//     BitwiseORExpression[?In, ?Yield, ?Await]
+//
+// CoalesceExpressionHead[In, Yield, Await] :
+// - CoalesceExpression[?In, ?Yield, ?Await]
+// - BitwiseORExpression[?In, ?Yield, ?Await]
+// ShortCircuitExpression[In, Yield, Await] :
+// - LogicalORExpression[?In, ?Yield, ?Await]
+// - CoalesceExpression[?In, ?Yield, ?Await]
+type ExpressionLogicalExpression struct {
+	Expression
+	Left     Expression
+	Operator LogicalOperator
+	Right    Expression
+}
+
+func (e *ExpressionLogicalExpression) astIsOr() bool {
+	return e.Operator == LogicalOperatorOr
+}
+
+func (e *ExpressionLogicalExpression) astIsAnd() bool {
+	return e.Operator == LogicalOperatorAnd
+}
+
+func (e *ExpressionLogicalExpression) astNullishCoalescing() bool {
+	return e.Operator == LogicalOperatorNullishCoalescing
+}
+
+// Evaluation
+// spec: 13.13.1
+func (e *ExpressionLogicalExpression) Evaluation(vm *VM) (co CompletionValue) {
+	switch {
+	case e.astIsOr():
+		lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+		if isAbrupt {
+			return rt
+		}
+		lbool := lval.ToBoolean()
+		if lbool {
+			return lval.ToCompletion()
+		}
+		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+		if isAbrupt {
+			return rt
+		}
+		return rval.ToCompletion()
+	case e.astIsAnd():
+		lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+		if isAbrupt {
+			return rt
+		}
+		lbool := lval.ToBoolean()
+		if !lbool {
+			return lval.ToCompletion()
+		}
+		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+		if isAbrupt {
+			return rt
+		}
+		return rval.ToCompletion()
+	case e.astNullishCoalescing():
+		lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+		if isAbrupt {
+			return rt
+		}
+		if IsUndefinedOrNil(lval) || lval == NullValue {
+			rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+			if isAbrupt {
+				return rt
+			}
+			return rval.ToCompletion()
+		} else {
+			return lval.ToCompletion()
+		}
+	}
+	panic("unreachable")
+}
+
+func (e *ExpressionLogicalExpression) String() string {
+	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
+}
+
+// MARK: - EqualityExpression
+
+type EqualityOperator int
+
+const (
+	EqualityOperatorEqual EqualityOperator = iota
+	EqualityOperatorNotEqual
+	EqualityOperatorStrictEqual
+	EqualityOperatorStrictNotEqual
+)
+
+var operatorEqualityMap = map[TokenType]EqualityOperator{
+	TEquals:          EqualityOperatorEqual,
+	TNotEquals:       EqualityOperatorNotEqual,
+	TStrictEquals:    EqualityOperatorStrictEqual,
+	TStrictNotEquals: EqualityOperatorStrictNotEqual,
+}
+
+func (e EqualityOperator) String() string {
+	switch e {
+	case EqualityOperatorEqual:
+		return "=="
+	case EqualityOperatorNotEqual:
+		return "!="
+	case EqualityOperatorStrictEqual:
+		return "==="
+	case EqualityOperatorStrictNotEqual:
+		return "!=="
+	}
+	return ""
+}
+
+// EqualityExpression [In, Yield, Await] :
+// RelationalExpression[?In, ?Yield, ?Await]
+// EqualityExpression[?In, ?Yield, ?Await] == RelationalExpression[?In, ?Yield, ?Await]
+// EqualityExpression[?In, ?Yield, ?Await] != RelationalExpression[?In, ?Yield, ?Await]
+// EqualityExpression[?In, ?Yield, ?Await] ===
+// RelationalExpression[?In, ?Yield, ?Await]
+// EqualityExpression[?In, ?Yield, ?Await] !==
+// RelationalExpression[?In, ?Yield, ?Await]
+type EqualityExpression struct {
+	Expression
+	// EqualityExpression
+	Left     Expression
+	Operator EqualityOperator
+	// RelationalExpression
+	Right Expression
+}
+
+// Evaluation
+// spec: 13.11.1
+func (e *EqualityExpression) Evaluation(vm *VM) (co CompletionValue) {
+	lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+	if isAbrupt {
+		return rt
+	}
+	rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+
+	switch e.Operator {
+	case EqualityOperatorEqual:
+		if b, isAbrupt, rt := ReturnIfAbrupt(IsLooselyEqual(vm.agent, lval, rval), co); isAbrupt {
+			return rt
+		} else {
+			return NewBooleanValue(b).ToCompletion()
+		}
+	case EqualityOperatorNotEqual:
+		if b, isAbrupt, rt := ReturnIfAbrupt(IsLooselyEqual(vm.agent, lval, rval), co); isAbrupt {
+			return rt
+		} else {
+			return NewBooleanValue(!b).ToCompletion()
+		}
+	case EqualityOperatorStrictEqual:
+		return NewBooleanValue(IsStrictlyEqual(lval, rval)).ToCompletion()
+	case EqualityOperatorStrictNotEqual:
+		return NewBooleanValue(!IsStrictlyEqual(lval, rval)).ToCompletion()
+	}
+	panic("unreachable")
+}
+
+func (e *EqualityExpression) String() string {
+	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
+}
+
+// MARK: - RelationalExpression
+
+type RelationalOperator int
+
+func (r RelationalOperator) String() string {
+	switch r {
+	case RelationalOperatorLessThan:
+		return "<"
+	case RelationalOperatorGreaterThan:
+		return ">"
+	case RelationalOperatorLessThanOrEqual:
+		return "<="
+	case RelationalOperatorGreaterThanOrEqual:
+		return ">="
+	case RelationalOperatorInstanceof:
+		return "instanceof"
+	case RelationalOperatorIn:
+		return "in"
+	}
+	return ""
+}
+
+const (
+	RelationalOperatorLessThan RelationalOperator = iota
+	RelationalOperatorGreaterThan
+	RelationalOperatorLessThanOrEqual
+	RelationalOperatorGreaterThanOrEqual
+	RelationalOperatorInstanceof
+	RelationalOperatorIn
+)
+
+var operatorRelationMap = map[TokenType]RelationalOperator{
+	TLessThan:          RelationalOperatorLessThan,
+	TGreaterThan:       RelationalOperatorGreaterThan,
+	TLessThanEquals:    RelationalOperatorLessThanOrEqual,
+	TGreaterThanEquals: RelationalOperatorGreaterThanOrEqual,
+	TInstanceof:        RelationalOperatorInstanceof,
+	TIn:                RelationalOperatorIn,
+}
+
+// RelationalExpression [In, Yield, Await] :
+// ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] < ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] > ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] <= ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] >= ShiftExpression[?Yield, ?Await]
+// RelationalExpression[?In, ?Yield, ?Await] instanceof
+// ShiftExpression[?Yield, ?Await]
+// [+In] RelationalExpression[+In, ?Yield, ?Await] in ShiftExpression[?Yield, ?Await]
+// [+In] PrivateIdentifier in ShiftExpression[?Yield, ?Await]
+type RelationalExpression struct {
+	Expression
+	Left     Expression
+	Operator RelationalOperator
+	Right    Expression
+}
+
+// Evaluation
+// spec: 13.10.1
+func (e *RelationalExpression) Evaluation(vm *VM) (co CompletionValue) {
+	lval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
+	if isAbrupt {
+		return rt
+	}
+	rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+	if isAbrupt {
+		return rt
+	}
+	switch e.Operator {
+	case RelationalOperatorLessThan, RelationalOperatorGreaterThan:
+		var order isLessThanOrder
+		if e.Operator == RelationalOperatorLessThan {
+			order = IsLessThanOrderLeftFirst
+		} else {
+			order = IsLessThanOrderRightFirst
+		}
+		isLessThan, isAbrupt, rt := ReturnIfAbrupt(IsLessThan(vm.agent, lval, rval, order), co)
+		if isAbrupt {
+			return rt
+		}
+		return isLessThan.ToCompletion()
+	case RelationalOperatorLessThanOrEqual, RelationalOperatorGreaterThanOrEqual:
+		var order isLessThanOrder
+		if e.Operator == RelationalOperatorLessThanOrEqual {
+			order = IsLessThanOrderRightFirst
+		} else {
+			order = IsLessThanOrderLeftFirst
+		}
+		isLessThan, isAbrupt, rt := ReturnIfAbrupt(IsLessThan(vm.agent, rval, lval, order), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(!isLessThan.ToBoolean()).ToCompletion()
+	case RelationalOperatorInstanceof:
+		return NewBooleanValue(vm.InstanceOfOperator(lval, rval)).ToCompletion()
+	case RelationalOperatorIn:
+		if !rval.IsObject() {
+			return co.ThrowTypeError(vm.agent, "right-hand side of 'in' is not an object")
+		}
+		propertyKey, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, lval), co)
+		if isAbrupt {
+			return rt
+		}
+		object := MustGetObject(rval)
+		hasProperty, isAbrupt, rt := ReturnIfAbrupt(
+			object.internalMethods().HasProperty(object, propertyKey),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(hasProperty).ToCompletion()
+	}
+	panic("unreachable")
+}
+
+func (e *RelationalExpression) String() string {
+	return e.Left.String() + " " + e.Operator.String() + " " + e.Right.String()
+}
+
+// MARK: - UnaryExpression
+
+type UnaryOperator int
+
+const (
+	UnaryOperatorDelete UnaryOperator = iota
+	UnaryOperatorVoid
+	UnaryOperatorTypeof
+	UnaryOperatorAddition
+	UnaryOperatorSubtraction
+	UnaryOperatorLogicalNot
+	UnaryOperatorBitwiseNot
+)
+
+func (u UnaryOperator) String() string {
+	switch u {
+	case UnaryOperatorDelete:
+		return "delete"
+	case UnaryOperatorVoid:
+		return "void"
+	case UnaryOperatorTypeof:
+		return "typeof"
+	case UnaryOperatorAddition:
+		return "+"
+	case UnaryOperatorSubtraction:
+		return "-"
+	case UnaryOperatorLogicalNot:
+		return "!"
+	case UnaryOperatorBitwiseNot:
+		return "~"
+	}
+	return ""
+}
+
+// UnaryExpression [Yield, Await] :
+// - UpdateExpression[?Yield, ?Await]
+// - delete UnaryExpression[?Yield, ?Await]
+// - void UnaryExpression[?Yield, ?Await]
+// - typeof UnaryExpression[?Yield, ?Await]
+// - + UnaryExpression[?Yield, ?Await]
+// - - UnaryExpression[?Yield, ?Await]
+// - ~ UnaryExpression[?Yield, ?Await]
+// - ! UnaryExpression[?Yield, ?Await]
+// - [+Await] AwaitExpression[?Yield]
+type UnaryExpression struct {
+	Expression
+	Operator UnaryOperator
+	Operand  Expression
+}
+
+func (u *UnaryExpression) astIsAdd() bool {
+	return u.Operator == UnaryOperatorAddition
+}
+
+func (u *UnaryExpression) astIsSubtract() bool {
+	return u.Operator == UnaryOperatorSubtraction
+}
+
+func (u *UnaryExpression) astIsLogicalNot() bool {
+	return u.Operator == UnaryOperatorLogicalNot
+}
+
+func (u *UnaryExpression) astIsBitwiseNot() bool {
+	return u.Operator == UnaryOperatorBitwiseNot
+}
+
+func (u *UnaryExpression) astIsTypeof() bool {
+	return u.Operator == UnaryOperatorTypeof
+}
+
+func (u *UnaryExpression) astIsDelete() bool {
+	return u.Operator == UnaryOperatorDelete
+}
+
+func (u *UnaryExpression) astIsVoid() bool {
+	return u.Operator == UnaryOperatorVoid
+}
+
+// TODO: use Number::[op], BigInt::[op]
+// spec: 13.5.3.1, 13.5.4.1, 13.5.5.1, 13.5.6.1, 13.5.7.1
+func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
+	agent := vm.agent
+	switch {
+	case u.astIsTypeof():
+		// 13.5.3.1
+		val, isAbrupt, rt := ReturnIfAbrupt(u.Operand.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		if r, ok := val.ReferenceRecord(); ok {
+			if r.IsUnresolvableReference() {
+				return NewStringValue("undefined").ToCompletion()
+			}
+		}
+		val, isAbrupt, rt = ReturnIfAbrupt(val.GetValue(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		// TODO: B.3.6.3 isHTMLDDA
+		return NewStringValue(val.TypeString()).ToCompletion()
+	case u.astIsAdd():
+		// 13.5.4.1
+		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		v, isAbrupt, rt := ReturnIfAbrupt(expr.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = v
+		return
+	case u.astIsSubtract():
+		// 13.5.5.1
+		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		oldValue, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, expr), co)
+		if isAbrupt {
+			return rt
+		}
+		if n, b, ok := oldValue.NumberOrBigInt(); ok {
+			if n != nil {
+				return NewNumberValue(-n.Data).ToCompletion()
+			} else {
+				return b.UnaryMinus().ToCompletion()
+			}
+		} else {
+			Assert(false)
+		}
+	case u.astIsBitwiseNot():
+		// 13.5.6.1
+		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		oldValue, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, expr), co)
+		if isAbrupt {
+			return rt
+		}
+		if n, b, ok := oldValue.NumberOrBigInt(); ok {
+			if n != nil {
+				return NewNumberValue(JSNumber(^int64(n.Data))).ToCompletion()
+			} else {
+				return b.BitwiseNot().ToCompletion()
+			}
+		} else {
+			Assert(false)
+		}
+	case u.astIsLogicalNot():
+		// 13.5.7.1
+		expr, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		oldValue := expr.ToBoolean()
+		if oldValue {
+			return FalseValue.ToCompletion()
+		} else {
+			return TrueValue.ToCompletion()
+		}
+	case u.astIsTypeof():
+		// 13.5.3.1
+		val, isAbrupt, rt := ReturnIfAbrupt(u.Operand.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		if ref, ok := val.ReferenceRecord(); ok {
+			if ref.IsUnresolvableReference() {
+				return NewStringValue("undefined").ToCompletion()
+			}
+		}
+		val, isAbrupt, rt = ReturnIfAbrupt(val.GetValue(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewStringValue(val.TypeString()).ToCompletion()
+	case u.astIsVoid():
+		// 13.5.2.1
+		_, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
+		if isAbrupt {
+			return rt
+		}
+		return UndefinedValue.ToCompletion()
+	case u.astIsDelete():
+		// 13.5.1.2
+		refValue := u.Operand.Evaluation(vm)
+		ref, ok := refValue.value.ReferenceRecord()
+		if !ok {
+			return TrueValue.ToCompletion()
+		}
+		if ref.IsUnresolvableReference() {
+			Assert(!ref.Strict)
+			return TrueValue.ToCompletion()
+		}
+		if ref.IsPropertyReference() {
+			Assert(!ref.IsPrivateReference())
+			if ref.IsSuperReference() {
+				vm.panic(agent.ThrowException(ReferenceError, "cannot delete super property"))
+			}
+			v, _ := ref.Base.Value()
+			baseObj := v.ToObject(agent).value
+			var referencedName PropertyKey
+			if ref.ReferencedName.PrivateName != nil {
+				panic("unreachable")
+			} else if ref.ReferencedName.Symbol != nil {
+				referencedName = NewSymbolPropertyKey(ref.ReferencedName.Symbol)
+			} else {
+				referencedName = NewStringPropertyKey(ref.ReferencedName.String)
+			}
+			deleteStatus, isAbrupt, rt := ReturnIfAbrupt(
+				baseObj.internalMethods().Delete(baseObj, referencedName),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			if !deleteStatus && ref.Strict {
+				vm.panic(agent.ThrowTypeError("cannot delete property"))
+			}
+			return NewBooleanValue(deleteStatus).ToCompletion()
+		} else {
+			base, ok := ref.Base.Env()
+			Assert(ok)
+			return NewBooleanValue(base.DeleteBinding(ref.ReferencedName.String)).ToCompletion()
+		}
+	}
+	panic("unimplemented")
+}
+
+func (u *UnaryExpression) String() string {
+	return "UnaryExpression " + u.Operator.String() + " " + u.Operand.String()
+}
+
+// MARK: - CallExpression
+
+// TODO: handle spread expression
+// ArgumentList[Yield, Await] :
+// AssignmentExpression[+In, ?Yield, ?Await]
+// ... AssignmentExpression[+In, ?Yield, ?Await]
+// ArgumentList[?Yield, ?Await] , AssignmentExpression[+In, ?Yield, ?Await]
+// ArgumentList[?Yield, ?Await] , ... AssignmentExpression[+In, ?Yield, ?Await]
+type Arguments []Expression
+
+var _ RuntimeSemanticsArgumentListEvaluation = Arguments{}
+
+func (a Arguments) astIsAssignmentExpression() bool {
+	return len(a) == 1
+}
+
+// TODO
+func (a Arguments) astIsSpreadElement() bool {
+	return false
+}
+
+func (a Arguments) isEmpty() bool {
+	return len(a) == 0
+}
+
+func (a Arguments) ArgumentListEvaluation(vm *VM) (co Completion[[]Value]) {
+	if a.isEmpty() {
+		return
+	}
+	if a.astIsAssignmentExpression() {
+		// TODO: handle spread
+		if a.astIsSpreadElement() {
+			panic("unimplemented")
+		}
+		ref := a[0].Evaluation(vm)
+		arg := ref.value.GetValue(vm.agent).value
+		co.value = []Value{arg}
+		return
+	} else {
+		// TODO: handle spread
+		last, isAbrupt, rt := ReturnIfAbrupt(a[len(a)-1].Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		v, isAbrupt, rt := ReturnIfAbrupt(last.GetValue(vm.agent), co)
+		if isAbrupt {
+			return rt
+		}
+		list, isAbrupt, rt := ReturnIfAbrupt(a[:len(a)-1].ArgumentListEvaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = append(list, v)
+		return
+	}
+}
+
+func (a Arguments) String() string {
+	var sb string
+	for i, arg := range a {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += arg.String()
+	}
+	return sb
+}
+
+// TODO(WIP): Spread, Template
+// Evaluation 13.3.8.1
+// ArgumentListEvaluation
+func (a Arguments) Evaluation(vm *VM) (co CompletionValue) {
+	var values []Value
+	for _, elem := range a {
+		arg, _, isAbrupt, rt := vm.EvalAndGetValue(elem, co)
+		if isAbrupt {
+			return rt
+		}
+		values = append(values, arg)
+	}
+	co.value = NewListValue(values)
+	return
+}
+
+// CallExpression [Yield, Await] :
+// - CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await]
+// - SuperCall[?Yield, ?Await]
+// - ImportCall[?Yield, ?Await]
+// - CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+// - CallExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
+// - CallExpression[?Yield, ?Await]. IdentifierName
+// - CallExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+// - CallExpression[?Yield, ?Await]. PrivateIdentifier
+// CoverCallExpressionAndAsyncArrowHead[Yield, Await] :
+// - MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+type CallExpression struct {
+	Expression
+	Callee    Expression
+	Arguments Arguments
+}
+
+var _ Expression = (*CallExpression)(nil)
+
+// astIsCover matches CoverCallExpressionAndAsyncArrowHead
+func (c *CallExpression) astIsCover() bool {
+	_, ok := c.Callee.(*MemberExpression)
+	return ok
+}
+
+// astIsFunctionCall matches CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+func (c *CallExpression) astIsFunctionCall() bool {
+	return true
+}
+
+// Evaluation
+// spec: 13.3.6.1
+func (c *CallExpression) Evaluation(vm *VM) (co CompletionValue) {
+	if c.astIsCover() {
+		return c.coverCallExpressionAndAsyncArrowHead(vm)
+	}
+	if !c.astIsFunctionCall() {
+		panic("unimplemented")
+	}
+	// rename from func
+	f, ref, isAbrupt, rt := vm.EvalAndGetValue(c.Callee, co)
+	if isAbrupt {
+		return rt
+	}
+
+	// TODO: this ref
+	// i.This(c)
+	// i.Let("thisCall")
+
+	// TODO: IsInTailPosition
+	// i.IsInTailPosition()
+	// i.Let("tailPosition")
+
+	arguments, isAbrupt, rt := ReturnIfAbrupt(c.Arguments.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, false)
+}
+
+// coverCallExpressionAndAsyncArrowHead matches CallExpression : CoverCallExpressionAndAsyncArrowHead
+// spec: 13.3.6.1
+func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) (co CompletionValue) {
+	callee := c.Callee.(*MemberExpression)
+	expr := callee
+	memberExpr := expr
+	// TODO(XXX): is pass Arguments to evaluate directly?
+	arguments, isAbrupt, rt := ReturnIfAbrupt(c.Arguments.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	f, ref, isAbrupt, rt := vm.EvalAndGetValue(memberExpr, co)
+	if isAbrupt {
+		return rt
+	}
+	if r, ok := ref.ReferenceRecord(); ok {
+		if !r.IsPropertyReference() && r.ReferencedName.String == "eval" {
+			panic("unimplemented")
+		}
+	}
+
+	// TODO: check is tailPosition
+	tailCall := false
+
+	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, tailCall)
+}
+
+func (c *CallExpression) String() string {
+	sb := "CallExpression "
+	sb += c.Callee.String() + "("
+	for i, arg := range c.Arguments {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += arg.String()
+	}
+	sb += ")"
+	return sb
+}
+
+// MARK: - Statement
+
+type Statement interface {
+	ASTNode
+	VarScopedDeclarations() []*VariableDeclaration
+	VarDeclaredNames() []IdentifierName
+	_statement()
+}
+
+func StatementAnalyze(s Statement, a AnalyzeQuery) bool {
+	exprStmt, isExpr := s.(*StatementExpression)
+	if isExpr {
+		return ExpressionAnalyze(exprStmt.Expression, a)
+	}
+	switch a {
+	case AnalyzeQueryIsIdentifierReference:
+		return false
+	case AnalyzeQueryIsReference:
+		return false
+	case AnalyzeQueryIsStringLiteral:
+		return false
+	}
+	panic("unreachable")
+}
+
+// MARK: - VariableStatement
+
+// VariableStatement [Yield, Await] :
+// - var VariableDeclarationList[+In, ?Yield, ?Await] ;
+type VariableStatement struct {
+	Statement
+	DeclarationList *VariableDeclarationList
+}
+
+var _ Statement = (*VariableStatement)(nil)
+
+func (s *VariableStatement) _statement() {}
+func (s *VariableStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return s.DeclarationList.VarScopedDeclarations()
+}
+
+func (s *VariableStatement) Evaluation(vm *VM) CompletionValue {
+	return s.DeclarationList.Evaluation(vm)
+}
+
+func (s *VariableStatement) String() string {
+	return "var " + s.DeclarationList.String()
+}
+
+// VariableDeclarationList [In, Yield, Await] :
+// VariableDeclaration[?In, ?Yield, ?Await]
+// VariableDeclarationList[?In, ?Yield, ?Await] , VariableDeclaration[?In, ?Yield, ?Await]
+type VariableDeclarationList struct {
+	Items []*VariableDeclaration
+}
+
+func (v *VariableDeclarationList) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return v.Items
+}
+
+func (v *VariableDeclarationList) Evaluation(vm *VM) (co CompletionValue) {
+	var lastValue Value
+	for _, item := range v.Items {
+		_lastValue, isAbrupt, rt := ReturnIfAbrupt(item.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		lastValue = _lastValue
+	}
+	if lastValue == nil {
+		return UndefinedValue.ToCompletion()
+	}
+	return lastValue.ToCompletion()
+}
+
+func (v *VariableDeclarationList) String() string {
+	var sb string
+	for i, item := range v.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+// VariableDeclaration [In] :
+// - BindingIdentifier Initializer[?In]
+type VariableDeclaration struct {
+	BindingIdentifier IdentifierName
+	Initializer       Expression
+}
+
+// VariableDeclaration : BindingIdentifier Initializer
+func (v *VariableDeclaration) astHasInitializer() bool {
+	return v.Initializer != nil
+}
+
+func (v *VariableDeclaration) Evaluation(vm *VM) (co CompletionValue) {
+	if !v.astHasInitializer() {
+		return UndefinedValue.ToCompletion()
+	} else {
+		bindingId := v.BindingIdentifier
+		lhs := vm.agent.ResolveBinding(bindingId, nil, false)
+		var value Value
+		if IsAnonymousFunctionDefinition(v.Initializer) {
+			// FIXME: handle named evaluation
+			panic("")
+		} else {
+			v, _, isAbrupt, rt := vm.EvalAndGetValue(v.Initializer, co)
+			value = v
+			if isAbrupt {
+				return rt
+			}
+		}
+		_, isAbrupt, rt := ReturnIfAbrupt(lhs.PutValue(vm.agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+	}
+
+	// return EMPTY
+	return UndefinedValue.ToCompletion()
+}
+
+func (v *VariableDeclaration) String() string {
+	if v.Initializer != nil {
+		return string(v.BindingIdentifier) + " = " + v.Initializer.String()
+	}
+	return string(v.BindingIdentifier)
+}
+
+// MARK: - EmptyStatement
+
+type StatementEmpty struct {
+	Statement
+}
+
+func (s *StatementEmpty) _statement() {}
+
+var _ Statement = (*StatementEmpty)(nil)
+
+func (s *StatementEmpty) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return l
+}
+
+func (s *StatementEmpty) Evaluation(vm *VM) (co CompletionValue) {
+	return
+}
+
+func (s *StatementEmpty) String() string {
+	return ""
+}
+
+// MARK: - TryStatement
+
+// CatchParameter [Yield, Await] :
+// - BindingIdentifier[?Yield, ?Await]
+// - BindingPattern[?Yield, ?Await]
+type CatchParameter struct {
+	Identifier *BindingIdentifier
+	// TODO(BM): pattern
+	Pattern *BindingPattern
+}
+
+var _ RuntimeSemanticsBindingInitialization = (*CatchParameter)(nil)
+
+func (c *CatchParameter) astIsIdentifier() bool {
+	return c.Identifier != nil
+}
+
+func (c *CatchParameter) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
+	if c.astIsIdentifier() {
+		return c.Identifier.BindingInitialization(vm, value, env)
+	} else {
+		panic("unimplemented")
+	}
+}
+
+// Catch [Yield, Await, Return] :
+// catch ( CatchParameter[?Yield, ?Await] ) Block[?Yield, ?Await, ?Return]
+// catch Block[?Yield, ?Await, ?Return]
+type Catch struct {
+	CatchParameter *CatchParameter
+	CatchBlock     *Block
+}
+
+var _ RuntimeSemanticsCatchClauseEvaluation = (*Catch)(nil)
+
+func (c *Catch) CatchClauseEvaluation(vm *VM, thrownValue Value) (co CompletionValue) {
+	oldEnv := vm.RunningLexicalEnvironment()
+	catchEnv := NewDeclarativeEnvironment(oldEnv)
+	// TODO(BM): handle BindingPattern
+	catchEnv.CreateMutableBinding(c.CatchParameter.Identifier.identifier, false)
+	vm.SetRunningLexicalEnvironment(catchEnv)
+	status := c.CatchParameter.BindingInitialization(vm, thrownValue, catchEnv)
+	if status.IsAbrupt() {
+		vm.SetRunningLexicalEnvironment(oldEnv)
+		return status
+	}
+	B := c.CatchBlock.Evaluation(vm)
+	vm.SetRunningLexicalEnvironment(oldEnv)
+	return B
+}
+
+// TryStatement [Yield, Await, Return] :
+// - try Block[?Yield, ?Await, ?Return] Catch[?Yield, ?Await, ?Return]
+// - try Block[?Yield, ?Await, ?Return] Finally[?Yield, ?Await, ?Return]
+// - try Block[?Yield, ?Await, ?Return] Catch[?Yield, ?Await, ?Return]
+// - Finally[?Yield, ?Await, ?Return]
+type TryStatement struct {
+	Statement
+	TryBlock     *Block
+	Catch        *Catch
+	FinallyBlock *Block
+}
+
+func (t *TryStatement) _statement() {}
+
+var _ Statement = (*TryStatement)(nil)
+
+func (t *TryStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	l = append(l, t.TryBlock.StatementList.VarScopedDeclarations()...)
+	if t.Catch.CatchBlock != nil {
+		l = append(l, t.Catch.CatchBlock.StatementList.VarScopedDeclarations()...)
+	}
+	if t.FinallyBlock != nil {
+		l = append(l, t.FinallyBlock.StatementList.VarScopedDeclarations()...)
+	}
+	return
+}
+
+func (t *TryStatement) astHasCatch() bool {
+	return t.Catch != nil
+}
+
+func (t *TryStatement) astHasFinally() bool {
+	return t.FinallyBlock != nil
+}
+
+// Evaluation
+// spec: 14.15.3
+func (t *TryStatement) Evaluation(vm *VM) CompletionValue {
+	switch {
+	case t.astHasCatch() && t.astHasFinally():
+		B := CompletionHandle(t.TryBlock.Evaluation(vm))
+		var C CompletionValue
+		if B.t == CompletionTypeThrow {
+			C = CompletionHandle(t.Catch.CatchClauseEvaluation(vm, B.value))
+		} else {
+			C = B
+		}
+		F := CompletionHandle(t.FinallyBlock.Evaluation(vm))
+		if F.t == CompletionTypeNormal {
+			F = C
+		}
+		return UpdateEmpty(F, UndefinedValue)
+	case t.astHasCatch():
+		B := t.TryBlock.Evaluation(vm)
+		var C CompletionValue
+		if B.t == CompletionTypeThrow || B.err != nil {
+			C = CompletionHandle(t.Catch.CatchClauseEvaluation(vm, B.err))
+		} else {
+			C = B
+		}
+		return UpdateEmpty(C, UndefinedValue)
+	case t.astHasFinally():
+		B := CompletionHandle(t.TryBlock.Evaluation(vm))
+		F := CompletionHandle(t.FinallyBlock.Evaluation(vm))
+		if F.t == CompletionTypeNormal {
+			F = B
+		}
+		return UpdateEmpty(F, UndefinedValue)
+	default:
+		panic("unreachable")
+	}
+}
+
+func (t *TryStatement) String() string {
+	sb := "try " + t.TryBlock.String()
+	if t.Catch.CatchBlock != nil {
+		sb += " catch (" + string(t.Catch.CatchParameter.Identifier.identifier) + ") " + t.Catch.CatchBlock.String()
+	}
+	if t.FinallyBlock != nil {
+		sb += " finally " + t.FinallyBlock.String()
+	}
+	return sb
+}
+
+// MARK: - DebuggerStatement
+
+type StatementDebugger struct {
+	Statement
+}
+
+var _ Statement = (*StatementDebugger)(nil)
+
+func (s *StatementDebugger) String() string {
+	return "debugger"
+}
+
+// MARK: - ExpressionStatement
+
+type StatementExpression struct {
+	Statement
+	Expression Expression
+}
+
+var _ Statement = (*StatementExpression)(nil)
+
+func (s *StatementExpression) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return
+}
+
+func (s *StatementExpression) Evaluation(vm *VM) CompletionValue {
+	return s.Expression.Evaluation(vm)
+}
+
+func (s *StatementExpression) String() string {
+	e := s.Expression.String()
+	return "ExpressionStatement " + e
+}
+
+// MARK: - BreakableStatement
+
+// BreakableStatement [Yield, Await, Return] :
+// - IterationStatement[?Yield, ?Await, ?Return]
+// - SwitchStatement[?Yield, ?Await, ?Return]
+type BreakableStatement struct {
+	Statement
+	IterationStatement IterationStatement
+	SwitchStatement    *SwitchStatement
+}
+
+func (b *BreakableStatement) astIsIteration() bool {
+	return b.IterationStatement != nil
+}
+
+func (b *BreakableStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	if b.astIsIteration() {
+		return b.IterationStatement.VarScopedDeclarations()
+	} else {
+		return b.SwitchStatement.VarScopedDeclarations()
+	}
+}
+
+func (b *BreakableStatement) Evaluation(vm *VM) CompletionValue {
+	if b.astIsIteration() {
+		return b.IterationStatement.Evaluation(vm)
+	} else {
+		return b.SwitchStatement.Evaluation(vm)
+	}
+}
+
+func (b *BreakableStatement) String() string {
+	return b.IterationStatement.String()
+}
+
+// MARK: - ThrowStatement
+
+// ThrowStatement [Yield, Await] :
+// - throw [no LineTerminator here] Expression[+In, ?Yield, ?Await] ;
+type ThrowStatement struct {
+	Statement
+	Expression Expression
+}
+
+var _ RuntimeSemanticsEvaluation = (*ThrowStatement)(nil)
+
+func (s *ThrowStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+func (s *ThrowStatement) Evaluation(vm *VM) (co CompletionValue) {
+	exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Expression, co)
+	if isAbrupt {
+		return rt
+	}
+	co.t = CompletionTypeThrow
+	co.err = exprValue
+	return
+}
+
+func (s *ThrowStatement) String() string {
+	return "ThrowStatement " + s.Expression.String()
+}
+
+// MARK: - Function
+
+type FunctionType int
+
+const (
+	FunctionTypeNormal FunctionType = iota
+	FunctionTypeGenerator
+	FunctionTypeAsync
+	FunctionTypeAsyncGenerator
+)
+
+// FunctionBody [Yield, Await] :
+// - FunctionStatementList[?Yield, ?Await]
+//
+// FunctionStatementList[Yield, Await] :
+// - StatementList[?Yield, ?Await, +Return] opt
+type FunctionBody struct {
+	StatementList StatementList
+	Strict        bool
+	Type          FunctionType
+}
+
+var _ RuntimeSemanticsEvaluateBody = (*FunctionBody)(nil)
+
+// EvaluateBody
+// spec: 10.2.1.3
+func (f *FunctionBody) EvaluateBody(agent *Agent, function *ECMAScriptFunction, argumentList []Value) (value CompletionValue) {
+	switch f.Type {
+	case FunctionTypeNormal:
+		return EvaluateFunctionBody(agent, function, argumentList)
+	case FunctionTypeGenerator:
+		return EvaluateGeneratorBody(agent, function, argumentList)
+	case FunctionTypeAsyncGenerator:
+		return EvaluateAsyncGeneratorBody(agent, function, argumentList)
+	case FunctionTypeAsync:
+		return EvaluateAsyncFunctionBody(agent, function, argumentList)
+	}
+
+	panic("unreachable")
+}
+
+func (f *FunctionBody) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return f.StatementList.VarScopedDeclarations()
+}
+
+func (f *FunctionBody) VarDeclaredNames() (l []IdentifierName) {
+	return f.StatementList.VarDeclaredNames()
+}
+
+func (f *FunctionBody) LexicallyDeclaredNames() (l []IdentifierName) {
+	return f.StatementList.TopLevelLexicallyDeclaredNames()
+}
+
+// TODO(spec)
+func (f *FunctionBody) Evaluation(vm *VM) CompletionValue {
+	return f.StatementList.Evaluation(vm)
+}
+
+func (f *FunctionBody) String() string {
+	return f.StatementList.String()
+}
+
+func (f *FunctionBody) FunctionBodyContainsUseStrict() bool {
+	return f.StatementList.ContainsDirective("use strict")
+}
+
+// MARK: - FormalParameters
+
+type FormalParameters struct {
+	Items []FormalParametersItem
+}
+
+func (f *FormalParameters) IsSimpleParameterList() bool {
+	for _, item := range f.Items {
+		switch f := item.(type) {
+		case *FormalParameter:
+			if !f.BindingElement.IsSimpleParameterList() {
+				return false
+			}
+		case *FormalParameterFunctionRestParameter:
+			return false
+		}
+	}
+	return true
+}
+
+func (f *FormalParameters) ContainsExpression() bool {
+	for _, item := range f.Items {
+		switch p := item.(type) {
+		case *FormalParameter:
+			if p.BindingElement.ContainsExpression() {
+				return true
+			}
+		case *FormalParameterFunctionRestParameter:
+			if p.BindingRestElement.ContainsExpression() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (f *FormalParameters) BoundNames() (l []IdentifierName) {
+	for _, item := range f.Items {
+		var name IdentifierName
+		switch p := item.(type) {
+		case *FormalParameter:
+			l = append(l, p.BindingElement.BoundNames()...)
+			continue
+		case *FormalParameterFunctionRestParameter:
+			name = p.BindingRestElement.(*BindingRestElementIdentifier).Identifier
+		}
+		l = append(l, name)
+	}
+	return
+}
+
+// 15.1.5
+func (f *FormalParameters) ExpectedArgumentCount() JSInt {
+	l := JSInt(len(f.Items))
+	if l > 0 {
+		if _, ok := f.Items[l-1].(*FormalParameterFunctionRestParameter); ok {
+			return l - 1
+		}
+	}
+	return l
+}
+
+func (f *FormalParameters) String() string {
+	var sb string
+	for i, item := range f.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+type FormalParametersItem interface {
+	ASTNode
+	_formalParametersItem()
+	ContainsExpression() bool
+}
+
+// MARK:-
+type FormalParameterFunctionRestParameter struct {
+	FormalParametersItem
+	BindingRestElement BindingRestElement
+}
+
+func (f *FormalParameterFunctionRestParameter) ContainsExpression() bool {
+	return f.BindingRestElement.ContainsExpression()
+}
+
+// MARK: - BindingRestElement
+
+type BindingRestElement interface {
+	ASTNode
+	_bindingRestElement()
+	ContainsExpression() bool
+}
+type BindingRestElementIdentifier struct {
+	BindingRestElement
+	Identifier IdentifierName
+}
+
+func (b *BindingRestElementIdentifier) ContainsExpression() bool {
+	return false
+}
+
+func (b *BindingRestElementIdentifier) String() string {
+	return "..." + string(b.Identifier)
+}
+
+// MARK: - FormalParameter
+
+type FormalParameter struct {
+	FormalParametersItem
+	BindingElement *BindingElement
+}
+
+func (f *FormalParameter) String() string {
+	return f.BindingElement.String()
+}
+
+// MARK: - BindingElement
+
+// SingleNameBinding [Yield, Await] :
+// - BindingIdentifier[?Yield, ?Await] Initializer[+In, ?Yield, ?Await] opt
+type SingleNameBinding struct {
+	BindingIdentifier IdentifierName
+	Initializer       Expression
+}
+
+func (s *SingleNameBinding) BoundNames() (l []IdentifierName) {
+	l = append(l, s.BindingIdentifier)
+	return
+}
+
+func (s *SingleNameBinding) String() string {
+	if s.Initializer != nil {
+		return string(s.BindingIdentifier) + " = " + s.Initializer.String()
+	}
+	return string(s.BindingIdentifier)
+}
+
+// BindingProperty [Yield, Await] :
+// - SingleNameBinding[?Yield, ?Await]
+// - PropertyName[?Yield, ?Await] : BindingElement[?Yield, ?Await]
+type BindingProperty struct {
+	SingleNameBinding             *SingleNameBinding
+	PropertyNameAndBindingElement *struct {
+		PropertyName   PropertyName
+		BindingElement *BindingElement
+	}
+}
+
+func (b *BindingProperty) String() string {
+	if b.SingleNameBinding != nil {
+		return b.SingleNameBinding.String()
+	}
+	return b.PropertyNameAndBindingElement.PropertyName.String() + " : " + b.PropertyNameAndBindingElement.BindingElement.String()
+}
+
+// BindingRestProperty [Yield, Await] :
+// - ... BindingIdentifier[?Yield, ?Await]
+type BindingRestProperty struct {
+	BindingIdentifier IdentifierName
+}
+
+func (b *BindingRestProperty) String() string {
+	return "..." + string(b.BindingIdentifier)
+}
+
+// ObjectBindingPattern : { }
+// ObjectBindingPattern : { BindingPropertyList, BindingRestProperty }
+type ObjectBindingPattern struct {
+	Properties []*struct {
+		BindingPropertyList []BindingProperty
+		BindingRestProperty *BindingRestProperty
+	}
+}
+
+func (o *ObjectBindingPattern) ContainsExpression() bool {
+	// TODO
+	return false
+}
+
+func (o *ObjectBindingPattern) String() string {
+	var sb string
+	for i, p := range o.Properties {
+		if i != 0 {
+			sb += ", "
+		}
+		for j, bp := range p.BindingPropertyList {
+			if j != 0 {
+				sb += ", "
+			}
+			sb += bp.String()
+		}
+		if p.BindingRestProperty != nil {
+			sb += ", " + p.BindingRestProperty.String()
+		}
+	}
+	return sb
+}
+
+// ArrayBindingPattern [Yield, Await] :
+// - [ Elision(opt) BindingRestElement[?Yield, ?Await] opt ]
+// - [ BindingElementList[?Yield, ?Await] ]
+// - [ BindingElementList[?Yield, ?Await] , Elision(opt)
+// - BindingRestElement[?Yield, ?Await] opt ]
+type ArrayBindingPattern struct {
+	Elements []*struct {
+		Elision            bool
+		BindingRestElement BindingRestElement
+		BindingElement     *BindingElement
+	}
+}
+
+func (a *ArrayBindingPattern) ContainsExpression() bool {
+	// TODO
+	return false
+}
+
+func (a *ArrayBindingPattern) String() string {
+	var sb string
+	for i, e := range a.Elements {
+		if i != 0 {
+			sb += ", "
+		}
+		if e.BindingElement != nil {
+			sb += e.BindingElement.String()
+		} else {
+			sb += e.BindingRestElement.String()
+		}
+	}
+	return sb
+}
+
+// BindingPattern : ObjectBindingPattern | ArrayBindingPattern
+type BindingPattern struct {
+	ObjectBindingPattern *ObjectBindingPattern
+	ArrayBindingPattern  *ArrayBindingPattern
+}
+
+func (b *BindingPattern) BoundNames() (l []IdentifierName) {
+	if b.ObjectBindingPattern != nil {
+		for _, p := range b.ObjectBindingPattern.Properties {
+			for _, bp := range p.BindingPropertyList {
+				if bp.SingleNameBinding != nil {
+					l = append(l, bp.SingleNameBinding.BindingIdentifier)
+				}
+			}
+		}
+	}
+	if b.ArrayBindingPattern != nil {
+		for _, e := range b.ArrayBindingPattern.Elements {
+			if e.BindingElement != nil {
+				l = append(l, e.BindingElement.BoundNames()...)
+			}
+		}
+	}
+	return
+}
+
+func (b *BindingPattern) ContainsExpression() bool {
+	if b.ObjectBindingPattern != nil {
+		return b.ObjectBindingPattern.ContainsExpression()
+	}
+	return b.ArrayBindingPattern.ContainsExpression()
+}
+
+func (b *BindingPattern) String() string {
+	if b.ObjectBindingPattern != nil {
+		return b.ObjectBindingPattern.String()
+	}
+	return b.ArrayBindingPattern.String()
+}
+
+// BindingElement [Yield, Await] :
+// - SingleNameBinding[?Yield, ?Await]
+// - BindingPattern[?Yield, ?Await] Initializer[+In, ?Yield, ?Await] opt
+type BindingElement struct {
+	BindingPattern    *BindingPattern
+	SingleNameBinding *SingleNameBinding
+}
+
+func (b *BindingElement) IsSimpleParameterList() bool {
+	return b.SingleNameBinding != nil && b.SingleNameBinding.Initializer == nil
+}
+
+func (b *BindingElement) ContainsExpression() bool {
+	if b.SingleNameBinding != nil {
+		return b.SingleNameBinding.Initializer != nil
+	}
+	if b.BindingPattern.ObjectBindingPattern != nil {
+		return b.BindingPattern.ContainsExpression()
+	}
+	panic("unreachable")
+}
+
+func (b *BindingElement) BoundNames() (l []IdentifierName) {
+	if b.SingleNameBinding != nil {
+		return b.SingleNameBinding.BoundNames()
+	}
+	return b.BindingPattern.BoundNames()
+}
+
+func (b *BindingElement) String() string {
+	if b.SingleNameBinding != nil {
+		return b.SingleNameBinding.String()
+	}
+	return b.BindingPattern.String()
+}
+
+// MARK: - IfStatement
+
+// IfStatement [Yield, Await, Return] :
+//   - if ( Expression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return] else
+//     Statement[?Yield, ?Await, ?Return]
+//   - if ( Expression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?Return]
+//     [lookahead ≠ else]
+type IfStatement struct {
+	Statement
+	Condition  Expression
+	Consequent Statement
+	Alternate  Statement
+}
+
+var _ Statement = (*IfStatement)(nil)
+
+func (s *IfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	l = append(l, s.Consequent.VarScopedDeclarations()...)
+	if s.Alternate != nil {
+		l = append(l, s.Alternate.VarScopedDeclarations()...)
+		return
+	}
+	return
+}
+
+func (s *IfStatement) astHasElse() bool {
+	return s.Alternate != nil
+}
+
+// Evaluation
+// spec: 14.6.2
+func (s *IfStatement) Evaluation(vm *VM) (co CompletionValue) {
+	if s.astHasElse() {
+		exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Condition, co)
+		if isAbrupt {
+			return rt
+		}
+		var stmtCompletion CompletionValue
+		if exprValue.ToBoolean() {
+			stmtCompletion = s.Consequent.Evaluation(vm)
+		} else {
+			stmtCompletion = s.Alternate.Evaluation(vm)
+		}
+		return UpdateEmpty(stmtCompletion, UndefinedValue)
+	} else {
+		exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Condition, co)
+		if isAbrupt {
+			return rt
+		}
+		if !exprValue.ToBoolean() {
+			return UndefinedValue.ToCompletion()
+		} else {
+			stmtCompletion := s.Consequent.Evaluation(vm)
+			return UpdateEmpty(stmtCompletion, UndefinedValue)
+		}
+	}
+}
+
+func (s *IfStatement) String() string {
+	sb := "If"
+	sb += " " + s.Condition.String() + " \n"
+	sb += s.Consequent.String()
+	if s.Alternate != nil {
+		sb += "Else\n"
+		sb += s.Alternate.String()
+	}
+	return sb
+}
+
+// MARK: - SwitchStatement
+
+// SwitchStatement [Yield, Await, Return] :
+// - switch ( Expression[+In, ?Yield, ?Await] ) CaseBlock[?Yield, ?Await, ?Return]
+type SwitchStatement struct {
+	Expression Expression
+	CaseBlock  *CaseBlock
+}
+
+var (
+	_ RuntimeSemanticsEvaluation = (*SwitchStatement)(nil)
+	_ ASTNode                    = (*SwitchStatement)(nil)
+)
+
+// Evaluation
+// spec: 14.12.4
+func (s *SwitchStatement) Evaluation(vm *VM) (co CompletionValue) {
+	switchValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Expression, co)
+	if isAbrupt {
+		return rt
+	}
+	oldEnv := vm.RunningLexicalEnvironment()
+	blockEnv := NewDeclarativeEnvironment(oldEnv)
+	vm.BlockDeclarationInstantiation(s.CaseBlock, blockEnv)
+	vm.SetRunningLexicalEnvironment(blockEnv)
+	R := CompletionHandle(s.CaseBlock.CaseBlockEvaluation(vm, switchValue))
+	vm.SetRunningLexicalEnvironment(oldEnv)
+	return R
+}
+
+func (s *SwitchStatement) String() string {
+	sb := "Switch"
+	sb += " " + s.Expression.String() + " \n"
+	sb += s.CaseBlock.String()
+	return sb
+}
+
+func (s *SwitchStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+// CaseBlock [Yield, Await, Return] :
+// - { CaseClauses[?Yield, ?Await, ?Return] opt }
+// - { CaseClauses[?Yield, ?Await, ?Return] opt DefaultClause[?Yield, ?Await, ?Return]
+// - CaseClauses[?Yield, ?Await, ?Return] opt }
+//
+// CaseClauses[Yield, Await, Return] :
+// - CaseClause[?Yield, ?Await, ?Return]
+// - CaseClauses[?Yield, ?Await, ?Return] CaseClause[?Yield, ?Await, ?Return]
+type CaseBlock struct {
+	CaseClauses   []*CaseClause
+	DefaultClause *DefaultClause
+}
+
+var (
+	_ StaticSemanticsLexicallyScopedDeclarations = (*CaseBlock)(nil)
+	_ RuntimeSemanticsCaseBlockEvaluation        = (*CaseBlock)(nil)
+)
+
+func (c *CaseBlock) astHasDefault() bool {
+	return c.DefaultClause != nil
+}
+
+func (c *CaseBlock) astIsEmpty() bool {
+	return !c.astHasDefault() && len(c.CaseClauses) == 0
+}
+
+// CaseBlockEvaluation
+// spec: 14.12.2
+// TODO(WIP): handle cases after default clauses
+func (c *CaseBlock) CaseBlockEvaluation(vm *VM, input Value) (co CompletionValue) {
+	if c.astIsEmpty() {
+		co.value = UndefinedValue
+		return
+	} else if c.astHasDefault() {
+		var V Value = UndefinedValue
+		found := false
+		for _, clause := range c.CaseClauses {
+			if !found {
+				f, isAbrupt, rt := ReturnIfAbrupt(clause.CaseClauseIsSelected(vm, input), co)
+				if isAbrupt {
+					return rt
+				}
+				found = f
+			}
+			if found {
+				R := CompletionHandle(clause.Evaluation(vm))
+				if !IsUndefinedOrNil(R.value) {
+					V = R.value
+				}
+				if R.IsAbrupt() {
+					return UpdateEmpty(R, V)
+				}
+			}
+		}
+		defaultR := CompletionHandle(c.DefaultClause.Evaluation(vm))
+		if !IsUndefinedOrNil(defaultR.value) {
+			V = defaultR.value
+		}
+		if defaultR.IsAbrupt() {
+			return UpdateEmpty(defaultR, V)
+		}
+		co.value = V
+		// TODO(WIP): handle cases after default clauses
+		return
+	} else {
+		var V Value = UndefinedValue
+		found := false
+		for _, clause := range c.CaseClauses {
+			if !found {
+				f, isAbrupt, rt := ReturnIfAbrupt(clause.CaseClauseIsSelected(vm, input), co)
+				if isAbrupt {
+					return rt
+				}
+				found = f
+			}
+			if found {
+				R := CompletionHandle(clause.Evaluation(vm))
+				if !IsUndefinedOrNil(R.value) {
+					V = R.value
+				}
+				if R.IsAbrupt() {
+					return UpdateEmpty(R, V)
+				}
+			}
+		}
+		co.value = V
+		return
+	}
+}
+
+func (c *CaseBlock) LexicallyScopedDeclarations() (l []ASTNode) {
+	for _, clause := range c.CaseClauses {
+		l = append(l, clause.LexicallyScopedDeclarations()...)
+	}
+	if c.astHasDefault() {
+		l = append(l, c.DefaultClause.LexicallyScopedDeclarations()...)
+	}
+	return
+}
+
+func (c *CaseBlock) String() string {
+	sb := "CaseBlock"
+	for _, clause := range c.CaseClauses {
+		sb += clause.String()
+	}
+	if c.DefaultClause != nil {
+		sb += c.DefaultClause.String()
+	}
+	return sb
+}
+
+// CaseClause [Yield, Await, Return] :
+// - case Expression[+In, ?Yield, ?Await] : StatementList[?Yield, ?Await, ?Return] opt
+type CaseClause struct {
+	Expression    Expression
+	StatementList StatementList
+}
+
+var (
+	_ StaticSemanticsLexicallyScopedDeclarations = (*CaseClause)(nil)
+	_ RuntimeSemanticsEvaluation                 = (*CaseClause)(nil)
+)
+
+func (c *CaseClause) astIsStatementListEmpty() bool {
+	return len(c.StatementList) == 0
+}
+
+// Evaluation
+// spec: 14.12.4
+// returns UndefinedValue for EMPTY
+func (c *CaseClause) Evaluation(vm *VM) (co CompletionValue) {
+	if c.astIsStatementListEmpty() {
+		co.value = UndefinedValue
+		return
+	} else {
+		return c.StatementList.Evaluation(vm)
+	}
+}
+
+// CaseClauseIsSelected
+// spec: 14.12.3
+func (c *CaseClause) CaseClauseIsSelected(vm *VM, input Value) (co Completion[bool]) {
+	exprRef, isAbrupt, rt := ReturnIfAbrupt(c.Expression.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	clauseSelector, isAbrupt, rt := ReturnIfAbrupt(exprRef.GetValue(vm.agent), co)
+	if isAbrupt {
+		return rt
+	}
+	co.value = IsStrictlyEqual(input, clauseSelector)
+	return
+}
+
+func (c *CaseClause) LexicallyScopedDeclarations() (l []ASTNode) {
+	return c.StatementList.LexicallyScopedDeclarations()
+}
+
+func (c *CaseClause) String() string {
+	return "CaseClause " + c.Expression.String() + " " + c.StatementList.String()
+}
+
+// DefaultClause [Yield, Await, Return] :
+// - default : StatementList[?Yield, ?Await, ?Return] opt
+type DefaultClause struct {
+	StatementList StatementList
+}
+
+var (
+	_ StaticSemanticsLexicallyScopedDeclarations = (*DefaultClause)(nil)
+	_ RuntimeSemanticsEvaluation                 = (*DefaultClause)(nil)
+)
+
+func (d *DefaultClause) astIsStatementListEmpty() bool {
+	return len(d.StatementList) == 0
+}
+
+func (d *DefaultClause) Evaluation(vm *VM) CompletionValue {
+	if d.astIsStatementListEmpty() {
+		return UndefinedValue.ToCompletion()
+	} else {
+		return d.StatementList.Evaluation(vm)
+	}
+}
+
+func (d *DefaultClause) LexicallyScopedDeclarations() []ASTNode {
+	return d.StatementList.LexicallyScopedDeclarations()
+}
+
+func (d *DefaultClause) String() string {
+	return "DefaultClause " + d.StatementList.String()
+}
+
+// MARK: - IterationStatement
+
+type IterationStatement interface {
+	VarScopedDeclarations() []*VariableDeclaration
+	Statement
+}
+
+// MARK: - WhileStatement
+
+// WhileStatement :
+// - while ( Expression ) Statement
+type WhileStatement struct {
+	IterationStatement
+	Condition Expression
+	Body      Statement
+}
+
+var (
+	_ IterationStatement                  = (*WhileStatement)(nil)
+	_ RuntimeSemanticsWhileLoopEvaluation = (*WhileStatement)(nil)
+)
+
+func (s *WhileStatement) VarScopedDeclarations() []*VariableDeclaration {
+	return s.Body.VarScopedDeclarations()
+}
+
+func (s *WhileStatement) Evaluation(vm *VM) CompletionValue {
+	var labelSet []string
+	return s.WhileLoopEvaluation(vm, labelSet)
+}
+
+// WhileLoopEvaluation
+// spec: 14.7.3.2
+func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue) {
+	var V Value = UndefinedValue
+	for {
+		exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Condition, co)
+		if isAbrupt {
+			return rt
+		}
+		if !exprValue.ToBoolean() {
+			return V.ToCompletion()
+		}
+		stmtResult := s.Body.Evaluation(vm)
+		if !LoopContinues(stmtResult, labelSet) {
+			return UpdateEmpty(stmtResult, V)
+		}
+		if !IsUndefinedOrNil(stmtResult.value) {
+			V = stmtResult.value
+		}
+	}
+}
+
+func (s *WhileStatement) String() string {
+	sb := "While"
+	sb += " " + s.Condition.String() + " \n"
+	sb += s.Body.String()
+	return sb
+}
+
+// MARK: - DoWhileStatement
+
+type StatementDoWhile struct {
+	IterationStatement
+	Condition Expression
+	Body      Statement
+}
+
+func (s *StatementDoWhile) VarScopedDeclarations() []*VariableDeclaration {
+	return s.Body.VarScopedDeclarations()
+}
+
+func (s *StatementDoWhile) String() string {
+	sb := "DoWhile"
+	sb += " " + s.Condition.String() + " \n"
+	sb += s.Body.String()
+	return sb
+}
+
+// MARK: - ForStatement
+
+type ForStatementInitializer interface {
+	ASTNode
+}
+
+type ForStatementInitializerVariable struct {
+	ForStatementInitializer
+	VariableStatement *VariableStatement
+}
+
+func (f *ForStatementInitializerVariable) String() string {
+	return f.VariableStatement.String()
+}
+
+func (f *ForStatementInitializerVariable) Evaluation(vm *VM) CompletionValue {
+	return f.VariableStatement.Evaluation(vm)
+}
+
+type ForStatementInitializerLexicalDeclaration struct {
+	ForStatementInitializer
+	LexicalDeclaration *LexicalDeclaration
+}
+
+func (f *ForStatementInitializerLexicalDeclaration) String() string {
+	return f.LexicalDeclaration.String()
+}
+
+// ForStatement :
+// for ( LexicalDeclaration ; ) Statement
+// for ( LexicalDeclaration ; Expression ) Statement
+// for ( LexicalDeclaration Expression ; ) Statement
+// for ( LexicalDeclaration Expression ; Expression ) Statement
+type ForStatement struct {
+	IterationStatement
+	Initializer ForStatementInitializer
+	Condition   Expression
+	Increment   Expression
+	Body        Statement
+}
+
+func (s *ForStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	if s.Initializer != nil {
+		if varStatement, ok := s.Initializer.(*ForStatementInitializerVariable); ok {
+			l = append(l, varStatement.VariableStatement.DeclarationList.VarScopedDeclarations()...)
+		}
+	}
+	l = append(l, s.Body.VarScopedDeclarations()...)
+	return
+}
+
+// isVariableDeclarationList identifies
+// ForStatement : for ( var VariableDeclarationList ; Expression opt ; Expression opt ) Statement
+func (s *ForStatement) isVariableDeclarationList() bool {
+	_, ok := s.Initializer.(*ForStatementInitializerVariable)
+	return ok
+}
+
+func (s *ForStatement) isLexicalDeclaration() bool {
+	_, ok := s.Initializer.(*ForStatementInitializerLexicalDeclaration)
+	return ok
+}
+
+// ForLoopEvaluation
+// spec: 14.7.4.2
+func (s *ForStatement) ForLoopEvaluation(vm *VM) (co CompletionValue) {
+	// TODO: label set
+	if s.isVariableDeclarationList() {
+		s.Initializer.Evaluation(vm)
+		var test Expression
+		if s.Condition != nil {
+			test = s.Condition
+		}
+		var increment Expression
+		if s.Increment != nil {
+			increment = s.Increment
+		}
+		var perIterationBindings []string
+		return vm.ForBodyEvaluation(test, increment, s.Body, perIterationBindings, nil)
+	} else if s.isLexicalDeclaration() {
+		initializer := s.Initializer.(*ForStatementInitializerLexicalDeclaration).LexicalDeclaration
+		oldEnv := vm.RunningLexicalEnvironment()
+		loopEnv := NewDeclarativeEnvironment(oldEnv)
+		for _, name := range initializer.BoundNames() {
+			if initializer.IsConstantDeclaration() {
+				loopEnv.CreateImmutableBinding(name, true)
+			} else {
+				loopEnv.CreateMutableBinding(name, false)
+			}
+		}
+		vm.SetRunningLexicalEnvironment(loopEnv)
+		defer vm.SetRunningLexicalEnvironment(oldEnv)
+
+		status := initializer.Evaluation(vm)
+		if status.IsAbrupt() {
+			return status
+		}
+		var perIterationBindings []string
+		if !initializer.IsConstantDeclaration() {
+			perIterationBindings = initializer.BoundNames()
+		}
+		return vm.ForBodyEvaluation(
+			s.Condition,
+			s.Increment,
+			s.Body,
+			perIterationBindings,
+			nil,
+		)
+	} else {
+		if s.Initializer != nil {
+			_, _, isAbrupt, rt := vm.EvalAndGetValue(s.Initializer, co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		var test Expression
+		if s.Condition != nil {
+			test = s.Condition
+		}
+		var increment Expression
+		if s.Increment != nil {
+			increment = s.Increment
+		}
+		return vm.ForBodyEvaluation(test, increment, s.Body, []string{}, nil)
+	}
+}
+
+func (s *ForStatement) Evaluation(vm *VM) CompletionValue {
+	return s.ForLoopEvaluation(vm)
+}
+
+func (s *ForStatement) String() string {
+	sb := "For"
+	if s.Initializer != nil {
+		sb += " " + s.Initializer.String()
+	}
+	if s.Condition != nil {
+		sb += " " + s.Condition.String()
+	}
+	if s.Increment != nil {
+		sb += " " + s.Increment.String()
+	}
+	sb += " \n"
+	sb += s.Body.String()
+	return sb
+}
+
+// MARK: - ForInOfStatement
+
+type ForInOfStatementType int
+
+const (
+	ForInOfStatementTypeIn ForInOfStatementType = iota
+	ForInOfStatementTypeOf
+)
+
+// ForInOfStatement [Yield, Await, GetLastValue] :
+// - for ( [lookahead ≠ let [] LeftHandSideExpression[?Yield, ?Await] in
+//   - Expression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
+//
+// - for ( var ForBinding[?Yield, ?Await] in Expression[+In, ?Yield, ?Await] )
+//   - Statement[?Yield, ?Await, ?GetLastValue]
+//
+// - for ( ForDeclaration[?Yield, ?Await] in Expression[+In, ?Yield, ?Await] )
+//   - Statement[?Yield, ?Await, ?GetLastValue]
+//
+// - for ( [lookahead ∉ { let, async of}] LeftHandSideExpression[?Yield, ?Await] of
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
+//
+// - for ( var ForBinding[?Yield, ?Await] of AssignmentExpression[+In, ?Yield, ?Await]
+//   - ) Statement[?Yield, ?Await, ?GetLastValue]
+//
+// - for ( ForDeclaration[?Yield, ?Await] of AssignmentExpression[+In, ?Yield, ?Await]
+//   - ) Statement[?Yield, ?Await, ?GetLastValue]
+//
+// - [+Await] for await ( [lookahead ≠ let] LeftHandSideExpression[?Yield, ?Await] of
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
+//
+// - [+Await] for await ( var ForBinding[?Yield, ?Await] of
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
+//
+// - [+Await] for await ( ForDeclaration[?Yield, ?Await] of
+//   - AssignmentExpression[+In, ?Yield, ?Await] ) Statement[?Yield, ?Await, ?GetLastValue]
+type ForInOfStatement struct {
+	IterationStatement
+	Type        ForInOfStatementType
+	IsAwait     bool
+	Body        Statement
+	isVar       bool
+	Initializer *ForInOfStatementInitializer
+	// Expression is Expression, LeftHandSideExpression or AssignmentExpression
+	Expression Expression
+}
+
+var _ RuntimeSemanticsForInOfLoopEvaluation = (*ForInOfStatement)(nil)
+
+func (f *ForInOfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	if f.Initializer.ForBinding != nil && f.Initializer.ForBinding.BindingPattern == nil {
+		l = append(l, &VariableDeclaration{
+			BindingIdentifier: f.Initializer.ForBinding.BindingIdentifier,
+		})
+	}
+	l = append(l, f.Body.VarScopedDeclarations()...)
+	return
+}
+
+func (f *ForInOfStatement) BoundNames() (l []IdentifierName) {
+	if f.Initializer.ForBinding != nil {
+		l = append(l, f.Initializer.ForBinding.BoundNames()...)
+		l = append(l, f.Body.VarDeclaredNames()...)
+	}
+	return
+}
+
+func (f *ForInOfStatement) Evaluation(vm *VM) (co CompletionValue) {
+	// TODO
+	var labelSet []string
+	result, isAbrupt, rt := ReturnIfAbrupt(f.ForInOfLoopEvaluation(vm, labelSet), co)
+	if isAbrupt {
+		return rt
+	}
+	co.value = result
+	return
+}
+
+func (f *ForInOfStatement) astIsLeftHandSideExpression() bool {
+	return f.Initializer.LeftHandSideExpression != nil
+}
+
+func (f *ForInOfStatement) astIsIn() bool {
+	return f.Type == ForInOfStatementTypeIn
+}
+
+func (f *ForInOfStatement) astIsOf() bool {
+	return f.Type == ForInOfStatementTypeOf
+}
+
+func (f *ForInOfStatement) astIsForDeclaration() bool {
+	return f.Initializer.ForDeclaration != nil
+}
+
+func (f *ForInOfStatement) astIsVarForBinding() bool {
+	return f.Initializer.ForBinding != nil
+}
+
+// ForInOfLoopEvaluation
+// spec: 14.7.5.5
+func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co CompletionValue) {
+	kind := IteratorKindSync
+	iterationKind := ForInOfIterationKindIterate
+	if f.astIsIn() {
+		iterationKind = ForInOfIterationKindEnumerate
+	} else if f.IsAwait {
+		kind = IteratorKindAsync
+		iterationKind = ForInOfIterationKindAsyncIterate
+	}
+	if f.astIsForDeclaration() {
+		forDeclaration := f.Initializer.ForDeclaration
+		if f.astIsOf() {
+			keyResult, isAbrupt, rt := ReturnIfAbrupt(
+				vm.ForInOfHeadEvaluation(
+					forDeclaration.BoundNames(),
+					f.Expression,
+					iterationKind,
+				),
+				co)
+			if isAbrupt {
+				return rt
+			}
+			return vm.ForInOfBodyEvaluation(
+				forDeclaration,
+				f.Body,
+				keyResult,
+				iterationKind,
+				ForInOfLhsKindLexicalBinding,
+				labelSet,
+				kind,
+			)
+		} else {
+			// for in
+			keyResult, isAbrupt, rt := ReturnIfAbrupt(
+				vm.ForInOfHeadEvaluation(
+					forDeclaration.BoundNames(),
+					f.Expression,
+					ForInOfIterationKindEnumerate,
+				), co)
+			if isAbrupt {
+				return rt
+			}
+			return vm.ForInOfBodyEvaluation(
+				forDeclaration,
+				f.Body,
+				keyResult,
+				ForInOfIterationKindEnumerate,
+				ForInOfLhsKindLexicalBinding,
+				labelSet,
+				kind,
+			)
+		}
+	} else if f.astIsVarForBinding() {
+		keyResult, isAbrupt, rt := ReturnIfAbrupt(
+			vm.ForInOfHeadEvaluation(
+				[]string{},
+				f.Expression,
+				ForInOfIterationKindEnumerate,
+			), co)
+		if isAbrupt {
+			return rt
+		}
+		return vm.ForInOfBodyEvaluation(
+			f.Initializer.ForBinding,
+			f.Body,
+			keyResult,
+			ForInOfIterationKindEnumerate,
+			ForInOfLhsKindVarBinding,
+			labelSet,
+			kind,
+		)
+	}
+
+	keyResult, isAbrupt, rt := ReturnIfAbrupt(
+		vm.ForInOfHeadEvaluation(
+			[]string{},
+			f.Expression,
+			iterationKind,
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	return vm.ForInOfBodyEvaluation(
+		f.Initializer.LeftHandSideExpression,
+		f.Body,
+		keyResult,
+		iterationKind,
+		ForInOfLhsKindAssignment,
+		labelSet,
+		kind,
+	)
+}
+
+type ForInOfIterationKind int
+
+const (
+	ForInOfIterationKindEnumerate ForInOfIterationKind = iota
+	ForInOfIterationKindIterate
+	ForInOfIterationKindAsyncIterate
+)
+
+type ForInOfLhsKind int
+
+const (
+	ForInOfLhsKindAssignment ForInOfLhsKind = iota
+	ForInOfLhsKindVarBinding
+	ForInOfLhsKindLexicalBinding
+)
+
+func (f *ForInOfStatement) IsDestructuring() bool {
+	// TODO:
+	return f.Initializer.ForBinding != nil && f.Initializer.ForBinding.BindingPattern != nil
+}
+
+func (f *ForInOfStatement) String() string {
+	s := "ForInOfStatement "
+	if f.IsAwait {
+		s += "await "
+	}
+	s += f.Initializer.String() + " "
+	if f.Type == ForInOfStatementTypeIn {
+		s += "In "
+	} else {
+		s += "Of "
+	}
+	s += f.Expression.String() + " " + f.Body.String()
+	return s
+}
+
+// ForInOfStatementInitializer Enum
+type ForInOfStatementInitializer struct {
+	// LeftHandSideExpression [Yield, Await] :
+	// - NewExpression[?Yield, ?Await]
+	// - CallExpression[?Yield, ?Await]
+	// - OptionalExpression[?Yield, ?Await]
+	LeftHandSideExpression Expression
+	ForBinding             *ForBinding
+	ForDeclaration         *ForDeclaration
+}
+
+func (f *ForInOfStatementInitializer) String() string {
+	if f.ForBinding != nil {
+		return f.ForBinding.String()
+	} else if f.ForDeclaration != nil {
+		return f.ForDeclaration.String()
+	} else {
+		return f.LeftHandSideExpression.String()
+	}
+}
+
+// ForBinding [Yield, Await] :
+// - BindingIdentifier[?Yield, ?Await]
+// - BindingPattern[?Yield, ?Await]
+type ForBinding struct {
+	BindingIdentifier IdentifierName
+	BindingPattern    *BindingPattern
+}
+
+var _ StaticSemanticsBoundNames = (*ForBinding)(nil)
+
+func (f *ForBinding) String() string {
+	if f.BindingPattern != nil {
+		return f.BindingPattern.String()
+	}
+	return string(f.BindingIdentifier)
+}
+
+func (f *ForBinding) Evaluation(vm *VM) CompletionValue {
+	panic("ForBinding is a static binding and has no direct runtime evaluation")
+}
+
+func (f *ForBinding) BoundNames() (l []IdentifierName) {
+	if f.BindingPattern != nil {
+		return f.BindingPattern.BoundNames()
+	}
+	return []IdentifierName{f.BindingIdentifier}
+}
+
+// ForDeclaration [Yield, Await] :
+// - LetOrConst ForBinding[?Yield, ?Await]
+type ForDeclaration struct {
+	// TODO(BM): unused, remove
+	Expression
+	LetOrConst LetOrConst
+	ForBinding *ForBinding
+}
+
+var (
+	_ StaticSemanticsBoundNames                          = (*ForDeclaration)(nil)
+	_ RuntimeSemanticsForDeclarationBindingInstantiation = (*ForDeclaration)(nil)
+)
+
+func (f *ForDeclaration) ForDeclarationBindingInstantiation(vm *VM, env EnvironmentRecord) {
+	for _, name := range f.ForBinding.BoundNames() {
+		if f.LetOrConst.IsConstantDeclaration() {
+			env.CreateImmutableBinding(name, true)
+		} else {
+			env.CreateMutableBinding(name, false)
+		}
+	}
+	// return UNUSED
+}
+
+func (f *ForDeclaration) BoundNames() (l []IdentifierName) {
+	return f.ForBinding.BoundNames()
+}
+
+func (f *ForDeclaration) String() string {
+	var letOrConst string
+	if f.LetOrConst == LetOrConstLet {
+		letOrConst = "Let"
+	} else {
+		letOrConst = "Const"
+	}
+	return letOrConst + " " + f.ForBinding.String()
+}
+
+// MARK: - BreakStatement
+
+// BreakStatement [Yield, Await] :
+// - break ;
+// - break [no LineTerminator here] LabelIdentifier[?Yield, ?Await] ;
+type BreakStatement struct {
+	Statement
+	Label IdentifierName
+}
+
+var _ RuntimeSemanticsEvaluation = (*BreakStatement)(nil)
+
+func (s *BreakStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+func (s *BreakStatement) astHasIdentifier() bool {
+	return s.Label != ""
+}
+
+func (s *BreakStatement) Evaluation(vm *VM) (co CompletionValue) {
+	if s.astHasIdentifier() {
+		label := s.Label
+		co.target = label
+		co.t = CompletionTypeBreak
+		return
+	} else {
+		co.t = CompletionTypeBreak
+		return
+	}
+}
+
+func (s *BreakStatement) String() string {
+	if s.Label != "" {
+		return "Break " + string(s.Label)
+	}
+	return "Break"
+}
+
+// MARK: - ContinueStatement
+
+type StatementContinue struct {
+	Statement
+	Label IdentifierName
+}
+
+func (s *StatementContinue) String() string {
+	if s.Label != "" {
+		return "Continue " + string(s.Label)
+	}
+	return "Continue"
+}
+
+// MARK: - ReturnStatement
+
+// ReturnStatement [Yield, Await] :
+// - return ;
+// - return [no LineTerminator here] Expression[+In, ?Yield, ?Await] ;
+type ReturnStatement struct {
+	Statement
+	Expression Expression
+}
+
+func (s *ReturnStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+// Evaluation
+// spec: 14.10.1
+func (s *ReturnStatement) Evaluation(vm *VM) (co CompletionValue) {
+	if s.Expression == nil {
+		co.value = UndefinedValue
+		co.t = CompletionTypeReturn
+		return
+	} else {
+		exprValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Expression, co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = exprValue
+		co.t = CompletionTypeReturn
+		// TODO: GetGeneratorKind
+		return
+	}
+}
+
+func (s *ReturnStatement) String() string {
+	if s.Expression != nil {
+		return "CompletionTypeReturn " + s.Expression.String()
+	}
+	return "CompletionTypeReturn"
+}
+
+// MARK: - Declaration
+
+// Declaration [Yield, Await] :
+// - HoistableDeclaration[?Yield, ?Await, ~Default]
+// - ClassDeclaration[?Yield, ?Await, ~Default]
+// - LexicalDeclaration[+In, ?Yield, ?Await]
+type Declaration interface {
+	ASTNode
+	BoundNames() []IdentifierName
+}
+type declarationDefaultImpl struct {
+	Declaration
+}
+
+func DeclarationBoundNames(d Declaration) (l []IdentifierName) {
+	switch decl := d.(type) {
+	case *DeclarationHoistableFunction, *DeclarationHoistableAsyncFunction:
+		return
+	case *ClassDeclaration:
+		return decl.BoundNames()
+	case *LexicalDeclaration:
+		return decl.BoundNames()
+	}
+	panic("unreachable")
+}
+
+func DeclarationAnalyze(d Declaration, a AnalyzeQuery) bool {
+	return false
+}
+
+// MARK: - HoistableDeclaration
+
+// TODO: use HoistableDeclaration
+// HoistableDeclaration [Yield, Await, Default] :
+// - FunctionDeclaration[?Yield, ?Await, ?Default]
+// - GeneratorDeclaration[?Yield, ?Await, ?Default]
+// - AsyncFunctionDeclaration[?Yield, ?Await, ?Default]
+// - AsyncGeneratorDeclaration[?Yield, ?Await, ?Default]
+type DeclarationHoistable interface {
+	Declaration
+}
+
+// MARK: - FunctionDeclaration
+
+// TODO: use FunctionDeclaration directly
+type DeclarationHoistableFunction struct {
+	DeclarationHoistable
+	*declarationDefaultImpl
+	FunctionDeclaration *FunctionDeclaration
+}
+
+func (d *DeclarationHoistableFunction) Evaluation(vm *VM) CompletionValue {
+	return d.FunctionDeclaration.Evaluation(vm)
+}
+
+func (d *DeclarationHoistableFunction) BoundNames() []IdentifierName {
+	return d.FunctionDeclaration.BoundNames()
+}
+
+func (d *DeclarationHoistableFunction) String() string {
+	return d.FunctionDeclaration.String()
+}
+
+// MARK: - AsyncFunctionDeclaration
+
+type DeclarationHoistableAsyncFunction struct {
+	DeclarationHoistable
+	*declarationDefaultImpl
+	AsyncFunctionDeclaration *AsyncFunctionDeclaration
+}
+
+func (d *DeclarationHoistableAsyncFunction) _declaration() {}
+
+func (d *DeclarationHoistableAsyncFunction) Evaluation(vm *VM) CompletionValue {
+	return d.AsyncFunctionDeclaration.Evaluation(vm)
+}
+
+func (d *DeclarationHoistableAsyncFunction) String() string {
+	return d.AsyncFunctionDeclaration.String()
+}
+
+type AsyncFunctionDeclaration struct {
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+// TODO: not standard
+func (d *AsyncFunctionDeclaration) Evaluation(vm *VM) CompletionValue {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateAsyncFunctionObject(agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+	return UndefinedValue.ToCompletion()
+}
+
+func (d *AsyncFunctionDeclaration) instantiateAsyncFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+	realm := agent.CurrentRealm()
+	name := d.Identifier
+	sourceText := d.SourceText
+	function := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.AsyncFunctionPrototype,
+		sourceText,
+		d.FormalParameters,
+		d.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	return function
+}
+
+func (d *AsyncFunctionDeclaration) String() string {
+	return "AsyncFunctionDeclaration " + string(d.Identifier)
+}
+
+// MARK: - AsyncGeneratorDeclaration
+
+type DeclarationHoistableAsyncGenerator struct {
+	DeclarationHoistable
+	AsyncGeneratorDeclaration *AsyncGeneratorDeclaration
+}
+
+func (d *DeclarationHoistableAsyncGenerator) Evaluation(vm *VM) CompletionValue {
+	return d.AsyncGeneratorDeclaration.Evaluation(vm)
+}
+
+func (d *DeclarationHoistableAsyncGenerator) String() string {
+	return d.AsyncGeneratorDeclaration.String()
+}
+
+type AsyncGeneratorDeclaration struct {
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+// TODO: not standard
+func (d *AsyncGeneratorDeclaration) Evaluation(vm *VM) CompletionValue {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateAsyncGeneratorFunctionObject(agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(d.Identifier), function.ToValue(), setThrowTypeIgnore)
+	return UndefinedValue.ToCompletion()
+}
+
+// instantiateAsyncGeneratorFunctionObject
+// spec: 15.6.3
+func (d *AsyncGeneratorDeclaration) instantiateAsyncGeneratorFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+	realm := agent.CurrentRealm()
+	name := d.Identifier
+	sourceText := d.SourceText
+	function := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.AsyncGeneratorFunctionPrototype,
+		sourceText,
+		d.FormalParameters,
+		d.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+	SetFunctionName(function, NewStringPropertyKey(string(name)), "")
+	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
+	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+		Value:        prototype.ToValue(),
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	return function
+}
+
+func (d *AsyncGeneratorDeclaration) String() string {
+	return "AsyncGeneratorDeclaration " + string(d.Identifier)
+}
+
+// MARK: - GeneratorDeclaration
+
+type DeclarationHoistableGenerator struct {
+	DeclarationHoistable
+	GeneratorDeclaration *GeneratorDeclaration
+}
+
+func (d *DeclarationHoistableGenerator) Evaluation(vm *VM) CompletionValue {
+	return d.GeneratorDeclaration.Evaluation(vm)
+}
+
+func (d *DeclarationHoistableGenerator) String() string {
+	return d.GeneratorDeclaration.String()
+}
+
+type GeneratorDeclaration struct {
+	Identifier       IdentifierName
+	FormalParameters *FormalParameters
+	Body             *FunctionBody
+	SourceText       string
+}
+
+// TODO: not standard
+func (d *GeneratorDeclaration) Evaluation(vm *VM) CompletionValue {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := realm.GlobalEnv
+	function := d.instantiateGeneratorFunctionObject(agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(CMString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
+	return UndefinedValue.ToCompletion()
+}
+
+// 15.5.3
+func (d *GeneratorDeclaration) instantiateGeneratorFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+	realm := agent.CurrentRealm()
+	name := d.Identifier
+	sourceText := d.SourceText
+	function := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		d.FormalParameters,
+		d.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+
+	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototype, nil)
+	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+		Value:        (prototype).ToValue(),
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	return function
+}
+
+func (d *GeneratorDeclaration) String() string {
+	return "GeneratorDeclaration " + string(d.Identifier)
+}
+
+// MARK: - ClassDeclaration
+
+// ClassDeclaration [Yield, Await, Default] :
+// - class BindingIdentifier[?Yield, ?Await] ClassTail[?Yield, ?Await]
+// - [+Default] class ClassTail[?Yield, ?Await]
+type ClassDeclaration struct {
+	Declaration
+	IdentifierName IdentifierName
+	ClassTail      *ClassTail
+	SourceText     string
+}
+
+var (
+	_ RuntimeSemanticsEvaluation                        = (*ClassDeclaration)(nil)
+	_ RuntimeSemanticsBindingClassDeclarationEvaluation = (*ClassDeclaration)(nil)
+)
+
+func (d *ClassDeclaration) LexicallyDeclaredNames() (l []IdentifierName) {
+	return d.BoundNames()
+}
+
+func (d *ClassDeclaration) BoundNames() (l []IdentifierName) {
+	if d.IdentifierName != "" {
+		l = append(l, d.IdentifierName)
+	} else {
+		l = append(l, "default")
+	}
+	return
+}
+
+func (d *ClassDeclaration) astHasIdentifier() bool {
+	return d.IdentifierName != ""
+}
+
+// 15.7.16
+func (d *ClassDeclaration) Evaluation(vm *VM) CompletionValue {
+	d.BindingClassDeclarationEvaluation(vm)
+	// return EMPTY
+	return UndefinedValue.ToCompletion()
+}
+
+// BindingClassDeclarationEvaluation
+// spec: 15.7.15
+func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM) (co Completion[ObjectType]) {
+	if d.astHasIdentifier() {
+		className := d.IdentifierName
+		value, isAbrupt, rt := ReturnIfAbrupt(d.ClassTail.ClassDefinitionEvaluation(vm, className, NewStringPropertyKey(className)), co)
+		if isAbrupt {
+			return rt
+		}
+		// TODO: set [[SourceText]]
+		env := vm.RunningLexicalEnvironment()
+		vm.InitializeBoundName(className, value.ToValue(), env)
+		co.value = value
+		return
+	} else {
+		value, isAbrupt, rt := ReturnIfAbrupt(d.ClassTail.ClassDefinitionEvaluation(vm, "", NewStringPropertyKey("default")), co)
+		if isAbrupt {
+			return rt
+		}
+		// TODO: set [[SourceText]]
+
+		co.value = value
+		return
+	}
+}
+
+func (d *ClassDeclaration) String() string {
+	return "ClassDeclaration " + string(d.IdentifierName)
+}
+
+type ClassTail struct {
+	ClassHeritage Expression
+	ClassBody     *ClassBody
+}
+
+var _ RuntimeSemanticsClassDefinitionEvaluation = (*ClassTail)(nil)
+
+// ClassDefinitionEvaluation
+// spec: 15.7.14
+func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, className PropertyKeyOrPrivateName) (returnCompletion Completion[ObjectType]) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	// outer env of class
+	env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+	// the class env
+	classEnv := NewDeclarativeEnvironment(env)
+	if classBinding != "" {
+		classEnv.CreateImmutableBinding(classBinding, true)
+	}
+
+	outerPrivateEnvironment := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	classPrivateEnvironment := NewPrivateEnvironment(outerPrivateEnvironment)
+
+	if len(c.ClassBody.ClassElementList.Items) > 0 {
+		privateBoundIdentifiers := c.ClassBody.PrivateBoundIdentifiers()
+		for _, privateBoundIdentifier := range privateBoundIdentifiers {
+			names := lo.Map(classPrivateEnvironment.Names, func(item PrivateName, index int) string {
+				return item.Symbol.Description
+			})
+			if lo.Contains(names, string(privateBoundIdentifier)) {
+			} else {
+				classPrivateEnvironment.Names = append(classPrivateEnvironment.Names, PrivateName{
+					Symbol: agent.CreateSymbol(string(privateBoundIdentifier)),
+				})
+			}
+		}
+	}
+
+	var protoParent ObjectType
+	var constructorParent ObjectType
+	if c.ClassHeritage == nil {
+		protoParent = realm.Intrinsics.ObjectPrototype
+		constructorParent = realm.Intrinsics.FunctionPrototype
+	} else {
+		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
+		superclassRef := RunNode(agent,
+			&StatementExpression{
+				Expression: c.ClassHeritage,
+			},
+		)
+		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+		superclass := superclassRef.Data().GetValue(agent).value
+		if superclass == nil {
+			protoParent = nil
+			constructorParent = realm.Intrinsics.FunctionPrototype
+		} else if !IsConstructor(superclass) {
+			panic("TypeError: superclass is not a constructor")
+		} else {
+			protoParentValue := MustGetObject(superclass).Get(NewStringPropertyKey("prototype"))
+			if !protoParentValue.IsObject() {
+				panic("TypeError: prototype is not an object")
+			}
+			protoParent = MustGetObject(protoParentValue)
+			constructorParent = MustGetObject(superclass)
+		}
+	}
+
+	proto := OrdinaryObjectCreate(agent, protoParent, nil)
+	constructor := c.ClassBody.ConstructorMethod()
+	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
+	agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = classPrivateEnvironment
+
+	var function ObjectType
+	if constructor == nil {
+		var defaultConstructor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+			args := arguments
+			if newTarget == nil {
+				return agent.ThrowTypeError("class must be invoked with 'new'")
+			}
+
+			F := agent.ActiveFunctionObject()
+			classConstructorFields := ObjectAs[*BuiltinFunction](F).AdditionalFields.ClassConstructorFields
+			var result ObjectType
+			if classConstructorFields.ConstructorKind == ConstructorKindDerived {
+				fun := function.internalMethods().GetPrototypeOf(function)
+				if !IsConstructor((fun).ToValue()) {
+					panic("TypeError: prototype is not a constructor")
+				}
+				result = fun.Construct(args, newTarget).value
+			} else {
+				result = OrdinaryCreateFromConstructor(agent, newTarget, "%Object.prototype", nil)
+			}
+			return result.ToValue()
+		}
+
+		function = CreateBuiltinFunction(
+			agent,
+			defaultConstructor,
+			0,
+			CMString("constructor"),
+			builtinFunctionArgs{
+				prototype:     constructorParent,
+				realm:         realm,
+				isConstructor: true,
+				additionalFields: &AdditionalFields{
+					ClassConstructorFields: &ClassConstructorFields{},
+				},
+			})
+	} else {
+		// 15.
+		constructorInfo := ReturnAssertNormal(
+			constructor.DefineMethod(vm, proto, constructorParent),
+		)
+		F := constructorInfo.Closure
+		MakeClassConstructor(F.(*ECMAScriptFunction))
+		SetFunctionName(F, className.(PropertyKey), "")
+		function = F
+	}
+
+	MakeConstructor(function, false, proto)
+	if c.ClassHeritage != nil {
+		if f, ok := function.(*ECMAScriptFunction); ok {
+			f.ConstructorKind = ConstructorKindDerived
+		} else if b, ok := function.(*BuiltinFunction); ok {
+			b.AdditionalFields.ClassConstructorFields.ConstructorKind = ConstructorKindDerived
+		} else {
+			panic("unreachable")
+		}
+	}
+
+	DefineMethodProperty(proto, NewStringPropertyKey("constructor"), function, false)
+
+	elements := c.ClassBody.NonConstructorElements()
+
+	instancePrivateMethods := &pkg.Stack[*PrivateElement]{}
+	staticPrivateMethods := &pkg.Stack[*PrivateElement]{}
+
+	instanceFields := make([]*ClassFieldDefinition, 0)
+
+	staticClassFields := make([]*ClassFieldDefinition, 0)
+	staticStaticBlocks := make([]*ClassStaticBlockDefinition, 0)
+
+	// 25.
+	for _, classElement := range elements {
+		var completion Completion[*classEvaluationResult]
+		if !ClassElementIsStatic(classElement) {
+			completion = CompletionHandle(classElement.ClassElementEvaluation(vm, proto))
+		} else {
+			completion = CompletionHandle(classElement.ClassElementEvaluation(vm, function))
+		}
+		if completion.IsAbrupt() {
+			agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+			agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+			return CompletionFrom(returnCompletion, completion)
+		}
+		result := completion.value
+		if result == nil {
+			result = &classEvaluationResult{}
+		}
+		if result.classFieldDefinition != nil {
+			if !ClassElementIsStatic(classElement) {
+				instanceFields = append(instanceFields, result.classFieldDefinition)
+			} else {
+				staticClassFields = append(staticClassFields, result.classFieldDefinition)
+			}
+		} else if result.staticBlockDefinition != nil {
+			staticStaticBlocks = append(staticStaticBlocks, result.staticBlockDefinition)
+		} else if result.privateElement != nil {
+			pme := result.privateElement
+			Assert(pme.Kind == PrivateElementKindMethod || pme.Kind == PrivateElementKindAccessor)
+			var container *pkg.Stack[*PrivateElement]
+			if !ClassElementIsStatic(classElement) {
+				container = instancePrivateMethods
+			} else {
+				container = staticPrivateMethods
+			}
+
+			element := pme
+			var found bool
+			for i, pe := range container.Data() {
+				if pe.Key.Equal(element.Key) {
+					found = true
+					Assert(
+						pe.Kind == PrivateElementKindAccessor &&
+							pe.Kind == element.Kind)
+					var combined *PrivateElement
+					if element.Get == nil {
+						combined = &PrivateElement{
+							Key:  element.Key,
+							Kind: PrivateElementKindAccessor,
+							Set:  element.Set,
+							Get:  pe.Get,
+						}
+					} else {
+						combined = &PrivateElement{
+							Key:  element.Key,
+							Kind: PrivateElementKindAccessor,
+							Set:  pe.Set,
+							Get:  element.Get,
+						}
+					}
+					container.Data()[i] = combined
+				}
+			}
+			if !found {
+				container.Push(pme)
+			}
+		}
+	}
+
+	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
+	if classBinding != "" {
+		classEnv.InitializeBinding(classBinding, function.ToValue())
+	}
+
+	if ObjectIs[*ECMAScriptFunction](function) {
+		e := ObjectAs[*ECMAScriptFunction](function)
+		e.privateMethods = instancePrivateMethods.Data()
+		function.(InternalSlotFields).SetFields(instanceFields)
+	}
+
+	for _, method := range staticPrivateMethods.Data() {
+		function.PrivateMethodOrAccessorAdd(method)
+	}
+	for _, element := range staticClassFields {
+		function.DefineField(element)
+	}
+	for _, block := range staticStaticBlocks {
+		block.BodyFunction.Call(function.ToValue(), nil)
+	}
+
+	agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment = outerPrivateEnvironment
+
+	returnCompletion.value = function
+	return
+}
+
+type ClassBody struct {
+	ClassElementList *ClassElementList
+}
+
+// 15.7.3
+func (c *ClassBody) ConstructorMethod() *MethodDefinition {
+	for _, item := range c.ClassElementList.Items {
+		if item.ClassElementKind() == ClassElementKindConstructorMethod {
+			return item.(*ClassElementMethodDefinition).MethodDefinition
+		}
+	}
+	return nil
+}
+
+func (c *ClassBody) PrivateBoundIdentifiers() (l []PrivateIdentifierName) {
+	var propertyName PropertyName
+	for _, item := range c.ClassElementList.Items {
+		switch i := item.(type) {
+		case *ClassElementStaticBlock, *ClassElementEmpty:
+			// ignore
+		case *ClassElementMethodDefinition:
+			propertyName = i.MethodDefinition.PropertyName
+		case *ClassElementFieldDefinition:
+			propertyName = i.FieldDefinition.PropertyName
+		}
+	}
+	switch p := propertyName.(type) {
+	case *PropertyNameLiteralIdentifier:
+		l = append(l, PrivateIdentifierName(p.Identifier))
+	}
+
+	return
+}
+
+// 15.7.5
+func (c *ClassBody) NonConstructorElements() (l []ClassElement) {
+	for _, item := range c.ClassElementList.Items {
+		if item.ClassElementKind() == ClassElementKindNonConstructorMethod {
+			l = append(l, item)
+		}
+	}
+	return l
+}
+
+func (c *ClassBody) String() string {
+	return c.ClassElementList.String()
+}
+
+// MARK: - ClassElementList
+
+type ClassElementList struct {
+	Items []ClassElement
+}
+
+func (c *ClassElementList) String() string {
+	var sb string
+	for i, item := range c.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+// MARK: - Class: ClassElement
+
+type ClassElementKind int
+
+const (
+	ClassElementKindConstructorMethod ClassElementKind = iota
+	ClassElementKindNonConstructorMethod
+	ClassElementKindEmpty
+)
+
+// TODO(BM): use struct
+// ClassElement [Yield, Await] :
+// - MethodDefinition[?Yield, ?Await]
+// - static MethodDefinition[?Yield, ?Await]
+// - FieldDefinition[?Yield, ?Await] ;
+// - static FieldDefinition[?Yield, ?Await] ;
+// - ClassStaticBlock
+// - ;
+type ClassElement interface {
+	ASTNode
+	RuntimeSemanticsClassElementEvaluation
+	ClassElementKind() ClassElementKind
+}
+
+// ClassElementIsStatic
+// spec: 15.7.4
+func ClassElementIsStatic(c ClassElement) bool {
+	switch ce := c.(type) {
+	case *ClassElementFieldDefinition:
+		return ce.IsStatic
+	case *ClassElementMethodDefinition:
+		return ce.IsStatic
+	default:
+		return false
+	}
+}
+
+// MARK: - ClassElement: ClassStaticBlock
+
+type ClassElementStaticBlock struct {
+	ClassElement
+	StatementList StatementList
+}
+
+func (c *ClassElementStaticBlock) ClassElementKind() ClassElementKind {
+	return ClassElementKindNonConstructorMethod
+}
+
+// MARK: - ClassElement: FieldDefinition, StaticFieldDefinition
+
+type ClassElementFieldDefinition struct {
+	ClassElement
+	FieldDefinition *FieldDefinition
+	IsStatic        bool
+}
+
+var (
+	_ RuntimeSemanticsClassElementEvaluation         = (*ClassElementFieldDefinition)(nil)
+	_ RuntimeSemanticsClassFieldDefinitionEvaluation = (*ClassElementFieldDefinition)(nil)
+)
+
+// ClassElementEvaluation
+// spec: 15.7.13
+func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (co Completion[*classEvaluationResult]) {
+	field, isAbrupt, rt := ReturnIfAbrupt(c.ClassFieldDefinitionEvaluation(vm, obj), co)
+	if isAbrupt {
+		return rt
+	}
+	co.value = &classEvaluationResult{
+		classFieldDefinition: field,
+	}
+	return
+}
+
+func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM, homeObject ObjectType) (co Completion[*ClassFieldDefinition]) {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	var name PropertyKeyOrPrivateName
+	value, isAbrupt, rt := ReturnIfAbrupt(RunNode(agent, c.FieldDefinition.PropertyName), co)
+	if isAbrupt {
+		return rt
+	}
+	name, isAbrupt, rt = ReturnIfAbrupt(ToPropertyKey(agent, value), co)
+	if isAbrupt {
+		return rt
+	}
+	var initializer ObjectType
+	if c.FieldDefinition.Initializer != nil {
+		formalParameterList := &FormalParameters{}
+		env := agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment
+		privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+		sourceText := ""
+		functionBody := &FunctionBody{
+			StatementList: StatementList{
+				&StatementListItemStatement{
+					Statement: &ReturnStatement{
+						Expression: c.FieldDefinition.Initializer,
+					},
+				},
+			},
+			Strict: true,
+			Type:   FunctionTypeNormal,
+		}
+		initializer = OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.FunctionPrototype,
+			sourceText,
+			formalParameterList,
+			functionBody,
+			functionCreateThisModeNonLexical,
+			env,
+			privateEnv,
+		)
+		MakeMethod(initializer.(*ECMAScriptFunction), homeObject)
+		initializer.(InternalSlotClassFieldInitializerName).SetClassFieldInitializerName(name)
+	} else {
+		co.value = &ClassFieldDefinition{
+			Name: name,
+		}
+		return
+	}
+
+	co.value = &ClassFieldDefinition{
+		Name:        name,
+		Initializer: initializer.(*ECMAScriptFunction),
+	}
+	return
+}
+
+func (c *ClassElementFieldDefinition) ClassElementKind() ClassElementKind {
+	return ClassElementKindNonConstructorMethod
+}
+
+// MARK: - ClassElement: EmptyStatement
+
+type ClassElementEmpty struct {
+	ClassElement
+}
+
+func (c *ClassElementEmpty) ClassElementKind() ClassElementKind {
+	return ClassElementKindEmpty
+}
+
+func (c *ClassElementEmpty) ClassElementEvaluation(vm *VM, obj ObjectType) (result Completion[*classEvaluationResult]) {
+	// return UNUSED
+	return
+}
+
+// MARK: - ClassElement: MethodDefinition
+
+type ClassElementMethodDefinition struct {
+	ClassElement
+	MethodDefinition *MethodDefinition
+	IsStatic         bool
+}
+
+// ClassElementEvaluation
+// spec: 15.7.13
+func (c *ClassElementMethodDefinition) ClassElementEvaluation(vm *VM, obj ObjectType) (co Completion[*classEvaluationResult]) {
+	privateElement, isAbrupt, rt := ReturnIfAbrupt(c.MethodDefinition.MethodDefinitionEvaluation(vm, obj, false), co)
+	if isAbrupt {
+		return rt
+	}
+	co.value = &classEvaluationResult{
+		privateElement: privateElement,
+	}
+	return
+}
+
+func (c *ClassElementMethodDefinition) ClassElementKind() ClassElementKind {
+	switch pn := c.MethodDefinition.PropertyName.(type) {
+	case LiteralPropertyName:
+		if l, ok := pn.(*PropertyNameLiteralIdentifier); ok {
+			if l.Identifier == "constructor" {
+				return ClassElementKindConstructorMethod
+			}
+		}
+	}
+	return ClassElementKindNonConstructorMethod
+}
+
+func (c *ClassElementMethodDefinition) String() string {
+	return c.MethodDefinition.String()
+}
+
+// MARK: - Class: MethodDefinition
+
+// MARK: - LexicalDeclaration
+
+type LetOrConst int
+
+const (
+	LetOrConstLet LetOrConst = iota
+	LetOrConstConst
+)
+
+var _ StaticSemanticsIsConstantDeclaration = LetOrConst(0)
+
+func (l LetOrConst) IsConstantDeclaration() bool {
+	return l == LetOrConstConst
+}
+
+// LexicalDeclaration [In, Yield, Await] :
+// LetOrConst BindingList[?In, ?Yield, ?Await] ;
+type LexicalDeclaration struct {
+	Declaration
+	Type        LetOrConst
+	BindingList *BindingList
+}
+
+func (d *LexicalDeclaration) IsConstantDeclaration() bool {
+	return d.Type == LetOrConstConst
+}
+
+// Evaluation 14.3.1.2
+func (d *LexicalDeclaration) Evaluation(vm *VM) CompletionValue {
+	d.BindingList.Evaluation(vm)
+	// return EMPTY
+	return UndefinedValue.ToCompletion()
+}
+
+func (d *LexicalDeclaration) String() string {
+	return "LexicalDeclaration " + d.BindingList.String()
+}
+
+func (d *LexicalDeclaration) BoundNames() (l []IdentifierName) {
+	return d.BindingList.BoundNames()
+}
+
+// BindingList [In, Yield, Await] :
+// - LexicalBinding[?In, ?Yield, ?Await]
+// - BindingList[?In, ?Yield, ?Await] , LexicalBinding[?In, ?Yield, ?Await]
+type BindingList struct {
+	Items []*LexicalBinding
+}
+
+func (b *BindingList) BoundNames() (l []IdentifierName) {
+	for _, item := range b.Items {
+		l = append(l, item.BoundNames()...)
+	}
+	return
+}
+
+func (b *BindingList) Evaluation(vm *VM) CompletionValue {
+	var list []Value
+	for _, item := range b.Items {
+		list = append(list, item.Evaluation(vm).value)
+	}
+	return NewListValue(list).ToCompletion()
+}
+
+func (b *BindingList) String() string {
+	var sb string
+	for i, item := range b.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+// LexicalBinding [In, Yield, Await] :
+// - BindingIdentifier[?Yield, ?Await] Initializer[?In, ?Yield, ?Await] opt
+// - BindingPattern[?Yield, ?Await] Initializer[?In, ?Yield, ?Await]
+type LexicalBinding struct {
+	// BindingIdentifier
+	Identifier     IdentifierName
+	BindingPattern *BindingPattern
+	Initializer    Expression
+}
+
+func (l *LexicalBinding) BoundNames() (list []IdentifierName) {
+	if l.Identifier != "" {
+		list = append(list, l.Identifier)
+	} else {
+		list = append(list, l.BindingPattern.BoundNames()...)
+	}
+	return
+}
+
+// Evaluation
+// spec: 14.3.1.2
+func (l *LexicalBinding) Evaluation(vm *VM) (co CompletionValue) {
+	switch {
+	case l.Identifier != "" && l.Initializer == nil:
+		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
+		lhs.InitializeReferencedBinding(UndefinedValue)
+	case l.Identifier != "":
+		// LexicalBinding : BindingIdentifier Initializer
+		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
+		if IsAnonymousFunctionDefinition(l.Initializer) {
+			// FIXME: handle named evaluation
+			panic("")
+		} else {
+			value, _, isAbrupt, rt := vm.EvalAndGetValue(l.Initializer, co)
+			if isAbrupt {
+				return rt
+			}
+			lhs.InitializeReferencedBinding(value)
+		}
+		// return EMPTY
+		return UndefinedValue.ToCompletion()
+	}
+	panic("unimplemented")
+}
+
+func (l *LexicalBinding) String() string {
+	if l.Initializer != nil {
+		return string(l.Identifier) + " = " + l.Initializer.String()
+	}
+	return string(l.Identifier)
+}
+
+// MARK: - FunctionDeclaration
+
+// FunctionDeclaration [Yield, Await, Default] :
+// - function BindingIdentifier[?Yield, ?Await] ( FormalParameters[~Yield, ~Await] ) {
+// - FunctionBody[~Yield, ~Await] }
+// - [+Default] function ( FormalParameters[~Yield, ~Await] ) {
+// - FunctionBody[~Yield, ~Await] }
+type FunctionDeclaration struct {
+	Identifier       IdentifierName
+	Body             *FunctionBody
+	FormalParameters *FormalParameters
+	SourceText       string
+}
+
+var _ StaticSemanticsBoundNames = (*FunctionDeclaration)(nil)
+
+func (f *FunctionDeclaration) BoundNames() (l []IdentifierName) {
+	if f.Identifier != "" {
+		l = append(l, f.Identifier)
+	}
+	return
+}
+
+// 15.2.2
+func (f *FunctionDeclaration) functionBodyContainsUseStrict() bool {
+	return f.Body.StatementList.ContainsDirective("use strict")
+}
+
+// 15.2.4
+func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, env EnvironmentRecord, privateEnv *PrivateEnvironment) ObjectType {
+	realm := agent.CurrentRealm()
+	name := f.Identifier
+	sourceText := f.SourceText
+	function := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.FunctionPrototype,
+		sourceText,
+		f.FormalParameters,
+		f.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		privateEnv,
+	)
+
+	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
+	MakeConstructor(function, true, nil)
+	return function
+}
+
+// Evaluation
+// spec: 15.2.6
+func (f *FunctionDeclaration) Evaluation(vm *VM) CompletionValue {
+	// TODO(BM): match spec
+	realm := vm.agent.CurrentRealm()
+	// TODO(XXX): is it lexical env?
+	env := vm.RunningLexicalEnvironment()
+	function := f.instantiateOrdinaryFunctionObject(vm.agent, env, nil)
+	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), function.ToValue(), setThrowTypeIgnore)
+	// return EMPTY
+	return UndefinedValue.ToCompletion()
+}
+
+func (f *FunctionDeclaration) String() string {
+	return "FunctionDeclaration " + string(f.Identifier)
+}
+
+// MARK: - BlockStatement
+
+// BlockStatement [Yield, Await, Return] :
+// - Block[?Yield, ?Await, ?Return]
+type BlockStatement struct {
+	Block *Block
+}
+
+func (b *BlockStatement) _statement() {}
+func (b *BlockStatement) VarScopedDeclarations() []*VariableDeclaration {
+	return b.Block.StatementList.VarScopedDeclarations()
+}
+
+func (b *BlockStatement) VarDeclaredNames() []IdentifierName {
+	return b.Block.StatementList.VarDeclaredNames()
+}
+
+func (b *BlockStatement) Evaluation(vm *VM) CompletionValue {
+	return b.Block.Evaluation(vm)
+}
+
+func (b *BlockStatement) String() string {
+	return b.Block.StatementList.String()
+}
+
+type Block struct {
+	StatementList StatementList
+}
+
+// 14.2.2
+func (b *Block) Evaluation(vm *VM) CompletionValue {
+	return b.StatementList.Evaluation(vm)
+}
+
+func (b *Block) String() string {
+	return b.StatementList.String()
+}
+
+type StatementList []StatementListItem
+
+var _ StaticSemanticsLexicallyScopedDeclarations = StatementList(nil)
+
+func (s StatementList) LexicallyScopedDeclarations() (l []ASTNode) {
+	for _, item := range s {
+		l = append(l, item.LexicallyScopedDeclarations()...)
+	}
+	return
+}
+
+func (s StatementList) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
+	for _, item := range s {
+		l = append(l, StatementListItemTopLevelLexicallyDeclaredNames(item)...)
+	}
+	return
+}
+
+func StatementListItemTopLevelLexicallyDeclaredNames(item StatementListItem) (l []IdentifierName) {
+	switch t := item.(type) {
+	case *StatementListItemDeclaration:
+		return DeclarationBoundNames(t.Declaration)
+	case *StatementListItemStatement:
+		return
+	}
+	return
+}
+
+func (s StatementList) LexicallyDeclaredNames() (l []IdentifierName) {
+	for _, item := range s {
+		l = append(l, item.LexicallyDeclaredNames()...)
+	}
+	return
+}
+
+func (s StatementList) VarScopedDeclarations() (l []*VariableDeclaration) {
+	for _, item := range s {
+		l = append(l, item.VarScopedDeclarations()...)
+	}
+	return
+}
+
+func (s StatementList) VarDeclaredNames() (l []IdentifierName) {
+	for _, item := range s {
+		l = append(l, item.VarDeclaredNames()...)
+	}
+	return
+}
+
+func (s StatementList) ContainsDirective(directive string) bool {
+	for _, item := range s {
+		if !StatementListItemAnalyze(item, AnalyzeQueryIsStringLiteral) {
+			break
+		}
+		statementItem := item.(*StatementListItemStatement).Statement
+		statementExpression := statementItem.(*StatementExpression).Expression
+		var literal *StringLiteral
+		switch expression := statementExpression.(type) {
+		case *StringLiteral:
+			literal = expression
+		case *ExpressionPrimary:
+			literal = expression.PrimaryExpression.(Literal).(*StringLiteral)
+		default:
+			break
+		}
+		if literal == nil {
+			break
+		}
+		if literal.Value == directive {
+			return true
+		}
+	}
+	return false
+}
+
+func (s StatementList) Evaluation(vm *VM) CompletionValue {
+	var lastValue CompletionValue
+	for _, item := range s {
+		lastValue = item.Evaluation(vm)
+		if lastValue.IsAbrupt() {
+			return lastValue
+		}
+	}
+	if lastValue.value == nil {
+		return UndefinedValue.ToCompletion()
+	}
+	return lastValue
+}
+
+func (s StatementList) String() string {
+	var str string
+	for _, item := range s {
+		switch t := item.(type) {
+		case *StatementListItemStatement:
+			str += t.Statement.String()
+		case *StatementListItemDeclaration:
+			str += t.Declaration.String()
+		}
+		str += "\n"
+	}
+	return str
+}
+
+// StatementListItem [Yield, Await, GetLastValue] :
+// - Statement[?Yield, ?Await, ?GetLastValue]
+// - Declaration[?Yield, ?Await]
+type StatementListItem interface {
+	ASTNode
+	VarScopedDeclarations() []*VariableDeclaration
+	VarDeclaredNames() []IdentifierName
+	LexicallyDeclaredNames() []IdentifierName
+	StaticSemanticsLexicallyScopedDeclarations
+}
+
+func StatementListItemAnalyze(s StatementListItem, a AnalyzeQuery) bool {
+	switch t := s.(type) {
+	case *StatementListItemStatement:
+		return StatementAnalyze(t.Statement, a)
+	case *StatementListItemDeclaration:
+		return DeclarationAnalyze(t.Declaration, a)
+	}
+	return false
+}
+
+type StatementListItemStatement struct {
+	StatementListItem
+	Statement Statement
+}
+
+var (
+	_ ASTNode                                    = (*StatementListItemStatement)(nil)
+	_ StaticSemanticsLexicallyScopedDeclarations = (*StatementListItemStatement)(nil)
+)
+
+func (s *StatementListItemStatement) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
+	return
+}
+
+func (s *StatementListItemStatement) LexicallyScopedDeclarations() (l []ASTNode) {
+	// TODO(WIP): LabelledStatement
+	return
+}
+
+func (s *StatementListItemStatement) VarDeclaredNames() (l []IdentifierName) {
+	return s.Statement.VarDeclaredNames()
+}
+
+func (s *StatementListItemStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	vars := s.Statement.VarScopedDeclarations()
+	if vars == nil {
+		return
+	}
+	return vars
+}
+
+func (s *StatementListItemStatement) Evaluation(vm *VM) CompletionValue {
+	return s.Statement.Evaluation(vm)
+}
+
+func (s *StatementListItemStatement) String() string {
+	return s.Statement.String()
+}
+
+type StatementListItemDeclaration struct {
+	StatementListItem
+	Declaration Declaration
+}
+
+var _ ASTNode = (*StatementListItemDeclaration)(nil)
+
+func (s *StatementListItemDeclaration) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
+	return s.Declaration.BoundNames()
+}
+
+func (s *StatementListItemDeclaration) VarDeclaredNames() (l []IdentifierName) {
+	return
+}
+
+func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDeclaration) {
+	switch d := s.Declaration.(type) {
+	case *LexicalDeclaration:
+		for _, bindingItem := range d.BindingList.Items {
+			l = append(l, &VariableDeclaration{
+				BindingIdentifier: bindingItem.Identifier,
+				Initializer:       bindingItem.Initializer,
+			})
+		}
+	default:
+	}
+	return
+}
+
+func (s *StatementListItemDeclaration) Evaluation(vm *VM) CompletionValue {
+	return s.Declaration.Evaluation(vm)
+}
+
+func (s *StatementListItemDeclaration) String() string {
+	return s.Declaration.String()
+}
+
+type ExpressionStatement struct {
+	Expression Expression
+}
+
+func (e *ExpressionStatement) Evaluation(vm *VM) CompletionValue {
+	return e.Expression.Evaluation(vm)
+}
+
+func (e *ExpressionStatement) String() string {
+	return e.Expression.String()
+}
+
+// MARK: - Script
+
+type Script struct {
+	StatementList StatementList
+}
+
+func (s *Script) Evaluation(vm *VM) CompletionValue {
+	return s.StatementList.Evaluation(vm)
+}
+
+func (s *Script) String() string {
+	return s.StatementList.String()
+}
+
+func (s *Script) IsStrict() bool {
+	return s.StatementList.ContainsDirective("use strict")
+}
+
+// MARK: - Module
+
+// Module :
+// - ModuleBody[opt]
+type Module struct {
+	ModuleItemList ModuleItemList
+}
+
+var (
+	_ ASTNode                       = (*Module)(nil)
+	_ StaticSemanticsModuleRequests = (*Module)(nil)
+	_ StaticSemanticsImportEntries  = (*Module)(nil)
+	_ StaticSemanticsExportEntries  = (*Module)(nil)
+)
+
+// TODO: spec reference
+func (m *Module) Evaluation(vm *VM) CompletionValue {
+	var lastValue CompletionValue
+	for _, moduleItem := range m.ModuleItemList {
+		switch stmt := moduleItem.(type) {
+		case *ModuleItemImportDeclaration:
+			return UndefinedValue.ToCompletion()
+		case *ModuleItemStatementListItem:
+			lastValue = stmt.Evaluation(vm)
+		case *ModuleItemExportDeclaration:
+			lastValue = stmt.Evaluation(vm)
+		default:
+			panic("unimplemented")
+		}
+		if lastValue.IsAbrupt() {
+			return lastValue
+		}
+	}
+	return lastValue
+}
+
+func (m *Module) String() string {
+	return m.ModuleItemList.String()
+}
+
+func (m *Module) moduleRequests() []string {
+	return m.ModuleItemList.moduleRequests()
+}
+
+func (m *Module) importEntries() (l []ImportEntryRecord) {
+	for _, item := range m.ModuleItemList {
+		switch stmt := item.(type) {
+		case *ModuleItemImportDeclaration:
+			moduleRequest := stmt.ImportDeclaration.ModuleSpecifier.StringValue().String()
+			if stmt.ImportDeclaration.ImportClause != nil {
+				i := stmt.ImportDeclaration.ImportClause
+				if i.ImportedDefaultBinding != "" {
+					l = append(l, ImportEntryRecord{
+						ImportName:    "default",
+						ModuleRequest: moduleRequest,
+						LocalName:     string(i.ImportedDefaultBinding),
+					})
+				} else if i.NamespaceImport != "" {
+					l = append(l, ImportEntryRecord{
+						ImportName:    ImportNameNamespaceObject,
+						ModuleRequest: moduleRequest,
+						LocalName:     string(i.NamespaceImport),
+					})
+				} else if i.NamedImports != nil {
+					for _, specifier := range i.NamedImports.Items {
+						if specifier.ModuleExportName != nil {
+							var importName ImportName
+							if specifier.ModuleExportName.IdentifierName != "" {
+								importName = ImportName(specifier.ModuleExportName.IdentifierName)
+							} else {
+								importName = ImportName(specifier.ModuleExportName.StringLiteral.StringValue().String())
+							}
+							localName := string(specifier.ImportedBinding)
+							l = append(l, ImportEntryRecord{
+								ImportName:    importName,
+								ModuleRequest: moduleRequest,
+								LocalName:     localName,
+							})
+						} else {
+							l = append(l, ImportEntryRecord{
+								ImportName:    ImportName(specifier.ImportedBinding),
+								ModuleRequest: moduleRequest,
+								LocalName:     string(specifier.ImportedBinding),
+							})
+						}
+					}
+				} else {
+					panic("unimplemented")
+				}
+			}
+		default:
+			continue
+		}
+	}
+	return
+}
+
+func (m *Module) exportEntries() (l []ExportEntry) {
+	for _, item := range m.ModuleItemList {
+		switch stmt := item.(type) {
+		case *ModuleItemStatementListItem, *ModuleItemImportDeclaration:
+			continue
+		case *ModuleItemExportDeclaration:
+			l = append(l, stmt.exportEntries()...)
+		default:
+			panic("unimplemented")
+		}
+	}
+	return
+}
+
+type ModuleItemList []ModuleItem
+
+var _ StaticSemanticsModuleRequests = (ModuleItemList)(nil)
+
+func (m ModuleItemList) String() string {
+	var sb string
+	for _, item := range m {
+		sb += item.String()
+		sb += "\n"
+	}
+	return sb
+}
+
+func (m ModuleItemList) moduleRequests() (l []string) {
+	for _, item := range m {
+		l = append(l, item.moduleRequests()...)
+	}
+	return
+}
+
+func (m ModuleItemList) VarScopedDeclarations() (l []*VariableDeclaration) {
+	for _, item := range m {
+		switch stmt := item.(type) {
+		case *ModuleItemStatementListItem:
+			l = append(l, stmt.StatementListItem.VarScopedDeclarations()...)
+		case *ModuleItemExportDeclaration:
+			if stmt.VariableStatement != nil {
+				l = append(l, stmt.VariableStatement.VarScopedDeclarations()...)
+			}
+		case *ModuleItemImportDeclaration:
+			continue
+		default:
+			panic("unimplemented")
+		}
+	}
+	return
+}
+
+// MARK: - ModuleItem
+
+// TODO: convert to struct
+// ModuleItem :
+// - ImportDeclaration
+// - ExportDeclaration
+// - StatementListItem[~Yield, +Await, ~GetLastValue]
+type ModuleItem interface {
+	String() string
+	StaticSemanticsModuleRequests
+}
+
+// MARK: - ModuleItem: StatementListItem
+
+type ModuleItemStatementListItem struct {
+	StatementListItem StatementListItem
+}
+
+var _ ModuleItem = (*ModuleItemStatementListItem)(nil)
+
+func (m *ModuleItemStatementListItem) moduleRequests() (l []string) {
+	return
+}
+
+func (m *ModuleItemStatementListItem) Evaluation(vm *VM) CompletionValue {
+	return m.StatementListItem.Evaluation(vm)
+}
+
+func (m *ModuleItemStatementListItem) String() string {
+	return m.StatementListItem.String()
+}
+
+// MARK: - ModuleItem: ImportDeclaration
+
+type ModuleItemImportDeclaration struct {
+	ImportDeclaration *ImportDeclaration
+}
+
+var _ ModuleItem = (*ModuleItemImportDeclaration)(nil)
+
+func (m *ModuleItemImportDeclaration) moduleRequests() (l []string) {
+	l = append(l, m.ImportDeclaration.ModuleSpecifier.StringValue().String())
+	return
+}
+
+func (m *ModuleItemImportDeclaration) String() string {
+	return m.ImportDeclaration.String()
+}
+
+// MARK: - ModuleItem: ExportDeclaration
+
+// TODO: rename
+// ExportDeclaration :
+//   - export ExportFromClause FromClause ;
+//   - export NamedExports ;
+//   - export VariableStatement[~Yield, +Await]
+//   - export Declaration[~Yield, +Await]
+//   - export default HoistableDeclaration[~Yield, +Await, +Default]
+//   - export default ClassDeclaration[~Yield, +Await, +Default]
+//   - export default [lookahead ∉ { function, async [no LineTerminator here] function,
+//     class}] AssignmentExpression[+In, ~Yield, +Await] ;
+type ModuleItemExportDeclaration struct {
+	ExportFrom                  *ExportFrom
+	NamedExports                *NamedExports
+	Declaration                 Declaration
+	VariableStatement           *VariableStatement
+	DefaultHoistableDeclaration DeclarationHoistable
+	DefaultClassDeclaration     *ClassDeclaration
+	DefaultExpression           Expression
+}
+
+var (
+	_ ModuleItem                   = (*ModuleItemExportDeclaration)(nil)
+	_ StaticSemanticsExportEntries = (*ModuleItemExportDeclaration)(nil)
+	_ ASTNode                      = (*ModuleItemExportDeclaration)(nil)
+)
+
+func (m *ModuleItemExportDeclaration) Evaluation(vm *VM) CompletionValue {
+	switch {
+	case m.ExportFrom != nil || m.NamedExports != nil:
+		return UndefinedValue.ToCompletion()
+	case m.Declaration != nil:
+		return m.Declaration.Evaluation(vm)
+	case m.VariableStatement != nil:
+		return m.VariableStatement.Evaluation(vm)
+	case m.DefaultHoistableDeclaration != nil:
+		return m.DefaultHoistableDeclaration.Evaluation(vm)
+	case m.DefaultClassDeclaration != nil:
+		return m.DefaultClassDeclaration.Evaluation(vm)
+	case m.DefaultExpression != nil:
+		return m.DefaultExpression.Evaluation(vm)
+	default:
+		panic("unreachable")
+	}
+}
+
+func (m *ModuleItemExportDeclaration) String() string {
+	switch {
+	case m.ExportFrom != nil:
+		panic("unimplemented")
+	case m.NamedExports != nil:
+		panic("unimplemented")
+	case m.Declaration != nil:
+		return m.Declaration.String()
+	case m.VariableStatement != nil:
+		return m.VariableStatement.String()
+	case m.DefaultHoistableDeclaration != nil:
+		return m.DefaultHoistableDeclaration.String()
+	case m.DefaultClassDeclaration != nil:
+		return m.DefaultClassDeclaration.String()
+	case m.DefaultExpression != nil:
+		return m.DefaultExpression.String()
+	}
+	return "ModuleItemExportDeclaration"
+}
+
+func (m *ModuleItemExportDeclaration) moduleRequests() (l []string) {
+	if m.ExportFrom != nil {
+		l = append(l, m.ExportFrom.ModuleSpecifier.StringValue().String())
+	}
+	return
+}
+
+func (m *ModuleItemExportDeclaration) exportEntries() (l []ExportEntry) {
+	if m.ExportFrom != nil {
+		panic("unimplemented")
+	} else if m.NamedExports != nil {
+		panic("unimplemented")
+	} else if m.Declaration != nil {
+		boundNames := m.Declaration.BoundNames()
+		for _, name := range boundNames {
+			l = append(l, ExportEntry{
+				ExportName: string(name),
+				LocalName:  string(name),
+			})
+		}
+	} else if m.VariableStatement != nil {
+		panic("unimplemented")
+	} else if m.DefaultHoistableDeclaration != nil {
+		panic("unimplemented")
+	} else if m.DefaultClassDeclaration != nil {
+		panic("unimplemented")
+	} else if m.DefaultExpression != nil {
+		panic("unimplemented")
+	}
+	return
+}
+
+type ExportFrom struct {
+	ExportFromClause *ExportFromClause
+	ModuleSpecifier  *StringLiteral
+}
+
+// Enum
+type ExportFromClause struct {
+	Star         bool
+	StarAs       *ModuleExportName
+	NamedExports *NamedExports
+}
+
+type NamedExports struct {
+	ExportsList *ExportsList
+}
+type ExportsList struct {
+	Items []*ExportSpecifier
+}
+type ExportSpecifier struct {
+	Name  *ModuleExportName
+	Alias *ModuleExportName
+}
+
+// ModuleExportName :
+// - IdentifierName
+// - StringLiteral
+type ModuleExportName struct {
+	IdentifierName IdentifierName
+	StringLiteral  *StringLiteral
+}
+
+func (m *ModuleExportName) String() string {
+	if m.IdentifierName != "" {
+		return string(m.IdentifierName)
+	}
+	return m.StringLiteral.String()
+}
+
+func (m *ModuleItemExportDeclaration) _moduleItem() {}
+
+// MARK: - Import
+
+// ImportDeclaration :
+// - import ImportClause FromClause ;
+// - import ModuleSpecifier ;
+type ImportDeclaration struct {
+	// FromClause :
+	// - from ModuleSpecifier
+	// optional
+	ImportClause *ImportClause
+	// Not null
+	ModuleSpecifier *StringLiteral
+}
+
+func (i *ImportDeclaration) BoundNames() (l []IdentifierName) {
+	if i.ImportClause != nil {
+		return i.ImportClause.BoundNames()
+	}
+	return
+}
+
+// 16.2.2.2
+
+func (i *ImportDeclaration) String() string {
+	if i.ImportClause != nil {
+		return "ImportDeclaration " + i.ImportClause.String()
+	}
+	return "ImportDeclaration"
+}
+
+// ImportClause :
+// - ImportedDefaultBinding
+// - NameSpaceImport
+// - NamedImports
+// - ImportedDefaultBinding, NameSpaceImport
+// - ImportedDefaultBinding, NamedImports
+type ImportClause struct {
+	ImportedDefaultBinding IdentifierName
+	NamespaceImport        IdentifierName
+	// NamedImports :
+	// - { }
+	// - { ImportsList }
+	// - { ImportsList, }
+	NamedImports *ImportsList
+}
+
+func (i *ImportClause) BoundNames() (l []IdentifierName) {
+	if i.ImportedDefaultBinding != "" {
+		l = append(l, i.ImportedDefaultBinding)
+	} else if i.NamedImports != nil {
+		for _, s := range i.NamedImports.Items {
+			if s.ImportedBinding != "" {
+				l = append(l, s.ImportedBinding)
+			}
+		}
+	} else {
+		panic("unimplemented")
+	}
+	return
+}
+
+func (i *ImportClause) String() string {
+	var sb string
+	if i.ImportedDefaultBinding != "" {
+		sb += string(i.ImportedDefaultBinding)
+	}
+	if i.NamespaceImport != "" {
+		sb += " " + string(i.NamespaceImport)
+	}
+	if i.NamedImports != nil {
+		sb += " " + i.NamedImports.String()
+	}
+	return sb
+}
+
+// ImportsList :
+// - ImportSpecifier
+// - ImportsList, ImportSpecifier
+type ImportsList struct {
+	Items []*ImportSpecifier
+}
+
+func (i *ImportsList) String() string {
+	var sb string
+	for i, item := range i.Items {
+		if i != 0 {
+			sb += ", "
+		}
+		sb += item.String()
+	}
+	return sb
+}
+
+// ImportSpecifier :
+// - ImportedBinding
+// - ModuleExportName as ImportedBinding
+type ImportSpecifier struct {
+	// ImportedBinding :
+	// - BindingIdentifier[~Yield, +Await]
+	// TODO: change to BindingIdentifier
+	ImportedBinding  IdentifierName
+	ModuleExportName *ModuleExportName
+}
+
+func (i *ImportSpecifier) String() string {
+	if i.ModuleExportName != nil {
+		return i.ModuleExportName.String() + " as " + string(i.ImportedBinding)
+	}
+	return string(i.ImportedBinding)
+}
+
+// MARK: - AwaitExpression
+
+// AwaitExpression [Yield] :
+// - await UnaryExpression[?Yield, +Await]
+type AwaitExpression struct {
+	Expression
+}
+
+var _ ASTNode = (*AwaitExpression)(nil)
+
+func (a *AwaitExpression) String() string {
+	return "AwaitExpression " + a.Expression.String()
+}
+
+func (a *AwaitExpression) Evaluation(vm *VM) (co CompletionValue) {
+	agent := vm.agent
+	value, _, isAbrupt, rt := vm.EvalAndGetValue(a.Expression, co)
+	if isAbrupt {
+		return rt
+	}
+	return Await(agent, value)
+}
+
+// Await
+// spec: 27.7.5.3
+func Await(agent *Agent, value Value) (co CompletionValue) {
+	realm := agent.CurrentRealm()
+	asyncContext := agent.RunningExecutionContext()
+	promise := PromiseResolve(agent, realm.Intrinsics.Promise, value)
+	var fulfilledClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		v := pkg.SliceSafeGet(argumentsList, 0)
+		asyncContext.Result = v.ToCompletion()
+		asyncContext.awaitCh <- struct{}{}
+		return UndefinedValue
+	}
+	onFulfilled := CreateBuiltinFunction(agent, fulfilledClosure, 1, CMString(""), builtinFunctionArgs{})
+	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		panic("unimplemented")
+		//prevContext := agent.RunningExecutionContext()
+		// agent.resumeExecutionContext(asyncContext)
+		//
+		//// TODO: Resume
+		//asyncContext.Suspend()
+		//Assert(prevContext == agent.RunningExecutionContext())
+		//return UndefinedValue
+	}
+	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, CMString(""), builtinFunctionArgs{})
+	PerformPromiseThen(agent, promise, onFulfilled.ToValue(), onRejected.ToValue(), nil)
+
+	agent.suspendExecutionContext(asyncContext)
+	if !asyncContext.asyncCallerResumed {
+		asyncContext.asyncCallerResumed = true
+		agent.Scheduler.StartTask(asyncContext.Resume)
+	}
+	<-asyncContext.awaitCh
+	agent.resumeExecutionContext(asyncContext)
+	Assert(asyncContext == agent.RunningExecutionContext())
+	return asyncContext.Result
+}
+
+// MARK: - YieldExpression
+
+// YieldExpression [In, Await] :
+// yield
+// yield [no LineTerminator here] AssignmentExpression[?In, +Yield, ?Await]
+// yield [no LineTerminator here] * AssignmentExpression[?In, +Yield, ?Await]
+type YieldExpression struct {
+	Expression
+	// AssignmentExpression is optional
+	AssignmentExpression Expression
+	hasStar              bool
+}
+
+var _ Expression = (*YieldExpression)(nil)
+
+func (y *YieldExpression) String() string {
+	if y.AssignmentExpression != nil {
+		return "YieldExpression " + y.AssignmentExpression.String()
+	}
+	return "YieldExpression"
+}
+
+func (y *YieldExpression) astHasAssignmentExpression() bool {
+	return y.AssignmentExpression != nil
+}
+
+func (y *YieldExpression) Evaluation(vm *VM) (co CompletionValue) {
+	if !y.astHasAssignmentExpression() {
+		return Yield(vm.agent, UndefinedValue)
+	} else if y.hasStar {
+		panic("unimplemented")
+	} else {
+		value, _, isAbrupt, rt := vm.EvalAndGetValue(y.AssignmentExpression, co)
+		if isAbrupt {
+			return rt
+		}
+		return Yield(vm.agent, value)
+	}
+}

@@ -1,0 +1,2345 @@
+package coldmoon
+
+import (
+	"math"
+	"strings"
+
+	"github.com/Seeingu/coldmoon/pkg"
+	"github.com/samber/lo"
+)
+
+type ArrayObject struct {
+	*Object
+}
+
+func getArrayLength(array ObjectType) JSInt {
+	lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
+	Assert(lengthDesc.IsDataDescriptor())
+	return lengthDesc.Value.(*NumberValue).Data.ToInt()
+}
+
+// ArrayCreate
+// spec: 10.4.2.2
+// proto is optional
+func ArrayCreate(agent *Agent, length JSInt, proto ObjectType) *ArrayObject {
+	realm := agent.CurrentRealm()
+	// 10.4.2.1
+	defineOwnProperty := func(array ObjectType, p PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
+		propertyKeyString, ok := p.(StringPropertyKey)
+		if ok && propertyKeyString.Value == "length" {
+			return ArraySetLength(agent, array, desc)
+		}
+		index, err := p.GetIndex()
+		if err != nil {
+			co.value = OrdinaryDefineOwnProperty(array, p, desc)
+			return
+		}
+		lengthDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
+		Assert(lengthDesc.IsDataDescriptor())
+		Assert(!lengthDesc.Configurable)
+
+		lengthValue := lengthDesc.Value
+		length := lengthValue.(*NumberValue).Data.ToInt()
+		Assert(length.IsInf() || length >= 0)
+
+		if index >= length && !lengthDesc.Writable {
+			return
+		}
+
+		succeeded := OrdinaryDefineOwnProperty(array, p, desc)
+
+		if !succeeded {
+			return
+		}
+
+		if index >= length {
+			lengthDesc.Value = NewNumberValue((index + 1).ToNumber())
+
+			succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), lengthDesc)
+			Assert(succeeded)
+		}
+		co.value = true
+		return
+	}
+
+	if float64(length) > POW_2_32-1 {
+		panic("RangeError")
+	}
+
+	if proto == nil {
+		proto = realm.Intrinsics.ArrayPrototype
+	}
+
+	arr := &ArrayObject{
+		Object: NewObject(agent, proto, "Array"),
+	}
+	arr.ref = arr
+	arr.Object.internalMethods().DefineOwnProperty = defineOwnProperty
+	OrdinaryDefineOwnProperty(arr, NewStringPropertyKey("length"), &PropertyDescriptor{
+		Value:        NewNumberValue(length.ToNumber()),
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	return arr
+}
+
+// 10.4.2.3
+func ArraySpeciesCreate(agent *Agent, originalArray ObjectType, length JSInt) (co Completion[ObjectType]) {
+	isArray, isAbrupt, rt := ReturnIfAbrupt(IsArrayCompletion(originalArray.ToValue()), co)
+	if isAbrupt {
+		return rt
+	}
+	if !isArray {
+		co.value = ArrayCreate(agent, length, nil)
+		return
+	}
+
+	c, isAbrupt, rt := ReturnIfAbrupt(
+		originalArray.internalMethods().Get(
+			originalArray,
+			NewStringPropertyKey("constructor"),
+			originalArray.ToValue(),
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	constructorObject, isObject := c.(*ObjectValue)
+	if IsConstructor(c) {
+		thisRealm := agent.CurrentRealm()
+		realmC := constructorObject.Object.GetFunctionRealm()
+		if thisRealm != realmC {
+			if pkg.FuncEqual(constructorObject.Object, realmC.Intrinsics.ArrayConstructor) {
+				c = UndefinedValue
+			}
+		}
+	}
+
+	if isObject {
+		c, isAbrupt, rt = ReturnIfAbrupt(
+			constructorObject.Object.internalMethods().Get(
+				constructorObject.Object,
+				NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]),
+				c,
+			),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		if c == NullValue {
+			c = UndefinedValue
+		}
+	}
+	if c == UndefinedValue {
+		co.value = ArrayCreate(agent, length, nil)
+		return
+	}
+	if !IsConstructor(c) {
+		return co.ThrowTypeError(agent, "Array species is not a constructor")
+	}
+
+	return MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil)
+}
+
+// ArraySetLength
+// spec: 10.4.2.4
+func ArraySetLength(agent *Agent, array ObjectType, desc *PropertyDescriptor) (co Completion[bool]) {
+	if desc.Value == nil {
+		co.value = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), desc)
+		return
+	}
+	newLenDesc := desc
+
+	newLenValue := desc.Value
+	newLen, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, newLenValue), co)
+	if isAbrupt {
+		return rt
+	}
+	numberLen, isAbrupt, rt := ReturnIfAbrupt(newLenValue.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
+
+	if numberLen.Data != newLen.ToNumber() {
+		return co.ThrowError(agent, RangeError, "Invalid array length")
+	}
+
+	newLenDesc.Value = NewNumberValue(newLen.ToNumber())
+
+	oldLenDesc := OrdinaryGetOwnProperty(array, NewStringPropertyKey("length"))
+	Assert(oldLenDesc.IsDataDescriptor())
+	Assert(!oldLenDesc.Configurable)
+	oldLen := JSInt(oldLenDesc.Value.(*NumberValue).Data)
+
+	if newLen >= oldLen {
+		co.value = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), newLenDesc)
+		return
+	}
+
+	if !oldLenDesc.Writable {
+		co.value = false
+		return
+	}
+
+	newWritable := !newLenDesc.WritableSet || newLenDesc.Writable
+	if !newWritable {
+		newLenDesc.Writable = true
+		newLenDesc.WritableSet = true
+	}
+
+	succeeded := OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), newLenDesc)
+	if !succeeded {
+		co.value = false
+		return
+	}
+
+	for k := oldLen - 1; k >= newLen; k-- {
+		deleteSucceeded, isAbrupt, rt := ReturnIfAbrupt(
+			array.internalMethods().Delete(array, NewIntegerIndexPropertyKey(k)),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		if !deleteSucceeded {
+			newLenDesc.Value = NewNumberValue(JSNumber(k) + 1)
+			if !newWritable {
+				succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), &PropertyDescriptor{
+					Writable:    false,
+					WritableSet: true,
+				})
+				Assert(succeeded)
+			}
+			co.value = false
+			return
+		}
+	}
+
+	if !newWritable {
+		succeeded = OrdinaryDefineOwnProperty(array, NewStringPropertyKey("length"), &PropertyDescriptor{
+			Writable:    false,
+			WritableSet: true,
+		})
+		Assert(succeeded)
+	}
+
+	co.value = true
+	return
+}
+
+func NewArrayConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		if newTarget == nil {
+			newTarget = agent.ActiveFunctionObject()
+		}
+
+		proto := GetPrototypeFromConstructor(newTarget, "%Array.prototype%")
+
+		numberOfArgs := JSInt(len(args))
+		if numberOfArgs == 0 {
+			return ArrayCreate(agent, 0, proto).ToValue()
+		} else if numberOfArgs == 1 {
+			length := argumentAt(args, 0)
+			array := ArrayCreate(agent, 0, proto)
+
+			var intLen JSNumber
+			if number, ok := length.(*NumberValue); ok {
+				n, isAbrupt, rt := ReturnIfAbrupt(ToUint32(agent, number), co)
+				if isAbrupt {
+					return rt
+				}
+				if number.Data != n.ToNumber() {
+					return co.ThrowRangeError(agent, "invalid array length")
+				}
+				intLen = n.ToNumber()
+			} else {
+				_, isAbrupt, rt := ReturnIfAbrupt(
+					array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(0), length),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				intLen = 1
+			}
+
+			_, isAbrupt, rt := ReturnIfAbrupt(array.Set(
+				NewStringPropertyKey("length"),
+				NewNumberValue(intLen),
+				setThrowTypeThrow,
+			), co)
+			if isAbrupt {
+				return rt
+			}
+
+			return array.ToValue()
+		} else {
+			Assert(numberOfArgs >= 2)
+			array := ArrayCreate(agent, numberOfArgs, proto)
+
+			for k := range numberOfArgs {
+				propertyKey := NewIntegerIndexPropertyKey(k)
+				array.CreateDataPropertyOrThrow(propertyKey, args[k])
+			}
+
+			Assert(getArrayLength(array) == numberOfArgs)
+			return array.ToValue()
+		}
+	}
+
+	var isArray BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		arg := argumentAt(args, 0)
+		return NewBooleanValue(IsArray(arg))
+	}
+	var of BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		length := JSInt(len(args))
+		lenNumber := NewNumberValue(length.ToNumber())
+
+		constructor := this
+		var array ObjectType
+		if IsConstructor(constructor) {
+			constructed, isAbrupt, rt := ReturnIfAbrupt(
+				MustGetObject(constructor).Construct([]Value{lenNumber}, nil),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			array = constructed
+		} else {
+			array = ArrayCreate(realm.Agent, length, nil)
+		}
+
+		for k := range args {
+			propertyKey := NewIntegerIndexPropertyKey(JSInt(k))
+			_, isAbrupt, rt := ReturnIfAbrupt(
+				array.CreateDataPropertyOrThrow(propertyKey, args[k]),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+		}
+
+		_, isAbrupt, rt := ReturnIfAbrupt(
+			array.Set(NewStringPropertyKey("length"), lenNumber, setThrowTypeThrow),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		return array.ToValue()
+	}
+
+	object := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("Array"), builtinFunctionArgs{
+		realm:         realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		isConstructor: true,
+	})
+
+	object.defineBuiltinFunction(realm, CMString("isArray"), isArray, 1)
+	object.defineBuiltinFunction(realm, CMString("of"), of, 0)
+
+	// 23.1.2.5
+	var getter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return this
+	}
+	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
+		Getter: getter,
+	})
+	// 23.1.2.1
+	var from BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		items := argumentAt(args, 0)
+		mapFn := pkg.SliceSafeGet(args, 1)
+		thisArg := pkg.SliceSafeGet(args, 2)
+
+		c := this
+		var mapping bool
+		if mapFn == nil || mapFn == UndefinedValue {
+			mapping = false
+		} else {
+			if !IsCallable(mapFn) {
+				return co.ThrowTypeError(agent, "mapFn is not callable")
+			}
+			mapping = true
+		}
+		iteratorMethod, isAbrupt, rt := ReturnIfAbrupt(
+			GetV(agent, items, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator])),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+
+		var usingIterator ObjectType
+		if !IsUndefinedOrNull(iteratorMethod) {
+			if !IsCallable(iteratorMethod) {
+				return co.ThrowTypeError(agent, "items iterator method is not callable")
+			}
+			usingIterator = MustGetObject(iteratorMethod)
+		}
+		if usingIterator != nil {
+			var a ObjectType
+			if IsConstructor(c) {
+				constructed, isAbrupt, rt := ReturnIfAbrupt(
+					MustGetObject(c).Construct(nil, nil),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				a = constructed
+			} else {
+				a = ArrayCreate(agent, 0, nil)
+			}
+
+			iteratorRecord := GetIteratorFromMethod(agent, items, usingIterator)
+
+			for k := JSInt(0); ; k++ {
+				pk := NewIntegerIndexPropertyKey(k)
+				next, isDone := iteratorRecord.IteratorStepValue()
+				nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+				if isAbrupt {
+					return rt
+				}
+				if isDone {
+					_, isAbrupt, rt := ReturnIfAbrupt(
+						a.Set(NewStringPropertyKey("length"), NewNumberValue(k.ToNumber()), setThrowTypeThrow),
+						co,
+					)
+					if isAbrupt {
+						return rt
+					}
+					return a.ToValue()
+				}
+
+				var mappedValue Value
+				if mapping {
+					_mappedValue, isAbrupt, rt := ReturnIfAbrupt(
+						mapFn.Call(agent, thisArg, []Value{nextValue, NewNumberValue(k.ToNumber())}),
+						co,
+					)
+					if isAbrupt {
+						return iteratorRecord.IteratorClose(rt)
+					}
+					mappedValue = _mappedValue
+				} else {
+					mappedValue = nextValue
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(
+					a.CreateDataPropertyOrThrow(pk, mappedValue),
+					co,
+				)
+				if isAbrupt {
+					return iteratorRecord.IteratorClose(rt)
+				}
+			}
+
+		}
+		arrayLike := ReturnAssertNormal(items.ToObject(agent))
+		length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		var a ObjectType
+		if IsConstructor(c) {
+			_a, isAbrupt, rt := ReturnIfAbrupt(
+				MustGetObject(c).Construct([]Value{NewNumberValue(length.ToNumber())}, nil),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			a = _a
+		} else {
+			a = ArrayCreate(agent, length, nil)
+		}
+
+		for k := JSInt(0); k < length; k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			kValue := arrayLike.Get(pk)
+			var mappedValue Value
+			if mapping {
+				_mappedValue, isAbrupt, rt := ReturnIfAbrupt(
+					mapFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber())}),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				mappedValue = _mappedValue
+			} else {
+				mappedValue = kValue
+			}
+			a.CreateDataPropertyOrThrow(pk, mappedValue)
+		}
+		a.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow)
+		return a.ToValue()
+	}
+	object.defineBuiltinFunction(realm, CMString("from"), from, 1)
+	BindPrototypeAndConstructor(realm.Intrinsics.ArrayPrototype, object)
+
+	return object
+}
+
+func NewArrayPrototype(realm *Realm) ObjectType {
+	agent := realm.Agent
+	object := &ArrayObject{
+		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "ArrayPrototype"),
+	}
+	object.ref = object
+
+	object.defineBuiltinProperty(CMString("length"), &PropertyDescriptor{
+		Value:        NewNumberValue(0),
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: false,
+	})
+
+	var arrayMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+
+		array, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		if !IsCallable(callbackFn) {
+			return co.ThrowTypeError(agent, "map: callback is not callable")
+		}
+
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, array, length), co)
+		if isAbrupt {
+			return rt
+		}
+		callbackObject := this
+		if !this.IsObject() {
+			callbackObject = array.ToValue()
+		}
+		for k := range length {
+			pk := NewIntegerIndexPropertyKey(k)
+			if array.HasProperty(pk) {
+				mappedValue, isAbrupt, rt := ReturnIfAbrupt(callbackFn.Call(
+					agent,
+					thisArg,
+					[]Value{array.Get(pk), NewNumberValue(k.ToNumber()), callbackObject},
+				), co)
+				if isAbrupt {
+					return rt
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(A.CreateDataPropertyOrThrow(pk, mappedValue), co)
+				if isAbrupt {
+					return rt
+				}
+			}
+		}
+		return A.ToValue()
+	}
+
+	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		array := MustGetObject(this)
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		sep := ","
+		if len(args) > 0 {
+			sep = argumentAt(args, 0).String()
+		}
+
+		var elements []string
+		for k := range length {
+			element := array.Get(NewIntegerIndexPropertyKey(k))
+
+			var next string
+			if element == nil || element == UndefinedValue || element == NullValue {
+			} else {
+				next = element.String()
+			}
+			elements = append(elements, next)
+		}
+		return NewStringValue(strings.Join(elements, sep))
+	}
+
+	var toString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		array := ReturnAssertNormal(this.ToObject(agent))
+		fun := array.Get(NewStringPropertyKey("join"))
+		if !IsCallable(fun) {
+			fun = realm.Intrinsics.ObjectPrototype.Get(NewStringPropertyKey("toString"))
+		}
+		return fun.Call(agent, this, nil)
+	}
+
+	var forEach BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+
+		array, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		if !IsCallable(callbackFn) {
+			return co.ThrowTypeError(agent, "forEach: callback is not callable")
+		}
+
+		for k := JSInt(0); k < length; k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := array.HasProperty(pk)
+			if kPresent {
+				kValue := array.Get(pk)
+				_, isAbrupt, rt := ReturnIfAbrupt(
+					callbackFn.Call(
+						agent,
+						thisArg,
+						[]Value{kValue, NewNumberValue(k.ToNumber()), array.ToValue()},
+					),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+			}
+		}
+		return UndefinedValue
+	}
+	var push BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		array := MustGetObject(this)
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		argCount := len(args)
+		for i := 0; i < argCount; i++ {
+			array.Set(NewIntegerIndexPropertyKey(length), args[i], setThrowTypeThrow)
+			length++
+		}
+
+		_, isAbrupt, rt = ReturnIfAbrupt(array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewNumberValue(length.ToNumber())
+	}
+	var pop BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		array := MustGetObject(this)
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		if length == 0 {
+			_, isAbrupt, rt := ReturnIfAbrupt(array.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
+			return UndefinedValue.ToCompletion()
+		}
+		length--
+		element := array.Get(NewIntegerIndexPropertyKey(length))
+		deleteSucceeded := array.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(length))
+		if !deleteSucceeded {
+			return co.ThrowTypeError(agent, "delete failed")
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(array.Set(NewStringPropertyKey("length"), NewNumberValue(length.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
+		return element
+	}
+	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		array := MustGetObject(this)
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		separator := ", "
+		var elements []string
+		for k := range length {
+			nextElement := array.Get(NewIntegerIndexPropertyKey(k))
+			if nextElement == nil || nextElement == UndefinedValue {
+				elements = append(elements, "")
+			} else {
+				s := ReturnAssertNormal(ValueInvoke(agent, nextElement, NewStringPropertyKey("toLocaleString"), nil)).String()
+				elements = append(elements, s)
+			}
+		}
+		return NewStringValue(strings.Join(elements, separator))
+	}
+	var includes BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		searchElement := pkg.SliceSafeGet(args, 0)
+		fromIndex := pkg.SliceSafeGet(args, 1)
+		if searchElement == nil {
+			searchElement = UndefinedValue
+		}
+		if fromIndex == nil {
+			fromIndex = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		if length == 0 {
+			return FalseValue
+		}
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+		if isAbrupt {
+			return rt
+		}
+		if n.IsPositiveInf() {
+			return FalseValue
+		} else if n.IsNegInf() {
+			n = 0
+		}
+
+		k := n
+		if k < 0 {
+			k = (length + k).Max(0)
+		}
+
+		for k < length {
+			elementK := o.Get(NewIntegerIndexPropertyKey(k))
+			if SameValueZero(searchElement, elementK) {
+				return TrueValue
+			}
+			k++
+		}
+		return FalseValue
+	}
+	var indexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		searchElement := pkg.SliceSafeGet(args, 0)
+		fromIndex := pkg.SliceSafeGet(args, 1)
+		if searchElement == nil {
+			searchElement = UndefinedValue
+		}
+		if fromIndex == nil {
+			fromIndex = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		if length == 0 {
+			return NewNumberValue(-1)
+		}
+		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+		if isAbrupt {
+			return rt
+		}
+		if fromIndex == UndefinedValue {
+			Assert(n == 0)
+		}
+		if n.IsPositiveInf() {
+			return NewNumberValue(-1)
+		} else if n.IsNegInf() {
+			n = 0
+		}
+
+		var k JSInt
+		if n >= 0 {
+			k = n
+		} else {
+			k = (length + n).Max(0)
+		}
+
+		for k < length {
+			kPresent := o.HasProperty(NewIntegerIndexPropertyKey(k))
+			if kPresent {
+				elementK := o.Get(NewIntegerIndexPropertyKey(k))
+				if IsStrictlyEqual(searchElement, elementK) {
+					return NewNumberValue(k.ToNumber())
+				}
+			}
+			k++
+		}
+		return NewNumberValue(-1)
+	}
+	var find BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		predicate := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if predicate == nil {
+			predicate = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		findRec, isAbrupt, rt := ReturnIfAbrupt(o.FindViaPredicate(length, DirectionAscending, predicate, thisArg), co)
+		if isAbrupt {
+			return rt
+		}
+		return findRec.Value
+	}
+	var findIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		predicate := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if predicate == nil {
+			predicate = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		findRec, isAbrupt, rt := ReturnIfAbrupt(o.FindViaPredicate(length, DirectionAscending, predicate, thisArg), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewNumberValue(findRec.Index.ToNumber())
+	}
+	var findLast BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		predicate := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if predicate == nil {
+			predicate = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		findRec, isAbrupt, rt := ReturnIfAbrupt(o.FindViaPredicate(length, DirectionDescending, predicate, thisArg), co)
+		if isAbrupt {
+			return rt
+		}
+		return findRec.Value
+	}
+	var findLastIndex BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		predicate := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if predicate == nil {
+			predicate = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		findRec, isAbrupt, rt := ReturnIfAbrupt(o.FindViaPredicate(length, DirectionDescending, predicate, thisArg), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewNumberValue(findRec.Index.ToNumber())
+	}
+	var lastIndexOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		searchElement := pkg.SliceSafeGet(args, 0)
+		fromIndex := pkg.SliceSafeGet(args, 1)
+		if searchElement == nil {
+			searchElement = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		if length == 0 {
+			return NewNumberValue(-1)
+		}
+		var n JSInt
+		if len(args) > 1 {
+			_n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, fromIndex), co)
+			if isAbrupt {
+				return rt
+			}
+			n = _n
+		} else {
+			n = length - 1
+		}
+
+		if n.IsNegInf() {
+			return NewNumberValue(-1)
+		}
+
+		var k JSInt
+		if n >= 0 {
+			k = n.Min(length - 1)
+		} else {
+			k = length + n
+		}
+		for k >= 0 {
+			kPresent := o.HasProperty(NewIntegerIndexPropertyKey(k))
+			if kPresent {
+				elementK := o.Get(NewIntegerIndexPropertyKey(k))
+				if IsStrictlyEqual(searchElement, elementK) {
+					return NewNumberValue(k.ToNumber())
+				}
+			}
+			k--
+		}
+		return NewNumberValue(-1)
+	}
+	var at BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		index := argumentAt(args, 0)
+		o := ReturnAssertNormal(this.ToObject(agent))
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		relativeIndex, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, index), co)
+		if isAbrupt {
+			return rt
+		}
+		k := relativeIndex
+		if k < 0 {
+			k += length
+		}
+		return o.Get(NewIntegerIndexPropertyKey(k))
+	}
+	var every BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		if !IsCallable(callbackFn) {
+			return co.ThrowTypeError(agent, "every: callback is not callable")
+		}
+
+		callbackObject := this
+		if !this.IsObject() {
+			callbackObject = o.ToValue()
+		}
+		for k := JSInt(0); k < length; k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				testResult, isAbrupt, rt := ReturnIfAbrupt(
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), callbackObject}),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				if !testResult.ToBoolean() {
+					return FalseValue
+				}
+			}
+		}
+		return TrueValue
+	}
+	var some BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		if !IsCallable(callbackFn) {
+			return co.ThrowTypeError(agent, "some: callback is not callable")
+		}
+
+		callbackObject := this
+		if !this.IsObject() {
+			callbackObject = o.ToValue()
+		}
+		for k := JSInt(0); k < length; k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				testResult, isAbrupt, rt := ReturnIfAbrupt(
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), callbackObject}),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				if testResult.ToBoolean() {
+					return TrueValue
+				}
+			}
+		}
+		return FalseValue
+	}
+	var with BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		index := argumentAt(args, 0)
+		value := argumentAt(args, 1)
+		o := ReturnAssertNormal(this.ToObject(agent))
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		relativeIndex, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, index), co)
+		if isAbrupt {
+			return rt
+		}
+
+		actualIndex := relativeIndex
+		if actualIndex < 0 {
+			actualIndex += length
+		}
+
+		array := ArrayCreate(agent, length, nil)
+		for k := JSInt(0); k < length; k++ {
+			pk := NewIntegerIndexPropertyKey(k)
+			if k == actualIndex {
+				array.CreateDataPropertyOrThrow(pk, value)
+			} else {
+				array.CreateDataPropertyOrThrow(pk, o.Get(pk))
+			}
+		}
+		return array.ToValue()
+	}
+	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := this.ToObject(agent).value
+		return CreateArrayIterator(agent, o, objectOwnPropertiesKindKeyAndValue).ToValue()
+	}
+	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := this.ToObject(agent).value
+		return CreateArrayIterator(agent, o, objectOwnPropertiesKindKey).ToValue()
+	}
+	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := this.ToObject(agent).value
+		iterator := CreateArrayIterator(agent, o, objectOwnPropertiesKindValue).ToValue()
+		return iterator
+	}
+	var shift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := this.ToObject(agent).value
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		if length == 0 {
+			_, isAbrupt, rt := ReturnIfAbrupt(o.Set(NewStringPropertyKey("length"), NewNumberValue(0), setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
+			return UndefinedValue
+		}
+		first := o.Get(NewIntegerIndexPropertyKey(0))
+		for k := JSInt(1); k < length; k++ {
+			from := NewIntegerIndexPropertyKey(k)
+			to := NewIntegerIndexPropertyKey(k - 1)
+			fromPresent := o.HasProperty(from)
+			if fromPresent {
+				fromValue := o.Get(from)
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(to, fromValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
+			} else {
+				o.DeletePropertyOrThrow(to)
+			}
+		}
+		deleteSucceeded := o.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(length - 1))
+		if !deleteSucceeded {
+			panic("TypeError")
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(o.Set(NewStringPropertyKey("length"), NewNumberValue((length-1).ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
+		return first
+	}
+	var unshift BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o := this.ToObject(agent).value
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		argCount := JSInt(len(args))
+		if argCount == 0 {
+			return NewNumberValue(length.ToNumber())
+		}
+		if float64(length)+float64(argCount) > POW_2_32-1 {
+			return co.ThrowTypeError(agent, "size is too large")
+		}
+
+		k := length
+		for k > 0 {
+			k--
+			from := NewIntegerIndexPropertyKey(k - 1)
+			to := NewIntegerIndexPropertyKey(k + argCount - 1)
+			fromPresent := o.HasProperty(from)
+			if fromPresent {
+				fromValue := o.Get(from)
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(to, fromValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
+			} else {
+				o.DeletePropertyOrThrow(to)
+			}
+		}
+		for j, arg := range args {
+			key := NewIntegerIndexPropertyKey(JSInt(j))
+			_, isAbrupt, rt := ReturnIfAbrupt(o.Set(key, arg, setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		newLength := (length + argCount).ToNumber()
+		_, isAbrupt, rt = ReturnIfAbrupt(o.Set(NewStringPropertyKey("length"), NewNumberValue(newLength), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewNumberValue(newLength)
+	}
+	var filter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		if !IsCallable(callbackFn) {
+			return co.ThrowTypeError(agent, "filter: callback is not callable")
+		}
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
+		if isAbrupt {
+			return rt
+		}
+		callbackObject := this
+		if !this.IsObject() {
+			callbackObject = o.ToValue()
+		}
+		k := JSInt(0)
+		to := JSInt(0)
+		for k < length {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				selected, isAbrupt, rt := ReturnIfAbrupt(
+					callbackFn.Call(agent, thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), callbackObject}),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				if selected.ToBoolean() {
+					A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(to), kValue)
+					to++
+				}
+			}
+			k++
+		}
+		return A.ToValue()
+	}
+	var reduce BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		hasInitialValue := len(args) > 1
+		initialValue := pkg.SliceSafeGet(args, 1)
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		if !IsCallable(callbackFn) {
+			return co.ThrowTypeError(agent, "reduce: callback is not callable")
+		}
+		if length == 0 && !hasInitialValue {
+			return co.ThrowTypeError(agent, "reduce of empty array with no initial value")
+		}
+		k := JSInt(0)
+		var accumulator Value
+		if !hasInitialValue {
+			kPresent := false
+			for {
+				pk := NewIntegerIndexPropertyKey(k)
+				kPresent = o.HasProperty(pk)
+				if kPresent {
+					accumulator = o.Get(pk)
+					k++
+					break
+				}
+				k++
+				if k >= length {
+					return co.ThrowTypeError(agent, "reduce of empty array with no initial value")
+				}
+			}
+		} else {
+			accumulator = initialValue
+		}
+		for k < length {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				accumulator, isAbrupt, rt = ReturnIfAbrupt(
+					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), o.ToValue()}),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+			}
+			k++
+		}
+		return accumulator
+	}
+	var reduceRight BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		callbackFn := pkg.SliceSafeGet(args, 0)
+		if callbackFn == nil {
+			callbackFn = UndefinedValue
+		}
+		hasInitialValue := len(args) > 1
+		initialValue := pkg.SliceSafeGet(args, 1)
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		if !IsCallable(callbackFn) {
+			return co.ThrowTypeError(agent, "reduceRight: callback is not callable")
+		}
+		if length == 0 && !hasInitialValue {
+			return co.ThrowTypeError(agent, "reduceRight of empty array with no initial value")
+		}
+		k := JSInt(length) - 1
+		var accumulator Value
+		if !hasInitialValue {
+			kPresent := false
+			for {
+				pk := NewIntegerIndexPropertyKey(k)
+				kPresent = o.HasProperty(pk)
+				if kPresent {
+					accumulator = o.Get(pk)
+					k--
+					break
+				}
+				k--
+				if k < 0 {
+					return co.ThrowTypeError(agent, "reduceRight of empty array with no initial value")
+				}
+			}
+		} else {
+			accumulator = initialValue
+		}
+		for k >= 0 {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				accumulator, isAbrupt, rt = ReturnIfAbrupt(
+					callbackFn.Call(agent, UndefinedValue, []Value{accumulator, kValue, NewNumberValue(k.ToNumber()), o.ToValue()}),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+			}
+			k--
+		}
+		return accumulator
+	}
+	var concat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o := this.ToObject(agent).value
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
+		if isAbrupt {
+			return rt
+		}
+		n := JSInt(0)
+
+		for index := range len(args) + 1 {
+			var element Value
+			if index == 0 {
+				element = o.ToValue()
+			} else {
+				element = args[index-1]
+			}
+
+			spreadable, isAbrupt, rt := ReturnIfAbrupt(IsConcatSpreadable(agent, element), co)
+			if isAbrupt {
+				return rt
+			}
+			if spreadable {
+				length, isAbrupt, rt := ReturnIfAbrupt(MustGetObject(element).LengthOfArrayLike(), co)
+				if isAbrupt {
+					return rt
+				}
+
+				if float64(n)+float64(length) > POW_2_53-1 {
+					panic("TypeError")
+				}
+
+				k := JSInt(0)
+				for k < length {
+					pk := NewIntegerIndexPropertyKey(k)
+					elementObject := MustGetObject(element)
+					kPresent, isAbrupt, rt := ReturnIfAbrupt(
+						elementObject.internalMethods().HasProperty(elementObject, pk),
+						co,
+					)
+					if isAbrupt {
+						return rt
+					}
+					if kPresent {
+						kValue, isAbrupt, rt := ReturnIfAbrupt(
+							elementObject.internalMethods().Get(elementObject, pk, element),
+							co,
+						)
+						if isAbrupt {
+							return rt
+						}
+						_, isAbrupt, rt = ReturnIfAbrupt(
+							A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(n), kValue),
+							co,
+						)
+						if isAbrupt {
+							return rt
+						}
+					}
+					k++
+					n++
+				}
+			} else {
+				A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(n), element)
+				n++
+			}
+		}
+
+		_, isAbrupt, rt = ReturnIfAbrupt(A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
+		return A.ToValue()
+	}
+	var slice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+		start := pkg.SliceSafeGet(args, 0)
+		end := pkg.SliceSafeGet(args, 1)
+		if start == nil {
+			start = UndefinedValue
+		}
+		if end == nil {
+			end = UndefinedValue
+		}
+
+		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+		if isAbrupt {
+			return rt
+		}
+
+		var k JSInt
+		if relativeStart.IsNegInf() {
+			k = 0
+		} else if relativeStart < 0 {
+			k = (length + relativeStart).Max(0)
+		} else {
+			k = relativeStart.Min(length)
+		}
+
+		var relativeEnd JSInt
+		if end == UndefinedValue {
+			relativeEnd = length
+		} else {
+			_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeEnd = _relativeEnd
+		}
+
+		var final JSInt
+		if relativeEnd.IsNegInf() {
+			final = 0
+		} else if relativeEnd < 0 {
+			final = JSInt(math.Max(float64(length+relativeEnd), 0))
+		} else {
+			final = JSInt(math.Min(float64(relativeEnd), float64(length)))
+		}
+		count := (final - k).Max(0)
+
+		n := JSInt(0)
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, count), co)
+		if isAbrupt {
+			return rt
+		}
+		for k < final {
+			pk := NewIntegerIndexPropertyKey(k)
+			kPresent := o.HasProperty(pk)
+			if kPresent {
+				kValue := o.Get(pk)
+				A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(n), kValue)
+			}
+			k++
+			n++
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(A.Set(NewStringPropertyKey("length"), NewNumberValue(n.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
+		return A.ToValue()
+	}
+	var fill BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		value := pkg.SliceSafeGet(args, 0)
+		start := pkg.SliceSafeGet(args, 1)
+		end := pkg.SliceSafeGet(args, 2)
+		if value == nil {
+			value = UndefinedValue
+		}
+		if start == nil {
+			start = UndefinedValue
+		}
+		if end == nil {
+			end = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+		if isAbrupt {
+			return rt
+		}
+		var k JSInt
+		if relativeStart.IsNegInf() {
+			k = 0
+		} else if relativeStart < 0 {
+			k = (length + relativeStart).Max(0)
+		} else {
+			k = relativeStart.Min(length)
+		}
+		var relativeEnd JSInt
+		if end == UndefinedValue {
+			relativeEnd = length
+		} else {
+			_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeEnd = _relativeEnd
+
+		}
+
+		var final JSInt
+		if relativeEnd.IsNegInf() {
+			final = 0
+		} else if relativeEnd < 0 {
+			final = (length + relativeEnd).Max(0)
+		} else {
+			final = relativeEnd.Min(length)
+		}
+		for k < final {
+			pk := NewIntegerIndexPropertyKey(k)
+			_, isAbrupt, rt := ReturnIfAbrupt(o.Set(pk, value, setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
+			k++
+		}
+		return o.ToValue()
+	}
+	var copyWithin BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var target Value = UndefinedValue
+		var start Value = UndefinedValue
+		var end Value = UndefinedValue
+		if len(args) > 0 {
+			target = argumentAt(args, 0)
+		}
+		if len(args) > 1 {
+			start = argumentAt(args, 1)
+		}
+		if len(args) > 2 {
+			end = argumentAt(args, 2)
+		}
+		o := this.ToObject(agent).value
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		relativeTarget, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, target), co)
+		if isAbrupt {
+			return rt
+		}
+		var to JSInt
+		if relativeTarget.IsNegInf() {
+			to = 0
+		} else if relativeTarget < 0 {
+			to = (length + relativeTarget).Max(0)
+		} else {
+			to = relativeTarget.Min(length)
+		}
+
+		relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+		if isAbrupt {
+			return rt
+		}
+		var from JSInt
+		if relativeStart.IsNegInf() {
+			from = 0
+		} else if relativeStart < 0 {
+			from = (length + relativeStart).Max(0)
+		} else {
+			from = relativeStart.Min(length)
+		}
+
+		var relativeEnd JSInt
+		if end == UndefinedValue {
+			relativeEnd = length
+		} else {
+			_relativeEnd, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, end), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeEnd = _relativeEnd
+		}
+
+		var final JSInt
+		if relativeEnd.IsNegInf() {
+			final = 0
+		} else if relativeEnd < 0 {
+			final = (length + relativeEnd).Max(0)
+		} else {
+			final = relativeEnd.Min(length)
+		}
+
+		count := (final - from).Min(length - to)
+
+		var direction int
+		if from < to && to < from+count {
+			direction = -1
+			from += count - 1
+			to += count - 1
+		} else {
+			direction = 1
+		}
+
+		for count > 0 {
+			fromKey := NewIntegerIndexPropertyKey(from)
+			toKey := NewIntegerIndexPropertyKey(to)
+			fromPresent, isAbrupt, rt := ReturnIfAbrupt(
+				o.internalMethods().HasProperty(o, fromKey),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			if fromPresent {
+				fromValue, isAbrupt, rt := ReturnIfAbrupt(
+					o.internalMethods().Get(o, fromKey, o.ToValue()),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(o.Set(toKey, fromValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
+			} else {
+				deleteSucceeded, isAbrupt, rt := ReturnIfAbrupt(
+					o.internalMethods().Delete(o, toKey),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+				if !deleteSucceeded {
+					return co.ThrowTypeError(agent, "copyWithin could not delete target property")
+				}
+			}
+			from += JSInt(direction)
+			to += JSInt(direction)
+			count--
+		}
+		return o.ToValue()
+	}
+	var reverse BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := this.ToObject(agent).value
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		middle := length / 2
+		lower := JSInt(0)
+		for lower < middle {
+			upper := length - lower - 1
+			lowerP := NewIntegerIndexPropertyKey(lower)
+			upperP := NewIntegerIndexPropertyKey(upper)
+			lowerExists := o.HasProperty(lowerP)
+			upperExists := o.HasProperty(upperP)
+
+			var lowerValue Value = UndefinedValue
+			if lowerExists {
+				lowerValue = o.Get(lowerP)
+			}
+			var upperValue Value = UndefinedValue
+			if upperExists {
+				upperValue = o.Get(upperP)
+			}
+			if lowerExists && upperExists {
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(lowerP, upperValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(o.Set(upperP, lowerValue, setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
+			} else if !lowerExists && upperExists {
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(lowerP, o.Get(upperP), setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
+				o.DeletePropertyOrThrow(upperP)
+			} else if lowerExists && !upperExists {
+				_, isAbrupt, rt := ReturnIfAbrupt(o.Set(upperP, o.Get(lowerP), setThrowTypeThrow), co)
+				if isAbrupt {
+					return rt
+				}
+				o.DeletePropertyOrThrow(lowerP)
+			}
+			lower++
+		}
+		return o.ToValue()
+	}
+	var toReversed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := this.ToObject(agent).value
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+		A := ArrayCreate(agent, length, nil)
+		for k := JSInt(0); k < length; k++ {
+			from := NewIntegerIndexPropertyKey(length - k - 1)
+			fromValue := o.Get(from)
+			pk := NewIntegerIndexPropertyKey(k)
+			A.CreateDataPropertyOrThrow(pk, fromValue)
+		}
+		return A.ToValue()
+	}
+	var sort BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		compareFn := pkg.SliceSafeGet(args, 0)
+		if compareFn == nil {
+			compareFn = UndefinedValue
+		}
+		if compareFn != UndefinedValue && !IsCallable(compareFn) {
+			return co.ThrowTypeError(agent, "sort comparator is not callable")
+		}
+		obj, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(obj.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		var compareObject ObjectType
+		if compareFn != UndefinedValue {
+			compareObject = MustGetObject(compareFn)
+		}
+		sortCompare := SortCompare{
+			compareFn: compareObject,
+			impl:      CompareArrayElements,
+		}
+
+		sortedList := SortIndexedProperties(agent, obj, length, sortCompare, sortHolesTypeSkipHoles)
+		itemCount := JSInt(len(sortedList))
+
+		j := JSInt(0)
+		for ; j < itemCount; j++ {
+			_, isAbrupt, rt := ReturnIfAbrupt(obj.Set(NewIntegerIndexPropertyKey(j), sortedList[j], setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		for ; j < length; j++ {
+			obj.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(j))
+		}
+		return obj.ToValue()
+	}
+	var toSorted BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		compareFn := pkg.SliceSafeGet(args, 0)
+		if compareFn == nil {
+			compareFn = UndefinedValue
+		}
+		if compareFn != UndefinedValue && !IsCallable(compareFn) {
+			return co.ThrowTypeError(agent, "toSorted comparator is not callable")
+		}
+		obj, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(obj.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		var compareObject ObjectType
+		if compareFn != UndefinedValue {
+			compareObject = MustGetObject(compareFn)
+		}
+		sortCompare := SortCompare{
+			compareFn: compareObject,
+			impl:      CompareArrayElements,
+		}
+
+		sortedList := SortIndexedProperties(agent, obj, length, sortCompare, sortHolesTypeReadThroughHoles)
+		A := ArrayCreate(agent, length, nil)
+		for k, v := range sortedList {
+			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(JSInt(k)), v)
+		}
+		return A.ToValue()
+	}
+	var flat BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		depth := pkg.SliceSafeGet(args, 0)
+		if depth == nil {
+			depth = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		sourceLen, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		var depthNum JSInt = 1
+		if depth != UndefinedValue {
+			_depthNum, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, depth), co)
+			if isAbrupt {
+				return rt
+			}
+			depthNum = _depthNum
+			if depthNum < 0 {
+				depthNum = 0
+			}
+		}
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
+		if isAbrupt {
+			return rt
+		}
+		FlattenIntoArray(agent, A, o, sourceLen, 0, depthNum, nil, nil)
+		return A.ToValue()
+	}
+	var flatMap BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		mapperFunction := pkg.SliceSafeGet(args, 0)
+		thisArg := pkg.SliceSafeGet(args, 1)
+		if mapperFunction == nil {
+			mapperFunction = UndefinedValue
+		}
+		if thisArg == nil {
+			thisArg = UndefinedValue
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		sourceLen, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		if !IsCallable(mapperFunction) {
+			return co.ThrowTypeError(agent, "flatMap mapper is not callable")
+		}
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, 0), co)
+		if isAbrupt {
+			return rt
+		}
+		FlattenIntoArray(agent, A, o, sourceLen, 0, 1, MustGetObject(mapperFunction), thisArg)
+		return A.ToValue()
+	}
+	var splice BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		start := pkg.SliceSafeGet(args, 0)
+		deleteCount := pkg.SliceSafeGet(args, 1)
+		var items []Value
+		if len(args) > 2 {
+			items = args[2:]
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			return rt
+		}
+
+		var relativeStart JSInt = 0
+		if start != nil {
+			_relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeStart = _relativeStart
+		}
+		var actualStart JSInt
+		if relativeStart.IsNegInf() {
+			actualStart = 0
+		} else if relativeStart < 0 {
+			actualStart = (length + relativeStart).Max(0)
+		} else {
+			actualStart = relativeStart.Min(length)
+		}
+		itemCount := JSInt(len(items))
+		var actualDeleteCount JSInt
+		if start == nil {
+			actualDeleteCount = 0
+		} else if deleteCount == nil {
+			actualDeleteCount = length - actualStart
+		} else {
+			_actualDeleteCount, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, deleteCount), co)
+			if isAbrupt {
+				return rt
+			}
+			actualDeleteCount = _actualDeleteCount.Max(0).Min(length - actualStart)
+		}
+
+		if float64(length+itemCount-actualDeleteCount) > POW_2_53-1 {
+			return co.ThrowTypeError(agent, "splice result exceeds maximum safe length")
+		}
+
+		A, isAbrupt, rt := ReturnIfAbrupt(ArraySpeciesCreate(agent, o, actualDeleteCount), co)
+		if isAbrupt {
+			return rt
+		}
+		for k := JSInt(0); k < actualDeleteCount; k++ {
+			from := NewIntegerIndexPropertyKey(actualStart + k)
+			fromPresent := o.HasProperty(from)
+			if fromPresent {
+				fromValue := o.Get(from)
+				A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(k), fromValue)
+			}
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(A.Set(NewStringPropertyKey("length"), NewNumberValue(actualDeleteCount.ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
+		if itemCount < actualDeleteCount {
+			k := actualStart
+			for k < length-actualDeleteCount {
+				from := NewIntegerIndexPropertyKey(k + actualDeleteCount)
+				to := NewIntegerIndexPropertyKey(k + itemCount)
+				fromPresent := o.HasProperty(from)
+				if fromPresent {
+					fromValue := o.Get(from)
+					_, isAbrupt, rt := ReturnIfAbrupt(o.Set(to, fromValue, setThrowTypeThrow), co)
+					if isAbrupt {
+						return rt
+					}
+				} else {
+					o.DeletePropertyOrThrow(to)
+				}
+				k++
+			}
+			k = length
+			for k > length-actualDeleteCount+itemCount {
+				k--
+				o.DeletePropertyOrThrow(NewIntegerIndexPropertyKey(k))
+			}
+		} else if itemCount > actualDeleteCount {
+			k := length - actualDeleteCount
+			for k > actualStart {
+				from := NewIntegerIndexPropertyKey(k + actualDeleteCount - 1)
+				to := NewIntegerIndexPropertyKey(k + itemCount - 1)
+				fromPresent := o.HasProperty(from)
+				if fromPresent {
+					fromValue := o.Get(from)
+					_, isAbrupt, rt := ReturnIfAbrupt(o.Set(to, fromValue, setThrowTypeThrow), co)
+					if isAbrupt {
+						return rt
+					}
+				} else {
+					o.DeletePropertyOrThrow(to)
+				}
+				k--
+			}
+		}
+		k := actualStart
+		for _, E := range items {
+			_, isAbrupt, rt := ReturnIfAbrupt(o.Set(NewIntegerIndexPropertyKey(k), E, setThrowTypeThrow), co)
+			if isAbrupt {
+				return rt
+			}
+			k++
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(o.Set(NewStringPropertyKey("length"), NewNumberValue((length-actualDeleteCount+itemCount).ToNumber()), setThrowTypeThrow), co)
+		if isAbrupt {
+			return rt
+		}
+		return A.ToValue()
+	}
+	var toSpliced BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		start := argumentAt(args, 0)
+		skipCount := argumentAt(args, 1)
+		var items []Value
+		if len(args) > 2 {
+			items = args[2:]
+		}
+		o := this.ToObject(agent).value
+		var co CompletionValue
+		length, isAbrupt, rt := ReturnIfAbrupt(o.LengthOfArrayLike(), co)
+		if isAbrupt {
+			panic(rt)
+		}
+
+		var relativeStart JSInt = 0
+		if start != nil {
+			_relativeStart, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, start), co)
+			if isAbrupt {
+				return rt
+			}
+			relativeStart = _relativeStart
+		}
+		var actualStart JSInt
+		if relativeStart.IsNegInf() {
+			actualStart = 0
+		} else if relativeStart < 0 {
+			actualStart = (length + relativeStart).Max(0)
+		} else {
+			actualStart = relativeStart.Min(length)
+		}
+		insertCount := JSInt(len(items))
+		var actualSkipCount JSInt
+		if start == nil {
+			actualSkipCount = 0
+		} else if skipCount == nil {
+			actualSkipCount = length - actualStart
+		} else {
+			sc, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, skipCount), co)
+			if isAbrupt {
+				return rt
+			}
+			actualSkipCount = lo.Clamp(sc, 0, length-actualStart)
+		}
+
+		newLen := length + insertCount - actualSkipCount
+
+		A := ArrayCreate(agent, newLen, nil)
+		i := JSInt(0)
+		r := actualStart + actualSkipCount
+		for ; i < actualStart; i++ {
+			from := NewIntegerIndexPropertyKey(i)
+			fromValue := o.Get(from)
+			A.CreateDataPropertyOrThrow(from, fromValue)
+		}
+		for _, E := range items {
+			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), E)
+			i++
+		}
+		for ; i < newLen; i++ {
+			from := NewIntegerIndexPropertyKey(r)
+			fromValue := o.Get(from)
+			A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), fromValue)
+			r++
+		}
+
+		return A.ToValue()
+	}
+
+	object.defineBuiltinFunction(realm, CMString("join"), join, 1)
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	object.defineBuiltinFunction(realm, CMString("forEach"), forEach, 1)
+	object.defineBuiltinFunction(realm, CMString("push"), push, 1)
+	object.defineBuiltinFunction(realm, CMString("pop"), pop, 0)
+	object.defineBuiltinFunction(realm, CMString("map"), arrayMap, 1)
+	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
+	object.defineBuiltinFunction(realm, CMString("includes"), includes, 1)
+	object.defineBuiltinFunction(realm, CMString("indexOf"), indexOf, 1)
+	object.defineBuiltinFunction(realm, CMString("find"), find, 1)
+	object.defineBuiltinFunction(realm, CMString("findIndex"), findIndex, 1)
+	object.defineBuiltinFunction(realm, CMString("findLast"), findLast, 1)
+	object.defineBuiltinFunction(realm, CMString("findLastIndex"), findLastIndex, 1)
+	object.defineBuiltinFunction(realm, CMString("lastIndexOf"), lastIndexOf, 1)
+	object.defineBuiltinFunction(realm, CMString("at"), at, 1)
+	object.defineBuiltinFunction(realm, CMString("every"), every, 1)
+	object.defineBuiltinFunction(realm, CMString("some"), some, 1)
+	object.defineBuiltinFunction(realm, CMString("with"), with, 2)
+	object.defineBuiltinFunction(realm, CMString("entries"), entries, 0)
+	object.defineBuiltinFunction(realm, CMString("keys"), keys, 0)
+	object.defineBuiltinFunction(realm, CMString("values"), values, 0)
+	object.defineBuiltinFunction(realm, CMString("shift"), shift, 0)
+	object.defineBuiltinFunction(realm, CMString("unshift"), unshift, 1)
+	object.defineBuiltinFunction(realm, CMString("filter"), filter, 1)
+	object.defineBuiltinFunction(realm, CMString("reduce"), reduce, 1)
+	object.defineBuiltinFunction(realm, CMString("reduceRight"), reduceRight, 1)
+	object.defineBuiltinFunction(realm, CMString("concat"), concat, 1)
+	object.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
+	object.defineBuiltinFunction(realm, CMString("fill"), fill, 1)
+	object.defineBuiltinFunction(realm, CMString("copyWithin"), copyWithin, 2)
+	object.defineBuiltinFunction(realm, CMString("reverse"), reverse, 0)
+	object.defineBuiltinFunction(realm, CMString("toReversed"), toReversed, 0)
+	object.defineBuiltinFunction(realm, CMString("sort"), sort, 1)
+	object.defineBuiltinFunction(realm, CMString("toSorted"), toSorted, 1)
+	object.defineBuiltinFunction(realm, CMString("flat"), flat, 0)
+	object.defineBuiltinFunction(realm, CMString("flatMap"), flatMap, 1)
+	object.defineBuiltinFunction(realm, CMString("splice"), splice, 2)
+	object.defineBuiltinFunction(realm, CMString("toSpliced"), toSpliced, 2)
+
+	unscopablesList := OrdinaryObjectCreate(agent, nil, nil)
+	unscopablesProps := []string{
+		"at",
+		"copyWithin",
+		"entries",
+		"fill",
+		"find",
+		"findIndex",
+		"findLast",
+		"findLastIndex",
+		"flat",
+		"flatMap",
+		"includes",
+		"keys",
+		"values",
+		"toReversed",
+		"toSorted",
+		"toSpliced",
+	}
+	for _, prop := range unscopablesProps {
+		unscopablesList.CreateDataPropertyOrThrow(NewStringPropertyKey(prop), NewBooleanValue(true))
+	}
+
+	object.defineUnscopables(unscopablesList.ToValue())
+	value := object.propertyStorage().Get(NewStringPropertyKey("values"))
+	object.defineBuiltinProperty(WellKnownSymbolsIterator, value)
+
+	return object
+}
+
+// 23.1.3.2.1
+func IsConcatSpreadable(agent *Agent, value Value) (co Completion[bool]) {
+	if !value.IsObject() {
+		return
+	}
+	object := MustGetObject(value)
+	spreadable, isAbrupt, rt := ReturnIfAbrupt(
+		object.internalMethods().Get(
+			object,
+			NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIsConcatSpreadable]),
+			value,
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	if spreadable != UndefinedValue {
+		co.value = spreadable.ToBoolean()
+		return
+	}
+	return IsArrayCompletion(value)
+}
+
+type SortCompare struct {
+	compareFn ObjectType
+	impl      func(*Agent, Value, Value, ObjectType) Completion[JSNumber]
+}
+
+type sortHolesType int
+
+const (
+	sortHolesTypeSkipHoles sortHolesType = iota
+	sortHolesTypeReadThroughHoles
+)
+
+func InsertionSort(agent *Agent, items []Value, sortCompare SortCompare) {
+	if len(items) == 0 {
+		return
+	}
+	for i := 1; i < len(items); i++ {
+		x := items[i]
+		j := i
+		for j > 0 {
+			y := items[j-1]
+			c := ReturnAssertNormal(sortCompare.impl(agent, x, y, sortCompare.compareFn))
+			if c >= 0 {
+				break
+			}
+			items[j] = y
+			j--
+		}
+		items[j] = x
+	}
+}
+
+// 23.1.3.30.1
+func SortIndexedProperties(agent *Agent, obj ObjectType, length JSInt, sortCompare SortCompare, holes sortHolesType) (items []Value) {
+	k := JSInt(0)
+	for k < length {
+		pk := NewIntegerIndexPropertyKey(k)
+		var kRead bool
+		if holes == sortHolesTypeSkipHoles {
+			kRead = obj.HasProperty(pk)
+		} else {
+			kRead = true
+		}
+		if kRead {
+			kValue := obj.Get(pk)
+			items = append(items, kValue)
+		}
+		k++
+	}
+	InsertionSort(agent, items, sortCompare)
+
+	return
+}
+
+// CompareArrayElements
+// spec: 23.1.3.30.2
+func CompareArrayElements(agent *Agent, x, y Value, compareFn ObjectType) (co Completion[JSNumber]) {
+	if x == UndefinedValue && y == UndefinedValue {
+		co.value = 0
+		return
+	}
+	if x == UndefinedValue {
+		co.value = 1
+		return
+	}
+	if y == UndefinedValue {
+		co.value = -1
+		return
+	}
+	if compareFn != nil {
+		v, isAbrupt, rt := ReturnIfAbrupt(compareFn.
+			ToValue().
+			Call(agent, UndefinedValue, []Value{x, y}).
+			value.
+			ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		if v.IsNaN() {
+			co.value = 0
+			return
+		}
+		co.value = v.Data
+		return
+	}
+
+	xString := x.String()
+	yString := y.String()
+	xSmaller, isAbrupt, rt := ReturnIfAbrupt(
+		IsLessThan(agent, NewStringValue(xString), NewStringValue(yString), IsLessThanOrderLeftFirst),
+		co)
+	if isAbrupt {
+		return rt
+	}
+	if xSmaller.ToBoolean() {
+		co.value = -1
+		return
+	}
+
+	ySmaller, isAbrupt, rt := ReturnIfAbrupt(
+		IsLessThan(agent, NewStringValue(yString), NewStringValue(xString), IsLessThanOrderLeftFirst),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	if ySmaller.ToBoolean() {
+		co.value = 1
+		return
+	}
+	co.value = 0
+	return
+}
+
+// FlattenIntoArray
+// spec: 23.1.3.13.1
+func FlattenIntoArray(
+	agent *Agent,
+	target, source ObjectType,
+	sourceLen JSInt,
+	start, depth JSInt,
+	mapperFunction ObjectType,
+	thisArg Value,
+) JSInt {
+	if mapperFunction != nil {
+		Assert(IsCallable((mapperFunction).ToValue()))
+		Assert(thisArg != nil)
+		Assert(depth == 1)
+	}
+
+	targetIndex := start
+	sourceIndex := JSInt(0)
+	for sourceIndex < sourceLen {
+		p := NewIntegerIndexPropertyKey(sourceIndex)
+		exists := source.HasProperty(p)
+		if exists {
+			element := source.Get(p)
+			if mapperFunction != nil {
+				element = mapperFunction.Call(
+					thisArg,
+					[]Value{element, NewNumberValue(sourceIndex.ToNumber()), (source).ToValue()},
+				).value
+			}
+
+			shouldFlatten := false
+			if depth > 0 {
+				shouldFlatten = IsArray(element)
+			}
+			if shouldFlatten {
+				var newDepth JSInt
+				if depth.IsPositiveInf() {
+					newDepth = JSInt(math.Inf(1))
+				} else {
+					newDepth = depth - 1
+				}
+				var co CompletionValue
+				elementLen, isAbrupt, rt := ReturnIfAbrupt(MustGetObject(element).LengthOfArrayLike(), co)
+				if isAbrupt {
+					panic(rt)
+				}
+
+				targetIndex = FlattenIntoArray(agent, target, MustGetObject(element), elementLen, targetIndex, newDepth, nil, nil)
+			} else {
+				if float64(targetIndex) >= POW_2_53-1 {
+					panic("TypeError")
+				}
+				target.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(targetIndex), element)
+				targetIndex++
+			}
+		}
+		sourceIndex++
+	}
+	return targetIndex
+}
+
+// MARK: - Internal
+
+func (a *ArrayObject) String() string {
+	s := "ArrayObject ["
+	for i := JSInt(0); i < a.LengthOfArrayLike().value; i++ {
+		if i > 0 {
+			s += ", "
+		}
+		s += a.Get(NewIntegerIndexPropertyKey(i)).String()
+	}
+	s += "]"
+	return s
+}

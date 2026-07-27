@@ -1,0 +1,262 @@
+package coldmoon
+
+import "github.com/Seeingu/coldmoon/pkg"
+
+type ErrorObject struct {
+	*Object
+	Name    string
+	Message string
+}
+
+var errorInternalSet SetFn = func(o ObjectType, p PropertyKey, v Value, receiver Value) Completion[bool] {
+	switch pp := p.(type) {
+	case StringPropertyKey:
+		if pp.Value == "name" {
+			o.(*ErrorObject).Name = v.String()
+		}
+		if pp.Value == "message" {
+			o.(*ErrorObject).Message = v.String()
+		}
+	}
+	return OrdinarySet(o, p, v, receiver)
+}
+
+func NewErrorConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
+		message := pkg.SliceSafeGet(argumentsList, 0)
+		if message == nil {
+			message = UndefinedValue
+		}
+		options := pkg.SliceSafeGet(argumentsList, 1)
+
+		newTarget := _newTarget
+		if newTarget == nil {
+			newTarget = agent.ActiveFunctionObject()
+		}
+
+		object := OrdinaryCreateFromConstructor(agent, newTarget, "%Error.prototype%", []string{})
+		errorObject := &ErrorObject{
+			Object: object,
+		}
+		errorObject.ref = errorObject
+		errorObject.internalMethods().Set = errorInternalSet
+
+		if message != UndefinedValue {
+			msg := message.String()
+
+			errorObject.CreateNonEnumerableDataProperty(NewStringPropertyKey("message"), NewStringValue(msg))
+
+			errorObject.Message = msg
+		}
+
+		InstallErrorCause(agent, errorObject, options)
+
+		return (errorObject).ToValue()
+	}
+
+	object := CreateBuiltinFunction(
+		realm.Agent,
+		behavior,
+		1,
+		CMString("Error"),
+		builtinFunctionArgs{
+			realm:         realm,
+			prototype:     realm.Intrinsics.FunctionPrototype,
+			isConstructor: true,
+		},
+	)
+
+	BindPrototypeAndConstructor(realm.Intrinsics.ErrorPrototype, object)
+
+	return object
+}
+
+// 20.5.8.1
+func InstallErrorCause(agent *Agent, errorObject *ErrorObject, options Value) {
+	if optionsValue, ok := options.(*ObjectValue); ok {
+		causeKey := NewStringPropertyKey("cause")
+		if optionsValue.Object.HasProperty(causeKey) {
+			cause := optionsValue.Object.Get(causeKey)
+
+			errorObject.CreateNonEnumerableDataProperty(causeKey, cause)
+		}
+	}
+}
+
+func NewErrorPrototype(realm *Realm) ObjectType {
+	agent := realm.Agent
+
+	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "ErrorPrototype")
+
+	object.defineBuiltinProperty(CMString("name"), NewStringValue("Error").ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToBuiltinPropertyDescriptor())
+
+	var toString BehaviorFn = func(thisValue Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
+		O, ok := thisValue.(*ObjectValue)
+		if !ok {
+			panic("TypeError")
+		}
+		object := O.Object
+		name := object.Get(NewStringPropertyKey("name"))
+		var nameString string
+		if name == nil {
+			nameString = "Error"
+		} else {
+			nameString = name.String()
+		}
+
+		msg := object.Get(NewStringPropertyKey("message"))
+		var msgString string
+		if msg == nil {
+			msgString = ""
+		} else {
+			msgString = msg.String()
+		}
+
+		if nameString == "" {
+			return NewStringValue(msgString)
+		}
+
+		if msgString == "" {
+			return NewStringValue(nameString)
+		}
+
+		return NewStringValue(nameString + ": " + msgString)
+	}
+
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+
+	return object
+}
+
+// 20.5.6.4
+func NativeError() ObjectType {
+	errorObject := &ErrorObject{
+		Object: NewObject(nil, nil, "Error"),
+	}
+	errorObject.ref = errorObject
+	return errorObject
+}
+
+func NewNativeErrorConstructor(realm *Realm, name string) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
+		message := pkg.SliceSafeGet(argumentsList, 0)
+		if message == nil {
+			message = UndefinedValue
+		}
+		options := pkg.SliceSafeGet(argumentsList, 1)
+
+		newTarget := _newTarget
+		if newTarget == nil {
+			newTarget = agent.ActiveFunctionObject()
+		}
+
+		protoName := IntrinsicName("%" + name + ".prototype%")
+		object := OrdinaryCreateFromConstructor(agent, newTarget, protoName, []string{})
+		errorObject := &ErrorObject{
+			Object: object,
+			Name:   name,
+		}
+		errorObject.ref = errorObject
+		errorObject.internalMethods().Set = errorInternalSet
+
+		if message != UndefinedValue {
+			msg := message.String()
+
+			errorObject.CreateNonEnumerableDataProperty(NewStringPropertyKey("message"), NewStringValue(msg))
+
+			errorObject.Message = msg
+		}
+
+		InstallErrorCause(agent, errorObject, options)
+
+		return (errorObject).ToValue()
+	}
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString(name), builtinFunctionArgs{
+		realm:         realm,
+		prototype:     realm.Intrinsics.ErrorConstructor,
+		isConstructor: true,
+	})
+
+	protoName := IntrinsicName("%" + name + ".prototype%")
+	BindPrototypeAndConstructor(realm.Intrinsics.Get(protoName), object)
+
+	return object
+}
+
+func NewNativeErrorPrototype(realm *Realm, name string) ObjectType {
+	agent := realm.Agent
+	object := NewObject(agent, realm.Intrinsics.ErrorPrototype, name+"Prototype")
+
+	object.defineBuiltinProperty(CMString("name"), NewStringValue(name).ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToBuiltinPropertyDescriptor())
+
+	return object
+}
+
+func NewAggregateErrorConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, _newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		errors := pkg.SliceSafeGet(argumentsList, 0)
+		message := pkg.SliceSafeGet(argumentsList, 1)
+		options := pkg.SliceSafeGet(argumentsList, 2)
+		if errors == nil {
+			errors = UndefinedValue
+		}
+		if message == nil {
+			message = UndefinedValue
+		}
+		newTarget := _newTarget
+		if newTarget == nil {
+			newTarget = agent.ActiveFunctionObject()
+		}
+		o := OrdinaryCreateFromConstructor(agent, newTarget, "%AggregateError.prototype%", []string{})
+		errorObject := &ErrorObject{
+			Object:  o,
+			Name:    "AggregateError",
+			Message: "",
+		}
+		errorObject.internalMethods().Set = errorInternalSet
+		if message != UndefinedValue {
+			msg := message.String()
+			errorObject.CreateNonEnumerableDataProperty(NewStringPropertyKey("message"), NewStringValue(msg))
+			errorObject.Message = msg
+		}
+
+		InstallErrorCause(agent, errorObject, options)
+		iterator, isAbrupt, rt := ReturnIfAbrupt(GetIterator(agent, errors, IteratorKindSync), co)
+		if isAbrupt {
+			return rt
+		}
+		errorsList, isAbrupt, rt := ReturnIfAbrupt(iterator.IteratorToList(), co)
+		if isAbrupt {
+			return rt
+		}
+		errorObject.DefinePropertyOrThrow(NewStringPropertyKey("errors"), &PropertyDescriptor{
+			Value:        (CreateArrayFromList(agent, errorsList)).ToValue(),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: true,
+		})
+		return (errorObject).ToValue()
+	}
+	object := CreateBuiltinFunction(agent, behavior, 2, CMString("AggregateError"), builtinFunctionArgs{
+		realm:         realm,
+		prototype:     realm.Intrinsics.ErrorConstructor,
+		isConstructor: true,
+	})
+	BindPrototypeAndConstructor(realm.Intrinsics.AggregateErrorPrototype, object)
+	return object
+}
+
+func NewAggregateErrorPrototype(realm *Realm) ObjectType {
+	agent := realm.Agent
+	object := NewObject(agent, realm.Intrinsics.ErrorPrototype, "AggregateErrorPrototype")
+	object.defineBuiltinProperty(CMString("name"), NewStringValue("AggregateError").ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("message"), NewStringValue("").ToBuiltinPropertyDescriptor())
+	return object
+}

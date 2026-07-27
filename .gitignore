@@ -25,3 +25,12 @@ go.work.sum
 .env
 
 .idea
+
+main.exe
+
+*.a
+
+.passed.txt
+.failed.txt
+.passed.v2.txt
+.failed.v2.txt

@@ -1,0 +1,1542 @@
+package coldmoon
+
+import (
+	"fmt"
+
+	"github.com/Seeingu/coldmoon/pkg"
+	"github.com/samber/lo"
+)
+
+type IntegrityLevel int
+
+const (
+	IntegrityLevelSealed IntegrityLevel = iota
+	IntegrityLevelFrozen
+)
+
+type Data struct {
+	id                uint64
+	prototype         ObjectType
+	extensible        bool
+	internalSlotNames map[string]any
+	agent             *Agent
+	internalMethods   InternalMethods
+	propertyStorage   PropertyStorage
+	privateElements   map[PrivateName]*PrivateElement
+}
+
+type Object struct {
+	ObjectType
+	typeName string
+	data     *Data
+	// ref is used to store the reference of the object
+	ref ObjectType
+}
+
+var _ ObjectType = (*Object)(nil)
+
+func (o *Object) ToValue() Value {
+	return NewValueFromObject(o.Ref())
+}
+
+func (o *Object) GetId() uint64 {
+	return o.data.id
+}
+
+// Ref returns the reference of the object
+// If the object does not have a reference, it returns itself
+func (o *Object) Ref() ObjectType {
+	// TODO(BM): replace ref by using ObjectType directly
+	if o.ref == nil {
+		return o
+	}
+	return o.ref
+}
+
+func NewObject(agent *Agent, prototype ObjectType, typeName string) *Object {
+	o := &Object{
+		typeName: typeName,
+		data: &Data{
+			id:                agent.UniqueObjectId(),
+			agent:             agent,
+			prototype:         prototype,
+			extensible:        true,
+			internalSlotNames: map[string]any{},
+			internalMethods:   NewInternalMethods(),
+			propertyStorage:   NewPropertyStorage(),
+		},
+	}
+	return o
+}
+
+func NewObjectV2(agent *Agent, prototype ObjectType, typeName string, additionalInternalSlotsList []string) *Object {
+	o := NewObject(agent, prototype, typeName)
+	for _, slot := range additionalInternalSlotsList {
+		o.data.internalSlotNames[slot] = nil
+	}
+	return o
+}
+
+var EmptyObject = &Object{}
+
+func (o *Object) Prototype() ObjectType {
+	return o.data.prototype
+}
+
+func (o *Object) SetSlot(name string, value any) {
+	o.data.internalSlotNames[name] = value
+}
+
+func (o *Object) GetSlot(name string) (value any, ok bool) {
+	value, ok = o.data.internalSlotNames[name]
+	return
+}
+
+func (o *Object) HasSlot(name string) bool {
+	v, ok := o.data.internalSlotNames[name]
+	if !ok {
+		return false
+	}
+	return v != nil
+}
+
+// TODO: implement spec
+// 14.7.5.9
+func (o *Object) EnumerateObjectProperties() ObjectType {
+	return CreateForInIterator(o.Agent(), o.Ref())
+}
+
+func (o *Object) SetPrototype(p ObjectType) {
+	o.data.prototype = p
+}
+
+func (o *Object) Extensible() bool {
+	return o.data.extensible
+}
+
+func (o *Object) SetExtensible(v bool) {
+	o.data.extensible = v
+}
+
+func (o *Object) Agent() *Agent {
+	return o.data.agent
+}
+
+func (o *Object) internalMethods() *InternalMethods {
+	return &o.data.internalMethods
+}
+
+func (o *Object) propertyStorage() *PropertyStorage {
+	return &o.data.propertyStorage
+}
+
+// TODO: check is ordinary
+func (o *Object) IsOrdinary() bool {
+	return o.Prototype() != nil
+}
+
+// OrdinaryToPrimitive
+// spec: 7.1.1.1
+func (o *Object) OrdinaryToPrimitive(hint PreferredType) (co CompletionValue) {
+	var methodNames []string
+	switch hint {
+	case PreferredTypeString:
+		methodNames = []string{"toString", "valueOf"}
+	default:
+		methodNames = []string{"valueOf", "toString"}
+	}
+
+	for _, name := range methodNames {
+		method := o.Get(NewStringPropertyKey(name))
+		if IsCallable(method) {
+			r := method.CallNoArgs(o.ToValue())
+			result, isAbrupt, rt := ReturnIfAbrupt(r, co)
+			if isAbrupt {
+				return rt
+			}
+			if _, isObject := result.(*ObjectValue); !isObject {
+				return result.ToCompletion()
+			}
+		}
+	}
+	message := "Could not convert object to primitive"
+	return co.ThrowTypeError(o.Agent(), message)
+}
+
+func (o *Object) IsCallable() bool {
+	if o.Ref().internalMethods().Call != nil {
+		return true
+	}
+
+	return false
+}
+
+// Call
+// spec: 7.3.13
+// argumentsList is optional
+func (o *Object) Call(this Value, argumentsList ArgumentsList) (co CompletionValue) {
+	if !o.IsCallable() {
+		return co.ThrowTypeError(o.Agent(), fmt.Sprintf("TypeError: %s is not callable", o.String()))
+	}
+	if argumentsList == nil {
+		argumentsList = ArgumentsList{}
+	}
+	object := o.Ref()
+	return object.internalMethods().Call(object, this, argumentsList)
+}
+
+// 7.2.5
+func (o *Object) IsExtensible() bool {
+	return o.internalMethods().IsExtensible(o)
+}
+
+// TODO(BM): return CompletionValue
+// spec: 7.3.2
+func (o *Object) Get(key PropertyKey) Value {
+	r := o.internalMethods().Get(o.Ref(), key, o.ToValue())
+	// FIXME: no need when return CompletionValue
+	if r.t == CompletionTypeReturn {
+		return r.value
+	}
+	return ReturnAssertNormal(r)
+}
+
+// Set
+// spec: 7.3.4
+// returns UNUSED or throw
+func (o *Object) Set(key PropertyKey, value Value, throw setThrowType) (co CompletionValue) {
+	success, isAbrupt, rt := ReturnIfAbrupt(
+		o.internalMethods().Set(o.Ref(), key, value, o.ToValue()),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	if !success && throw == setThrowTypeThrow {
+		return co.ThrowTypeError(o.Agent(), "SetObject failed")
+	}
+	return
+}
+
+// 7.3.5
+func (o *Object) CreateDataProperty(key PropertyKey, value Value) bool {
+	newDesc := o.internalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
+		Value:           value,
+		Writable:        true,
+		WritableSet:     true,
+		Enumerable:      true,
+		EnumerableSet:   true,
+		Configurable:    true,
+		ConfigurableSet: true,
+	})
+	return ReturnAssertNormal(newDesc)
+}
+
+// 7.3.6
+
+func (o *Object) CreateDataPropertyOrThrow(key PropertyKey, value Value) (co Completion[bool]) {
+	success, isAbrupt, rt := ReturnIfAbrupt(
+		o.internalMethods().DefineOwnProperty(o.Ref(), key, &PropertyDescriptor{
+			Value:           value,
+			Writable:        true,
+			WritableSet:     true,
+			Enumerable:      true,
+			EnumerableSet:   true,
+			Configurable:    true,
+			ConfigurableSet: true,
+		}),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	if !success {
+		return co.ThrowTypeError(o.Agent(), "CreateDataPropertyOrThrow failed")
+	}
+	co.value = true
+	return
+}
+
+// 7.3.7
+func (o *Object) CreateNonEnumerableDataProperty(key PropertyKey, value Value) bool {
+	for _, p := range o.propertyStorage().Descriptors() {
+		Assert(p.Configurable)
+	}
+
+	newDesc := o.DefinePropertyOrThrow(key, &PropertyDescriptor{
+		Value:        value,
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: true,
+	})
+	return newDesc
+}
+
+// 7.3.8
+func (o *Object) DefinePropertyOrThrow(key PropertyKey, desc *PropertyDescriptor) bool {
+	success := ReturnAssertNormal(o.internalMethods().DefineOwnProperty(o.Ref(), key, desc))
+	if !success {
+		o.Agent().ThrowException(TypeError, "DefinePropertyOrThrow failed")
+	}
+	return success
+}
+
+// 7.3.9
+func (o *Object) DeletePropertyOrThrow(key PropertyKey) bool {
+	success := ReturnAssertNormal(o.internalMethods().Delete(o.Ref(), key))
+	if !success {
+		o.Agent().ThrowException(TypeError, "DeletePropertyOrThrow failed")
+	}
+	return success
+}
+
+// 7.3.11
+func (o *Object) HasProperty(key PropertyKey) bool {
+	return ReturnAssertNormal(o.internalMethods().HasProperty(o.Ref(), key))
+}
+
+// 7.3.12
+func ObjectHasOwnProperty(o ObjectType, key PropertyKey) bool {
+	desc := o.internalMethods().GetOwnProperty(o, key)
+	return desc != nil
+}
+
+// 7.3.14
+func ObjectConstruct(
+	o ObjectType,
+	_argumentLists []Value,
+	_newTarget ObjectType,
+) Completion[ObjectType] {
+	newTarget := _newTarget
+	if newTarget == nil {
+		newTarget = o
+	}
+	return o.internalMethods().Construct(o, _argumentLists, newTarget)
+}
+
+func (o *Object) Construct(
+	argumentLists []Value,
+	newTarget ObjectType,
+) (co Completion[ObjectType]) {
+	object := o.Ref()
+	if newTarget == nil {
+		newTarget = object
+	}
+	return object.internalMethods().Construct(object, argumentLists, newTarget)
+}
+
+// 7.3.15
+func SetIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
+	status := o.internalMethods().PreventExtensions(o)
+
+	if !status {
+		return false
+	}
+
+	keys := o.internalMethods().OwnPropertyKeys(o)
+	switch level {
+	case IntegrityLevelSealed:
+		for _, k := range keys {
+			o.DefinePropertyOrThrow(k, &PropertyDescriptor{
+				Configurable:    false,
+				ConfigurableSet: true,
+			})
+		}
+	case IntegrityLevelFrozen:
+		for _, k := range keys {
+			currentDesc := o.internalMethods().GetOwnProperty(o, k)
+			var desc *PropertyDescriptor
+
+			if currentDesc != nil {
+				if currentDesc.IsAccessorDescriptor() {
+					desc = &PropertyDescriptor{
+						Configurable:    false,
+						ConfigurableSet: true,
+					}
+				} else {
+					desc = &PropertyDescriptor{
+						Configurable:    false,
+						ConfigurableSet: true,
+						Writable:        false,
+						WritableSet:     true,
+					}
+				}
+				o.DefinePropertyOrThrow(k, desc)
+			}
+		}
+	}
+	return true
+}
+
+// 7.3.16
+func TestIntegrityLevel(o ObjectType, level IntegrityLevel) bool {
+	extensible := o.IsExtensible()
+	if extensible {
+		return false
+	}
+
+	keys := o.internalMethods().OwnPropertyKeys(o)
+
+	for _, k := range keys {
+		currentDesc := o.internalMethods().GetOwnProperty(o, k)
+		if currentDesc == nil {
+			continue
+		}
+
+		if currentDesc.Configurable {
+			return false
+		}
+
+		if level == IntegrityLevelFrozen && currentDesc.IsDataDescriptor() {
+			if currentDesc.Writable {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// LengthOfArrayLike
+// spec: 7.3.18
+func (o *Object) LengthOfArrayLike() (co Completion[JSInt]) {
+	length, isAbrupt, rt := ReturnIfAbrupt(
+		o.internalMethods().Get(
+			o.Ref(),
+			NewStringPropertyKey("length"),
+			o.ToValue(),
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	return ToLength(o.Agent(), length)
+}
+
+// 7.3.22
+func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) (co Completion[ObjectType]) {
+	objectRef := o.Ref()
+	c := objectRef.Get(NewStringPropertyKey("constructor"))
+	if c == UndefinedValue {
+		co.value = defaultConstructor
+		return
+	}
+	if !c.IsObject() {
+		co.err = objectRef.Agent().ThrowException(TypeError, c.String()+" is not an object")
+		return
+	}
+	cObject := MustGetObject(c)
+	s := cObject.Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]))
+	if s == UndefinedValue || s == NullValue {
+		co.value = defaultConstructor
+		return
+	}
+	if IsConstructor(s) {
+		co.value = MustGetObject(s)
+		return
+	}
+	co.value = defaultConstructor
+	return
+}
+
+func (o *Object) ToCompletion() (co Completion[ObjectType]) {
+	co.value = o
+	return
+}
+
+// MARK: - 7.3.23
+type objectOwnPropertiesKind int
+
+const (
+	objectOwnPropertiesKindKey objectOwnPropertiesKind = iota
+	objectOwnPropertiesKindValue
+	objectOwnPropertiesKindKeyAndValue
+)
+
+func (o *Object) EnumerableOwnProperties(kind objectOwnPropertiesKind) (results []Value) {
+	object := o.Ref()
+	ownKeys := object.internalMethods().OwnPropertyKeys(object)
+
+	for _, key := range ownKeys {
+		if _, isSymbol := key.(SymbolPropertyKey); isSymbol {
+			continue
+		}
+		desc := object.internalMethods().GetOwnProperty(object, key)
+		if desc != nil && desc.Enumerable {
+			switch kind {
+			case objectOwnPropertiesKindKey:
+				results = append(results, key.ToValue())
+			case objectOwnPropertiesKindValue:
+				results = append(results, object.Get(key))
+			case objectOwnPropertiesKindKeyAndValue:
+				keyValue := key.ToValue()
+				entry := CreateArrayFromList(o.Agent(), []Value{
+					keyValue,
+					object.Get(key),
+				})
+				results = append(results, (entry).ToValue())
+			}
+		}
+	}
+	return
+}
+
+// 7.3.24
+func (o *Object) GetFunctionRealm() *Realm {
+	return o.Agent().CurrentRealm()
+}
+
+// CopyDataProperties
+// spec: 7.3.25
+func (o *Object) CopyDataProperties(source Value, excludedItems []PropertyKey) {
+	if IsUndefinedOrNull(source) {
+		return
+	}
+	from := ReturnAssertNormal(source.ToObject(o.Agent()))
+	keys := from.internalMethods().OwnPropertyKeys(from)
+
+	for _, key := range keys {
+		excluded := false
+		if lo.Contains(excludedItems, key) {
+			excluded = true
+		}
+		if !excluded {
+			desc := from.internalMethods().GetOwnProperty(from, key)
+			if desc != nil && desc.Enumerable {
+				propValue := from.Get(key)
+				o.CreateDataPropertyOrThrow(key, propValue)
+			}
+		}
+	}
+}
+
+// 7.3.27
+func (o *Object) PrivateFieldAdd(privateName PrivateName, value Value) {
+	// TODO: HostEnsureCanAddPrivateElement
+	entry := o.PrivateElementFind(privateName)
+	if entry != nil {
+		o.Agent().ThrowTypeError("private field already exists")
+	}
+	o.data.privateElements[privateName] = &PrivateElement{
+		Kind:  PrivateElementKindField,
+		Value: value,
+	}
+}
+
+// MARK: - DefineField
+
+func (o *Object) DefineField(field *ClassFieldDefinition) {
+	fieldName := field.Name
+	var initializer Value = UndefinedValue
+	if field.Initializer != nil {
+		initializer = field.Initializer.ToValue()
+	}
+
+	switch name := fieldName.(type) {
+	case PropertyKey:
+		o.CreateDataPropertyOrThrow(name, initializer)
+	case PropertyKeyOrPrivateNameName:
+		o.PrivateFieldAdd(name.PrivateName, initializer)
+	default:
+		panic("unreachable")
+	}
+}
+
+func (o *Object) PrivateElementFind(privateName PrivateName) *PrivateElement {
+	return o.data.privateElements[privateName]
+}
+
+// 7.3.26
+func (o *Object) PrivateMethodOrAccessorAdd(
+	method *PrivateElement,
+) {
+	privateName := method.Key
+	Assert(method.Kind == PrivateElementKindMethod || method.Kind == PrivateElementKindAccessor)
+	o.Agent().HostHooks.HostEnsureCanAddPrivateElement()
+	entry := o.PrivateElementFind(privateName)
+	if entry != nil {
+		panic("TypeError")
+	}
+	o.data.privateElements[privateName] = method
+}
+
+// PrivateGet
+// spec: 7.3.30
+func (o *Object) PrivateGet(privateName PrivateName) (co CompletionValue) {
+	entry := o.PrivateElementFind(privateName)
+	if entry == nil {
+		return co.ThrowTypeError(o.Agent(), "PrivateGet failed")
+	}
+	switch entry.Kind {
+	case PrivateElementKindField:
+		return entry.Value.ToCompletion()
+	case PrivateElementKindMethod:
+		return entry.Value.ToCompletion()
+	case PrivateElementKindAccessor:
+		getter := entry.Get
+		if getter == nil {
+			return co.ThrowTypeError(o.Agent(), "PrivateGet failed: getter is nil")
+		}
+		return getter.Call(o.ToValue(), []Value{})
+	}
+	panic("unreachable")
+}
+
+// MARK: - InitializeInstanceElements
+
+func (o *Object) InitializeInstanceElements(constructor ObjectType) {
+	methods := constructor.(InternalSlotPrivateMethods).PrivateMethods()
+	for _, method := range methods {
+		o.PrivateMethodOrAccessorAdd(method)
+	}
+
+	fields := constructor.(InternalSlotFields).Fields()
+	for _, field := range fields {
+		o.DefineField(field)
+	}
+}
+
+// MARK: - Object Constructor
+
+// 20.1.1
+func NewObjectConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var value Value
+		if len(argumentsList) > 0 {
+			value = argumentAt(argumentsList, 0)
+		}
+		if newTarget != nil && newTarget != agent.ActiveFunctionObject() {
+			return OrdinaryCreateFromConstructor(
+				agent, newTarget, "%Object.prototype%", []string{},
+			).ToValue()
+		}
+
+		if value == nil || value == UndefinedValue || value == NullValue {
+			return OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{}).ToValue()
+		}
+
+		var co CompletionValue
+		objectValue, isAbrupt, rt := ReturnIfAbrupt(value.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return objectValue.ToValue()
+	}
+
+	object := CreateBuiltinFunction(
+		agent,
+		behavior,
+		1, CMString("Object"),
+		builtinFunctionArgs{
+			realm:         realm,
+			prototype:     realm.Intrinsics.FunctionPrototype,
+			prefix:        "",
+			isConstructor: true,
+		},
+	)
+
+	argument := func(arguments []Value, index int) Value {
+		value := pkg.SliceSafeGet(arguments, index)
+		if value == nil {
+			return UndefinedValue
+		}
+		return value
+	}
+
+	var create BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o := argument(arguments, 0)
+		if !o.IsObject() && o != NullValue {
+			return co.ThrowTypeError(agent, "is not an object")
+		}
+
+		var proto ObjectType
+		if o != NullValue {
+			proto = MustGetObject(o)
+		}
+		obj := OrdinaryObjectCreate(agent, proto, []string{})
+
+		if len(arguments) > 1 && argumentAt(arguments, 1) != UndefinedValue {
+			properties := argumentAt(arguments, 1)
+			var co CompletionValue
+			result, isAbrupt, rt := ReturnIfAbrupt(objectDefineProperties(agent, obj, properties), co)
+			if isAbrupt {
+				return rt
+			}
+			return result.ToValue()
+		}
+
+		return (obj).ToValue()
+	}
+
+	var defineProperties BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o := pkg.SliceSafeGet(arguments, 0)
+		properties := pkg.SliceSafeGet(arguments, 1)
+		if o == nil {
+			o = UndefinedValue
+		}
+		if properties == nil {
+			properties = UndefinedValue
+		}
+		if !o.IsObject() {
+			return co.ThrowTypeError(agent, "is not an object")
+		}
+		result, isAbrupt, rt := ReturnIfAbrupt(objectDefineProperties(agent, MustGetObject(o), properties), co)
+		if isAbrupt {
+			return rt
+		}
+		return result.ToValue()
+	}
+
+	defineProperty := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o := pkg.SliceSafeGet(arguments, 0)
+		property := pkg.SliceSafeGet(arguments, 1)
+		attributes := pkg.SliceSafeGet(arguments, 2)
+		if o == nil {
+			o = UndefinedValue
+		}
+		if property == nil {
+			property = UndefinedValue
+		}
+		if attributes == nil {
+			attributes = UndefinedValue
+		}
+		if !o.IsObject() {
+			return co.ThrowTypeError(agent, "is not an object")
+		}
+
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, property), co)
+		if isAbrupt {
+			return rt
+		}
+		desc, isAbrupt, rt := ReturnIfAbrupt(ToPropertyDescriptorCompletion(agent, attributes), co)
+		if isAbrupt {
+			return rt
+		}
+		target := MustGetObject(o)
+		success, isAbrupt, rt := ReturnIfAbrupt(
+			target.internalMethods().DefineOwnProperty(target, key, desc),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		if !success {
+			return co.ThrowTypeError(agent, "Object.defineProperty failed")
+		}
+
+		return o
+	}
+
+	// 20.1.2.6
+	var freeze BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return objectValue
+		}
+		obj := MustGetObject(objectValue)
+
+		status := SetIntegrityLevel(obj, IntegrityLevelFrozen)
+		if !status {
+			return co.ThrowTypeError(agent, "SetIntegrityLevel failed")
+		}
+		return objectValue
+	}
+
+	// 20.1.2.8
+	var getOwnPropertyDescriptor BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := argument(args, 0)
+		p := argument(args, 1)
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, p), co)
+		if isAbrupt {
+			return rt
+		}
+		desc := obj.internalMethods().GetOwnProperty(obj, key)
+
+		if desc == nil {
+			return UndefinedValue
+		}
+		return (desc.FromPropertyDescriptor(agent, desc)).ToValue()
+	}
+	// 20.1.2.9
+	var getOwnPropertyDescriptors BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := argument(args, 0)
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+
+		ownKeys := obj.internalMethods().OwnPropertyKeys(obj)
+
+		descriptors := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
+		for _, key := range ownKeys {
+			desc := obj.internalMethods().GetOwnProperty(obj, key)
+			if desc != nil {
+				descValue := (desc.FromPropertyDescriptor(agent, desc)).ToValue()
+				descriptors.CreateDataPropertyOrThrow(key, descValue)
+			}
+		}
+		return (descriptors).ToValue()
+	}
+
+	// 20.1.2.12
+	var getPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		o := argument(args, 0)
+
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(o.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		proto := obj.internalMethods().GetPrototypeOf(obj)
+		if proto == nil {
+			return NullValue
+		}
+		return proto.ToValue()
+	}
+
+	// 20.1.2.15
+	var objectIs BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		arg1 := argument(args, 0)
+		arg2 := argument(args, 1)
+		return NewBooleanValue(SameValue(arg1, arg2))
+	}
+
+	// 20.1.2.16
+	var isExtensible BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(MustGetObject(objectValue).IsExtensible())
+	}
+
+	// 20.1.2.17
+	var isFrozen BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return NewBooleanValue(true)
+		}
+		return NewBooleanValue(TestIntegrityLevel(MustGetObject(objectValue), IntegrityLevelFrozen))
+	}
+
+	// 20.1.2.18
+	var isSealed BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return NewBooleanValue(true)
+		}
+		return NewBooleanValue(TestIntegrityLevel(MustGetObject(objectValue), IntegrityLevelSealed))
+	}
+
+	// 20.1.2.20
+	var preventExtensions BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return objectValue
+		}
+		obj := MustGetObject(objectValue)
+
+		status := obj.internalMethods().PreventExtensions(obj)
+		if !status {
+			return co.ThrowTypeError(agent, "PreventExtensions failed")
+		}
+		return objectValue
+	}
+
+	// 20.1.2.22
+	var seal BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		if !objectValue.IsObject() {
+			return objectValue
+		}
+		obj := MustGetObject(objectValue)
+
+		status := SetIntegrityLevel(obj, IntegrityLevelSealed)
+		if !status {
+			return co.ThrowTypeError(agent, "SetIntegrityLevel failed")
+		}
+		return objectValue
+	}
+
+	// 20.1.2.23
+	var setPrototypeOf BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		proto := argument(args, 1)
+		if objectValue == UndefinedValue || objectValue == NullValue {
+			return co.ThrowTypeError(agent, "cannot convert undefined or null to object")
+		}
+		if !proto.IsObject() && proto != NullValue {
+			return co.ThrowTypeError(agent, "prototype must be an object or null")
+		}
+		if !objectValue.IsObject() {
+			return objectValue
+		}
+
+		var protoObj ObjectType
+		if proto.IsObject() {
+			protoObj = MustGetObject(proto)
+		}
+		obj := MustGetObject(objectValue)
+		status := obj.internalMethods().SetPrototypeOf(obj, protoObj)
+		if !status {
+			return co.ThrowTypeError(agent, "setPrototypeOf failed")
+		}
+
+		return objectValue
+	}
+
+	var hasOwn BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		objectValue := argument(args, 0)
+		key := argument(args, 1)
+
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, key), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(ObjectHasOwnProperty(obj, p))
+	}
+
+	var entries BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		objectValue := argument(args, 0)
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		entryList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKeyAndValue)
+		return CreateArrayFromList(agent, entryList).ToValue()
+	}
+	var keys BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		objectValue := argument(args, 0)
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		keyList := obj.EnumerableOwnProperties(objectOwnPropertiesKindKey)
+		return CreateArrayFromList(agent, keyList).ToValue()
+	}
+	var values BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		objectValue := argument(args, 0)
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		valueList := obj.EnumerableOwnProperties(objectOwnPropertiesKindValue)
+		return CreateArrayFromList(agent, valueList).ToValue()
+	}
+	var assign BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		target := pkg.SliceSafeGet(args, 0)
+		if target == nil {
+			target = UndefinedValue
+		}
+		to, isAbrupt, rt := ReturnIfAbrupt(target.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		sources := args[1:]
+		if len(sources) == 0 {
+			return to.ToValue()
+		}
+		for _, nextSource := range sources {
+			if nextSource != UndefinedValue && nextSource != NullValue {
+				from, isAbrupt, rt := ReturnIfAbrupt(nextSource.ToObject(agent), co)
+				if isAbrupt {
+					return rt
+				}
+				pKeys := from.internalMethods().OwnPropertyKeys(from)
+				for _, nextKey := range pKeys {
+					desc := from.internalMethods().GetOwnProperty(from, nextKey)
+					if desc != nil && desc.Enumerable {
+						propValue := from.Get(nextKey)
+						_, isAbrupt, rt := ReturnIfAbrupt(
+							to.Set(nextKey, propValue, setThrowTypeThrow),
+							co,
+						)
+						if isAbrupt {
+							return rt
+						}
+					}
+				}
+			}
+		}
+		return (to).ToValue()
+	}
+	var getOwnPropertyNames BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		objectValue := argument(args, 0)
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		keys := obj.internalMethods().OwnPropertyKeys(obj)
+		keyNames := lo.Filter(keys, func(key PropertyKey, _ int) bool {
+			_, ok := key.(SymbolPropertyKey)
+			return !ok
+		})
+		keyValues := lo.Map(keyNames, func(key PropertyKey, _ int) Value {
+			return key.ToValue()
+		})
+		return CreateArrayFromList(agent, keyValues).ToValue()
+	}
+	var getOwnPropertySymbols BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		objectValue := argument(args, 0)
+		var co CompletionValue
+		obj, isAbrupt, rt := ReturnIfAbrupt(objectValue.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		keys := obj.internalMethods().OwnPropertyKeys(obj)
+		symbols := lo.Filter(keys, func(key PropertyKey, _ int) bool {
+			_, ok := key.(SymbolPropertyKey)
+			return ok
+		})
+		symbolValues := lo.Map(symbols, func(key PropertyKey, _ int) Value {
+			return key.ToValue()
+		})
+		return (CreateArrayFromList(agent, symbolValues)).ToValue()
+	}
+	fromEntries := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		iterable := argument(args, 0)
+		if iterable == UndefinedValue || iterable == NullValue {
+			return co.ThrowTypeError(agent, "cannot convert undefined or null to object")
+		}
+		obj := OrdinaryObjectCreate(agent, realm.Intrinsics.ObjectPrototype, []string{})
+		type Captures struct {
+			object ObjectType
+		}
+		var closure BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+			f := agent.ActiveFunctionObject()
+			captures := f.(*BuiltinFunction).AdditionalFieldsV2.(*Captures)
+			k := argumentAt(args, 0)
+			v := argumentAt(args, 1)
+			var co CompletionValue
+			propertyKey, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, k), co)
+			if isAbrupt {
+				return rt
+			}
+			captures.object.CreateDataPropertyOrThrow(propertyKey, v)
+			return UndefinedValue
+		}
+
+		adder := CreateBuiltinFunction(agent, closure, 2, CMString(""), builtinFunctionArgs{
+			additionalFieldsV2: &Captures{object: obj},
+		})
+		return AddEntriesFromIterable(agent, obj, iterable, adder)
+	}
+
+	object.defineBuiltinFunction(realm, CMString("hasOwn"), hasOwn, 2)
+	object.defineBuiltinFunction(realm, CMString("getPrototypeOf"), getPrototypeOf, 1)
+	object.defineBuiltinFunction(realm, CMString("create"), create, 2)
+	object.defineBuiltinFunction(realm, CMString("defineProperties"), defineProperties, 2)
+	object.defineBuiltinFunction(realm, CMString("defineProperty"), defineProperty, 3)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertyDescriptor"), getOwnPropertyDescriptor, 2)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertyDescriptors"), getOwnPropertyDescriptors, 1)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertyNames"), getOwnPropertyNames, 1)
+	object.defineBuiltinFunction(realm, CMString("getOwnPropertySymbols"), getOwnPropertySymbols, 1)
+	object.defineBuiltinFunction(realm, CMString("freeze"), freeze, 1)
+	object.defineBuiltinFunction(realm, CMString("is"), objectIs, 2)
+	object.defineBuiltinFunction(realm, CMString("isExtensible"), isExtensible, 1)
+	object.defineBuiltinFunction(realm, CMString("isFrozen"), isFrozen, 1)
+	object.defineBuiltinFunction(realm, CMString("isSealed"), isSealed, 1)
+	object.defineBuiltinFunction(realm, CMString("preventExtensions"), preventExtensions, 1)
+	object.defineBuiltinFunction(realm, CMString("seal"), seal, 1)
+	object.defineBuiltinFunction(realm, CMString("setPrototypeOf"), setPrototypeOf, 2)
+	object.defineBuiltinFunction(realm, CMString("entries"), entries, 1)
+	object.defineBuiltinFunction(realm, CMString("keys"), keys, 1)
+	object.defineBuiltinFunction(realm, CMString("values"), values, 1)
+	object.defineBuiltinFunction(realm, CMString("assign"), assign, 2)
+	object.defineBuiltinFunction(realm, CMString("fromEntries"), fromEntries, 1)
+
+	BindPrototypeAndConstructor(realm.Intrinsics.ObjectPrototype, object)
+
+	return object
+}
+
+// NewObjectPrototypeSkeleton init %Object.prototype% at first
+func NewObjectPrototypeSkeleton(realm *Realm) ObjectType {
+	object := NewObject(realm.Agent, nil, "Object")
+	return object
+}
+
+func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
+	agent := realm.Agent
+	object.internalMethods().SetPrototypeOf = ImmutableSetPrototypeOf
+	realm.Intrinsics.ObjectPrototype = object
+
+	valueOf := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		v, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return v.ToValue()
+	}
+
+	// 20.1.3.6 toString
+	toString := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		if this == UndefinedValue {
+			return NewStringValue("[object Undefined]")
+		}
+		if this == NullValue {
+			return NewStringValue("[object Null]")
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		_isArray := IsArray(this)
+		var builtInTag string
+		if _isArray {
+			builtInTag = "Array"
+		} else if o.internalMethods().Call != nil {
+			builtInTag = "Function"
+		} else if ObjectIs[*BooleanObject](o) {
+			builtInTag = "Boolean"
+		} else if ObjectIs[*ErrorObject](o) {
+			builtInTag = "Error"
+		} else if ObjectIs[*NumberObject](o) {
+			builtInTag = "Number"
+		} else if ObjectIs[*StringObject](o) {
+			builtInTag = "String"
+		} else if ObjectIs[*DateObject](o) {
+			builtInTag = "Date"
+		} else if ObjectIs[*RegExpObject](o) {
+			builtInTag = "RegExp"
+		} else {
+			builtInTag = "Object"
+		}
+
+		symbol := WellKnownSymbols[WellKnownSymbolsToStringTag]
+		tagValue := o.Get(NewSymbolPropertyKey(symbol))
+
+		var tag string
+		if stringTag, ok := tagValue.(*StringValue); ok {
+			tag = stringTag.Data
+		} else {
+			tag = builtInTag
+		}
+		return NewStringValue("[object " + tag + "]")
+	}
+	hasOwnProperty := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, argumentAt(args, 0)), co)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(ObjectHasOwnProperty(o, p))
+	}
+	isPrototypeOf := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		v := pkg.SliceSafeGet(args, 0)
+		if v == nil {
+			v = UndefinedValue
+		}
+		var co CompletionValue
+		if !v.IsObject() {
+			return NewBooleanValue(false)
+		}
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		target, isAbrupt, rt := ReturnIfAbrupt(v.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		for {
+			target = target.internalMethods().GetPrototypeOf(target)
+			if target == nil {
+				return NewBooleanValue(false)
+			}
+			if ObjectSameValue(target, o) {
+				return NewBooleanValue(true)
+			}
+		}
+	}
+	propertyIsEnumerable := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		p, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, argumentAt(args, 0)), co)
+		if isAbrupt {
+			return rt
+		}
+		desc := o.internalMethods().GetOwnProperty(o, p)
+		if desc == nil {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(desc.Enumerable)
+	}
+	defineLegacyAccessor := func(this Value, args []Value, getter bool) CompletionConvertable[Value] {
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		property := pkg.SliceSafeGet(args, 0)
+		accessor := pkg.SliceSafeGet(args, 1)
+		if property == nil {
+			property = UndefinedValue
+		}
+		if accessor == nil {
+			accessor = UndefinedValue
+		}
+		if !IsCallable(accessor) {
+			return co.ThrowTypeError(agent, "legacy accessor must be callable")
+		}
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, property), co)
+		if isAbrupt {
+			return rt
+		}
+		desc := &PropertyDescriptor{
+			Enumerable:      true,
+			EnumerableSet:   true,
+			Configurable:    true,
+			ConfigurableSet: true,
+		}
+		if getter {
+			desc.Get = MustGetObject(accessor)
+			desc.GetSet = true
+		} else {
+			desc.Set = MustGetObject(accessor)
+			desc.SetSet = true
+		}
+		if !o.DefinePropertyOrThrow(key, desc) {
+			return co.ThrowTypeError(agent, "could not define legacy accessor")
+		}
+		return UndefinedValue
+	}
+	var defineGetter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return defineLegacyAccessor(this, args, true)
+	}
+	var defineSetter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return defineLegacyAccessor(this, args, false)
+	}
+	lookupLegacyAccessor := func(this Value, args []Value, getter bool) CompletionConvertable[Value] {
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		property := pkg.SliceSafeGet(args, 0)
+		if property == nil {
+			property = UndefinedValue
+		}
+		key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, property), co)
+		if isAbrupt {
+			return rt
+		}
+		for o != nil {
+			desc := o.internalMethods().GetOwnProperty(o, key)
+			if desc != nil {
+				if !desc.IsAccessorDescriptor() {
+					return UndefinedValue
+				}
+				if getter && desc.Get != nil {
+					return desc.Get.ToValue()
+				}
+				if !getter && desc.Set != nil {
+					return desc.Set.ToValue()
+				}
+				return UndefinedValue
+			}
+			o = o.internalMethods().GetPrototypeOf(o)
+		}
+		return UndefinedValue
+	}
+	var lookupGetter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return lookupLegacyAccessor(this, args, true)
+	}
+	var lookupSetter BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		return lookupLegacyAccessor(this, args, false)
+	}
+	toLocaleString := func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		o, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		return ValueInvoke(agent, o.ToValue(), NewStringPropertyKey("toString"), []Value{})
+	}
+
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 0)
+	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
+	object.defineBuiltinFunction(realm, CMString("hasOwnProperty"), hasOwnProperty, 1)
+	object.defineBuiltinFunction(realm, CMString("isPrototypeOf"), isPrototypeOf, 1)
+	object.defineBuiltinFunction(realm, CMString("propertyIsEnumerable"), propertyIsEnumerable, 1)
+	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
+	object.defineBuiltinFunction(realm, CMString("__defineGetter__"), defineGetter, 2)
+	object.defineBuiltinFunction(realm, CMString("__defineSetter__"), defineSetter, 2)
+	object.defineBuiltinFunction(realm, CMString("__lookupGetter__"), lookupGetter, 1)
+	object.defineBuiltinFunction(realm, CMString("__lookupSetter__"), lookupSetter, 1)
+
+	return object
+}
+
+// 9.2.12
+func CoerceOptionsToObject(agent *Agent, options Value) ObjectType {
+	if options == UndefinedValue {
+		return nil
+	}
+	return options.ToObject(agent).value
+}
+
+// 9.2.13
+
+// 20.1.2.3.1
+func objectDefineProperties(agent *Agent, object ObjectType, properties Value) (co Completion[ObjectType]) {
+	props, isAbrupt, rt := ReturnIfAbrupt(properties.ToObject(agent), co)
+	if isAbrupt {
+		return rt
+	}
+
+	keys := props.internalMethods().OwnPropertyKeys(props)
+
+	type descriptorEntry struct {
+		key  PropertyKey
+		desc *PropertyDescriptor
+	}
+	var descriptors []descriptorEntry
+	for _, key := range keys {
+		propDesc := props.internalMethods().GetOwnProperty(props, key)
+		if propDesc != nil && propDesc.Enumerable {
+			descValue, isAbrupt, rt := ReturnIfAbrupt(
+				props.internalMethods().Get(props, key, properties),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			desc, isAbrupt, rt := ReturnIfAbrupt(ToPropertyDescriptorCompletion(agent, descValue), co)
+			if isAbrupt {
+				return rt
+			}
+			descriptors = append(descriptors, descriptorEntry{key: key, desc: desc})
+		}
+	}
+
+	for _, entry := range descriptors {
+		success, isAbrupt, rt := ReturnIfAbrupt(
+			object.internalMethods().DefineOwnProperty(object, entry.key, entry.desc),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		if !success {
+			return co.ThrowTypeError(agent, "Object.defineProperties failed")
+		}
+	}
+
+	co.value = object
+	return
+}
+
+// MARK: - FindViaPredicate
+
+type direction int
+
+const (
+	DirectionAscending direction = iota
+	DirectionDescending
+)
+
+type FoundResult struct {
+	Index JSInt
+	Value Value
+}
+
+// 23.1.3.12.1
+func (o *Object) FindViaPredicate(
+	len JSInt,
+	direction direction,
+	predicate Value,
+	thisArg Value,
+) (co Completion[FoundResult]) {
+	if thisArg == nil {
+		thisArg = UndefinedValue
+	}
+	if !IsCallable(predicate) {
+		return co.ThrowTypeError(o.Agent(), "predicate is not callable")
+	}
+
+	var k JSInt
+	if direction == DirectionAscending {
+		k = 0
+	} else {
+		k = len - 1
+	}
+
+	for {
+		if direction == DirectionAscending && k >= len {
+			break
+		}
+		if direction == DirectionDescending && k < 0 {
+			break
+		}
+		pk := NewIntegerIndexPropertyKey(k)
+		kValue, isAbrupt, rt := ReturnIfAbrupt(
+			o.internalMethods().Get(o.Ref(), pk, o.ToValue()),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		testResult, isAbrupt, rt := ReturnIfAbrupt(
+			predicate.Call(o.Agent(), thisArg, []Value{kValue, NewNumberValue(k.ToNumber()), o.ToValue()}),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+
+		if testResult.ToBoolean() {
+			co.value = FoundResult{
+				Index: k,
+				Value: kValue,
+			}
+			return
+		}
+		if direction == DirectionAscending {
+			k++
+		} else {
+			k--
+		}
+	}
+
+	co.value = FoundResult{
+		Index: -1,
+		Value: UndefinedValue,
+	}
+	return
+}
+
+func SameObject(o1, o2 ObjectType) bool {
+	return o1 == o2
+}
+
+// MARK: - Internal
+
+func (o *Object) String() string {
+	var sb string = "keys: "
+	for _, key := range o.data.propertyStorage.OrderedKeys() {
+		if k, ok := key.(StringPropertyKey); ok {
+			sb += fmt.Sprintf("%s,", k.Value)
+		}
+	}
+	return fmt.Sprintf("Object[%s]{%s}", o.typeName, sb)
+}
+
+func (o *Object) defineBuiltinProperty(name PropertyConvertable, desc *PropertyDescriptor) {
+	o.Ref().DefinePropertyOrThrow(name.ToPropertyKey(), desc)
+}
+
+func (o *Object) defineToStringTag(name string) {
+	o.Ref().defineBuiltinProperty(
+		WellKnownSymbolsToStringTag,
+		NewStringValue(name).ToBuiltinPropertyDescriptor(),
+	)
+}
+
+func (o *Object) defineUnscopables(value Value) {
+	o.Ref().defineBuiltinProperty(
+		WellKnownSymbolsUnscopables,
+		value.ToBuiltinPropertyDescriptor(),
+	)
+}
+
+func (o *Object) defineBuiltinFunction(
+	realm *Realm,
+	name PropertyConvertable,
+	fn BehaviorFn,
+	length JSInt,
+) {
+	f := CreateBuiltinFunction(
+		realm.Agent,
+		fn,
+		length,
+		name,
+		builtinFunctionArgs{realm: realm},
+	)
+	o.defineBuiltinProperty(name, f.ToValue().ToBuiltinPropertyDescriptor())
+}
+
+type builtinAccessorParams struct {
+	Getter BehaviorFn
+	Setter BehaviorFn
+}
+
+func (o *Object) defineBuiltinAccessor(realm *Realm, pname PropertyConvertable, params builtinAccessorParams) {
+	getter := params.Getter
+	setter := params.Setter
+	name := pname.ToName()
+	var get ObjectType
+	if getter != nil {
+		funName := "get " + name
+		get = CreateBuiltinFunction(realm.Agent, getter, 0, CMString(funName), builtinFunctionArgs{realm: realm})
+	}
+	var set ObjectType
+	if setter != nil {
+		funName := "set " + name
+		set = CreateBuiltinFunction(realm.Agent, setter, 1, CMString(funName), builtinFunctionArgs{realm: realm})
+	}
+	pk := pname.ToPropertyKey()
+	o.DefinePropertyOrThrow(pk, &PropertyDescriptor{
+		Get:          get,
+		Set:          set,
+		Enumerable:   false,
+		Configurable: true,
+	})
+}
+
+func (o *Object) defineBuiltinFunctionWithAttributes(
+	realm *Realm,
+	name PropertyConvertable,
+	fn BehaviorFn,
+	length JSInt,
+	attr PropertyDescriptorAttributes,
+) {
+	functionName := name
+	f := CreateBuiltinFunction(
+		realm.Agent,
+		fn,
+		length,
+		functionName,
+		builtinFunctionArgs{realm: realm},
+	)
+	o.defineBuiltinProperty(name, &PropertyDescriptor{
+		Value:        f.ToValue(),
+		Writable:     attr.Writable,
+		Configurable: attr.Configurable,
+		Enumerable:   attr.Enumerable,
+	})
+}

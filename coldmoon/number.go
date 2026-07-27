@@ -1,0 +1,705 @@
+package coldmoon
+
+import (
+	"math"
+	"strconv"
+	"strings"
+
+	"github.com/Seeingu/coldmoon/pkg"
+)
+
+// MARK: - JSNumber
+
+type JSNumber float64
+
+func (n JSNumber) ToValue() Value {
+	return NewNumberValue(n)
+}
+
+func (n JSNumber) ToInt() JSInt {
+	return JSInt(n)
+}
+
+func (n JSNumber) IsFloatInt() bool {
+	return math.Mod(float64(n), 1.0) == 0
+}
+
+func (n JSNumber) IsNegInf() bool {
+	return n == JSNumber(math.Inf(-1))
+}
+
+func (n JSNumber) IsPositiveInf() bool {
+	return n == JSNumber(math.Inf(1))
+}
+
+func (n JSNumber) IsInf() bool {
+	return n == JSNumber(math.Inf(0))
+}
+
+func (n JSNumber) IsNaN() bool {
+	return math.IsNaN(float64(n))
+}
+
+func (n JSNumber) Max(b JSNumber) JSNumber {
+	return JSNumber(math.Max(float64(n), float64(b)))
+}
+
+func (n JSNumber) Min(b JSNumber) JSNumber {
+	return JSNumber(math.Min(float64(n), float64(b)))
+}
+
+func (n JSNumber) ToFloat() float64 {
+	return float64(n)
+}
+
+func (n JSNumber) Mod(b JSNumber) JSNumber {
+	return JSNumber(math.Mod(float64(n), float64(b)))
+}
+
+func (n JSNumber) Floor() JSNumber {
+	return JSNumber(math.Floor(float64(n)))
+}
+
+func (n JSNumber) IsValidDateTime() bool {
+	if n.IsNaN() || n > DateMaxValue {
+		return false
+	}
+	return true
+}
+
+var (
+	JSNumberInf    = JSNumber(math.Inf(1))
+	JSNumberNegInf = JSNumber(math.Inf(-1))
+	JSNumberNaN    = JSNumber(math.NaN())
+)
+
+// MARK: - NumberValue
+
+type NumberValue struct {
+	Value
+	Data JSNumber
+}
+
+var _ Value = (*NumberValue)(nil)
+
+func NewNumberValue(v JSNumber) *NumberValue {
+	n := &NumberValue{
+		Data: v,
+	}
+	n.Value = NewBaseValue(n)
+	return n
+}
+
+var (
+	NaNValue              = NewNumberValue(JSNumberNaN)
+	InfinityValue         = NewNumberValue(JSNumberInf)
+	NegativeInfinityValue = NewNumberValue(JSNumberNegInf)
+)
+
+func (n *NumberValue) String() string {
+	return string(n.ToString())
+}
+
+func (n *NumberValue) ToString() CMString {
+	if math.IsNaN(n.Data.ToFloat()) {
+		return "NaN"
+	}
+	if n.IsPositiveInf() {
+		return "Infinity"
+	}
+	if n.IsNegativeInf() {
+		return "-Infinity"
+	}
+	if n.IsZero() {
+		return "0"
+	}
+	absolute := math.Abs(n.Data.ToFloat())
+	if absolute >= 1e21 || absolute < 1e-6 {
+		return CMString(normalizeNumberExponent(
+			strconv.FormatFloat(n.Data.ToFloat(), 'e', -1, 64),
+		))
+	}
+	return CMString(strconv.FormatFloat(n.Data.ToFloat(), 'f', -1, 64))
+}
+
+func normalizeNumberExponent(formatted string) string {
+	parts := strings.SplitN(formatted, "e", 2)
+	if len(parts) != 2 {
+		return formatted
+	}
+	exponent := parts[1]
+	sign := "+"
+	if strings.HasPrefix(exponent, "-") {
+		sign = "-"
+		exponent = exponent[1:]
+	} else if strings.HasPrefix(exponent, "+") {
+		exponent = exponent[1:]
+	}
+	exponent = strings.TrimLeft(exponent, "0")
+	if exponent == "" {
+		exponent = "0"
+	}
+	return parts[0] + "e" + sign + exponent
+}
+
+func formatNumberExponential(number float64, fractionDigits int) string {
+	if number != 0 &&
+		fractionDigits >= 0 &&
+		fractionDigits <= 15 &&
+		math.Abs(number) <= POW_2_53-1 &&
+		number == math.Trunc(number) {
+		absolute := math.Abs(number)
+		exponent := int(math.Floor(math.Log10(absolute)))
+		factor := math.Pow10(fractionDigits)
+		scaled := absolute / math.Pow10(exponent) * factor
+		lower := math.Floor(scaled)
+		if math.Abs((scaled-lower)-0.5) < 1e-12 {
+			mantissa := (lower + 1) / factor
+			if mantissa >= 10 {
+				mantissa /= 10
+				exponent++
+			}
+			formatted := strconv.FormatFloat(mantissa, 'f', fractionDigits, 64)
+			if math.Signbit(number) {
+				formatted = "-" + formatted
+			}
+			return normalizeNumberExponent(formatted + "e" + strconv.Itoa(exponent))
+		}
+	}
+	return normalizeNumberExponent(
+		strconv.FormatFloat(number, 'e', fractionDigits, 64),
+	)
+}
+
+func (n *NumberValue) IsNaN() bool {
+	return math.IsNaN(n.Data.ToFloat())
+}
+
+func (n *NumberValue) IsPositiveInf() bool {
+	return math.IsInf(n.Data.ToFloat(), 1)
+}
+
+func (n *NumberValue) IsNegativeInf() bool {
+	return math.IsInf(float64(n.Data), -1)
+}
+
+func (n *NumberValue) IsPositiveZero() bool {
+	return n.Data == 0 && math.Signbit(n.Data.ToFloat())
+}
+
+func (n *NumberValue) IsNegativeZero() bool {
+	return n.Data == 0 && !math.Signbit(n.Data.ToFloat())
+}
+
+func (n *NumberValue) IsFinite() bool {
+	return !math.IsInf(n.Data.ToFloat(), 0)
+}
+
+func (n *NumberValue) Truncate() JSNumber {
+	return JSNumber(math.Trunc(n.Data.ToFloat()))
+}
+
+func (n *NumberValue) Round() JSNumber {
+	return JSNumber(math.Round(n.Data.ToFloat()))
+}
+
+func (n *NumberValue) Ceil() JSNumber {
+	return JSNumber(math.Ceil(n.Data.ToFloat()))
+}
+
+func (n *NumberValue) Floor() JSNumber {
+	return JSNumber(math.Floor(n.Data.ToFloat()))
+}
+
+// 6.1.6.1.1
+func (n *NumberValue) UnaryMinus() *NumberValue {
+	return NewNumberValue(-n.Data)
+}
+
+// 6.1.6.1.2
+func (n *NumberValue) BitwiseNot() *NumberValue {
+	return NewNumberValue(JSNumber(^int64(n.Data)))
+}
+
+// 6.1.6.1.3
+func (n *NumberValue) Exponentiate(exponent *NumberValue) *NumberValue {
+	if exponent.IsNaN() {
+		return NewNumberValue(JSNumber(math.NaN()))
+	}
+	if exponent.IsZero() {
+		return NewNumberValue(1)
+	}
+	if n.IsPositiveInf() {
+		if exponent.Data > 0 {
+			return NewNumberValue(JSNumber(math.Inf(1)))
+		} else {
+			return NewNumberValue(0)
+		}
+	}
+
+	if n.IsNegativeInf() {
+		if exponent.Data > 0 {
+			if exponent.Data > 0 && math.Mod(exponent.Data.ToFloat(), 2) == 0 {
+				return InfinityValue
+			} else {
+				return NegativeInfinityValue
+			}
+		} else {
+			if math.Mod(exponent.Data.ToFloat(), 2) == 0 {
+				return NewNumberValue(0)
+			} else {
+				return NewNumberValue(-0)
+			}
+		}
+	}
+
+	if n.IsPositiveZero() {
+		if exponent.Data > 0 {
+			return NewNumberValue(0)
+		} else {
+			return NewNumberValue(JSNumberInf)
+		}
+	}
+
+	if n.IsNegativeZero() {
+		if exponent.Data > 0 {
+			if math.Mod(exponent.Data.ToFloat(), 2) == 0 {
+				return NewNumberValue(0)
+			} else {
+				return NewNumberValue(-0)
+			}
+		} else {
+			return NewNumberValue(JSNumberInf)
+		}
+	}
+
+	Assert(n.IsFinite() && !n.IsZero())
+	if exponent.IsPositiveInf() {
+		if math.Abs(n.Data.ToFloat()) == 1 {
+			return NewNumberValue(JSNumberNaN)
+		}
+		if math.Abs(n.Data.ToFloat()) > 1 {
+			return NewNumberValue(JSNumberInf)
+		}
+		return NewNumberValue(0)
+	}
+	if exponent.IsNegativeInf() {
+		if math.Abs(n.Data.ToFloat()) == 1 {
+			return NewNumberValue(JSNumberNaN)
+		}
+		if math.Abs(n.Data.ToFloat()) > 1 {
+			return NewNumberValue(0)
+		}
+		return NewNumberValue(JSNumberInf)
+	}
+
+	Assert(exponent.IsFinite() && !exponent.IsZero())
+
+	return NewNumberValue(JSNumber(math.Pow(n.Data.ToFloat(), exponent.Data.ToFloat())))
+}
+
+// 6.1.6.1.4
+func (n *NumberValue) Multiply(other *NumberValue) *NumberValue {
+	return NewNumberValue(n.Data * other.Data)
+}
+
+// 6.1.6.1.5
+func (n *NumberValue) Divide(other *NumberValue) *NumberValue {
+	return NewNumberValue(n.Data / other.Data)
+}
+
+// 6.1.6.1.6
+func (n *NumberValue) Remainder(other *NumberValue) *NumberValue {
+	return NewNumberValue(JSNumber(math.Mod(n.Data.ToFloat(), other.Data.ToFloat())))
+}
+
+// 6.1.6.1.7
+func (n *NumberValue) Add(other *NumberValue) *NumberValue {
+	return NewNumberValue(n.Data + other.Data)
+}
+
+// 6.1.6.1.8
+func (n *NumberValue) Subtract(other *NumberValue) *NumberValue {
+	return NewNumberValue(n.Data - other.Data)
+}
+
+// 6.1.6.1.9
+func (n *NumberValue) LeftShift(other *NumberValue) *NumberValue {
+	return NewNumberValue(JSNumber(int64(n.Data) << uint64(int64(other.Data))))
+}
+
+// 6.1.6.1.10
+func (n *NumberValue) SignedRightShift(other *NumberValue) *NumberValue {
+	return NewNumberValue(JSNumber(int64(n.Data) >> uint64(int64(other.Data))))
+}
+
+// 6.1.6.1.11
+func (n *NumberValue) UnsignedRightShift(other *NumberValue) *NumberValue {
+	return NewNumberValue(JSNumber(uint64(n.Data) >> uint64(int64(other.Data))))
+}
+
+// 6.1.6.1.12
+func (n *NumberValue) LessThan(other NumberValue) bool {
+	if n.IsNaN() || other.IsNaN() {
+		return false
+	}
+	return n.Data < other.Data
+}
+
+// 6.1.6.1.14
+func (n *NumberValue) SameValue(other *NumberValue) bool {
+	if n.IsNaN() && other.IsNaN() {
+		return true
+	}
+	if n.IsPositiveZero() && other.IsNegativeZero() {
+		return false
+	}
+	if n.IsNegativeZero() && other.IsPositiveZero() {
+		return false
+	}
+	return n.Data == other.Data
+}
+
+// 6.1.6.1.15
+func (n *NumberValue) SameValueZero(other *NumberValue) bool {
+	if n.IsNaN() && other.IsNaN() {
+		return true
+	}
+	return n.Data == other.Data
+}
+
+// 6.1.6.1.16
+type numberBitwiseOp int
+
+const (
+	numberBitwiseAnd numberBitwiseOp = iota
+	numberBitwiseXor
+	numberBitwiseOr
+)
+
+func (n *NumberValue) NumberBitwiseOp(op numberBitwiseOp, other *NumberValue) *NumberValue {
+	switch op {
+	case numberBitwiseAnd:
+		return NewNumberValue(JSNumber(int64(n.Data) & int64(other.Data)))
+	case numberBitwiseOr:
+		return NewNumberValue(JSNumber(int64(n.Data) | int64(other.Data)))
+	case numberBitwiseXor:
+		return NewNumberValue(JSNumber(int64(n.Data) ^ int64(other.Data)))
+	}
+	panic("unreachable")
+}
+
+// 6.1.6.1.17
+func (n *NumberValue) BitwiseAnd(other *NumberValue) *NumberValue {
+	return n.NumberBitwiseOp(numberBitwiseAnd, other)
+}
+
+// 6.1.6.1.18
+func (n *NumberValue) BitwiseXor(other *NumberValue) *NumberValue {
+	return n.NumberBitwiseOp(numberBitwiseXor, other)
+}
+
+// 6.1.6.1.19
+func (n *NumberValue) BitwiseOr(other *NumberValue) *NumberValue {
+	return n.NumberBitwiseOp(numberBitwiseOr, other)
+}
+
+func (n *NumberValue) IsZero() bool {
+	return n.Data == 0
+}
+
+// MARK: - Number Object
+
+func NewNumberConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		n := NewNumberValue(0)
+		if len(argumentsList) > 0 {
+			value := argumentAt(argumentsList, 0)
+			prim, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, value), co)
+			if isAbrupt {
+				return rt
+			}
+
+			bigintPrim, isBigInt := prim.(*BigIntValue)
+			if isBigInt {
+				data, _ := strconv.ParseFloat(bigintPrim.String(), 64)
+				n.Data = JSNumber(data)
+			} else {
+				_n, isAbrupt, rt := ReturnIfAbrupt(prim.ToNumber(agent), co)
+				if isAbrupt {
+					return rt
+				}
+				n = _n
+			}
+		}
+
+		if newTarget == nil {
+			return n
+		}
+
+		object := OrdinaryCreateFromConstructor(
+			agent,
+			newTarget,
+			"%Number.prototype%", nil)
+		numberObject := &NumberObject{
+			Object: object,
+			Data:   n.Data,
+		}
+		numberObject.ref = numberObject
+		return (numberObject).ToValue()
+	}
+	object := CreateBuiltinFunction(realm.Agent, behavior, 1, CMString("Number"), builtinFunctionArgs{
+		realm:         realm,
+		prototype:     realm.Intrinsics.FunctionPrototype,
+		isConstructor: true,
+	})
+
+	var isFinite BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		value := pkg.SliceSafeGet(arguments, 0)
+		numberValue, ok := value.(*NumberValue)
+		if !ok {
+			return NewBooleanValue(false)
+		}
+		if !numberValue.IsFinite() {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(true)
+	}
+	var isInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		value := pkg.SliceSafeGet(arguments, 0)
+		if value == nil {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(IsIntegralNumber(value))
+	}
+	var isNaN BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		value := pkg.SliceSafeGet(arguments, 0)
+		numberValue, ok := value.(*NumberValue)
+		if !ok {
+			return NewBooleanValue(false)
+		}
+		return NewBooleanValue(numberValue.IsNaN())
+	}
+	var isSafeInteger BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		numberValue := pkg.SliceSafeGet(arguments, 0)
+
+		if numberValue != nil && IsIntegralNumber(numberValue) {
+			data := numberValue.(*NumberValue).Data
+			if float64(data) <= POW_2_53-1 {
+				return NewBooleanValue(true)
+			}
+		}
+		return NewBooleanValue(false)
+	}
+
+	object.defineBuiltinFunction(realm, CMString("isFinite"), isFinite, 1)
+	object.defineBuiltinFunction(realm, CMString("isInteger"), isInteger, 1)
+	object.defineBuiltinFunction(realm, CMString("isNaN"), isNaN, 1)
+	object.defineBuiltinFunction(realm, CMString("isSafeInteger"), isSafeInteger, 1)
+
+	// TODO: do not use magic number
+	object.defineBuiltinProperty(CMString("EPSILON"), NewFrozenPropertyDescriptor(NewNumberValue(2.220446049250313e-16)))
+	object.defineBuiltinProperty(CMString("MAX_SAFE_INTEGER"), NewFrozenPropertyDescriptor(NewNumberValue(9007199254740991)))
+	object.defineBuiltinProperty(CMString("MIN_SAFE_INTEGER"), NewFrozenPropertyDescriptor(NewNumberValue(-9007199254740991)))
+	object.defineBuiltinProperty(CMString("MAX_VALUE"), NewFrozenPropertyDescriptor(NewNumberValue(1.7976931348623157e+308)))
+	object.defineBuiltinProperty(CMString("MIN_VALUE"), NewFrozenPropertyDescriptor(NewNumberValue(5e-324)))
+	object.defineBuiltinProperty(CMString("NEGATIVE_INFINITY"), NewFrozenPropertyDescriptor(NegativeInfinityValue))
+	object.defineBuiltinProperty(CMString("POSITIVE_INFINITY"), NewFrozenPropertyDescriptor(InfinityValue))
+	object.defineBuiltinProperty(CMString("NaN"), NewFrozenPropertyDescriptor(NaNValue))
+
+	object.defineBuiltinProperty(CMString("parseFloat"), realm.Intrinsics.ParseFloat.ToValue().ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("parseInt"), realm.Intrinsics.ParseInt.ToValue().ToBuiltinPropertyDescriptor())
+
+	BindPrototypeAndConstructor(realm.Intrinsics.NumberPrototype, object)
+	return object
+}
+
+type NumberObject struct {
+	*Object
+	Data JSNumber
+}
+
+func NewNumberObject(agent *Agent, value JSNumber, prototype ObjectType) *NumberObject {
+	object := &NumberObject{
+		Object: NewObject(agent, prototype, "Number"),
+		Data:   value,
+	}
+	object.ref = object
+	return object
+}
+
+func NewNumberPrototype(realm *Realm) *NumberObject {
+	object := &NumberObject{
+		Object: NewObject(realm.Agent, realm.Intrinsics.ObjectPrototype, "NumberPrototype"),
+	}
+	object.ref = object
+
+	agent := realm.Agent
+	var toString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		radix := pkg.SliceSafeGet(arguments, 0)
+
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		var radixMV JSInt = 10
+		if radix != nil {
+			_radixMV, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, radix), co)
+			if isAbrupt {
+				return rt
+			}
+			radixMV = _radixMV
+		}
+
+		if radixMV < 2 || radixMV > 36 {
+			return agent.ThrowRangeError("Radix must be an integer between 2 and 36, inclusive.")
+		}
+		if radixMV != 10 &&
+			!x.IsNaN() &&
+			!x.IsPositiveInf() &&
+			!x.IsNegativeInf() &&
+			x.Data.IsFloatInt() {
+			if x.IsZero() {
+				return NewStringValue("0")
+			}
+			return NewStringValue(strconv.FormatInt(int64(x.Data), int(radixMV)))
+		}
+		return x.ToString().ToValue()
+	}
+
+	var valueOf BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		return x
+	}
+	var toLocaleString BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+		return toString(x, nil, nil)
+	}
+	var toFixed BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+
+		fractionDigits := JSInt(0)
+		if value := pkg.SliceSafeGet(arguments, 0); value != nil {
+			fractionDigits, isAbrupt, rt = ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		if fractionDigits < 0 || fractionDigits > 100 {
+			return co.ThrowRangeError(agent, "toFixed digits must be between 0 and 100")
+		}
+		if x.IsNaN() || x.IsPositiveInf() || x.IsNegativeInf() {
+			return NewStringValue(string(x.ToString()))
+		}
+		if math.Abs(x.Data.ToFloat()) >= 1e21 {
+			return NewStringValue(string(x.ToString()))
+		}
+
+		number := x.Data.ToFloat()
+		if number == 0 {
+			number = 0
+		}
+		return NewStringValue(strconv.FormatFloat(number, 'f', int(fractionDigits), 64))
+	}
+	var toExponential BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+
+		fractionDigits := JSInt(-1)
+		hasFractionDigits := false
+		if value := pkg.SliceSafeGet(arguments, 0); value != nil && value != UndefinedValue {
+			hasFractionDigits = true
+			fractionDigits, isAbrupt, rt = ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
+			if isAbrupt {
+				return rt
+			}
+		}
+		if x.IsNaN() || x.IsPositiveInf() || x.IsNegativeInf() {
+			return NewStringValue(string(x.ToString()))
+		}
+		if hasFractionDigits && (fractionDigits < 0 || fractionDigits > 100) {
+			return co.ThrowRangeError(agent, "toExponential digits must be between 0 and 100")
+		}
+
+		number := x.Data.ToFloat()
+		if number == 0 {
+			number = 0
+		}
+		return NewStringValue(formatNumberExponential(number, int(fractionDigits)))
+	}
+	var toPrecision BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
+		x, isAbrupt, rt := ReturnIfAbrupt(thisNumberValue(agent, this), co)
+		if isAbrupt {
+			return rt
+		}
+
+		precisionValue := pkg.SliceSafeGet(arguments, 0)
+		if precisionValue == nil || precisionValue == UndefinedValue {
+			return NewStringValue(string(x.ToString()))
+		}
+		precision, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, precisionValue), co)
+		if isAbrupt {
+			return rt
+		}
+		if x.IsNaN() || x.IsPositiveInf() || x.IsNegativeInf() {
+			return NewStringValue(string(x.ToString()))
+		}
+		if precision < 1 || precision > 100 {
+			return co.ThrowRangeError(agent, "toPrecision digits must be between 1 and 100")
+		}
+
+		number := x.Data.ToFloat()
+		if number == 0 {
+			return NewStringValue(strconv.FormatFloat(0, 'f', int(precision-1), 64))
+		}
+		exponent := int(math.Floor(math.Log10(math.Abs(number))))
+		if exponent < -6 || exponent >= int(precision) {
+			return NewStringValue(formatNumberExponential(number, int(precision-1)))
+		}
+		fractionDigits := int(precision) - exponent - 1
+		return NewStringValue(strconv.FormatFloat(number, 'f', fractionDigits, 64))
+	}
+
+	object.defineBuiltinFunction(realm, CMString("toString"), toString, 1)
+	object.defineBuiltinFunction(realm, CMString("valueOf"), valueOf, 0)
+	object.defineBuiltinFunction(realm, CMString("toLocaleString"), toLocaleString, 0)
+	object.defineBuiltinFunction(realm, CMString("toFixed"), toFixed, 1)
+	object.defineBuiltinFunction(realm, CMString("toExponential"), toExponential, 1)
+	object.defineBuiltinFunction(realm, CMString("toPrecision"), toPrecision, 1)
+
+	return object
+}
+
+func thisNumberValue(agent *Agent, this Value) (co Completion[*NumberValue]) {
+	switch v := this.(type) {
+	case *NumberValue:
+		co.value = v
+		return
+	case *ObjectValue:
+		numberObject, ok := v.Object.(*NumberObject)
+		if ok {
+			co.value = NewNumberValue(numberObject.Data)
+			return
+		}
+	}
+	return co.ThrowTypeError(agent, "Not a Number")
+}

@@ -1,0 +1,45 @@
+package coldmoon
+
+func NewGeneratorFunctionConstructor(realm *Realm) ObjectType {
+	agent := realm.Agent
+	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		parameterArgs := argumentsList[0 : len(argumentsList)-1]
+		bodyArg := argumentsList[len(argumentsList)-1]
+		C := agent.ActiveFunctionObject()
+		if bodyArg == nil {
+			bodyArg = NewStringValue("")
+		}
+		return CreateDynamicFunction(
+			agent,
+			C,
+			newTarget,
+			dynamicFunctionKindGenerator,
+			parameterArgs,
+			bodyArg,
+		).ToValue()
+	}
+	object := CreateBuiltinFunction(agent, behavior, 1, CMString("GeneratorFunction"), builtinFunctionArgs{
+		realm:     realm,
+		prototype: realm.Intrinsics.FunctionConstructor,
+	})
+	object.defineBuiltinProperty(CMString("prototype"), &PropertyDescriptor{
+		Value:        (realm.Intrinsics.GeneratorFunctionPrototype).ToValue(),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	return object
+}
+
+func NewGeneratorFunctionPrototype(realm *Realm) ObjectType {
+	object := NewObject(realm.Agent, realm.Intrinsics.FunctionPrototype, "GeneratorFunctionPrototype")
+	object.defineBuiltinProperty(CMString("constructor"), NewValueFromObject(realm.Intrinsics.GeneratorFunctionConstructor).ToBuiltinPropertyDescriptor())
+	object.defineBuiltinProperty(CMString("prototype"), &PropertyDescriptor{
+		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototypePrototype),
+		Writable:     false,
+		Enumerable:   false,
+		Configurable: true,
+	})
+	object.defineToStringTag("GeneratorFunction")
+	return object
+}
