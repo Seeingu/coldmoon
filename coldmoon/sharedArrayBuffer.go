@@ -1,13 +1,15 @@
 package coldmoon
 
 import (
+	"sync/atomic"
+
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
 type SharedArrayBufferObject struct {
 	*Object
 	ArrayBufferData          *DataBlock
-	ArrayBufferByteLength    JSInt
+	ArrayBufferByteLength    atomic.Int64
 	ArrayBufferMaxByteLength JSInt
 }
 
@@ -43,6 +45,7 @@ func AllocateSharedArrayBuffer(
 		Object:          obj,
 		ArrayBufferData: block,
 	}
+	sharedArrayBuffer.ArrayBufferByteLength.Store(int64(byteLength))
 	if allocatingGrowableBuffer {
 		Assert(maxByteLength >= byteLength)
 		sharedArrayBuffer.ArrayBufferMaxByteLength = maxByteLength
@@ -114,7 +117,7 @@ func NewSharedArrayBufferPrototype(realm *Realm) ObjectType {
 		O := RequireInternalSlot[*SharedArrayBufferObject](this)
 		var length JSInt
 		if IsFixedLengthArrayBuffer(NewArrayBufferLike(O)) {
-			length = ArrayBufferByteLength(NewArrayBufferLike(O), SeqCst)
+			length = JSInt(O.ArrayBufferByteLength.Load())
 		} else {
 			length = O.ArrayBufferMaxByteLength
 		}
@@ -148,20 +151,23 @@ func sharedArrayBufferGrow(agent *Agent, this Value, newLength Value) (co Comple
 	if O.ArrayBufferMaxByteLength == 0 {
 		return co.ThrowTypeError(agent, "SharedArrayBuffer.prototype.grow called on a non-growable SharedArrayBuffer")
 	}
-	currentLength := ArrayBufferByteLength(NewArrayBufferLike(O), SeqCst)
 	newByteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, newLength), co)
 	if isAbrupt {
 		return rt
 	}
-	if newByteLength <= currentLength {
-		return co.ThrowRangeError(agent, "newByteLength <= currentLength")
-	}
-	if newByteLength > O.ArrayBufferMaxByteLength {
-		return co.ThrowRangeError(agent, "newByteLength > O.ArrayBufferMaxByteLength")
-	}
-	// TODO: resize
 
-	return UndefinedValue.ToCompletion()
+	for {
+		currentByteLength := O.ArrayBufferByteLength.Load()
+		if int64(newByteLength) == currentByteLength {
+			return UndefinedValue.ToCompletion()
+		}
+		if int64(newByteLength) < currentByteLength || newByteLength > O.ArrayBufferMaxByteLength {
+			return co.ThrowRangeError(agent, "newByteLength is outside the growable range")
+		}
+		if O.ArrayBufferByteLength.CompareAndSwap(currentByteLength, int64(newByteLength)) {
+			return UndefinedValue.ToCompletion()
+		}
+	}
 }
 
 func sharedArrayBufferSlice(agent *Agent, this Value, start Value, end Value) (co CompletionValue) {

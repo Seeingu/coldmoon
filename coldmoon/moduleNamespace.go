@@ -1,6 +1,11 @@
 package coldmoon
 
-import "github.com/samber/lo"
+import (
+	"sort"
+	"unicode/utf16"
+
+	"github.com/samber/lo"
+)
 
 type (
 	Exports         []string
@@ -14,16 +19,21 @@ type (
 )
 
 func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []string) ObjectType {
-	Assert(module == nil)
+	Assert(module != nil)
+	Assert(module.Namespace == nil)
 
-	sortedExports := exports
+	sortedExports := append(Exports(nil), exports...)
+	sortModuleExportNames(sortedExports)
 
 	object := NewObject(agent, nil, "ModuleNamespace")
+	object.defineToStringTag("Module")
+	object.SetExtensible(false)
 	M := &ModuleNamespace{
 		Object:  object,
 		Module:  module,
 		Exports: sortedExports,
 	}
+	object.ref = M
 	internalMethods := object.internalMethods()
 	internalMethods.GetPrototypeOf = func(o ObjectType) ObjectType {
 		return nil
@@ -40,7 +50,7 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 	internalMethods.GetOwnProperty = moduleNamespaceGetOwnProperty
 	internalMethods.DefineOwnProperty = func(o ObjectType, p PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
 		if _, ok := p.(SymbolPropertyKey); ok {
-			co.value = OrdinaryDefineOwnProperty(o, p, desc)
+			co.value = OrdinaryDefineOwnProperty(o.(*ModuleNamespace).Object, p, desc)
 			return
 		}
 		current := o.internalMethods().GetOwnProperty(o, p)
@@ -50,16 +60,16 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 		if desc.Configurable {
 			return
 		}
-		if !desc.Enumerable {
+		if desc.EnumerableSet && !desc.Enumerable {
 			return
 		}
 		if desc.IsAccessorDescriptor() {
 			return
 		}
-		if !desc.Writable {
+		if desc.WritableSet && !desc.Writable {
 			return
 		}
-		if !SameValue(desc.Value, current.Value) {
+		if desc.Value != nil && !SameValue(desc.Value, current.Value) {
 			return
 		}
 		co.value = true
@@ -67,7 +77,7 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 	}
 	internalMethods.HasProperty = func(o ObjectType, p PropertyKey) (co Completion[bool]) {
 		if _, ok := p.(SymbolPropertyKey); ok {
-			return OrdinaryHasProperty(o, p)
+			return OrdinaryHasProperty(o.(*ModuleNamespace).Object, p)
 		}
 		_exports := o.(*ModuleNamespace).Exports
 		co.value = lo.Contains(_exports, p.ToValue().String())
@@ -81,11 +91,11 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 	}
 	internalMethods.Delete = func(o ObjectType, p PropertyKey) (co Completion[bool]) {
 		if _, ok := p.(SymbolPropertyKey); ok {
-			co.value = OrdinaryDelete(o, p)
+			co.value = OrdinaryDelete(o.(*ModuleNamespace).Object, p)
 			return
 		}
 		_exports := o.(*ModuleNamespace).Exports
-		if !lo.Contains(_exports, p.ToValue().String()) {
+		if lo.Contains(_exports, p.ToValue().String()) {
 			return
 		}
 		co.value = true
@@ -93,21 +103,39 @@ func ModuleNamespaceCreate(agent *Agent, module *SourceTextModule, exports []str
 	}
 	internalMethods.OwnPropertyKeys = func(o ObjectType) []PropertyKey {
 		_exports := o.(*ModuleNamespace).Exports
-		symbolKeys := OrdinaryOwnPropertyKeys(o.(*Object))
+		keys := make([]PropertyKey, 0, len(_exports)+1)
 		for _, e := range _exports {
-			symbolKeys = append(symbolKeys, NewStringPropertyKey(e))
+			keys = append(keys, NewStringPropertyKey(e))
 		}
-		return symbolKeys
+		for _, key := range OrdinaryOwnPropertyKeys(o.(*ModuleNamespace).Object) {
+			if _, ok := key.(SymbolPropertyKey); ok {
+				keys = append(keys, key)
+			}
+		}
+		return keys
 	}
 
-	object.defineToStringTag("Module")
 	module.Namespace = M
 	return M
 }
 
+func sortModuleExportNames(exports []string) {
+	sort.Slice(exports, func(i, j int) bool {
+		left := utf16.Encode([]rune(exports[i]))
+		right := utf16.Encode([]rune(exports[j]))
+		limit := min(len(left), len(right))
+		for index := 0; index < limit; index++ {
+			if left[index] != right[index] {
+				return left[index] < right[index]
+			}
+		}
+		return len(left) < len(right)
+	})
+}
+
 func moduleNamespaceGetOwnProperty(o ObjectType, p PropertyKey) *PropertyDescriptor {
 	if _, ok := p.(SymbolPropertyKey); ok {
-		return OrdinaryGetOwnProperty(o, p)
+		return OrdinaryGetOwnProperty(o.(*ModuleNamespace).Object, p)
 	}
 	exports := o.(*ModuleNamespace).Exports
 	if !lo.Contains(exports, p.ToValue().String()) {
@@ -115,16 +143,19 @@ func moduleNamespaceGetOwnProperty(o ObjectType, p PropertyKey) *PropertyDescrip
 	}
 	value := ReturnAssertNormal(o.internalMethods().Get(o, p, o.ToValue()))
 	return &PropertyDescriptor{
-		Value:        value,
-		Writable:     true,
-		Enumerable:   true,
-		Configurable: false,
+		Value:           value,
+		Writable:        true,
+		WritableSet:     true,
+		Enumerable:      true,
+		EnumerableSet:   true,
+		Configurable:    false,
+		ConfigurableSet: true,
 	}
 }
 
 func moduleNamespaceGet(agent *Agent, o ObjectType, p PropertyKey, receiver Value) CompletionValue {
 	if _, ok := p.(SymbolPropertyKey); ok {
-		return OrdinaryGet(o, p, receiver)
+		return OrdinaryGet(o.(*ModuleNamespace).Object, p, receiver)
 	}
 	exports := o.(*ModuleNamespace).Exports
 	if !lo.Contains(exports, p.ToValue().String()) {
@@ -132,6 +163,10 @@ func moduleNamespaceGet(agent *Agent, o ObjectType, p PropertyKey, receiver Valu
 	}
 	m := o.(*ModuleNamespace).Module
 	binding := m.(*SourceTextModule).ResolveExport(p.ToValue().String(), nil)
+	Assert(binding != nil)
+	Assert(!binding.IsNull())
+	Assert(!binding.IsAmbiguous())
+	Assert(binding.BindingName != nil)
 	targetModule := binding.Module.(*SourceTextModule)
 	if binding.BindingName.Namespace {
 		return GetModuleNamespace(agent, targetModule).ToValue().ToCompletion()

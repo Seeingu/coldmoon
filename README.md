@@ -38,6 +38,14 @@ make test262
 The CLI Test262 host also requires an explicit checkout root through
 `-test262-root` or `TEST262_ROOT`.
 
+## Terminal console
+
+`runtime.RegisterTerminalRuntime` installs a stateful WHATWG-style `console`
+with logging, assertions, counters, groups, timers, traces, directory output,
+and tables. Embedders can call `runtime.CreateConsoleWithWriter` when console
+output needs to be captured or redirected; each created console keeps its own
+counter, group, and timer state.
+
 ## Architecture
 
 See [docs/architecture.md](docs/architecture.md) for runtime ownership,

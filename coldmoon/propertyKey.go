@@ -26,7 +26,7 @@ func NewSymbolPropertyKey(value *SymbolValue) SymbolPropertyKey {
 	return SymbolPropertyKey{Value: value}
 }
 
-// TODO: use as index key
+// ECMAScript index positions are represented by String property keys.
 func NewIntegerIndexPropertyKey(value JSInt) StringPropertyKey {
 	return NewStringPropertyKey(fmt.Sprintf("%d", value))
 }

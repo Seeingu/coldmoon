@@ -17,7 +17,8 @@ type (
 	SetPrototypeOfFn    = func(o ObjectType, v ObjectType) bool
 )
 
-// TODO: Update method signature
+// InternalMethods is the runtime dispatch table for object internal methods.
+// Its signatures match the implementation's current completion boundaries.
 type InternalMethods struct {
 	GetPrototypeOf    GetPrototypeOfFn
 	SetPrototypeOf    SetPrototypeOfFn

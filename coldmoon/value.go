@@ -10,7 +10,6 @@ import (
 
 	"github.com/bits-and-blooms/bitset"
 	"github.com/dlclark/regexp2"
-	"lukechampine.com/uint128"
 )
 
 // MARK: - PreferredType
@@ -283,17 +282,14 @@ func ToBigInt64(value Value, agent *Agent) (co Completion[int64]) {
 		return rt
 	}
 
-	twoPow64 := uint128.New(0, 1)
-	twoPow63 := uint128.New(1<<63, 0)
-
-	int64bit := uint128.FromBig(n.Data).Mod(twoPow64)
+	twoPow64 := new(big.Int).Lsh(big.NewInt(1), 64)
+	twoPow63 := new(big.Int).Lsh(big.NewInt(1), 63)
+	int64bit := new(big.Int).Mod(new(big.Int).Set(n.Data), twoPow64)
 	if int64bit.Cmp(twoPow63) >= 0 {
-		co.value = int64(int64bit.Sub(twoPow64).Lo)
-		return
-	} else {
-		co.value = int64(int64bit.Lo)
-		return
+		int64bit.Sub(int64bit, twoPow64)
 	}
+	co.value = int64bit.Int64()
+	return
 }
 
 // ToBigUint64
@@ -304,9 +300,9 @@ func ToBigUint64(agent *Agent, value Value) (co Completion[uint64]) {
 		return rt
 	}
 
-	twoPow64 := uint128.New(0, 1)
-	int64bit := uint128.FromBig(n.Data).Mod(twoPow64)
-	co.value = int64bit.Lo
+	twoPow64 := new(big.Int).Lsh(big.NewInt(1), 64)
+	uint64bit := new(big.Int).Mod(new(big.Int).Set(n.Data), twoPow64)
+	co.value = uint64bit.Uint64()
 	return
 }
 
@@ -769,10 +765,23 @@ func CreateArrayFromList(agent *Agent, elements []Value) ObjectType {
 	return array
 }
 
+type ArrayLikeElementTypes int
+
+const (
+	ArrayLikeElementTypesAll ArrayLikeElementTypes = iota
+	ArrayLikeElementTypesPropertyKey
+)
+
 // CreateListFromArrayLike
-// spec: 7.3.20
-func CreateListFromArrayLike(agent *Agent, self Value) (co Completion[[]Value]) {
-	// TODO: element types
+// spec: 7.3.19
+func CreateListFromArrayLike(agent *Agent, self Value, elementTypes ...ArrayLikeElementTypes) (co Completion[[]Value]) {
+	Assert(len(elementTypes) <= 1)
+	validElementTypes := ArrayLikeElementTypesAll
+	if len(elementTypes) == 1 {
+		validElementTypes = elementTypes[0]
+	}
+	Assert(validElementTypes == ArrayLikeElementTypesAll || validElementTypes == ArrayLikeElementTypesPropertyKey)
+
 	objectValue, ok := self.(*ObjectValue)
 	if !ok {
 		return co.ThrowTypeError(agent, "TypeError")
@@ -789,6 +798,13 @@ func CreateListFromArrayLike(agent *Agent, self Value) (co Completion[[]Value]) 
 		next, isAbrupt, rt := ReturnIfAbrupt(GetV(agent, self, index), co)
 		if isAbrupt {
 			return rt
+		}
+		if validElementTypes == ArrayLikeElementTypesPropertyKey {
+			switch next.(type) {
+			case *StringValue, *SymbolValue:
+			default:
+				return co.ThrowTypeError(agent, "array-like element is not a property key")
+			}
 		}
 		list = append(list, next)
 	}
@@ -918,11 +934,14 @@ func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) 
 
 	capturingGroupsCount := CountLeftCapturingParensWithin(parseResult)
 	rer := &RegExpRecord{
+		HasIndices:           flagsBitSet.Test(flagsD),
+		Global:               flagsBitSet.Test(flagsG),
 		IgnoreCase:           flagsBitSet.Test(flagsI),
 		Multiline:            flagsBitSet.Test(flagsM),
 		Unicode:              flagsBitSet.Test(flagsU),
 		DotAll:               flagsBitSet.Test(flagsS),
 		UnicodeSets:          flagsBitSet.Test(flagsV),
+		Sticky:               flagsBitSet.Test(flagsY),
 		CapturingGroupsCount: capturingGroupsCount,
 	}
 	regexpObject.RegExpRecord = rer
@@ -935,8 +954,14 @@ func RegExpInitialize(agent *Agent, obj ObjectType, pattern Value, flags Value) 
 }
 
 func CountLeftCapturingParensWithin(r *regexp2.Regexp) int {
-	// TODO
-	return 0
+	// regexp2 includes group zero (the entire match) in its group-number
+	// metadata. Every remaining number represents one capturing parenthesis,
+	// including named groups while excluding non-capturing assertions/groups.
+	count := len(r.GetGroupNumbers()) - 1
+	if count < 0 {
+		return 0
+	}
+	return count
 }
 
 // 22.2.3.4

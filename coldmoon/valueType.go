@@ -16,9 +16,6 @@ type Value interface {
 	// ToObject
 	// spec: 7.1.18
 	ToObject(agent *Agent) Completion[ObjectType]
-	// ThisStringValue implemented in BaseValue
-	// 22.1.3.35.1
-	ThisStringValue() string
 	AOGetValue
 	// --- internal methods ---
 

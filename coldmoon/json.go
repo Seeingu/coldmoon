@@ -285,7 +285,8 @@ func SerializeJSONProperty(agent *Agent, state *JSONSerializationRecord, key Pro
 		co.value = value.String()
 		return
 	case *StringValue:
-		co.value = value.String()
+		co.value = QuoteJSONString(agent, v.Data)
+		return
 	case *BigIntValue:
 		return co.ThrowTypeError(agent, "TypeError")
 	case *ObjectValue:
@@ -327,8 +328,15 @@ func QuoteJSONString(agent *Agent, value string) string {
 }
 
 func UnicodeEscape(c uint16) string {
-	// TODO
-	return ""
+	const hexadecimalDigits = "0123456789abcdef"
+	return string([]byte{
+		'\\',
+		'u',
+		hexadecimalDigits[c>>12],
+		hexadecimalDigits[(c>>8)&0x0f],
+		hexadecimalDigits[(c>>4)&0x0f],
+		hexadecimalDigits[c&0x0f],
+	})
 }
 
 func SerializeJSONObject(agent *Agent, state *JSONSerializationRecord, value ObjectType) (co Completion[string]) {

@@ -23,20 +23,22 @@ type Token struct {
 }
 
 type cachedState struct {
-	index        int
-	line         int
-	currentToken Token
-	nextToken    Token
+	index         int
+	line          int
+	previousToken Token
+	currentToken  Token
+	nextToken     Token
 }
 type Tokenizer struct {
-	SourceText   []rune
-	Index        int
-	Length       int
-	line         int
-	CurrentToken Token
-	NextToken    Token
-	cachedStates pkg.Stack[*cachedState]
-	isTemplate   bool
+	SourceText    []rune
+	Index         int
+	Length        int
+	line          int
+	PreviousToken Token
+	CurrentToken  Token
+	NextToken     Token
+	cachedStates  pkg.Stack[*cachedState]
+	isTemplate    bool
 }
 
 func NewTokenizer(sourceText string) *Tokenizer {
@@ -65,10 +67,11 @@ func (t *Tokenizer) CurrentEndIndex() int {
 
 func (t *Tokenizer) store() {
 	t.cachedStates.Push(&cachedState{
-		index:        t.Index,
-		line:         t.line,
-		currentToken: t.CurrentToken,
-		nextToken:    t.NextToken,
+		index:         t.Index,
+		line:          t.line,
+		previousToken: t.PreviousToken,
+		currentToken:  t.CurrentToken,
+		nextToken:     t.NextToken,
 	})
 }
 
@@ -83,6 +86,7 @@ func (t *Tokenizer) restore() {
 	cachedState := t.cachedStates.Pop()
 	t.Index = cachedState.index
 	t.line = cachedState.line
+	t.PreviousToken = cachedState.previousToken
 	t.CurrentToken = cachedState.currentToken
 	t.NextToken = cachedState.nextToken
 }
@@ -97,10 +101,25 @@ func (t *Tokenizer) newToken(tokenType TokenType, value string) Token {
 	}
 }
 
+func (t *Tokenizer) newTokenAt(startIndex int, tokenType TokenType, value string) Token {
+	return Token{
+		Type:       tokenType,
+		Line:       t.line,
+		StartIndex: startIndex,
+		EndIndex:   t.Index,
+		Value:      value,
+	}
+}
+
 func (t *Tokenizer) peek() Token {
 	t.skipWhiteSpace()
 	if t.Index >= t.Length {
-		return Token{Type: TEOF}
+		return Token{
+			Type:       TEOF,
+			Line:       t.line,
+			StartIndex: t.Index,
+			EndIndex:   t.Index,
+		}
 	}
 
 	ch := t.SourceText[t.Index]
@@ -297,6 +316,8 @@ func (t *Tokenizer) peek() Token {
 	case '~':
 		t.step()
 		return t.newToken(TTilde, "~")
+	case '#':
+		return t.privateIdentifier()
 	case '\'', '"':
 		return t.string()
 	default:
@@ -310,18 +331,34 @@ func (t *Tokenizer) peek() Token {
 	panic("unhandled token: " + string(ch))
 }
 
+func (t *Tokenizer) privateIdentifier() Token {
+	start := t.Index
+	t.step()
+	if t.atEnd() || !lo.Contains(identifierStartCharset, t.SourceText[t.Index]) {
+		panic("private identifier requires an identifier name")
+	}
+	for !t.atEnd() && lo.Contains(identifierCharset, t.SourceText[t.Index]) {
+		t.step()
+	}
+	return t.newTokenAt(start, TPrivateIdentifier, string(t.SourceText[start:t.Index]))
+}
+
 func (t *Tokenizer) templateMiddleOrTail() Token {
 	start := t.Index
 	t.step()
 	for !t.atEnd() {
+		if t.SourceText[t.Index] == '\\' {
+			t.skipTemplateEscape()
+			continue
+		}
 		if t.match('`') {
 			t.isTemplate = false
-			return t.newToken(TTemplateTail, string(t.SourceText[start:t.Index-1]))
+			return t.newTokenAt(start, TTemplateTail, string(t.SourceText[start:t.Index-1]))
 		}
 		if t.match('$') {
 			if t.match('{') {
 				t.isTemplate = true
-				return t.newToken(TTemplateMiddle, string(t.SourceText[start:t.Index-2]))
+				return t.newTokenAt(start, TTemplateMiddle, string(t.SourceText[start:t.Index-2]))
 			}
 		}
 		t.step()
@@ -333,18 +370,41 @@ func (t *Tokenizer) templateHead() Token {
 	start := t.Index
 	t.step()
 	for !t.atEnd() {
+		if t.SourceText[t.Index] == '\\' {
+			t.skipTemplateEscape()
+			continue
+		}
 		if t.match('`') {
-			return t.newToken(TNoSubstitutionTemplate, string(t.SourceText[start:t.Index]))
+			return t.newTokenAt(start, TNoSubstitutionTemplate, string(t.SourceText[start:t.Index]))
 		}
 		if t.match('$') {
 			if t.match('{') {
 				t.isTemplate = true
-				return t.newToken(TTemplateHead, string(t.SourceText[start:t.Index-2]))
+				return t.newTokenAt(start, TTemplateHead, string(t.SourceText[start:t.Index-2]))
 			}
 		}
 		t.step()
 	}
 	panic("unterminated template")
+}
+
+// skipTemplateEscape keeps escaped backticks and dollar signs inside the
+// current template token instead of treating them as lexical delimiters. The
+// escape is validated later because tagged templates permit malformed escape
+// sequences and expose an undefined cooked value.
+func (t *Tokenizer) skipTemplateEscape() {
+	t.step()
+	if t.atEnd() {
+		panic("unterminated template escape")
+	}
+	if t.SourceText[t.Index] == '\r' {
+		t.step()
+		if !t.atEnd() && t.SourceText[t.Index] == '\n' {
+			t.step()
+		}
+		return
+	}
+	t.step()
 }
 
 func (t *Tokenizer) comment(commentType string) string {
@@ -361,20 +421,22 @@ func (t *Tokenizer) comment(commentType string) string {
 	}
 	if commentType == "/*" {
 		for !t.atEnd() {
-			if t.match('*') {
-				if t.match('/') {
-					t.step()
-					return string(t.SourceText[startIndex : t.Index-2])
-				}
+			if t.SourceText[t.Index] == '*' && t.Index+1 < t.Length && t.SourceText[t.Index+1] == '/' {
+				endIndex := t.Index
+				t.step()
+				t.step()
+				return string(t.SourceText[startIndex:endIndex])
 			}
 			t.step()
 		}
+		panic("unterminated block comment")
 	}
 	return ""
 }
 
 // MARK: - String
 func (t *Tokenizer) string() Token {
+	start := t.Index
 	quote := t.SourceText[t.Index]
 	t.step()
 	var value strings.Builder
@@ -382,7 +444,10 @@ func (t *Tokenizer) string() Token {
 		ch := t.SourceText[t.Index]
 		if ch == quote {
 			t.step()
-			return t.newToken(TString, value.String())
+			return t.newTokenAt(start, TString, value.String())
+		}
+		if lo.Contains(lineTerminators, ch) {
+			panic("unterminated string")
 		}
 		if ch != '\\' {
 			value.WriteRune(ch)
@@ -409,8 +474,11 @@ func (t *Tokenizer) string() Token {
 			value.WriteRune('\t')
 		case 'v':
 			value.WriteRune('\v')
-		case '\n':
+		case '\n', '\u2028', '\u2029':
 			// A line continuation contributes no character.
+		case '\r':
+			// CRLF is a single LineTerminatorSequence.
+			t.match('\n')
 		default:
 			value.WriteRune(escaped)
 		}
@@ -419,55 +487,108 @@ func (t *Tokenizer) string() Token {
 }
 
 // MARK: - Number
-// TODO: parse later, use StringToBigInt
 func (t *Tokenizer) number() Token {
+	start := t.Index
+	base := 10
+	isDecimalInteger := false
 	var value string
 
 	switch {
 	case t.matchPrefix("0x", "0X"):
-		value = t.parseNumber(16, hexDigitCharset)
+		base = 16
+		value = t.parseDigits(hexDigitCharset, true)
 	case t.matchPrefix("0b", "0B"):
-		value = t.parseNumber(2, []rune{'0', '1'})
+		base = 2
+		value = t.parseDigits([]rune{'0', '1'}, true)
 	case t.matchPrefix("0o", "0O"):
-		value = t.parseNumber(8, []rune{'0', '1', '2', '3', '4', '5', '6', '7'})
+		base = 8
+		value = t.parseDigits([]rune{'0', '1', '2', '3', '4', '5', '6', '7'}, true)
 	default:
-		value = t.parseDecimalNumber()
+		value, isDecimalInteger = t.parseDecimalNumber()
 	}
 
-	if t.matchCharset([]rune{'n', 'N'}) {
-		return t.newToken(TBigInt, value)
+	isBigInt := false
+	if base != 10 || isDecimalInteger {
+		isBigInt = t.match('n')
+	}
+	t.ensureNumericLiteralBoundary()
+
+	if base != 10 {
+		integer, ok := new(big.Int).SetString(value, base)
+		if !ok {
+			panic("invalid numeric literal")
+		}
+		value = integer.Text(10)
 	}
 
-	return t.newToken(TNumber, value)
+	if isBigInt {
+		if base == 10 && len(value) > 1 && value[0] == '0' {
+			panic("invalid decimal BigInt literal with a leading zero")
+		}
+		return t.newTokenAt(start, TBigInt, value)
+	}
+
+	return t.newTokenAt(start, TNumber, value)
 }
 
-func (t *Tokenizer) parseNumber(base int, validDigits []rune) string {
-	start := t.Index
-	for t.matchCharset(validDigits) {
+func (t *Tokenizer) parseDigits(validDigits []rune, required bool) string {
+	var value strings.Builder
+	digitCount := 0
+	for !t.atEnd() {
+		ch := t.SourceText[t.Index]
+		if lo.Contains(validDigits, ch) {
+			value.WriteRune(ch)
+			digitCount++
+			t.step()
+			continue
+		}
+		if ch != '_' {
+			break
+		}
+		if digitCount == 0 || t.Index+1 >= t.Length || !lo.Contains(validDigits, t.SourceText[t.Index+1]) {
+			panic("invalid numeric separator")
+		}
+		t.step()
 	}
-	value, ok := new(big.Int).SetString(string(t.SourceText[start:t.Index]), base)
-	if !ok {
-		panic("invalid numeric literal")
+	if required && digitCount == 0 {
+		panic("numeric literal requires at least one digit")
 	}
-	return value.Text(10)
+	return value.String()
 }
 
-func (t *Tokenizer) parseDecimalNumber() string {
+func (t *Tokenizer) parseDecimalNumber() (value string, isInteger bool) {
 	start := t.Index
-	// TODO(XXX): is there a better way to handle empty loop/condition
-	for t.matchCharset(lo.NumbersCharset) {
-	}
-	if t.match('.') {
-		for t.matchCharset(lo.NumbersCharset) {
+	integerDigits := ""
+	if t.SourceText[t.Index] == '.' {
+		t.step()
+		t.parseDigits(lo.NumbersCharset, true)
+	} else {
+		integerDigits = t.parseDigits(lo.NumbersCharset, true)
+		isInteger = true
+		if t.match('.') {
+			isInteger = false
+			t.parseDigits(lo.NumbersCharset, false)
 		}
 	}
 	if t.matchCharset([]rune{'e', 'E'}) {
-		if t.matchCharset([]rune{'-', '+'}) {
-		}
-		for t.matchCharset(lo.NumbersCharset) {
-		}
+		isInteger = false
+		t.matchCharset([]rune{'-', '+'})
+		t.parseDigits(lo.NumbersCharset, true)
 	}
-	return string(t.SourceText[start:t.Index])
+	value = strings.ReplaceAll(string(t.SourceText[start:t.Index]), "_", "")
+	if isInteger {
+		value = integerDigits
+	}
+	return value, isInteger
+}
+
+func (t *Tokenizer) ensureNumericLiteralBoundary() {
+	if t.atEnd() {
+		return
+	}
+	if lo.Contains(identifierCharset, t.SourceText[t.Index]) {
+		panic("identifier cannot immediately follow a numeric literal")
+	}
 }
 
 // MARK: - Identifier, Keyword
@@ -499,6 +620,7 @@ var keywordsMap = map[string]TokenType{
 	"debugger":   TDebugger,
 	"this":       TThis,
 	"break":      TBreak,
+	"continue":   TContinue,
 	"while":      TWhile,
 	"do":         TDo,
 	"throw":      TThrow,
@@ -560,46 +682,129 @@ func (t *Tokenizer) matchString(s string) bool {
 }
 
 func (t *Tokenizer) tryToMatchRegularExpression() (token Token, ok bool) {
-	// TODO: auto insert semicolon
-	if t.NextToken.Type == TNumber || t.NextToken.Type == TString {
+	if tokenCanEndExpression(t.NextToken.Type) {
 		return
 	}
-	isRegExp := false
+	if !t.hasRegularExpressionTerminator() {
+		return
+	}
+	return t.regularExpression(), true
+}
+
+func (t *Tokenizer) hasRegularExpressionTerminator() bool {
 	index := t.Index
+	inCharacterClass := false
 	for index < t.Length {
 		ch := t.SourceText[index]
-		if ch == '\n' {
-			break
+		if lo.Contains(lineTerminators, ch) {
+			return false
 		}
-		if ch == '/' {
-			isRegExp = true
-			break
+		if ch == '\\' {
+			index++
+			if index >= t.Length || lo.Contains(lineTerminators, t.SourceText[index]) {
+				return false
+			}
+			index++
+			continue
+		}
+		if ch == '[' {
+			inCharacterClass = true
+		} else if ch == ']' {
+			inCharacterClass = false
+		} else if ch == '/' && !inCharacterClass {
+			return true
 		}
 		index++
 	}
+	return false
+}
 
-	if isRegExp {
-		return t.regularExpression(), true
+func tokenCanEndExpression(tokenType TokenType) bool {
+	switch tokenType {
+	case TIdentifier,
+		TNumber,
+		TBigInt,
+		TString,
+		TRegularExpression,
+		TTrue,
+		TFalse,
+		TNull,
+		TUndefined,
+		TThis,
+		TAsync,
+		TRightParen,
+		TRightBracket,
+		TRightBrace,
+		TPlusPlus,
+		TMinusMinus,
+		TTemplateTail,
+		TNoSubstitutionTemplate:
+		return true
+	default:
+		return false
 	}
-	return
+}
+
+// ReinterpretCurrentSlashAsRegularExpression applies the parser's
+// InputElementRegExp lexical goal to an otherwise ambiguous slash. A right
+// brace can end an expression (object, class, or function expression), so the
+// tokenizer initially treats a following slash as division. When the parser
+// has instead completed a statement block and starts a new statement, it uses
+// this method to rescan that slash as a regular expression literal.
+func (t *Tokenizer) ReinterpretCurrentSlashAsRegularExpression() {
+	if t.CurrentToken.Type != TSlash {
+		panic("regular expression rescan requires a slash token")
+	}
+	t.Index = t.CurrentToken.StartIndex
+	t.line = t.CurrentToken.Line
+	t.step()
+	regularExpression := t.regularExpression()
+	t.CurrentToken = regularExpression
+	// peek consults NextToken as the token immediately preceding the text it
+	// scans, so publish the rescanned literal before rebuilding lookahead.
+	t.NextToken = regularExpression
+	t.NextToken = t.peek()
 }
 
 func (t *Tokenizer) regularExpression() Token {
-	start := t.Index
+	tokenStart := t.Index - 1
+	patternStart := t.Index
+	inCharacterClass := false
+	terminated := false
 	for !t.atEnd() {
-		if t.match('/') {
-			break
+		ch := t.SourceText[t.Index]
+		if lo.Contains(lineTerminators, ch) {
+			panic("unterminated regular expression literal")
 		}
-		if t.match('\\') {
+		if ch == '\\' {
+			t.step()
+			if t.atEnd() || lo.Contains(lineTerminators, t.SourceText[t.Index]) {
+				panic("unterminated regular expression escape")
+			}
+			t.step()
+			continue
+		}
+		if ch == '[' {
+			inCharacterClass = true
+		} else if ch == ']' {
+			inCharacterClass = false
+		} else if ch == '/' && !inCharacterClass {
+			t.step()
+			terminated = true
+			break
 		}
 		t.step()
 	}
-	value := string(t.SourceText[start : t.Index-1])
-	return t.newToken(TRegularExpression, value)
+	if !terminated {
+		panic("unterminated regular expression literal")
+	}
+	value := string(t.SourceText[patternStart : t.Index-1])
+	return t.newTokenAt(tokenStart, TRegularExpression, value)
 }
 
 func (t *Tokenizer) Peek() Token {
 	token := t.peek()
+	t.PreviousToken = t.CurrentToken
 	t.CurrentToken = t.NextToken
 	t.NextToken = token
 	return t.CurrentToken
@@ -649,7 +854,7 @@ func (t *Tokenizer) skipWhiteSpace() {
 // - step will not check if the index is at the end of the source text.
 func (t *Tokenizer) step() {
 	ch := t.SourceText[t.Index]
-	if ch == '\n' {
+	if lo.Contains(lineTerminators, ch) && !(ch == '\n' && t.Index > 0 && t.SourceText[t.Index-1] == '\r') {
 		t.nextLine()
 	}
 	t.Index++
@@ -661,7 +866,7 @@ func (t *Tokenizer) atEnd() bool {
 
 func (t *Tokenizer) matchPrefix(prefixes ...string) bool {
 	for _, prefix := range prefixes {
-		if t.Index+len(prefix) < t.Length && string(t.SourceText[t.Index:t.Index+len(prefix)]) == prefix {
+		if t.Index+len(prefix) <= t.Length && string(t.SourceText[t.Index:t.Index+len(prefix)]) == prefix {
 			t.Index += len(prefix)
 			return true
 		}

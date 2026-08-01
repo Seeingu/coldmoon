@@ -30,13 +30,35 @@ func (w WellKnownSymbolsKey) ToPropertyKey() PropertyKey {
 
 func (w WellKnownSymbolsKey) ToName() string {
 	switch w {
+	case WellKnownSymbolsAsyncIterator:
+		return "[Symbol.asyncIterator]"
+	case WellKnownSymbolsHasInstance:
+		return "[Symbol.hasInstance]"
+	case WellKnownSymbolsIsConcatSpreadable:
+		return "[Symbol.isConcatSpreadable]"
+	case WellKnownSymbolsIterator:
+		return "[Symbol.iterator]"
+	case WellKnownSymbolsMatch:
+		return "[Symbol.match]"
+	case WellKnownSymbolsMatchAll:
+		return "[Symbol.matchAll]"
+	case WellKnownSymbolsReplace:
+		return "[Symbol.replace]"
+	case WellKnownSymbolsSearch:
+		return "[Symbol.search]"
 	case WellKnownSymbolsSpecies:
 		return "[Symbol.species]"
+	case WellKnownSymbolsSplit:
+		return "[Symbol.split]"
+	case WellKnownSymbolsToPrimitive:
+		return "[Symbol.toPrimitive]"
 	case WellKnownSymbolsToStringTag:
 		return "[Symbol.toStringTag]"
+	case WellKnownSymbolsUnscopables:
+		return "[Symbol.unscopables]"
+	default:
+		panic("unknown well-known symbol key: " + string(w))
 	}
-	// TODO: manage all string tags in one place
-	panic("unimplemented")
 }
 
 const (

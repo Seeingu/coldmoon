@@ -29,21 +29,21 @@ func NewMapIteratorPrototype(realm *Realm) ObjectType {
 		index := mapIterator.Index
 		kind := mapIterator.Kind
 
-		entries := m.MapValue.Data
+		entries := m.MapValue.Entries
 		numEntries := JSInt(len(entries))
-		if index >= numEntries {
-			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
-		}
-
 		for index < numEntries {
-			if _, ok := entries[NewNumberValue(index.ToNumber()).Hash()]; ok {
+			if !entries[index].Deleted {
 				break
 			}
 			index++
 		}
+		if index >= numEntries {
+			return CreateIterResultObject(agent, UndefinedValue, true).ToValue()
+		}
 		mapIterator.Index = index + 1
-		key := NewNumberValue(index.ToNumber())
-		value := entries[key.Hash()]
+		entry := entries[index]
+		key := entry.Key
+		value := entry.Value
 
 		var result Value
 		switch kind {

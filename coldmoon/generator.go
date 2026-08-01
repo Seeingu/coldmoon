@@ -1,7 +1,5 @@
 package coldmoon
 
-import "github.com/Seeingu/coldmoon/pkg"
-
 type GeneratorState int
 
 const (
@@ -15,10 +13,6 @@ type GeneratorObject struct {
 	*Object
 	// [[GeneratorState]]
 	GeneratorState GeneratorState
-	// [[GeneratorContext]]
-	// Deprecated: get from agent
-	// TODO(BM): Remove
-	GeneratorContext *ExecutionContext
 	// [[GeneratorBrand]]
 	GeneratorBrand string
 	closure        func() CompletionValue
@@ -37,11 +31,11 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 	g.ref = g
 
 	var next BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := pkg.SliceSafeGet(argumentsList, 0)
+		value := argumentAt(argumentsList, 0)
 		return GeneratorResume(agent, this, value)
 	}
 	var iteratorReturn BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := pkg.SliceSafeGet(argumentsList, 0)
+		value := argumentAt(argumentsList, 0)
 		generator := this
 		C := Completion[Value]{
 			t:     CompletionTypeReturn,
@@ -49,9 +43,17 @@ func NewGeneratorPrototype(realm *Realm) *GeneratorObject {
 		}
 		return GeneratorResumeAbrupt(agent, generator, C)
 	}
+	var iteratorThrow BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		reason := argumentAt(argumentsList, 0)
+		return GeneratorResumeAbrupt(agent, this, CompletionValue{
+			t:   CompletionTypeThrow,
+			err: reason,
+		})
+	}
 
 	g.defineBuiltinFunction(realm, CMString("next"), next, 1)
 	g.defineBuiltinFunction(realm, CMString("return"), iteratorReturn, 1)
+	g.defineBuiltinFunction(realm, CMString("throw"), iteratorThrow, 1)
 
 	g.defineBuiltinProperty(CMString("constructor"), &PropertyDescriptor{
 		Value:        NewValueFromObject(realm.Intrinsics.GeneratorFunctionPrototype),
@@ -77,7 +79,7 @@ func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody Gene
 	agent.ExecutionContextMap[generator.GetId()] = genContext
 	genVM := genContext.VM
 	genContext.Generator = generator
-	genContext.generatorCh = make(chan Value)
+	genContext.generatorCh = make(chan CompletionValue)
 	closure := func() CompletionValue {
 		a := agent
 		var result CompletionValue
@@ -86,7 +88,7 @@ func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody Gene
 		} else {
 			panic("unreachable")
 		}
-		// TODO: Assert generator status
+		Assert(generator.GeneratorState == GeneratorStateExecuting)
 		a.suspendExecutionContext(genContext)
 		generator.GeneratorState = GeneratorStateCompleted
 
@@ -109,7 +111,7 @@ func GeneratorStart(agent *Agent, generator *GeneratorObject, generatorBody Gene
 func GeneratorValidate(agent *Agent, generator Value) GeneratorState {
 	g := RequireInternalSlot[*GeneratorObject](generator)
 	if g.GeneratorState == GeneratorStateExecuting {
-		// TODO:
+		// A generator cannot be resumed while it is already executing.
 		panic("TypeError")
 	}
 	return g.GeneratorState
@@ -131,7 +133,7 @@ func GeneratorResume(agent *Agent, generator Value, value Value) CompletionValue
 	if state == GeneratorStateSuspendedStart {
 		go g.Resume()
 	} else {
-		genContext.generatorCh <- value
+		genContext.generatorCh <- value.ToCompletion()
 	}
 	methodContext.Suspend()
 	Assert(methodContext == agent.RunningExecutionContext())
@@ -149,18 +151,18 @@ func GeneratorResumeAbrupt(agent *Agent, generator Value, abruptCompletion Compl
 	}
 	if state == GeneratorStateCompleted {
 		if abruptCompletion.t == CompletionTypeReturn {
-			return CreateIterResultObject(agent, UndefinedValue, true).ToValue().ToCompletion()
+			return CreateIterResultObject(agent, abruptCompletion.value, true).ToValue().ToCompletion()
 		}
-		agent.exception = abruptCompletion.Error()
 		return abruptCompletion
 	}
+	Assert(state == GeneratorStateSuspendedYield)
 
 	genContext := agent.FindExecutionContextById(g.GetId())
 	methodContext := agent.RunningExecutionContext()
 	g.GeneratorState = GeneratorStateExecuting
 	agent.resumeExecutionContext(genContext)
-	go g.closure()
-	genContext.Suspend()
+	genContext.generatorCh <- abruptCompletion
+	methodContext.Suspend()
 	Assert(methodContext == agent.RunningExecutionContext())
 	return genContext.Result
 }
@@ -200,8 +202,7 @@ func GeneratorYield(agent *Agent, iterNextObj ObjectType) (co CompletionValue) {
 
 	genContext.Result = co
 	callerContext.Resume()
-	co.value = <-genContext.generatorCh
-	return
+	return <-genContext.generatorCh
 }
 
 // Yield

@@ -44,6 +44,21 @@ func NewReferenceRecord(base ReferenceRecordBase, referencedName *ReferencedName
 	}
 }
 
+// MakePrivateReference resolves a private identifier in the running lexical
+// private environment and always creates a strict property reference.
+// spec: 6.2.5.9
+func MakePrivateReference(agent *Agent, baseValue Value, privateIdentifier PrivateIdentifierName) *ReferenceRecord {
+	privateEnv := agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
+	Assert(privateEnv != nil)
+	privateName := ResolvePrivateIdentifier(privateEnv, privateIdentifier)
+	return NewReferenceRecord(
+		NewReferenceRecordBaseValue(baseValue),
+		&ReferencedName{PrivateName: &privateName},
+		true,
+		UndefinedValue,
+	)
+}
+
 // 6.2.5.1
 func (r *ReferenceRecord) IsPropertyReference() bool {
 	_, ok := r.Base.Value()
@@ -115,10 +130,13 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) (co CompletionValu
 
 	if r.IsPropertyReference() {
 		v, _ := r.Base.Value()
-		baseObj := v.ToObject(agent).value
+		baseObj, isAbrupt, rt := ReturnIfAbrupt(v.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 
 		if r.IsPrivateReference() {
-			panic("unimplemented")
+			return baseObj.PrivateSet(*r.ReferencedName.PrivateName, value)
 		}
 
 		var referencedName PropertyKey

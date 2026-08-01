@@ -1,7 +1,7 @@
 package coldmoon
 
 import (
-	"fmt"
+	"sync"
 
 	"github.com/Seeingu/coldmoon/pkg"
 )
@@ -36,6 +36,31 @@ type AsyncGeneratorObject struct {
 	// [[GeneratorBrand]]
 	GeneratorBrand string
 	closure        func()
+	resumeMu       sync.Mutex
+	resumeCaller   *ExecutionContext
+	resumeWaiting  bool
+}
+
+func (a *AsyncGeneratorObject) beginResume(caller *ExecutionContext) {
+	a.resumeMu.Lock()
+	defer a.resumeMu.Unlock()
+	Assert(!a.resumeWaiting)
+	a.resumeCaller = caller
+	a.resumeWaiting = true
+}
+
+func (a *AsyncGeneratorObject) signalResumeCaller() bool {
+	a.resumeMu.Lock()
+	if !a.resumeWaiting {
+		a.resumeMu.Unlock()
+		return false
+	}
+	caller := a.resumeCaller
+	a.resumeCaller = nil
+	a.resumeWaiting = false
+	a.resumeMu.Unlock()
+	caller.Resume()
+	return true
 }
 
 // AsyncGeneratorContext is [[AsyncGeneratorContext]]
@@ -62,11 +87,13 @@ func NewAsyncGeneratorPrototype(realm *Realm) ObjectType {
 
 	// spec: 27.6.1.2
 	var next BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		value := pkg.SliceSafeGet(argumentsList, 0)
+		value := argumentAt(argumentsList, 0)
 		generatorValue := this
 		promiseCapability := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
 		result := AsyncGeneratorValidate(generatorValue, "")
-		IfAbruptRejectPromise(agent, result, promiseCapability)
+		if !IfAbruptRejectPromise(agent, result, promiseCapability) {
+			return promiseCapability.Promise.ToValue()
+		}
 		generator := MustGetObject(generatorValue).(*AsyncGeneratorObject)
 		state := generator.AsyncGeneratorState
 		if state == AsyncGeneratorStateCompleted {
@@ -91,7 +118,9 @@ func NewAsyncGeneratorPrototype(realm *Realm) ObjectType {
 		value := argumentAt(argumentsList, 0)
 		promiseCapability := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
 		result := AsyncGeneratorValidate(generatorValue, "")
-		IfAbruptRejectPromise(agent, result, promiseCapability)
+		if !IfAbruptRejectPromise(agent, result, promiseCapability) {
+			return promiseCapability.Promise.ToValue()
+		}
 		generator := MustGetObject(generatorValue).(*AsyncGeneratorObject)
 		var completion CompletionValue
 		completion.t = CompletionTypeReturn
@@ -111,6 +140,32 @@ func NewAsyncGeneratorPrototype(realm *Realm) ObjectType {
 		return promiseCapability.Promise.ToValue()
 	}
 	g.defineBuiltinFunction(realm, CMString("return"), returnFn, 1)
+
+	var throwFn BehaviorFn = func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		generatorValue := this
+		reason := argumentAt(argumentsList, 0)
+		promiseCapability := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
+		result := AsyncGeneratorValidate(generatorValue, "")
+		if !IfAbruptRejectPromise(agent, result, promiseCapability) {
+			return promiseCapability.Promise.ToValue()
+		}
+		generator := MustGetObject(generatorValue).(*AsyncGeneratorObject)
+		completion := CompletionValue{t: CompletionTypeThrow, err: reason}
+		AsyncGeneratorEnqueue(agent, generator, completion, promiseCapability)
+		state := generator.AsyncGeneratorState
+		if state == AsyncGeneratorStateSuspendedStart {
+			generator.AsyncGeneratorState = AsyncGeneratorStateCompleted
+			AsyncGeneratorDrainQueue(agent, generator)
+		} else if state == AsyncGeneratorStateSuspendedYield {
+			AsyncGeneratorResume(agent, generator, completion)
+		} else if state == AsyncGeneratorStateCompleted {
+			AsyncGeneratorDrainQueue(agent, generator)
+		} else {
+			Assert(state == AsyncGeneratorStateExecuting || state == AsyncGeneratorStateAwaitingReturn)
+		}
+		return promiseCapability.Promise.ToValue()
+	}
+	g.defineBuiltinFunction(realm, CMString("throw"), throwFn, 1)
 
 	return g
 }
@@ -146,12 +201,16 @@ func AsyncGeneratorResume(agent *Agent, generator *AsyncGeneratorObject, value C
 	Assert(generator.AsyncGeneratorState == AsyncGeneratorStateSuspendedStart || generator.AsyncGeneratorState == AsyncGeneratorStateSuspendedYield)
 	genContext := generator.AsyncGeneratorContext(agent)
 	callerContext := agent.RunningExecutionContext()
+	generator.beginResume(callerContext)
+	starting := generator.AsyncGeneratorState == AsyncGeneratorStateSuspendedStart
 	generator.AsyncGeneratorState = AsyncGeneratorStateExecuting
-	fmt.Println("resume")
 	agent.resumeExecutionContext(genContext)
-	go generator.closure()
-	genContext.Suspend()
-	fmt.Println("resume after suspended")
+	if starting {
+		go generator.closure()
+	} else {
+		genContext.asyncGeneratorCh <- value
+	}
+	callerContext.Suspend()
 	Assert(callerContext == agent.RunningExecutionContext())
 }
 
@@ -171,7 +230,7 @@ func AsyncGeneratorAwaitReturn(agent *Agent, generator *AsyncGeneratorObject) (c
 		generator.AsyncGeneratorState = AsyncGeneratorStateCompleted
 		var result CompletionValue
 		result.value = value
-		AsyncGeneratorCompleteStep(agent, generator, result, true)
+		AsyncGeneratorCompleteStep(agent, generator, result, true, nil)
 		AsyncGeneratorDrainQueue(agent, generator)
 		return UndefinedValue
 	}
@@ -180,8 +239,9 @@ func AsyncGeneratorAwaitReturn(agent *Agent, generator *AsyncGeneratorObject) (c
 		reason := argumentAt(argumentsList, 0)
 		generator.AsyncGeneratorState = AsyncGeneratorStateCompleted
 		var result CompletionValue
-		result.value = reason
-		AsyncGeneratorCompleteStep(agent, generator, result, true)
+		result.t = CompletionTypeThrow
+		result.err = reason
+		AsyncGeneratorCompleteStep(agent, generator, result, true, nil)
 		AsyncGeneratorDrainQueue(agent, generator)
 		return UndefinedValue
 	}
@@ -198,18 +258,32 @@ func AsyncGeneratorCompleteStep(
 	generator *AsyncGeneratorObject,
 	completion CompletionValue,
 	done bool,
+	realm *Realm,
 ) {
 	Assert(!generator.AsyncGeneratorQueue.IsEmpty())
 	next := generator.AsyncGeneratorQueue.Dequeue()
 	promiseCapability := next.Capability
-	value := completion.value
 	if completion.t == CompletionTypeThrow {
+		reason := completion.Error()
+		Assert(reason != nil)
 		ReturnAssertNormal(
-			promiseCapability.Reject.Call(UndefinedValue, []Value{value}),
+			promiseCapability.Reject.Call(UndefinedValue, []Value{reason}),
 		)
 	} else {
-		// TODO: check realm is provided from parameters?
-		iteratorResult := CreateIterResultObject(agent, value, done)
+		Assert(completion.t == CompletionTypeNormal)
+		iteratorResult := func() ObjectType {
+			if realm == nil {
+				return CreateIterResultObject(agent, completion.value, done)
+			}
+
+			runningContext := agent.RunningExecutionContext()
+			oldRealm := runningContext.Realm
+			runningContext.Realm = realm
+			defer func() {
+				runningContext.Realm = oldRealm
+			}()
+			return CreateIterResultObject(agent, completion.value, done)
+		}()
 		ReturnAssertNormal(
 			promiseCapability.Resolve.Call(UndefinedValue, []Value{iteratorResult.ToValue()}),
 		)
@@ -223,30 +297,20 @@ func AsyncGeneratorDrainQueue(
 	generator *AsyncGeneratorObject,
 ) {
 	Assert(generator.AsyncGeneratorState == AsyncGeneratorStateCompleted)
-	queue := generator.AsyncGeneratorQueue
-	if queue.IsEmpty() {
-		return
-	}
-	done := false
-	for !done {
-		next := queue.Dequeue()
+	for !generator.AsyncGeneratorQueue.IsEmpty() {
+		next := generator.AsyncGeneratorQueue.Data()[0]
 		completion := next.Completion
 		if completion.t == CompletionTypeReturn {
 			generator.AsyncGeneratorState = AsyncGeneratorStateAwaitingReturn
 			ReturnAssertNormal(
 				AsyncGeneratorAwaitReturn(agent, generator),
 			)
-			done = true
-		} else {
-			if completion.t == CompletionTypeNormal {
-				var completion CompletionValue
-				completion.value = UndefinedValue
-				AsyncGeneratorCompleteStep(agent, generator, completion, true)
-				if queue.IsEmpty() {
-					done = true
-				}
-			}
+			return
 		}
+		if completion.t == CompletionTypeNormal {
+			completion.value = UndefinedValue
+		}
+		AsyncGeneratorCompleteStep(agent, generator, completion, true, nil)
 	}
 }
 
@@ -263,18 +327,12 @@ func AsyncGeneratorStart(
 	agent.ExecutionContextMap[generator.GetId()] = genContext
 	genVM := genContext.VM
 	genContext.AsyncGenerator = generator
-	genContext.yieldCh = make(chan struct{})
+	genContext.asyncGeneratorCh = make(chan CompletionValue)
+	genContext.awaitCh = make(chan struct{})
 
 	closure := func() {
-		if genContext.isSuspended {
-			fmt.Println("closure suspended")
-			genContext.yieldCh <- struct{}{}
-			return
-		}
-		fmt.Println("closure first")
 		result := generatorBody.Evaluation(genVM)
-		fmt.Println("completed")
-		// TODO: Assert generator status
+		Assert(generator.AsyncGeneratorState == AsyncGeneratorStateExecuting)
 		agent.suspendExecutionContext(genContext)
 		generator.AsyncGeneratorState = AsyncGeneratorStateCompleted
 
@@ -283,9 +341,9 @@ func AsyncGeneratorStart(
 		} else if result.t == CompletionTypeReturn {
 			result.t = CompletionTypeNormal
 		}
-		AsyncGeneratorCompleteStep(agent, generator, result, true)
+		AsyncGeneratorCompleteStep(agent, generator, result, true, nil)
 		AsyncGeneratorDrainQueue(agent, generator)
-		go genContext.Resume()
+		generator.signalResumeCaller()
 	}
 
 	generator.closure = closure
@@ -295,7 +353,6 @@ func AsyncGeneratorStart(
 // AsyncGeneratorYield
 // spec: 27.6.3.8
 func AsyncGeneratorYield(agent *Agent, value Value) (co CompletionValue) {
-	fmt.Println("yield")
 	genContext := agent.RunningExecutionContext()
 	Assert(genContext.AsyncGenerator != nil)
 	generator := genContext.AsyncGenerator
@@ -303,8 +360,10 @@ func AsyncGeneratorYield(agent *Agent, value Value) (co CompletionValue) {
 	var completion CompletionValue
 	completion.value = value
 
-	// TODO: use previousRealm
-	AsyncGeneratorCompleteStep(agent, generator, completion, false)
+	Assert(agent.ExecutionContextStack.Len() >= 2)
+	previousContext := agent.ExecutionContextStack.Index(agent.ExecutionContextStack.Len() - 2)
+	previousRealm := previousContext.Realm
+	AsyncGeneratorCompleteStep(agent, generator, completion, false, previousRealm)
 	queue := generator.AsyncGeneratorQueue
 	if !queue.IsEmpty() {
 		toYield := queue.Data()[0]
@@ -312,12 +371,10 @@ func AsyncGeneratorYield(agent *Agent, value Value) (co CompletionValue) {
 		return AsyncGeneratorUnwrapYieldResumption(agent, resumptionValue)
 	} else {
 		generator.AsyncGeneratorState = AsyncGeneratorStateSuspendedYield
-		fmt.Println("yield queue empty")
 		agent.suspendExecutionContext(genContext)
-		genContext.isSuspended = true
-		go genContext.Resume()
-		<-genContext.yieldCh
-		return
+		generator.signalResumeCaller()
+		resumptionValue := <-genContext.asyncGeneratorCh
+		return AsyncGeneratorUnwrapYieldResumption(agent, resumptionValue)
 	}
 }
 

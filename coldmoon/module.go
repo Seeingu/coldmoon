@@ -61,10 +61,11 @@ func GetModuleNamespace(agent *Agent, module *SourceTextModule) ObjectType {
 		unambiguousNames := make([]string, 0)
 		for _, name := range exportedNames {
 			resolution := module.ResolveExport(name, nil)
-			if resolution != nil && !resolution.IsAmbiguous() {
+			if resolution != nil && !resolution.IsNull() && !resolution.IsAmbiguous() {
 				unambiguousNames = append(unambiguousNames, name)
 			}
 		}
+		sortModuleExportNames(unambiguousNames)
 		namespace = ModuleNamespaceCreate(agent, module, unambiguousNames)
 	}
 	return namespace

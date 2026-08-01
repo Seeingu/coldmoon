@@ -4,13 +4,57 @@ import "github.com/Seeingu/coldmoon/pkg"
 
 type MapValue struct {
 	Value
-	Data map[string]Value
+	Data    map[string]*MapEntry
+	Entries []*MapEntry
+}
+
+// MapEntry retains the original key alongside its value so iteration can
+// preserve insertion order independently of the key's internal hash.
+type MapEntry struct {
+	Key     Value
+	Value   Value
+	Deleted bool
 }
 
 func NewMapValue() *MapValue {
 	return &MapValue{
-		Data: make(map[string]Value),
+		Data: make(map[string]*MapEntry),
 	}
+}
+
+// clear marks existing entries as deleted so live iterators can continue over
+// entries appended after the clear operation.
+func (m *MapValue) clear() {
+	for _, entry := range m.Entries {
+		entry.Deleted = true
+	}
+	m.Data = make(map[string]*MapEntry)
+}
+
+// delete removes a key from lookup while retaining its tombstone in the
+// insertion-order sequence used by active iterators.
+func (m *MapValue) delete(key Value) bool {
+	hash := key.Hash()
+	entry, ok := m.Data[hash]
+	if !ok {
+		return false
+	}
+	entry.Deleted = true
+	delete(m.Data, hash)
+	return true
+}
+
+// set updates an existing entry in place or appends a new insertion-order
+// record when the key is not currently present.
+func (m *MapValue) set(key, value Value) {
+	hash := key.Hash()
+	if entry, ok := m.Data[hash]; ok {
+		entry.Value = value
+		return
+	}
+	entry := &MapEntry{Key: key, Value: value}
+	m.Data[hash] = entry
+	m.Entries = append(m.Entries, entry)
 }
 
 type MapObject struct {
@@ -117,23 +161,18 @@ func NewMapPrototype(realm *Realm) ObjectType {
 
 	var mapClear BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
-		m.MapValue.Data = make(map[string]Value)
+		m.MapValue.clear()
 		return UndefinedValue
 	}
 	var mapDelete BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
-		key := argumentAt(arguments, 0).Hash()
-		if _, ok := m.MapValue.Data[key]; !ok {
-			return FalseValue
-		}
-		delete(m.MapValue.Data, key)
-		return TrueValue
+		return NewBooleanValue(m.MapValue.delete(argumentAt(arguments, 0)))
 	}
 	var mapGet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
 		key := argumentAt(arguments, 0).Hash()
-		if v, ok := m.MapValue.Data[key]; ok {
-			return v
+		if entry, ok := m.MapValue.Data[key]; ok {
+			return entry.Value
 		}
 		return UndefinedValue
 	}
@@ -145,9 +184,7 @@ func NewMapPrototype(realm *Realm) ObjectType {
 	}
 	var mapSet BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		m := RequireInternalSlot[*MapObject](this)
-		key := argumentAt(arguments, 0).Hash()
-		value := argumentAt(arguments, 1)
-		m.MapValue.Data[key] = value
+		m.MapValue.set(argumentAt(arguments, 0), argumentAt(arguments, 1))
 		return this
 	}
 	var size BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -170,14 +207,16 @@ func NewMapPrototype(realm *Realm) ObjectType {
 		if !IsCallable(callbackFn) {
 			panic("TypeError")
 		}
-		entries := m.MapValue.Data
-		numEntries := len(m.MapValue.Data)
+		entries := m.MapValue.Entries
+		numEntries := len(entries)
 		index := 0
 		for ; index < numEntries; index++ {
-			if v, ok := entries[NewNumberValue(JSNumber(index)).Hash()]; ok {
-				callbackFn.Call(agent, thisArg, []Value{v, NewNumberValue(JSNumber(index)), this})
+			entry := entries[index]
+			if !entry.Deleted {
+				callbackFn.Call(agent, thisArg, []Value{entry.Value, entry.Key, this})
 			}
-			numEntries = len(m.MapValue.Data)
+			numEntries = len(m.MapValue.Entries)
+			entries = m.MapValue.Entries
 		}
 		return UndefinedValue
 	}

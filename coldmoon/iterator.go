@@ -247,6 +247,47 @@ func (i *IteratorRecord) IteratorClose(completion CompletionValue) (co Completio
 	return completion
 }
 
+// AsyncIteratorClose closes an async iterator and awaits the return result
+// while preserving an incoming throw completion.
+// spec: 7.4.11
+func (i *IteratorRecord) AsyncIteratorClose(agent *Agent, completion CompletionValue) (co CompletionValue) {
+	iteratorValue := i.Iterator.ToValue()
+	returnMethod, isAbrupt, innerResult := ReturnIfAbrupt(
+		GetMethodCompletion(agent, iteratorValue, NewStringPropertyKey("return")),
+		co,
+	)
+	if !isAbrupt && returnMethod == nil {
+		return completion
+	}
+	if !isAbrupt {
+		innerValue, callAbrupt, callResult := ReturnIfAbrupt(
+			returnMethod.Call(iteratorValue, nil),
+			co,
+		)
+		if callAbrupt {
+			innerResult = callResult
+		} else {
+			awaitedValue, awaitAbrupt, awaitResult := ReturnIfAbrupt(Await(agent, innerValue), co)
+			if awaitAbrupt {
+				innerResult = awaitResult
+			} else {
+				innerResult.value = awaitedValue
+			}
+		}
+	}
+
+	if completion.IsError() || completion.t == CompletionTypeThrow {
+		return completion
+	}
+	if innerResult.IsAbrupt() {
+		return innerResult
+	}
+	if innerResult.value == nil || !innerResult.value.IsObject() {
+		return co.ThrowTypeError(agent, "async iterator return method must return an object")
+	}
+	return completion
+}
+
 // CreateIterResultObject
 // spec: 7.4.12
 // returns Object
@@ -279,6 +320,130 @@ func (i *IteratorRecord) IteratorToList() (co Completion[[]Value]) {
 }
 
 func CreateAsyncFromSyncIterator(iteratorRecord *IteratorRecord) *IteratorRecord {
-	// TODO
-	return iteratorRecord
+	agent := iteratorRecord.Iterator.Agent()
+	realm := agent.CurrentRealm()
+	asyncIterator := NewObject(agent, realm.Intrinsics.AsyncIteratorPrototype, "AsyncFromSyncIterator")
+
+	var next BehaviorFn = func(_ Value, argumentsList []Value, _ ObjectType) CompletionConvertable[Value] {
+		promiseCapability := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
+		var result CompletionValue
+		var nextValue Value
+		if len(argumentsList) != 0 {
+			nextValue = argumentAt(argumentsList, 0)
+		}
+		nextResult := iteratorRecord.IteratorNext(nextValue)
+		if nextResult.IsAbrupt() {
+			result = CompletionFrom(result, nextResult)
+		} else {
+			result.value = nextResult.Data().ToValue()
+		}
+		return AsyncFromSyncIteratorContinuation(agent, result, promiseCapability, iteratorRecord)
+	}
+	asyncIterator.defineBuiltinFunction(realm, CMString("next"), next, 1)
+
+	var iteratorReturn BehaviorFn = func(_ Value, argumentsList []Value, _ ObjectType) CompletionConvertable[Value] {
+		promiseCapability := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
+		value := argumentAt(argumentsList, 0)
+		returnMethod := GetMethodCompletion(agent, iteratorRecord.Iterator.ToValue(), NewStringPropertyKey("return"))
+		if returnMethod.IsAbrupt() {
+			return rejectAsyncFromSyncIteratorPromise(promiseCapability, returnMethod.Error())
+		}
+		if returnMethod.Data() == nil {
+			iteratorRecord.Done = true
+			iterResult := CreateIterResultObject(agent, value, true)
+			ReturnAssertNormal(promiseCapability.Resolve.Call(UndefinedValue, []Value{iterResult.ToValue()}))
+			return promiseCapability.Promise.ToValue()
+		}
+		result := returnMethod.Data().Call(iteratorRecord.Iterator.ToValue(), []Value{value})
+		return AsyncFromSyncIteratorContinuation(agent, result, promiseCapability, iteratorRecord)
+	}
+	asyncIterator.defineBuiltinFunction(realm, CMString("return"), iteratorReturn, 1)
+
+	var iteratorThrow BehaviorFn = func(_ Value, argumentsList []Value, _ ObjectType) CompletionConvertable[Value] {
+		promiseCapability := NewPromiseCapability(agent, realm.Intrinsics.Promise.ToValue())
+		value := argumentAt(argumentsList, 0)
+		throwMethod := GetMethodCompletion(agent, iteratorRecord.Iterator.ToValue(), NewStringPropertyKey("throw"))
+		if throwMethod.IsAbrupt() {
+			return rejectAsyncFromSyncIteratorPromise(promiseCapability, throwMethod.Error())
+		}
+		if throwMethod.Data() == nil {
+			iteratorRecord.Done = true
+			returnMethod := GetMethodCompletion(agent, iteratorRecord.Iterator.ToValue(), NewStringPropertyKey("return"))
+			if returnMethod.IsAbrupt() {
+				return rejectAsyncFromSyncIteratorPromise(promiseCapability, returnMethod.Error())
+			}
+			if returnMethod.Data() != nil {
+				returnResult := returnMethod.Data().Call(iteratorRecord.Iterator.ToValue(), nil)
+				if returnResult.IsAbrupt() {
+					return rejectAsyncFromSyncIteratorPromise(promiseCapability, returnResult.Error())
+				}
+				if returnResult.Data() == nil || !returnResult.Data().IsObject() {
+					reason := agent.ThrowTypeError("sync iterator return method must return an object")
+					return rejectAsyncFromSyncIteratorPromise(promiseCapability, reason)
+				}
+			}
+			reason := agent.ThrowTypeError("sync iterator does not provide a throw method")
+			return rejectAsyncFromSyncIteratorPromise(promiseCapability, reason)
+		}
+		result := throwMethod.Data().Call(iteratorRecord.Iterator.ToValue(), []Value{value})
+		return AsyncFromSyncIteratorContinuation(agent, result, promiseCapability, iteratorRecord)
+	}
+	asyncIterator.defineBuiltinFunction(realm, CMString("throw"), iteratorThrow, 1)
+
+	nextMethod := ReturnAssertNormal(GetV(agent, asyncIterator.ToValue(), NewStringPropertyKey("next")))
+	return &IteratorRecord{
+		Iterator:   asyncIterator,
+		NextMethod: nextMethod,
+	}
+}
+
+// AsyncFromSyncIteratorContinuation converts a synchronous iterator result to
+// a promise for an async iterator result, assimilating a promise-valued value.
+// spec: 27.1.5.2.1
+func AsyncFromSyncIteratorContinuation(
+	agent *Agent,
+	result CompletionValue,
+	promiseCapability *PromiseCapability,
+	syncIteratorRecord *IteratorRecord,
+) Value {
+	if result.IsAbrupt() {
+		return rejectAsyncFromSyncIteratorPromise(promiseCapability, result.Error())
+	}
+	if result.value == nil || !result.value.IsObject() {
+		reason := agent.ThrowTypeError("sync iterator method must return an object")
+		return rejectAsyncFromSyncIteratorPromise(promiseCapability, reason)
+	}
+
+	iterResult := MustGetObject(result.value)
+	doneCompletion := IteratorComplete(iterResult)
+	if doneCompletion.IsAbrupt() {
+		return rejectAsyncFromSyncIteratorPromise(promiseCapability, doneCompletion.Error())
+	}
+	done := doneCompletion.Data()
+	syncIteratorRecord.Done = done
+	valueCompletion := IteratorValue(iterResult)
+	if valueCompletion.IsAbrupt() {
+		return rejectAsyncFromSyncIteratorPromise(promiseCapability, valueCompletion.Error())
+	}
+
+	realm := agent.CurrentRealm()
+	valueWrapper := PromiseResolve(agent, realm.Intrinsics.Promise, valueCompletion.Data())
+	var unwrap BehaviorFn = func(_ Value, argumentsList []Value, _ ObjectType) CompletionConvertable[Value] {
+		value := argumentAt(argumentsList, 0)
+		return CreateIterResultObject(agent, value, done).ToValue()
+	}
+	onFulfilled := CreateBuiltinFunction(agent, unwrap, 1, CMString(""), builtinFunctionArgs{realm: realm})
+	PerformPromiseThen(
+		agent,
+		valueWrapper,
+		onFulfilled.ToValue(),
+		UndefinedValue,
+		promiseCapability,
+	)
+	return promiseCapability.Promise.ToValue()
+}
+
+func rejectAsyncFromSyncIteratorPromise(promiseCapability *PromiseCapability, reason Value) Value {
+	ReturnAssertNormal(promiseCapability.Reject.Call(UndefinedValue, []Value{reason}))
+	return promiseCapability.Promise.ToValue()
 }

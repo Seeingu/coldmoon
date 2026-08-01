@@ -389,7 +389,10 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		).value
 
 		var co CompletionValue
-		elements, isAbrupt, rt := ReturnIfAbrupt(CreateListFromArrayLike(agent, trapResultArray), co)
+		elements, isAbrupt, rt := ReturnIfAbrupt(
+			CreateListFromArrayLike(agent, trapResultArray, ArrayLikeElementTypesPropertyKey),
+			co,
+		)
 		if isAbrupt {
 			panic(rt)
 		}

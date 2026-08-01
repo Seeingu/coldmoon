@@ -1,6 +1,9 @@
 package coldmoon
 
 import (
+	"sync"
+	"sync/atomic"
+
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
@@ -9,16 +12,26 @@ type QueuedPromiseJob struct {
 	realm *Realm
 }
 type Agent struct {
-	symbolId              uint64
-	exception             Value
-	ExecutionContextStack pkg.Stack[*ExecutionContext]
-	ExecutionContextMap   map[uint64]*ExecutionContext
-	HostHooks             *HostHooks
-	Scheduler             *Scheduler
-	ModuleGraph           *ModuleGraph
-	GlobalSymbolRegistry  map[string]*SymbolValue
+	symbolId                   uint64
+	moduleAsyncEvaluationCount atomic.Uint64
+	exception                  Value
+	ExecutionContextStack      pkg.Stack[*ExecutionContext]
+	executionContextMu         sync.Mutex
+	executionContextReady      *sync.Cond
+	asyncContinuationContexts  map[*ExecutionContext]struct{}
+	ExecutionContextMap        map[uint64]*ExecutionContext
+	HostHooks                  *HostHooks
+	Scheduler                  *Scheduler
+	ModuleGraph                *ModuleGraph
+	GlobalSymbolRegistry       map[string]*SymbolValue
 	// [[IsLittleEndian]]
 	IsLittleEndian bool
+}
+
+// IncrementModuleAsyncEvaluationCount implements the agent-scoped counter
+// used to preserve depth-first module evaluation order across TLA suspension.
+func (a *Agent) IncrementModuleAsyncEvaluationCount() uint64 {
+	return a.moduleAsyncEvaluationCount.Add(1) - 1
 }
 
 type HostHooks struct {
@@ -43,9 +56,11 @@ func NewAgent() *Agent {
 // constructor to control time without changing runtime semantics.
 func NewAgentWithClock(clock Clock) *Agent {
 	a := &Agent{
-		ExecutionContextMap:  make(map[uint64]*ExecutionContext),
-		GlobalSymbolRegistry: make(map[string]*SymbolValue),
+		ExecutionContextMap:       make(map[uint64]*ExecutionContext),
+		asyncContinuationContexts: make(map[*ExecutionContext]struct{}),
+		GlobalSymbolRegistry:      make(map[string]*SymbolValue),
 	}
+	a.executionContextReady = sync.NewCond(&a.executionContextMu)
 	a.Scheduler = NewScheduler(a, clock)
 	a.ModuleGraph = NewModuleGraph(a)
 	initWellKnownSymbols(a)
@@ -58,7 +73,7 @@ func NewAgentWithClock(clock Clock) *Agent {
 		HostPromiseRejectionTracker: HostPromiseRejectionTracker,
 		HostResizeArrayBuffer:       HostResizeArrayBuffer,
 		HostEnsureCanAddPrivateElement: func() {
-			// TODO
+			// The default host accepts every private-element addition.
 		},
 		HostGetImportMetaProperties: HostGetImportMetaProperties,
 		HostFinalizeImportMeta:      HostFinalizeImportMeta,
@@ -67,6 +82,8 @@ func NewAgentWithClock(clock Clock) *Agent {
 }
 
 func (a *Agent) RunningExecutionContext() *ExecutionContext {
+	a.executionContextMu.Lock()
+	defer a.executionContextMu.Unlock()
 	Assert(a.ExecutionContextStack.Len() > 0)
 	return a.ExecutionContextStack.Peek()
 }
@@ -91,6 +108,8 @@ func (a *Agent) ActiveFunctionObject() ObjectType {
 // 9.4.1
 // return nil if there is no active script or module
 func (a *Agent) GetActiveScriptOrModule() ScriptOrModule {
+	a.executionContextMu.Lock()
+	defer a.executionContextMu.Unlock()
 	if a.ExecutionContextStack.IsEmpty() {
 		return nil
 	}

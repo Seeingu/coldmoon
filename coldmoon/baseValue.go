@@ -1,5 +1,11 @@
 package coldmoon
 
+import (
+	"fmt"
+	"math"
+	"strconv"
+)
+
 type BaseValue struct {
 	Value
 }
@@ -11,12 +17,37 @@ func (b *BaseValue) ToCompletion() (co CompletionValue) {
 
 func (b *BaseValue) Hash() string {
 	switch v := b.Value.(type) {
-	case *undefinedValue, *nullValue, *BooleanValue, *StringValue, *SymbolValue, *BigIntValue:
-		return v.String()
+	case *undefinedValue:
+		return "undefined"
+	case *nullValue:
+		return "null"
+	case *BooleanValue:
+		return "boolean:" + strconv.FormatBool(v.Data)
+	case *StringValue:
+		return "string:" + v.Data
+	case *SymbolValue:
+		return "symbol:" + strconv.FormatUint(v.Id, 10)
+	case *BigIntValue:
+		return "bigint:" + v.Data.String()
 	case *NumberValue:
-		return v.String()
+		// Map and Set use SameValueZero: all NaN payloads compare equal and
+		// positive and negative zero denote the same key.
+		if math.IsNaN(float64(v.Data)) {
+			return "number:nan"
+		}
+		if v.Data == 0 {
+			return "number:0"
+		}
+		bits := math.Float64bits(float64(v.Data))
+		return "number:" + strconv.FormatUint(bits, 16)
+	case *ObjectValue:
+		return "object:" + strconv.FormatUint(v.Object.GetId(), 10)
 	default:
-		panic("unimplemented")
+		// References, expression wrappers, and list values are internal
+		// specification values. They should be resolved before reaching a
+		// language-level collection, but identity hashing keeps accidental
+		// internal use deterministic instead of conflating unlike values.
+		return fmt.Sprintf("internal:%T:%p", v, v)
 	}
 }
 
@@ -34,7 +65,13 @@ func (b *BaseValue) ToPropertyKey() PropertyKey {
 	case *SymbolValue:
 		return NewSymbolPropertyKey(v)
 	default:
-		panic("unimplemented")
+		// This convenience method is used for values that have already been
+		// reduced to primitives. Object conversions must use ToPropertyKey,
+		// which preserves abrupt completion from @@toPrimitive/toString.
+		if b.Value.IsObject() {
+			panic(fmt.Sprintf("ToPropertyKey requires a primitive, got %T", b.Value))
+		}
+		return NewStringPropertyKey(string(b.Value.ToString()))
 	}
 }
 
@@ -203,7 +240,13 @@ func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) (co Completion
 	value := b.Value
 	if objectValue, isObject := value.(*ObjectValue); isObject {
 		symbol := WellKnownSymbols[WellKnownSymbolsToPrimitive]
-		exoticToPrim := GetMethod(agent, value, NewSymbolPropertyKey(symbol))
+		exoticToPrim, isAbrupt, rt := ReturnIfAbrupt(
+			GetMethodCompletion(agent, value, NewSymbolPropertyKey(symbol)),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if exoticToPrim != nil {
 			hintString := hint.String()
 
@@ -230,27 +273,14 @@ func (b *BaseValue) ToPrimitive(agent *Agent, hint PreferredType) (co Completion
 	return value.ToCompletion()
 }
 
-// TODO(BM): return a string completion or abrupt completion
-func (b *BaseValue) ThisStringValue() string {
-	switch v := b.Value.(type) {
-	case *StringValue:
-		return v.Data
-	case *ObjectValue:
-		s, ok := v.Object.(*StringObject)
-		if ok {
-			return s.Data
-		}
-	}
-	panic("TypeError")
-}
-
-// TODO(I): this is a backdoor method, every value should implement this method
+// ToString is the non-throwing primitive formatting hook required by Value.
+// Language-level conversion must use ToStringCompletion, which handles Symbol
+// errors and propagates abrupt object-to-primitive conversion.
 func (b *BaseValue) ToString() CMString {
 	return CMString(b.String())
 }
 
 // spec: 7.1.18
-// TODO: type error handling
 func (b *BaseValue) ToObject(agent *Agent) (co Completion[ObjectType]) {
 	realm := agent.CurrentRealm()
 	switch v := b.Value.(type) {
@@ -269,7 +299,7 @@ func (b *BaseValue) ToObject(agent *Agent) (co Completion[ObjectType]) {
 	case *BigIntValue:
 		co.value = NewBigIntObject(agent, v, realm.Intrinsics.BigIntPrototype)
 	default:
-		panic("unimplemented")
+		return co.ThrowTypeError(agent, fmt.Sprintf("cannot convert internal value %T to object", v))
 	}
 	return
 }
@@ -277,7 +307,8 @@ func (b *BaseValue) ToObject(agent *Agent) (co Completion[ObjectType]) {
 func (b *BaseValue) ToBuiltinPropertyDescriptor() *PropertyDescriptor {
 	return &PropertyDescriptor{
 		Value: b.Value,
-		// TODO: check writable
+		// Built-in data properties are writable unless their defining
+		// algorithm supplies an explicit descriptor with stricter flags.
 		Writable:     true,
 		Enumerable:   false,
 		Configurable: true,
@@ -415,7 +446,9 @@ func (b *BaseValue) String() string {
 	return b.Value.String()
 }
 
-// FIXME: will have recursive call
+// NewBaseValue installs the delegation layer used by concrete Value types. The
+// self-reference is intentional: promoted methods dispatch back to the concrete
+// value stored here, allowing shared conversions without losing dynamic type.
 func NewBaseValue(v Value) Value {
 	b := &BaseValue{
 		Value: v,

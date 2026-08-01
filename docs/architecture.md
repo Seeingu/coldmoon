@@ -117,6 +117,17 @@ to reject any missing field, installs restricted function properties, and only
 then marks the Realm ready. Global object/environment publication and default
 global bindings reject a building Realm.
 
+Intrinsic construction is split into dependency-checked phases: foundations,
+iteration/callables, the standard library, typed arrays, utility namespaces,
+and errors. Each phase validates the key products of earlier phases before it
+runs, so an unsafe reorder fails at the phase boundary with the missing
+intrinsic named explicitly.
+
+Function calls currently use the VM's eager execution path. Proper tail calls
+require a continuation trampoline and are intentionally not exposed through a
+dormant call-site flag; adding them is an execution-engine change rather than
+an expression-evaluator toggle.
+
 Global constructor exposure is a declarative mapping from JavaScript names to
 `IntrinsicName`. This keeps global publication on the same lookup path used by
 the rest of the runtime instead of maintaining a second set of direct field

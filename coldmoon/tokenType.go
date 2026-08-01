@@ -72,6 +72,7 @@ const (
 	TBitwiseXorEquals
 	TDivideEquals
 	TIdentifier
+	TPrivateIdentifier
 	TNumber
 	TBigInt
 	TString

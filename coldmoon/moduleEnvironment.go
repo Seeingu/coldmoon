@@ -18,27 +18,32 @@ func NewModuleEnvironment(outerEnv EnvironmentRecord) *ModuleEnvironment {
 	}
 }
 
-// InitializeBinding is not standard
-// When the name is not found in the declarative environment, it will be initialized in the declarative environment
-// TODO: check for non-class name
+// InitializeBinding initializes a binding created during module declaration
+// instantiation. Missing bindings are an invariant violation rather than an
+// opportunity to change a module's statically known environment shape.
 func (m *ModuleEnvironment) InitializeBinding(name string, value Value) {
-	if !m.HasBinding(name) {
-		m.DeclarativeEnvironment.CreateImmutableBinding(name, true)
-	}
+	Assert(m.HasBinding(name))
 	m.DeclarativeEnvironment.InitializeBinding(name, value)
 }
 
 func (m *ModuleEnvironment) CreateImportBinding(name string, module *SourceTextModule, bindingName string) {
+	Assert(!m.HasBinding(name))
 	m.IndirectBindings[name] = &IndirectBinding{
 		Module:      module,
 		BindingName: bindingName,
 	}
 }
 
+func (m *ModuleEnvironment) HasBinding(name string) bool {
+	if _, ok := m.IndirectBindings[name]; ok {
+		return true
+	}
+	return m.DeclarativeEnvironment.HasBinding(name)
+}
+
 // 9.1.1.5.1
 func (m *ModuleEnvironment) GetBindingValue(agent *Agent, name string, strict bool) (co CompletionValue) {
-	// TODO: should be strict
-	// Assert(strict)
+	Assert(strict)
 	Assert(m.HasBinding(name))
 	if binding, ok := m.IndirectBindings[name]; ok {
 		m := binding.Module

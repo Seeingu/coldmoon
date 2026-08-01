@@ -19,7 +19,7 @@ type Realm struct {
 	Intrinsics     *Intrinsics
 	GlobalObject   *Object
 	GlobalEnv      *GlobalEnvironment
-	TemplateMap    any
+	TemplateMap    map[*TemplateLiteral]ObjectType
 	HostDefined    any
 	Agent          *Agent
 	Rng            rand.Rand
@@ -60,10 +60,35 @@ func CreateRealm(agent *Agent) *Realm {
 // 9.3.2
 func (r *Realm) createIntrinsics() {
 	Assert(r.state == realmStateBuilding)
+	r.createFoundationIntrinsics()
+	r.createIterationAndCallableIntrinsics()
+	r.createStandardLibraryIntrinsics()
+	r.createTypedArrayIntrinsics()
+	r.createUtilityIntrinsics()
+	r.createErrorIntrinsics()
+}
+
+type intrinsicDependency struct {
+	name  string
+	value ObjectType
+}
+
+func (r *Realm) requireIntrinsicDependencies(phase string, dependencies ...intrinsicDependency) {
+	for _, dependency := range dependencies {
+		if dependency.value == nil {
+			panic(fmt.Sprintf("intrinsic bootstrap phase %q requires %s", phase, dependency.name))
+		}
+	}
+}
+
+// createFoundationIntrinsics builds the Object/Function cycle first, then the
+// primitive constructors and global functions that every later phase uses.
+func (r *Realm) createFoundationIntrinsics() {
 	r.Intrinsics.ObjectPrototype = NewObjectPrototypeSkeleton(r)
+	r.requireIntrinsicDependencies("function prototype", intrinsicDependency{"ObjectPrototype", r.Intrinsics.ObjectPrototype})
 	NewFunctionPrototypeWithIntrinsicsBinding(r)
+	r.requireIntrinsicDependencies("object prototype", intrinsicDependency{"FunctionPrototype", r.Intrinsics.FunctionPrototype})
 	r.Intrinsics.ObjectPrototype = NewObjectPrototypeWithObject(r, r.Intrinsics.ObjectPrototype)
-	// TODO: Register without restricted dependency order
 	r.Intrinsics.BooleanPrototype = NewBooleanPrototype(r)
 	r.Intrinsics.BooleanConstructor = NewBooleanConstructor(r)
 	r.Intrinsics.ThrowTypeError = NewThrowTypeError(r)
@@ -78,6 +103,18 @@ func (r *Realm) createIntrinsics() {
 	r.Intrinsics.EncodeURIComponent = NewEncodeURIComponent(r)
 	r.Intrinsics.ObjectConstructor = NewObjectConstructor(r)
 	r.Intrinsics.FunctionConstructor = NewFunctionConstructor(r)
+}
+
+// createIterationAndCallableIntrinsics establishes the iterator family before
+// generator and async prototypes, and ArrayBuffer before DataView/typed arrays.
+func (r *Realm) createIterationAndCallableIntrinsics() {
+	r.requireIntrinsicDependencies(
+		"iteration and callable",
+		intrinsicDependency{"ObjectPrototype", r.Intrinsics.ObjectPrototype},
+		intrinsicDependency{"FunctionPrototype", r.Intrinsics.FunctionPrototype},
+		intrinsicDependency{"ObjectConstructor", r.Intrinsics.ObjectConstructor},
+		intrinsicDependency{"FunctionConstructor", r.Intrinsics.FunctionConstructor},
+	)
 	r.Intrinsics.ArrayPrototype = NewArrayPrototype(r)
 	r.Intrinsics.ArrayConstructor = NewArrayConstructor(r)
 	r.Intrinsics.IteratorPrototype = NewIteratorPrototype(r)
@@ -97,6 +134,20 @@ func (r *Realm) createIntrinsics() {
 	r.Intrinsics.AsyncGeneratorFunctionPrototypePrototype = NewAsyncGeneratorPrototype(r)
 	r.Intrinsics.AsyncFunctionPrototype = NewAsyncFunctionPrototype(r)
 	r.Intrinsics.AsyncFunctionConstructor = NewAsyncFunctionConstructor(r)
+}
+
+// createStandardLibraryIntrinsics builds consumers of the iterator, callable,
+// string, and buffer foundations without depending on typed-array constructors.
+func (r *Realm) createStandardLibraryIntrinsics() {
+	r.requireIntrinsicDependencies(
+		"standard library",
+		intrinsicDependency{"ArrayConstructor", r.Intrinsics.ArrayConstructor},
+		intrinsicDependency{"ArrayBufferConstructor", r.Intrinsics.ArrayBufferConstructor},
+		intrinsicDependency{"StringConstructor", r.Intrinsics.StringConstructor},
+		intrinsicDependency{"IteratorPrototype", r.Intrinsics.IteratorPrototype},
+		intrinsicDependency{"AsyncIteratorPrototype", r.Intrinsics.AsyncIteratorPrototype},
+		intrinsicDependency{"AsyncFunctionConstructor", r.Intrinsics.AsyncFunctionConstructor},
+	)
 	r.Intrinsics.DataViewPrototype = NewDataViewPrototype(r)
 	r.Intrinsics.DataViewConstructor = NewDataViewConstructor(r)
 	r.Intrinsics.PromisePrototype = NewPromisePrototype(r)
@@ -116,6 +167,18 @@ func (r *Realm) createIntrinsics() {
 	r.Intrinsics.SymbolConstructor = NewSymbolConstructor(r)
 	r.Intrinsics.BigIntPrototype = NewBigIntPrototype(r)
 	r.Intrinsics.BigIntConstructor = NewBigIntConstructor(r)
+}
+
+// createTypedArrayIntrinsics constructs the shared TypedArray base before each
+// concrete numeric view; Atomics is intentionally deferred until all exist.
+func (r *Realm) createTypedArrayIntrinsics() {
+	r.requireIntrinsicDependencies(
+		"typed arrays",
+		intrinsicDependency{"ArrayBufferConstructor", r.Intrinsics.ArrayBufferConstructor},
+		intrinsicDependency{"IteratorPrototype", r.Intrinsics.IteratorPrototype},
+		intrinsicDependency{"NumberConstructor", r.Intrinsics.NumberConstructor},
+		intrinsicDependency{"BigIntConstructor", r.Intrinsics.BigIntConstructor},
+	)
 	r.Intrinsics.TypedArrayPrototype = NewTypedArrayPrototype(r)
 	r.Intrinsics.TypedArrayConstructor = NewTypedArrayConstructor(r)
 	r.Intrinsics.SharedArrayBufferPrototype = NewSharedArrayBufferPrototype(r)
@@ -142,6 +205,17 @@ func (r *Realm) createIntrinsics() {
 	r.Intrinsics.Int32ArrayConstructor = NewTypedArrayNameConstructor(r, TypedArrayNameInt32)
 	r.Intrinsics.Uint32ArrayPrototype = NewTypedArrayNamePrototype(r, TypedArrayNameUint32)
 	r.Intrinsics.Uint32ArrayConstructor = NewTypedArrayNameConstructor(r, TypedArrayNameUint32)
+}
+
+// createUtilityIntrinsics installs namespace-style objects and reflection only
+// after their collection, buffer, and typed-array dependencies are complete.
+func (r *Realm) createUtilityIntrinsics() {
+	r.requireIntrinsicDependencies(
+		"utility objects",
+		intrinsicDependency{"TypedArrayConstructor", r.Intrinsics.TypedArrayConstructor},
+		intrinsicDependency{"SharedArrayBufferConstructor", r.Intrinsics.SharedArrayBufferConstructor},
+		intrinsicDependency{"Uint32ArrayConstructor", r.Intrinsics.Uint32ArrayConstructor},
+	)
 	r.Intrinsics.Atomics = NewAtomics(r)
 	r.Intrinsics.JSON = NewJSON(r)
 	r.Intrinsics.Reflect = NewReflectObject(r)
@@ -151,6 +225,17 @@ func (r *Realm) createIntrinsics() {
 	r.Intrinsics.RegExpConstructor = NewRegExpConstructor(r)
 	r.Intrinsics.RegExpStringIteratorPrototype = NewRegExpStringIteratorPrototype(r)
 	r.Intrinsics.ForInIteratorPrototype = NewForInIteratorPrototype(r)
+}
+
+// createErrorIntrinsics is last so every constructor reachable while creating
+// an error object has already been published into the draft Intrinsics table.
+func (r *Realm) createErrorIntrinsics() {
+	r.requireIntrinsicDependencies(
+		"errors",
+		intrinsicDependency{"ObjectPrototype", r.Intrinsics.ObjectPrototype},
+		intrinsicDependency{"FunctionPrototype", r.Intrinsics.FunctionPrototype},
+		intrinsicDependency{"RegExpConstructor", r.Intrinsics.RegExpConstructor},
+	)
 	r.Intrinsics.ErrorPrototype = NewErrorPrototype(r)
 	r.Intrinsics.ErrorConstructor = NewErrorConstructor(r)
 	r.Intrinsics.SyntaxErrorPrototype = NewNativeErrorPrototype(r, "SyntaxError")

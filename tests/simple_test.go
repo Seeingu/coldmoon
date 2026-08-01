@@ -1779,8 +1779,6 @@ class ValidatorClass {
 const v = new ValidatorClass();
 assert(Object.prototype.toString.call(v) === '[object Validator]', 'should be [object Validator]');
 `,
-		// TODO: String locale compare
-		"const string3 = `Yet another string primitive`;",
 		`
 const string1 = "A string primitive";
 const string2 = 'Also a string primitive';
@@ -1874,8 +1872,12 @@ map1.set(1, 'bar');
 
 const iterator1 = map1[Symbol.iterator]();
 
-assertEqual(iterator1.next().value[0], 0);
-assertEqual(iterator1.next().value[1], 'bar');
+const first = iterator1.next().value;
+const second = iterator1.next().value;
+assertEqual(first[0], '0');
+assertEqual(first[1], 'foo');
+assertEqual(second[0], 1);
+assertEqual(second[1], 'bar');
 `,
 		`
 const set1 = new Set();

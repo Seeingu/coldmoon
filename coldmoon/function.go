@@ -33,6 +33,11 @@ func initFunctionMethods(f ObjectType, realm *Realm) {
 
 			builtinFunction, ok := o.Object.(*BuiltinFunction)
 			if ok {
+				if fields := builtinFunction.AdditionalFields; fields != nil &&
+					fields.ClassConstructorFields != nil &&
+					fields.ClassConstructorFields.SourceText != "" {
+					return NewStringValue(fields.ClassConstructorFields.SourceText)
+				}
 				name := builtinFunction.InitialName
 				sourceText := "function " + name + "() { [native code] }"
 				return NewStringValue(sourceText)
@@ -298,7 +303,8 @@ func CreateDynamicFunction(
 			Configurable: false,
 		})
 	case dynamicFunctionKindAsync:
-		panic("unimplemented")
+		// Async functions are not constructors and therefore do not receive
+		// the own "prototype" property installed on generator functions.
 	}
 	return function
 }

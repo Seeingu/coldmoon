@@ -177,15 +177,28 @@ func (s *Scheduler) takeJob() *QueuedPromiseJob {
 }
 
 func (s *Scheduler) runJob(job *QueuedPromiseJob) {
-	context := s.agent.RunningExecutionContext()
-	previousRealm := context.Realm
-	if job.realm != nil {
-		context.Realm = job.realm
-	}
-	defer func() {
-		context.Realm = previousRealm
+	func() {
+		var hostScope *ExecutionContextScope
+		if !s.agent.hasExecutionContext() {
+			Assert(job.realm != nil)
+			hostScope = s.agent.enterExecutionContext(&ExecutionContext{
+				Realm: job.realm,
+				ch:    make(chan struct{}),
+			})
+			defer hostScope.Leave()
+		}
+
+		context := s.agent.RunningExecutionContext()
+		previousRealm := context.Realm
+		if job.realm != nil {
+			context.Realm = job.realm
+		}
+		defer func() {
+			context.Realm = previousRealm
+		}()
+		job.job.Fun(job.job.Captures)
 	}()
-	job.job.Fun(job.job.Captures)
+	s.agent.waitForAsyncContinuations()
 }
 
 func (s *Scheduler) runDueTimers() bool {

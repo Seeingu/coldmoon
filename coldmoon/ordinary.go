@@ -124,7 +124,14 @@ func ValidateAndApplyPropertyDescriptor(
 	extensible bool,
 	desc, current *PropertyDescriptor,
 ) bool {
-	// TODO: Assert
+	// PropertyKey's static type establishes IsPropertyKey(P); retain explicit
+	// guards for invalid internal callers and descriptor invariants.
+	Assert(key != nil)
+	Assert(desc != nil)
+	if current != nil {
+		Assert(current.IsFullyPopulated())
+	}
+
 	if current == nil {
 		if !extensible {
 			return false
@@ -163,8 +170,6 @@ func ValidateAndApplyPropertyDescriptor(
 
 		return true
 	}
-
-	Assert(current.IsFullyPopulated())
 
 	if !desc.HasFields() {
 		return true
@@ -359,9 +364,7 @@ func OrdinaryGet(object ObjectType, key PropertyKey, receiver Value) CompletionV
 		return desc.Value.ToCompletion()
 	}
 
-	if !desc.IsAccessorDescriptor() {
-		panic("")
-	}
+	Assert(desc.IsAccessorDescriptor())
 
 	getter := desc.Get
 	if getter == nil {
