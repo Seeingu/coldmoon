@@ -21,12 +21,16 @@ type MapObject struct {
 // AddEntriesFromIterable
 // spec: 24.1.1.2
 func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, adder ObjectType) (co CompletionValue) {
-	iterator := GetIterator(agent, iterable, IteratorKindSync)
-	iteratorRecord := iterator.Data()
+	iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(agent, iterable, IteratorKindSync), co)
+	if isAbrupt {
+		return rt
+	}
 	for {
 		next, isDone := iteratorRecord.IteratorStepValue()
 		nextItem, isAbrupt, rt := ReturnIfAbrupt(next, co)
 		if isAbrupt {
+			// Failures raised by the iterator itself are returned directly; only
+			// failures while consuming an entry require IteratorClose.
 			return rt
 		}
 		if isDone {
@@ -34,22 +38,40 @@ func AddEntriesFromIterable(agent *Agent, target ObjectType, iterable Value, add
 			return
 		}
 
-		if !ValueIs[*ObjectValue](nextItem) {
-			panic("TypeError")
-			// TODO IteratorClose
+		if nextItem == nil || !nextItem.IsObject() {
+			return iteratorRecord.IteratorClose(
+				co.ThrowTypeError(agent, "iterator entry must be an object"),
+			)
 		}
-		k := MustGetObject(nextItem).Get(NewStringPropertyKey("0"))
-		v := MustGetObject(nextItem).Get(NewStringPropertyKey("1"))
-		adder.Call(target.ToValue(), []Value{k, v})
+		entry := MustGetObject(nextItem)
+		k, isAbrupt, rt := ReturnIfAbrupt(
+			entry.internalMethods().Get(entry, NewStringPropertyKey("0"), nextItem),
+			co,
+		)
+		if isAbrupt {
+			return iteratorRecord.IteratorClose(rt)
+		}
+		v, isAbrupt, rt := ReturnIfAbrupt(
+			entry.internalMethods().Get(entry, NewStringPropertyKey("1"), nextItem),
+			co,
+		)
+		if isAbrupt {
+			return iteratorRecord.IteratorClose(rt)
+		}
+		status := adder.Call(target.ToValue(), []Value{k, v})
+		if status.IsAbrupt() {
+			return iteratorRecord.IteratorClose(status)
+		}
 	}
 }
 
 func NewMapConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		iterable := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget == nil {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "Map constructor requires new")
 		}
 		o := OrdinaryCreateFromConstructor(agent, newTarget, "%Map.prototype%", nil)
 		m := &MapObject{
@@ -60,9 +82,15 @@ func NewMapConstructor(realm *Realm) ObjectType {
 		if IsUndefinedOrNil(iterable) {
 			return (m).ToValue()
 		}
-		adder := m.Get(NewStringPropertyKey("set"))
+		adder, isAbrupt, rt := ReturnIfAbrupt(
+			m.internalMethods().Get(m, NewStringPropertyKey("set"), m.ToValue()),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if !IsCallable(adder) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "Map adder is not callable")
 		}
 		return AddEntriesFromIterable(agent, m, iterable, MustGetObject(adder))
 	}

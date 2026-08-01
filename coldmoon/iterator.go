@@ -24,21 +24,39 @@ func NewIteratorPrototype(realm *Realm) ObjectType {
 	return object
 }
 
-// GetIteratorFromMethod
+// GetIteratorFromMethodCompletion creates an iterator record without losing
+// exceptions from the iterator method or the next-property lookup.
 // spec: 7.4.2
-func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *IteratorRecord {
-	iterator := method.Call(object, nil).value
-	if !iterator.IsObject() {
-		panic("TypeError")
+func GetIteratorFromMethodCompletion(agent *Agent, object Value, method ObjectType) (co Completion[*IteratorRecord]) {
+	iterator, isAbrupt, rt := ReturnIfAbrupt(method.Call(object, nil), co)
+	if isAbrupt {
+		return rt
 	}
-	nextMethod := ReturnAssertNormal(GetV(agent, iterator, NewStringPropertyKey("next")))
-	// TODO: not standard, for debug
-	Assert(nextMethod != UndefinedValue)
-	iteratorRecord := &IteratorRecord{
+	if iterator == nil || !iterator.IsObject() {
+		return co.ThrowTypeError(agent, "iterator method must return an object")
+	}
+	nextMethod, isAbrupt, rt := ReturnIfAbrupt(GetV(agent, iterator, NewStringPropertyKey("next")), co)
+	if isAbrupt {
+		return rt
+	}
+	co.value = &IteratorRecord{
 		Iterator:   MustGetObject(iterator),
 		NextMethod: nextMethod,
 	}
-	return iteratorRecord
+	return
+}
+
+// GetIteratorFromMethod is the panic-style compatibility wrapper for callers
+// that have not yet migrated to completion-aware iterator acquisition.
+func GetIteratorFromMethod(agent *Agent, object Value, method ObjectType) *IteratorRecord {
+	result := GetIteratorFromMethodCompletion(agent, object, method)
+	if result.IsAbrupt() {
+		if result.Error() != nil {
+			panic(result.Error())
+		}
+		panic("GetIteratorFromMethod completed abruptly without an error value")
+	}
+	return result.Data()
 }
 
 // GetIterator
@@ -50,15 +68,43 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) (co Completion[*Ite
 	var method ObjectType
 	switch kind {
 	case IteratorKindSync:
-		method = GetMethod(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
+		var isAbrupt bool
+		var rt Completion[*IteratorRecord]
+		method, isAbrupt, rt = ReturnIfAbrupt(
+			GetMethodCompletion(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator])),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 	case IteratorKindAsync:
-		method = GetMethod(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsAsyncIterator]))
+		var isAbrupt bool
+		var rt Completion[*IteratorRecord]
+		method, isAbrupt, rt = ReturnIfAbrupt(
+			GetMethodCompletion(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsAsyncIterator])),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if method == nil {
-			syncMethod := GetMethod(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator]))
+			syncMethod, isAbrupt, rt := ReturnIfAbrupt(
+				GetMethodCompletion(agent, obj, NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsIterator])),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
 			if syncMethod == nil {
 				return co.ThrowTypeError(agent, "GetIterator: async no iterator method")
 			}
-			syncIteratorRecord := GetIteratorFromMethod(agent, obj, syncMethod)
+			syncIteratorRecord, isAbrupt, rt := ReturnIfAbrupt(
+				GetIteratorFromMethodCompletion(agent, obj, syncMethod),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
 			co.value = CreateAsyncFromSyncIterator(syncIteratorRecord)
 			return
 		}
@@ -66,8 +112,7 @@ func GetIterator(agent *Agent, obj Value, kind IteratorKind) (co Completion[*Ite
 	if method == nil {
 		return co.ThrowTypeError(agent, "No iterator method")
 	}
-	co.value = GetIteratorFromMethod(agent, obj, method)
-	return
+	return GetIteratorFromMethodCompletion(agent, obj, method)
 }
 
 // IteratorNext
@@ -80,8 +125,14 @@ func (i *IteratorRecord) IteratorNext(value Value) (co Completion[ObjectType]) {
 		result = i.NextMethod.Call(i.Iterator.Agent(), i.Iterator.ToValue(), []Value{value})
 	}
 
-	resultObject, ok := result.value.(*ObjectValue)
+	resultValue, isAbrupt, rt := ReturnIfAbrupt(result, co)
+	if isAbrupt {
+		i.Done = true
+		return rt
+	}
+	resultObject, ok := resultValue.(*ObjectValue)
 	if !ok {
+		i.Done = true
 		return co.ThrowTypeError(i.Iterator.Agent(), "IteratorNext method must return an object")
 	}
 	co.value = resultObject.Object
@@ -91,7 +142,18 @@ func (i *IteratorRecord) IteratorNext(value Value) (co Completion[ObjectType]) {
 // IteratorComplete
 // spec: 7.4.5
 func IteratorComplete(iterResult ObjectType) (co Completion[bool]) {
-	co.value = iterResult.Get(NewStringPropertyKey("done")).ToBoolean()
+	done, isAbrupt, rt := ReturnIfAbrupt(
+		iterResult.internalMethods().Get(
+			iterResult,
+			NewStringPropertyKey("done"),
+			iterResult.ToValue(),
+		),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
+	co.value = done.ToBoolean()
 	return
 }
 
@@ -117,10 +179,12 @@ func (i *IteratorRecord) IteratorStep() (co Completion[ObjectType], isFalse bool
 	}
 	done, isAbrupt, rt := ReturnIfAbrupt(IteratorComplete(result), co)
 	if isAbrupt {
+		i.Done = true
 		co = rt
 		return
 	}
 	if done {
+		i.Done = true
 		isFalse = true
 		return
 	}
@@ -132,21 +196,15 @@ func (i *IteratorRecord) IteratorStep() (co Completion[ObjectType], isFalse bool
 // spec: 7.4.8
 // returns Value or DONE, abrupt
 func (i *IteratorRecord) IteratorStepValue() (co CompletionValue, isDone bool) {
-	result := i.IteratorNext(nil)
-	if result.t == CompletionTypeThrow {
-		i.Done = true
-		return CompletionFrom(co, result), false
+	resultCompletion, isDone := i.IteratorStep()
+	result, isAbrupt, rt := ReturnIfAbrupt(resultCompletion, co)
+	if isAbrupt {
+		return rt, false
 	}
-	done := IteratorComplete(result.value)
-	if done.t == CompletionTypeThrow {
-		i.Done = true
-		return CompletionFrom(co, done), false
-	}
-	if done.value {
-		i.Done = true
+	if isDone {
 		return co, true
 	}
-	value, isAbrupt, rt := ReturnIfAbrupt(IteratorValue(result.value), co)
+	value, isAbrupt, rt := ReturnIfAbrupt(IteratorValue(result), co)
 	if isAbrupt {
 		i.Done = true
 		return rt, false
@@ -160,21 +218,31 @@ func (i *IteratorRecord) IteratorStepValue() (co CompletionValue, isDone bool) {
 func (i *IteratorRecord) IteratorClose(completion CompletionValue) (co CompletionValue) {
 	iterator := i.Iterator
 	agent := iterator.Agent()
-	innerResult := GetMethod(agent, iterator.ToValue(), NewStringPropertyKey("return"))
-
-	if innerResult != nil {
-		callResult := innerResult.ToValue().CallNoArgs(iterator.ToValue())
-		// A throw completion supplied by the caller takes precedence over
-		// failures or a non-object result produced while closing the iterator.
-		if completion.IsError() || completion.t == CompletionTypeThrow {
+	iteratorValue := iterator.ToValue()
+	innerResult := GetV(agent, iteratorValue, NewStringPropertyKey("return"))
+	if !innerResult.IsAbrupt() {
+		returnMethod := innerResult.Data()
+		if IsUndefinedOrNull(returnMethod) {
 			return completion
 		}
-		if callResult.IsAbrupt() {
-			return callResult
+		if !IsCallable(returnMethod) {
+			innerResult = co.ThrowTypeError(agent, "iterator return method is not callable")
+		} else {
+			// Closing is observable even when the original completion is a throw.
+			innerResult = returnMethod.Call(agent, iteratorValue, nil)
 		}
-		if !callResult.value.IsObject() {
-			return co.ThrowTypeError(agent, "iterator return method must return an object")
-		}
+	}
+
+	// The original throw wins over failures produced while closing, but only
+	// after the return getter and method have had their observable effects.
+	if completion.IsError() || completion.t == CompletionTypeThrow {
+		return completion
+	}
+	if innerResult.IsAbrupt() {
+		return innerResult
+	}
+	if innerResult.Data() == nil || !innerResult.Data().IsObject() {
+		return co.ThrowTypeError(agent, "iterator return method must return an object")
 	}
 	return completion
 }

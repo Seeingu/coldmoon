@@ -258,7 +258,13 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		Assert(proxy.Handler != nil)
 		t := proxy.Target
 		h := proxy.Handler
-		trap := GetMethod(agent, (h).ToValue(), NewStringPropertyKey("get"))
+		trap, isAbrupt, rt := ReturnIfAbrupt(
+			GetMethodCompletion(agent, h.ToValue(), NewStringPropertyKey("get")),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if trap == nil {
 			return t.internalMethods().Get(t, pk, receiver)
 		}

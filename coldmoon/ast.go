@@ -426,7 +426,7 @@ func (a *ArrayElementElision) IteratorDestructuringAssignmentEvaluation(vm *VM, 
 		next, isFalse := iteratorRecord.IteratorStep()
 		if next.IsAbrupt() {
 			iteratorRecord.Done = true
-			return
+			return CompletionFrom(co, next)
 		}
 		if isFalse {
 			iteratorRecord.Done = true

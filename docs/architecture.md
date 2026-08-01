@@ -73,6 +73,25 @@ Completion conversion preserves the completion type, target, and error while
 changing only its generic payload type. This keeps `return`, `break`,
 `continue`, and `throw` intact across helper boundaries.
 
+## Iterator consumption boundaries
+
+Iterator acquisition preserves language completions from the iterator method
+and `next` lookup. Once a record exists, failures from `next`, `done`, and
+`value` are returned directly and mark that record done; consumers do not call
+`return` again for them.
+
+Once a consumer has obtained an item, failures introduced while consuming that
+item have a different boundary. `Map`, `Set`, and `Object.fromEntries` close the
+iterator when entry validation, entry property access, or the collection adder
+completes abruptly. The close is observable exactly once. An original throw
+takes precedence over a failure from the iterator's `return` getter or method,
+but the getter and method still run for their side effects.
+
+Completion-aware callers use `GetMethodCompletion`,
+`GetIteratorFromMethodCompletion`, `IteratorStepValue`, and `IteratorClose`.
+The panic-style wrappers remain only for older algorithms that have not yet
+migrated to explicit completion propagation.
+
 ## Module graph
 
 Each Agent owns one `ModuleGraph`. The host first resolves a referrer and

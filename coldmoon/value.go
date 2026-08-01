@@ -717,19 +717,38 @@ func GetV(agent *Agent, value Value, key PropertyKey) CompletionValue {
 	return object.internalMethods().Get(object, key, value)
 }
 
-// 7.3.11
-// TODO: Should Return UndefinedValue
-func GetMethod(agent *Agent, value Value, key PropertyKey) ObjectType {
-	fun := ReturnAssertNormal(GetV(agent, value, key))
+// GetMethodCompletion returns a callable property while preserving failures
+// from accessors and the TypeError required for non-callable properties.
+// spec: 7.3.11
+func GetMethodCompletion(agent *Agent, value Value, key PropertyKey) (co Completion[ObjectType]) {
+	fun, isAbrupt, rt := ReturnIfAbrupt(GetV(agent, value, key), co)
+	if isAbrupt {
+		return rt
+	}
 	if IsUndefinedOrNull(fun) {
-		return nil
+		return
 	}
 
 	if !IsCallable(fun) {
-		panic("TypeError")
+		return co.ThrowTypeError(agent, "method is not callable")
 	}
 
-	return fun.(*ObjectValue).Object
+	co.value = MustGetObject(fun)
+	return
+}
+
+// GetMethod is the panic-style compatibility wrapper used by algorithms that
+// have not yet migrated to completion-aware method lookup. Language errors are
+// rethrown as Values so builtin invocation can preserve them as completions.
+func GetMethod(agent *Agent, value Value, key PropertyKey) ObjectType {
+	result := GetMethodCompletion(agent, value, key)
+	if result.IsAbrupt() {
+		if result.Error() != nil {
+			panic(result.Error())
+		}
+		panic("GetMethod completed abruptly without an error value")
+	}
+	return result.Data()
 }
 
 // 7.3.18
