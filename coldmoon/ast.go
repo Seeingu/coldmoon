@@ -33,12 +33,6 @@ type VarScopedDeclaration struct {
 	HoistableDeclaration DeclarationHoistable
 }
 
-// LexicallyScopedDeclaration Enum
-type LexicallyScopedDeclaration struct {
-	HoistableDeclaration DeclarationHoistable
-	// TODO
-}
-
 // MARK: - PrimaryExpression
 
 type PrimaryExpression interface {
@@ -74,7 +68,7 @@ func (p *ClassExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		// TODO: set sourceText
+		SetClassSourceText(value, p.SourceText)
 		co.value = value.ToValue()
 		return
 	} else {
@@ -82,7 +76,7 @@ func (p *ClassExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		// TODO: set sourceText
+		SetClassSourceText(value, p.SourceText)
 		co.value = value.ToValue()
 		return
 	}
@@ -121,8 +115,13 @@ func (p *PrimaryExpressionRegularExpressionLiteral) String() string {
 }
 
 func (p *PrimaryExpressionRegularExpressionLiteral) IsValidRegularExpressionLiteral() bool {
-	// TODO
-	return true
+	unicode := strings.Contains(p.Flags, "u")
+	unicodeSets := strings.Contains(p.Flags, "v")
+	if unicode && unicodeSets {
+		return false
+	}
+	_, err := ParsePattern(p.Pattern, unicode, unicodeSets)
+	return err == nil
 }
 
 // BindingIdentifier [Yield, Await] :
@@ -138,12 +137,18 @@ type BindingIdentifier struct {
 var _ RuntimeSemanticsBindingInitialization = (*BindingIdentifier)(nil)
 
 func (b *BindingIdentifier) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
-	if b.identifier != "" {
-		name := b.identifier
-		return vm.InitializeBoundName(name, value, env)
-	} else {
-		panic("unimplemented")
+	name := b.identifier
+	if name == "" {
+		switch {
+		case b.isYield:
+			name = "yield"
+		case b.isAwait:
+			name = "await"
+		default:
+			panic("BindingIdentifier: missing identifier variant")
+		}
 	}
+	return vm.InitializeBoundName(name, value, env)
 }
 
 // MARK: - IdentifierReference
@@ -200,7 +205,7 @@ func (p *AsyncFunctionExpression) AssignmentTargetType() AssignmentTargetType {
 // Evaluation
 // spec: 15.8.5
 func (p *AsyncFunctionExpression) Evaluation(vm *VM) (co CompletionValue) {
-	return p.InstantiateAsyncFunctionExpression(vm).ToValue().ToCompletion()
+	return p.InstantiateAsyncFunctionExpression(vm, NewStringPropertyKey("")).ToValue().ToCompletion()
 }
 
 func (p *AsyncFunctionExpression) astHasBindingIdentifier() bool {
@@ -210,27 +215,44 @@ func (p *AsyncFunctionExpression) astHasBindingIdentifier() bool {
 // InstantiateAsyncFunctionExpression
 // spec: 15.8.3
 // returns function object
-func (p *AsyncFunctionExpression) InstantiateAsyncFunctionExpression(vm *VM) ObjectType {
+func (p *AsyncFunctionExpression) InstantiateAsyncFunctionExpression(
+	vm *VM,
+	inferredName PropertyKeyOrPrivateName,
+) ObjectType {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astHasBindingIdentifier() {
-		panic("unimplemented")
-	} else {
-		name := ""
-		env := vm.RunningLexicalEnvironment()
-		privateEnv := vm.RunningPrivateEnvironment()
-		sourceText := p.SourceText
+		name := p.Identifier
+		outerEnv := vm.RunningLexicalEnvironment()
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(name, false)
 		closure := OrdinaryFunctionCreate(
 			agent,
 			realm.Intrinsics.AsyncFunctionPrototype,
-			sourceText,
+			p.SourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			vm.RunningPrivateEnvironment(),
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		funcEnv.InitializeBinding(name, closure.ToValue())
+		return closure
+	} else {
+		env := vm.RunningLexicalEnvironment()
+		privateEnv := vm.RunningPrivateEnvironment()
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.AsyncFunctionPrototype,
+			p.SourceText,
 			p.FormalParameters,
 			p.Body,
 			functionCreateThisModeNonLexical,
 			env,
 			privateEnv,
 		)
-		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		SetFunctionName(closure, inferredName, "")
 		return closure
 	}
 }
@@ -272,6 +294,33 @@ func (p *GeneratorExpression) InstantiateGeneratorFunctionExpression(
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astHasIdentifierName() {
+		name := p.IdentifierName
+		outerEnv := vm.RunningLexicalEnvironment()
+		funcEnv := NewDeclarativeEnvironment(outerEnv)
+		funcEnv.CreateImmutableBinding(name, false)
+		privateEnv := vm.RunningPrivateEnvironment()
+		sourceText := p.SourceText
+		closure := OrdinaryFunctionCreate(
+			agent,
+			realm.Intrinsics.GeneratorFunctionPrototype,
+			sourceText,
+			p.FormalParameters,
+			p.Body,
+			functionCreateThisModeNonLexical,
+			funcEnv,
+			privateEnv,
+		)
+		SetFunctionName(closure, NewStringPropertyKey(name), "")
+		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
+		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+			Value:        prototype.ToValue(),
+			Writable:     true,
+			Enumerable:   false,
+			Configurable: false,
+		})
+		funcEnv.InitializeBinding(name, closure.ToValue())
+		return closure
+	} else {
 		env := vm.RunningLexicalEnvironment()
 		privateEnv := vm.RunningPrivateEnvironment()
 		sourceText := p.SourceText
@@ -294,38 +343,11 @@ func (p *GeneratorExpression) InstantiateGeneratorFunctionExpression(
 			Configurable: false,
 		})
 		return closure
-	} else {
-		outerEnv := vm.RunningLexicalEnvironment()
-		funcEnv := NewDeclarativeEnvironment(outerEnv)
-		funcEnv.CreateImmutableBinding(p.IdentifierName, false)
-		privateEnv := vm.RunningPrivateEnvironment()
-		sourceText := p.SourceText
-		closure := OrdinaryFunctionCreate(
-			agent,
-			realm.Intrinsics.GeneratorFunctionPrototype,
-			sourceText,
-			p.FormalParameters,
-			p.Body,
-			functionCreateThisModeNonLexical,
-			funcEnv,
-			privateEnv,
-		)
-		SetFunctionName(closure, NewStringPropertyKey(p.IdentifierName), "")
-		prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
-		closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
-			Value:        prototype.ToValue(),
-			Writable:     true,
-			Enumerable:   false,
-			Configurable: false,
-		})
-		return closure
 	}
 }
 
 func (p *GeneratorExpression) Evaluation(vm *VM) CompletionValue {
-	// TODO: name
-	name := NewStringPropertyKey("")
-	return p.InstantiateGeneratorFunctionExpression(vm, name).ToValue().ToCompletion()
+	return p.InstantiateGeneratorFunctionExpression(vm, NewStringPropertyKey("")).ToValue().ToCompletion()
 }
 
 func (p *GeneratorExpression) String() string {
@@ -345,6 +367,50 @@ type PrimaryExpressionAsyncGeneratorExpression struct {
 func (p *PrimaryExpressionAsyncGeneratorExpression) _primaryExpression() {}
 func (p *PrimaryExpressionAsyncGeneratorExpression) AssignmentTargetType() AssignmentTargetType {
 	return AssignmentTargetTypeInvalid
+}
+
+// InstantiateAsyncGeneratorFunctionExpression creates an async generator and
+// installs the self-binding required by named function expressions.
+func (p *PrimaryExpressionAsyncGeneratorExpression) InstantiateAsyncGeneratorFunctionExpression(
+	vm *VM,
+	inferredName PropertyKeyOrPrivateName,
+) ObjectType {
+	agent := vm.agent
+	realm := agent.CurrentRealm()
+	env := vm.RunningLexicalEnvironment()
+	name := inferredName
+	if p.IdentifierName != "" {
+		env = NewDeclarativeEnvironment(env)
+		env.CreateImmutableBinding(p.IdentifierName, false)
+		name = NewStringPropertyKey(p.IdentifierName)
+	}
+
+	closure := OrdinaryFunctionCreate(
+		agent,
+		realm.Intrinsics.AsyncGeneratorFunctionPrototype,
+		p.SourceText,
+		p.FormalParameters,
+		p.Body,
+		functionCreateThisModeNonLexical,
+		env,
+		vm.RunningPrivateEnvironment(),
+	)
+	SetFunctionName(closure, name, "")
+	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.AsyncGeneratorFunctionPrototypePrototype, nil)
+	closure.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
+		Value:        prototype.ToValue(),
+		Writable:     true,
+		Enumerable:   false,
+		Configurable: false,
+	})
+	if p.IdentifierName != "" {
+		env.InitializeBinding(p.IdentifierName, closure.ToValue())
+	}
+	return closure
+}
+
+func (p *PrimaryExpressionAsyncGeneratorExpression) Evaluation(vm *VM) CompletionValue {
+	return p.InstantiateAsyncGeneratorFunctionExpression(vm, NewStringPropertyKey("")).ToValue().ToCompletion()
 }
 
 func (p *PrimaryExpressionAsyncGeneratorExpression) String() string {
@@ -426,7 +492,7 @@ func (a *ArrayElementElision) IteratorDestructuringAssignmentEvaluation(vm *VM, 
 		next, isFalse := iteratorRecord.IteratorStep()
 		if next.IsAbrupt() {
 			iteratorRecord.Done = true
-			return
+			return CompletionFrom(co, next)
 		}
 		if isFalse {
 			iteratorRecord.Done = true
@@ -443,18 +509,7 @@ type ArrayElementExpression struct {
 var _ RuntimeSemanticsIteratorDestructuringAssignmentEvaluation = (*ArrayElementExpression)(nil)
 
 func (a *ArrayElementExpression) IteratorDestructuringAssignmentEvaluation(vm *VM, iteratorRecord *IteratorRecord) (co CompletionValue) {
-	// AssignmentElement : DestructuringAssignmentTarget Initializeropt
-
-	_, isObjectLiteral := a.Expression.(*PrimaryExpressionObjectLiteral)
-	_, isArrayLiteral := a.Expression.(*ArrayLiteral)
-	var lref Value
-	if !isObjectLiteral && !isArrayLiteral {
-		l, isAbrupt, rt := ReturnIfAbrupt(a.Expression.Evaluation(vm), co)
-		if isAbrupt {
-			return rt
-		}
-		lref = l
-	}
+	target, initializer := destructuringTargetAndInitializer(a.Expression)
 	var value Value = UndefinedValue
 	if !iteratorRecord.Done {
 		next, isDone := iteratorRecord.IteratorStepValue()
@@ -466,16 +521,34 @@ func (a *ArrayElementExpression) IteratorDestructuringAssignmentEvaluation(vm *V
 			value = nextValue
 		}
 	}
-	// TODO: check initializer
-	v := value
-	if isObjectLiteral || isArrayLiteral {
-		nextedAssignmentPattern := a.Expression
-		return nextedAssignmentPattern.(RuntimeSemanticsDestructuringAssignmentEvaluation).DestructuringAssignmentEvaluation(vm, v)
+	if value == UndefinedValue && initializer != nil {
+		var isAbrupt bool
+		var rt CompletionValue
+		if IsAnonymousFunctionDefinition(initializer) && ExpressionAnalyze(target, AnalyzeQueryIsIdentifierReference) {
+			result, isAbrupt, targetRT := ReturnIfAbrupt(target.Evaluation(vm), co)
+			if isAbrupt {
+				return targetRT
+			}
+			ref, ok := result.ReferenceRecord()
+			if !ok {
+				return co.ThrowTypeError(vm.agent, "destructuring target is not a reference")
+			}
+			value, isAbrupt, rt = ReturnIfAbrupt(
+				EvaluateNamedExpression(vm, initializer, ReferencedNameKey(ref.ReferencedName)),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			return ref.PutValue(vm.agent, value)
+		} else {
+			value, _, isAbrupt, rt = vm.EvalAndGetValue(initializer, co)
+		}
+		if isAbrupt {
+			return rt
+		}
 	}
-	if ref, ok := lref.ReferenceRecord(); ok {
-		return ref.PutValue(vm.agent, v)
-	}
-	return
+	return assignDestructuringTarget(vm, target, value)
 }
 
 type ArrayElementSpread struct {
@@ -483,7 +556,59 @@ type ArrayElementSpread struct {
 	Spread Expression
 }
 
-// TODO: handle elision
+var _ RuntimeSemanticsIteratorDestructuringAssignmentEvaluation = (*ArrayElementSpread)(nil)
+
+func (a *ArrayElementSpread) IteratorDestructuringAssignmentEvaluation(vm *VM, iteratorRecord *IteratorRecord) (co CompletionValue) {
+	array := ArrayCreate(vm.agent, 0, nil)
+	nextIndex := JSInt(0)
+	for !iteratorRecord.Done {
+		next, isDone := iteratorRecord.IteratorStepValue()
+		nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+		if isAbrupt {
+			return rt
+		}
+		if isDone {
+			break
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(
+			array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), nextValue),
+			co,
+		)
+		if isAbrupt {
+			return iteratorRecord.IteratorClose(rt)
+		}
+		nextIndex++
+	}
+	return assignDestructuringTarget(vm, a.Spread, array.ToValue())
+}
+
+func destructuringTargetAndInitializer(expression Expression) (target Expression, initializer Expression) {
+	assignment, ok := expression.(*AssignmentExpression)
+	if !ok {
+		return expression, nil
+	}
+	if assignment.Operator != AssignmentOperatorAssign {
+		panic("destructuring initializer must use simple assignment")
+	}
+	return assignment.Left.Expression, assignment.Right
+}
+
+func assignDestructuringTarget(vm *VM, target Expression, value Value) (co CompletionValue) {
+	switch target.(type) {
+	case *ArrayLiteral, *PrimaryExpressionObjectLiteral:
+		return (&LeftHandSideExpression{Expression: target}).DestructuringAssignmentEvaluation(vm, value)
+	}
+	referenceValue, isAbrupt, rt := ReturnIfAbrupt(target.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	reference, ok := referenceValue.ReferenceRecord()
+	if !ok {
+		return co.ThrowTypeError(vm.agent, "destructuring target is not a reference")
+	}
+	return reference.PutValue(vm.agent, value)
+}
+
 // ElementList [Yield, Await] :
 // Elisionopt AssignmentExpression[+In, ?Yield, ?Await]
 // Elisionopt SpreadElement[?Yield, ?Await]
@@ -519,7 +644,13 @@ func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSI
 		// Elision : ,
 		case *ArrayElementElision:
 			length := nextIndex + 1
-			array.Set(NewStringPropertyKey("length"), NewNumberValue(JSNumber(length)), setThrowTypeThrow)
+			_, isAbrupt, rt := ReturnIfAbrupt(
+				array.Set(NewStringPropertyKey("length"), NewNumberValue(JSNumber(length)), setThrowTypeThrow),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
 			nextIndex = length
 		case *ArrayElementExpression:
 			initResult, isAbrupt, rt := ReturnIfAbrupt(elem.Expression.Evaluation(vm), co)
@@ -540,9 +671,39 @@ func (e ElementList) ArrayAccumulation(vm *VM, array *ArrayObject, nextIndex JSI
 			}
 			nextIndex++
 		case *ArrayElementSpread:
-			panic("unimplemented")
+			spreadRef, isAbrupt, rt := ReturnIfAbrupt(elem.Spread.Evaluation(vm), co)
+			if isAbrupt {
+				return rt
+			}
+			spreadValue, isAbrupt, rt := ReturnIfAbrupt(spreadRef.GetValue(vm.agent), co)
+			if isAbrupt {
+				return rt
+			}
+			iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(vm.agent, spreadValue, IteratorKindSync), co)
+			if isAbrupt {
+				return rt
+			}
+			for {
+				next, isDone := iteratorRecord.IteratorStepValue()
+				nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+				if isAbrupt {
+					return rt
+				}
+				if isDone {
+					break
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(
+					array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), nextValue),
+					co,
+				)
+				if isAbrupt {
+					closed := iteratorRecord.IteratorClose(CompletionFrom(CompletionValue{}, rt))
+					return CompletionFrom(co, closed)
+				}
+				nextIndex++
+			}
 		default:
-			panic("unreachable")
+			panic("ArrayAccumulation: unexpected array element")
 		}
 	}
 	co.value = nextIndex
@@ -558,11 +719,6 @@ type ArrayLiteral struct {
 	ElementList ElementList
 }
 
-// TODO: Elision
-func (p *ArrayLiteral) astHasElision() bool {
-	return false
-}
-
 func (p *ArrayLiteral) astElementListEmpty() bool {
 	return len(p.ElementList) == 0
 }
@@ -574,9 +730,9 @@ func (p *ArrayLiteral) Evaluation(vm *VM) CompletionValue {
 	if p.astElementListEmpty() {
 		return array.ToValue().ToCompletion()
 	}
-	if p.astHasElision() {
-	} else {
-		p.ElementList.ArrayAccumulation(vm, array, 0)
+	result := p.ElementList.ArrayAccumulation(vm, array, 0)
+	if result.IsAbrupt() {
+		return CompletionFrom(CompletionValue{}, result)
 	}
 	return array.ToValue().ToCompletion()
 }
@@ -592,6 +748,8 @@ func (p *ArrayLiteral) String() string {
 			sb += element.Expression.String()
 		case *ArrayElementElision:
 			sb += ","
+		case *ArrayElementSpread:
+			sb += "..." + element.Spread.String()
 		}
 	}
 	sb += "]"
@@ -624,7 +782,10 @@ func (p *PrimaryExpressionObjectLiteral) Evaluation(vm *VM) CompletionValue {
 	}
 
 	obj := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
-	p.PropertyList.PropertyDefinitionEvaluation(vm, obj)
+	result := p.PropertyList.PropertyDefinitionEvaluation(vm, obj)
+	if result.IsAbrupt() {
+		return result
+	}
 	return obj.ToValue().ToCompletion()
 }
 
@@ -647,7 +808,10 @@ var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionList)(n
 // 13.2.5.4
 func (p *PropertyDefinitionList) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
 	for _, item := range p.Items {
-		item.PropertyDefinitionEvaluation(vm, obj)
+		_, isAbrupt, rt := ReturnIfAbrupt(item.PropertyDefinitionEvaluation(vm, obj), co)
+		if isAbrupt {
+			return rt
+		}
 	}
 	return co
 }
@@ -683,22 +847,43 @@ type PropertyDefinitionMethodDefinition struct {
 var _ RuntimeSemanticsPropertyDefinitionEvaluation = (*PropertyDefinitionMethodDefinition)(nil)
 
 func (p *PropertyDefinitionMethodDefinition) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
-	p.MethodDefinition.MethodDefinitionEvaluation(vm, obj, true)
+	_, isAbrupt, rt := ReturnIfAbrupt(p.MethodDefinition.MethodDefinitionEvaluation(vm, obj, true), co)
+	if isAbrupt {
+		return rt
+	}
 	return co
 }
 
 type PropertyDefinitionIdentifierReference struct {
 	PropertyDefinition
 	IdentifierReference *IdentifierReference
+	Initializer         Expression
 }
 
 var _ PropertyDefinition = (*PropertyDefinitionIdentifierReference)(nil)
 
 func (p *PropertyDefinitionIdentifierReference) PropertyDefinitionEvaluation(vm *VM, obj ObjectType) (co CompletionValue) {
 	propName := p.IdentifierReference.Identifier
-	propValue, _, isAbrupt, rt := vm.EvalAndGetValue(p.IdentifierReference, co)
-	if isAbrupt {
-		return rt
+	var propValue Value
+	var isAbrupt bool
+	var rt CompletionValue
+	if p.Initializer != nil {
+		if IsAnonymousFunctionDefinition(p.Initializer) {
+			propValue, isAbrupt, rt = ReturnIfAbrupt(
+				EvaluateNamedExpression(vm, p.Initializer, NewStringPropertyKey(propName)),
+				co,
+			)
+		} else {
+			propValue, _, isAbrupt, rt = vm.EvalAndGetValue(p.Initializer, co)
+		}
+		if isAbrupt {
+			return rt
+		}
+	} else {
+		propValue, _, isAbrupt, rt = vm.EvalAndGetValue(p.IdentifierReference, co)
+		if isAbrupt {
+			return rt
+		}
 	}
 	_, isAbrupt, rt = ReturnIfAbrupt(
 		obj.CreateDataPropertyOrThrow(NewStringPropertyKey(propName), propValue),
@@ -722,11 +907,18 @@ type PropertyDefinitionNameAndExpression struct {
 }
 
 func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *VM, object ObjectType) (co CompletionValue) {
-	propKey := p.Name.Evaluation(vm)
+	propKey, isAbrupt, rt := ReturnIfAbrupt(p.Name.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	pk, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, propKey), co)
+	if isAbrupt {
+		return rt
+	}
 	var isProtoSetter bool
 	if vm.IsJSONParse {
 		isProtoSetter = false
-	} else if propKey.value.String() == "__proto__" && !IsComputedPropertyKeyDefault(p.Name) {
+	} else if key, ok := pk.(StringPropertyKey); ok && key.Value == "__proto__" && !IsComputedPropertyKeyDefault(p.Name) {
 		isProtoSetter = true
 	} else {
 		isProtoSetter = false
@@ -734,7 +926,10 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 
 	var propValue Value
 	if IsAnonymousFunctionDefinition(p.Expression) {
-		panic("unimplemented")
+		propValue, isAbrupt, rt = ReturnIfAbrupt(EvaluateNamedExpression(vm, p.Expression, pk), co)
+		if isAbrupt {
+			return rt
+		}
 	} else {
 		pv, _, isAbrupt, rt := vm.EvalAndGetValue(p.Expression, co)
 		if isAbrupt {
@@ -743,17 +938,16 @@ func (p *PropertyDefinitionNameAndExpression) PropertyDefinitionEvaluation(vm *V
 		propValue = pv
 	}
 	if isProtoSetter {
-		if propValue.IsObject() || propValue == NullValue {
-			object.SetPrototype(propValue.ToObject(vm.agent).value)
+		if propValue == NullValue {
+			object.SetPrototype(nil)
+		} else if propValue.IsObject() {
+			object.SetPrototype(MustGetObject(propValue))
 		}
 		return co
 	}
-	// TODO: assert no non-configurable properties
+	// A fresh ordinary object cannot already contain a non-configurable own
+	// property at this key.
 	Assert(object.IsOrdinary() && object.IsExtensible())
-	pk, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, propKey.value), co)
-	if isAbrupt {
-		return rt
-	}
 	object.CreateDataPropertyOrThrow(
 		pk,
 		propValue)
@@ -767,6 +961,15 @@ func (p *PropertyDefinitionNameAndExpression) String() string {
 type PropertyDefinitionSpread struct {
 	PropertyDefinition
 	Spread Expression
+}
+
+func (p *PropertyDefinitionSpread) PropertyDefinitionEvaluation(vm *VM, object ObjectType) (co CompletionValue) {
+	spreadValue, _, isAbrupt, rt := vm.EvalAndGetValue(p.Spread, co)
+	if isAbrupt {
+		return rt
+	}
+	object.CopyDataProperties(spreadValue, nil)
+	return
 }
 
 func (p *PropertyDefinitionSpread) String() string {
@@ -845,13 +1048,37 @@ func (p *MethodDefinition) astIsGet() bool {
 	return p.Type == MethodDefinitionTypeGet
 }
 
+func (p *MethodDefinition) astIsSet() bool {
+	return p.Type == MethodDefinitionTypeSet
+}
+
+func evaluateClassElementName(vm *VM, propertyName PropertyName) (co Completion[PropertyKeyOrPrivateName]) {
+	value, isAbrupt, rt := ReturnIfAbrupt(propertyName.Evaluation(vm), co)
+	if isAbrupt {
+		return rt
+	}
+	if privateName, ok := GetPrivateName(vm.agent, value); ok {
+		co.value = PropertyKeyOrPrivateNameName{PrivateName: *privateName}
+		return
+	}
+	key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, value), co)
+	if isAbrupt {
+		return rt
+	}
+	co.value = key
+	return
+}
+
 // DefineMethod
 // spec: 15.4.4
 func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType) (co Completion[*DefineMethodRecord]) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astIsClassElementName() {
-		propKey := p.PropertyName.Evaluation(vm)
+		propKey, isAbrupt, rt := ReturnIfAbrupt(evaluateClassElementName(vm, p.PropertyName), co)
+		if isAbrupt {
+			return rt
+		}
 		env := vm.RunningLexicalEnvironment()
 		privateEnv := vm.RunningPrivateEnvironment()
 		var prototype ObjectType
@@ -872,12 +1099,8 @@ func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType
 			privateEnv,
 		)
 		MakeMethod(closure, obj)
-		pk, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propKey.value), co)
-		if isAbrupt {
-			return rt
-		}
 		co.value = &DefineMethodRecord{
-			Key:     pk,
+			Key:     propKey,
 			Closure: closure,
 		}
 		return
@@ -890,8 +1113,11 @@ func (p *MethodDefinition) DefineMethod(vm *VM, obj ObjectType, proto ObjectType
 // spec: 15.4.5
 func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, enumerable bool) (co Completion[*PrivateElement]) {
 	agent := vm.agent
-	if p.astIsGet() {
-		propKey := p.PropertyName.Evaluation(vm)
+	if p.astIsGet() || p.astIsSet() {
+		propKey, isAbrupt, rt := ReturnIfAbrupt(evaluateClassElementName(vm, p.PropertyName), co)
+		if isAbrupt {
+			return rt
+		}
 		env := vm.RunningLexicalEnvironment()
 		privateEnv := vm.RunningPrivateEnvironment()
 		sourceText := p.sourceText()
@@ -907,21 +1133,43 @@ func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, en
 			privateEnv,
 		)
 		MakeMethod(closure, obj)
-		// TODO: check propKey is private name
-		SetFunctionName(closure, propKey.value.ToPropertyKey(), "get")
-		// TODO: check propKey is private name
-		isPrivateName := false
-		if isPrivateName {
-			panic("unimplemented")
-		} else {
-			desc := &PropertyDescriptor{
-				Get:          closure,
-				Enumerable:   enumerable,
-				Configurable: true,
+		prefix := "get"
+		if p.astIsSet() {
+			prefix = "set"
+		}
+		SetFunctionName(closure, propKey, prefix)
+
+		switch key := propKey.(type) {
+		case PropertyKeyOrPrivateNameName:
+			privateElement := &PrivateElement{
+				Key:  key.PrivateName,
+				Kind: PrivateElementKindAccessor,
 			}
-			obj.DefinePropertyOrThrow(propKey.value.ToPropertyKey(), desc)
-			// return UNUSED
+			if p.astIsGet() {
+				privateElement.Get = closure
+			} else {
+				privateElement.Set = closure
+			}
+			co.value = privateElement
 			return
+		case PropertyKey:
+			desc := &PropertyDescriptor{
+				Enumerable:      enumerable,
+				EnumerableSet:   true,
+				Configurable:    true,
+				ConfigurableSet: true,
+			}
+			if p.astIsGet() {
+				desc.Get = closure
+				desc.GetSet = true
+			} else {
+				desc.Set = closure
+				desc.SetSet = true
+			}
+			obj.DefinePropertyOrThrow(key, desc)
+			return
+		default:
+			panic("MethodDefinitionEvaluation: unsupported class element name")
 		}
 	} else if p.astIsClassElementName() {
 		if methodDef, isAbrupt, rt := ReturnIfAbrupt(p.DefineMethod(vm, obj, nil), co); isAbrupt {
@@ -931,7 +1179,7 @@ func (p *MethodDefinition) MethodDefinitionEvaluation(vm *VM, obj ObjectType, en
 			return DefineMethodProperty(obj, methodDef.Key, methodDef.Closure, enumerable)
 		}
 	} else {
-		panic("unimplemented")
+		panic("MethodDefinitionEvaluation: missing class element name")
 	}
 }
 
@@ -967,6 +1215,23 @@ type LiteralPropertyName interface {
 type PropertyNameLiteralIdentifier struct {
 	LiteralPropertyName
 	Identifier IdentifierName
+}
+
+// PropertyNamePrivateIdentifier represents the PrivateIdentifier alternative
+// of ClassElementName. It is deliberately not a LiteralPropertyName because
+// private names are not valid object-literal property names.
+type PropertyNamePrivateIdentifier struct {
+	PropertyName
+	Identifier PrivateIdentifierName
+}
+
+func (p *PropertyNamePrivateIdentifier) String() string {
+	return string(p.Identifier)
+}
+
+func (p *PropertyNamePrivateIdentifier) Evaluation(vm *VM) CompletionValue {
+	privateName := ResolvePrivateIdentifier(vm.RunningPrivateEnvironment(), p.Identifier)
+	return privateName.Symbol.ToCompletion()
 }
 
 func (p *PropertyNameLiteralIdentifier) LiteralString() string {
@@ -1071,8 +1336,7 @@ func (p *FunctionExpression) InstantiateOrdinaryFunctionExpression(vm *VM, prope
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	if p.astHasIdentifier() {
-		// TODO: check Assert: name is not present.
-		// Assert(propertyKeyOrPrivateName == nil)
+		Assert(propertyKeyOrPrivateName == nil)
 		name := p.Identifier
 		outerEnv := vm.RunningLexicalEnvironment()
 		funcEnv := NewDeclarativeEnvironment(outerEnv)
@@ -1126,8 +1390,10 @@ func (p *FunctionExpression) NamedEvaluation(vm *VM, name PropertyKeyOrPrivateNa
 	return p.InstantiateOrdinaryFunctionExpression(vm, name).ToValue()
 }
 
-// TODO: non standard
 func (p *FunctionExpression) Evaluation(vm *VM) CompletionValue {
+	if p.astHasIdentifier() {
+		return p.InstantiateOrdinaryFunctionExpression(vm, nil).ToValue().ToCompletion()
+	}
 	return p.NamedEvaluation(vm, NewStringPropertyKey("")).ToCompletion()
 }
 
@@ -1193,7 +1459,8 @@ func (p *AsyncArrowFunction) String() string {
 // - ArrowParameters[?Yield, ?Await] [no LineTerminator here] => ConciseBody[?In]
 type ArrowFunction struct {
 	PrimaryExpression
-	// TODO: change to ArrowParameters
+	// FormalParameters is the normalized representation of both ArrowParameters
+	// grammar alternatives (a single binding identifier or a parenthesized list).
 	// ArrowParameters [Yield, Await] :
 	// - BindingIdentifier[?Yield, ?Await]
 	// - CoverParenthesizedExpressionAndArrowParameterList[?Yield, ?Await]
@@ -1214,10 +1481,10 @@ func (p *ArrowFunction) AssignmentTargetType() AssignmentTargetType {
 }
 
 func (p *ArrowFunction) Evaluation(vm *VM) CompletionValue {
-	return p.InstantiateArrowFunctionExpression(vm, "").ToCompletion()
+	return p.InstantiateArrowFunctionExpression(vm, NewStringPropertyKey("")).ToCompletion()
 }
 
-func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM, name string) Value {
+func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM, name PropertyKeyOrPrivateName) Value {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
 	env := vm.RunningLexicalEnvironment()
@@ -1233,7 +1500,7 @@ func (p *ArrowFunction) InstantiateArrowFunctionExpression(vm *VM, name string) 
 		env,
 		privateEnv,
 	)
-	SetFunctionName(closure, CMString(name).ToPropertyKey(), "")
+	SetFunctionName(closure, name, "")
 	return closure.ToValue()
 }
 
@@ -1256,6 +1523,15 @@ func (a *ASTPropertyIdentifier) String() string {
 	return string(a.Identifier)
 }
 
+type ASTPropertyPrivateIdentifier struct {
+	ASTProperty
+	Identifier PrivateIdentifierName
+}
+
+func (a *ASTPropertyPrivateIdentifier) String() string {
+	return string(a.Identifier)
+}
+
 type ASTPropertyExpression struct {
 	ASTProperty
 	Expression Expression
@@ -1265,7 +1541,6 @@ func (a *ASTPropertyExpression) String() string {
 	return a.Expression.String()
 }
 
-// TODO(BM): refactor: match spec
 // MemberExpression [Yield, Await] :
 // - PrimaryExpression[?Yield, ?Await]
 // - MemberExpression[?Yield, ?Await] [ Expression[+In, ?Yield, ?Await] ]
@@ -1302,7 +1577,6 @@ func (m *MemberExpression) Evaluation(vm *VM) (co CompletionValue) {
 
 	switch prop := m.Property.(type) {
 	case *ASTPropertyExpression:
-		// TODO: check source text is strict
 		r, isAbrupt, rt := ReturnIfAbrupt(vm.EvaluatePropertyAccessWithExpressionKey(baseValue, prop.Expression, strict), co)
 		if isAbrupt {
 			return rt
@@ -1312,8 +1586,12 @@ func (m *MemberExpression) Evaluation(vm *VM) (co CompletionValue) {
 		return NewReferenceRecordValue(
 			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, prop.Identifier, strict),
 		).ToCompletion()
+	case *ASTPropertyPrivateIdentifier:
+		return NewReferenceRecordValue(
+			MakePrivateReference(vm.agent, baseValue, prop.Identifier),
+		).ToCompletion()
 	}
-	panic("unimplemented")
+	panic("MemberExpression: unknown property variant")
 }
 
 func (m *MemberExpression) String() string {
@@ -1559,10 +1837,11 @@ func (i *ExpressionImportCall) String() string {
 // - OptionalChain[?Yield, ?Await]. PrivateIdentifier
 type OptionalExpression struct {
 	Expression
-	// Property is OptionalChain
-	Property *OptionalExpressionProperty
-	// Expr is MemberExpression, CallExpression, or OptionalExpression
-	Expr Expression
+	// Properties contains the complete chain beginning at the first optional
+	// segment. Keeping the chain together preserves short-circuiting across
+	// later non-optional accesses such as base?.property.child.
+	Properties []*OptionalExpressionProperty
+	Expr       Expression
 }
 
 func (o *OptionalExpression) AssignmentTargetType() AssignmentTargetType {
@@ -1576,34 +1855,73 @@ func (o *OptionalExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if isAbrupt {
 		return rt
 	}
-	if IsUndefinedOrNull(baseValue) {
-		return UndefinedValue.ToCompletion()
+	for index, property := range o.Properties {
+		if property.Optional && IsUndefinedOrNull(baseValue) {
+			return UndefinedValue.ToCompletion()
+		}
+		result, isAbrupt, rt := ReturnIfAbrupt(property.ChainEvaluation(vm, baseValue, baseReference), co)
+		if isAbrupt {
+			return rt
+		}
+		if index == len(o.Properties)-1 {
+			return result.ToCompletion()
+		}
+		baseReference = result
+		baseValue, isAbrupt, rt = ReturnIfAbrupt(result.GetValue(vm.agent), co)
+		if isAbrupt {
+			return rt
+		}
 	}
-	result, isAbrupt, rt := ReturnIfAbrupt(o.Property.ChainEvaluation(vm, baseValue, baseReference), co)
-	if isAbrupt {
-		return rt
-	}
-	return result.ToCompletion()
+	panic("OptionalExpression: chain has no properties")
 }
 
 func (o *OptionalExpression) String() string {
-	return o.Expr.String() + "?." + o.Property.String()
+	result := o.Expr.String()
+	for _, property := range o.Properties {
+		switch {
+		case property.astIsArguments():
+			if property.Optional {
+				result += "?."
+			}
+			result += "(" + property.Arguments.String() + ")"
+		case property.astIsExpression():
+			if property.Optional {
+				result += "?."
+			}
+			result += "[" + property.Expression.String() + "]"
+		case property.astIsIdentifier():
+			if property.Optional {
+				result += "?."
+			} else {
+				result += "."
+			}
+			result += string(property.Identifier)
+		case property.astIsPrivateIdentifier():
+			if property.Optional {
+				result += "?."
+			} else {
+				result += "."
+			}
+			result += string(property.PrivateIdentifier)
+		}
+	}
+	return result
 }
 
-// OptionalExpressionProperty Enum
-// TODO(BM): rename to OptionalChain
-// TODO: handle chaining
-// TODO: handle private identifier
+// OptionalExpressionProperty represents one segment of an OptionalChain.
 type OptionalExpressionProperty struct {
-	Arguments  Arguments
-	Expression Expression
-	Identifier IdentifierName
+	Arguments         Arguments
+	Expression        Expression
+	Identifier        IdentifierName
+	PrivateIdentifier PrivateIdentifierName
+	Call              bool
+	Optional          bool
 }
 
 var _ RuntimeSemanticsChainEvaluation = (*OptionalExpressionProperty)(nil)
 
 func (o *OptionalExpressionProperty) astIsArguments() bool {
-	return o.Arguments != nil
+	return o.Call
 }
 
 func (o *OptionalExpressionProperty) astIsExpression() bool {
@@ -1614,32 +1932,36 @@ func (o *OptionalExpressionProperty) astIsIdentifier() bool {
 	return o.Identifier != ""
 }
 
-func (o *OptionalExpressionProperty) isStrict() bool {
-	// TODO: check strict
-	return true
+func (o *OptionalExpressionProperty) astIsPrivateIdentifier() bool {
+	return o.PrivateIdentifier != ""
 }
 
 func (o *OptionalExpressionProperty) ChainEvaluation(vm *VM, baseValue Value, baseReference Value) (co CompletionValue) {
 	if o.astIsArguments() {
-		thisChain := o
-		// TODO
-		tailCall := false
-		arguments := thisChain.Arguments.Evaluation(vm)
-		return vm.EvaluateCall(baseValue, baseReference, arguments.value.(*ListValue).Values, tailCall)
+		arguments, isAbrupt, rt := ReturnIfAbrupt(o.Arguments.ArgumentListEvaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		return vm.EvaluateCall(baseValue, baseReference, arguments)
 	} else if o.astIsExpression() {
-		strict := o.isStrict()
-		r, isAbrupt, rt := ReturnIfAbrupt(vm.EvaluatePropertyAccessWithExpressionKey(baseValue, o.Expression, strict), co)
+		r, isAbrupt, rt := ReturnIfAbrupt(
+			vm.EvaluatePropertyAccessWithExpressionKey(baseValue, o.Expression, vm.containedInStrictCode),
+			co,
+		)
 		if isAbrupt {
 			return rt
 		}
 		return NewReferenceRecordValue(r).ToCompletion()
 	} else if o.astIsIdentifier() {
-		strict := o.isStrict()
 		return NewReferenceRecordValue(
-			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, o.Identifier, strict),
+			vm.EvaluatePropertyAccessWithIdentifierKey(baseValue, o.Identifier, vm.containedInStrictCode),
+		).ToCompletion()
+	} else if o.astIsPrivateIdentifier() {
+		return NewReferenceRecordValue(
+			MakePrivateReference(vm.agent, baseValue, o.PrivateIdentifier),
 		).ToCompletion()
 	} else {
-		panic("unimplemented")
+		panic("OptionalChain: unknown segment variant")
 	}
 }
 
@@ -1649,6 +1971,9 @@ func (o *OptionalExpressionProperty) String() string {
 	}
 	if o.Expression != nil {
 		return "[" + o.Expression.String() + "]"
+	}
+	if o.PrivateIdentifier != "" {
+		return string(o.PrivateIdentifier)
 	}
 	return string(o.Identifier)
 }
@@ -1804,12 +2129,29 @@ type TemplateSpan struct {
 	Expression Expression
 }
 
-// 12.9.6.1
-func (t *TemplateSpan) TV() CMString {
+// TV returns the cooked template value and whether its escapes are valid. An
+// invalid value becomes undefined in a tagged template and is an early error
+// in an untagged template.
+// spec: 12.9.6.1
+func (t *TemplateSpan) TV() (CMString, bool) {
+	return cookTemplateText(t.sourceCharacters())
+}
+
+// TRV returns the raw template value. Escape sequences remain source text,
+// while line terminators use the canonical LF representation required for a
+// tagged template's strings.raw array.
+func (t *TemplateSpan) TRV() CMString {
+	raw := t.sourceCharacters()
+	raw = strings.ReplaceAll(raw, "\r\n", "\n")
+	raw = strings.ReplaceAll(raw, "\r", "\n")
+	return CMString(raw)
+}
+
+func (t *TemplateSpan) sourceCharacters() string {
 	start := 0
 	end := len(t.Text)
 	if end == 0 {
-		return CMString("")
+		return ""
 	}
 	if t.Text[0] == '`' || t.Text[0] == '}' {
 		start = 1
@@ -1821,82 +2163,101 @@ func (t *TemplateSpan) TV() CMString {
 		end--
 	}
 	if start > end {
-		return CMString("")
+		return ""
 	}
-	return cookTemplateText(t.Text[start:end])
+	return t.Text[start:end]
 }
 
-func cookTemplateText(text string) CMString {
+func cookTemplateText(text string) (CMString, bool) {
+	runes := []rune(text)
 	var value strings.Builder
-	for i := 0; i < len(text); i++ {
-		ch := text[i]
+	for i := 0; i < len(runes); i++ {
+		ch := runes[i]
 		if ch == '\r' {
-			if i+1 < len(text) && text[i+1] == '\n' {
+			if i+1 < len(runes) && runes[i+1] == '\n' {
 				i++
 			}
-			value.WriteByte('\n')
+			value.WriteRune('\n')
 			continue
 		}
-		if ch != '\\' || i+1 >= len(text) {
-			value.WriteByte(ch)
+		if ch != '\\' {
+			value.WriteRune(ch)
 			continue
+		}
+		if i+1 >= len(runes) {
+			return "", false
 		}
 
 		i++
-		escaped := text[i]
+		escaped := runes[i]
 		switch escaped {
 		case 'b':
-			value.WriteByte('\b')
+			value.WriteRune('\b')
 		case 'f':
-			value.WriteByte('\f')
+			value.WriteRune('\f')
 		case 'n':
-			value.WriteByte('\n')
+			value.WriteRune('\n')
 		case 'r':
-			value.WriteByte('\r')
+			value.WriteRune('\r')
 		case 't':
-			value.WriteByte('\t')
+			value.WriteRune('\t')
 		case 'v':
-			value.WriteByte('\v')
+			value.WriteRune('\v')
 		case '0':
-			value.WriteByte(0)
-		case '\n':
+			if i+1 < len(runes) && runes[i+1] >= '0' && runes[i+1] <= '9' {
+				return "", false
+			}
+			value.WriteRune(0)
+		case '\n', '\u2028', '\u2029':
 			// A line continuation contributes no character.
 		case '\r':
-			if i+1 < len(text) && text[i+1] == '\n' {
+			if i+1 < len(runes) && runes[i+1] == '\n' {
 				i++
 			}
 		case 'x':
-			if i+2 < len(text) {
-				if code, err := strconv.ParseUint(text[i+1:i+3], 16, 8); err == nil {
-					value.WriteByte(byte(code))
-					i += 2
-					continue
-				}
+			if i+2 >= len(runes) {
+				return "", false
 			}
-			value.WriteByte(escaped)
+			code, err := strconv.ParseUint(string(runes[i+1:i+3]), 16, 8)
+			if err != nil {
+				return "", false
+			}
+			value.WriteRune(rune(code))
+			i += 2
 		case 'u':
-			if i+1 < len(text) && text[i+1] == '{' {
-				if close := strings.IndexByte(text[i+2:], '}'); close >= 0 {
-					end := i + 2 + close
-					if code, err := strconv.ParseUint(text[i+2:end], 16, 32); err == nil {
-						value.WriteRune(rune(code))
-						i = end
-						continue
-					}
+			if i+1 < len(runes) && runes[i+1] == '{' {
+				end := i + 2
+				for end < len(runes) && runes[end] != '}' {
+					end++
 				}
-			} else if i+4 < len(text) {
-				if code, err := strconv.ParseUint(text[i+1:i+5], 16, 16); err == nil {
-					value.WriteRune(rune(code))
-					i += 4
-					continue
+				if end == i+2 || end >= len(runes) {
+					return "", false
 				}
+				code, err := strconv.ParseUint(string(runes[i+2:end]), 16, 32)
+				if err != nil || code > 0x10ffff {
+					return "", false
+				}
+				value.WriteRune(rune(code))
+				i = end
+				continue
 			}
-			value.WriteByte(escaped)
+			if i+4 >= len(runes) {
+				return "", false
+			}
+			code, err := strconv.ParseUint(string(runes[i+1:i+5]), 16, 16)
+			if err != nil {
+				return "", false
+			}
+			value.WriteRune(rune(code))
+			i += 4
 		default:
-			value.WriteByte(escaped)
+			if escaped >= '1' && escaped <= '9' {
+				return "", false
+			}
+			value.WriteRune(escaped)
 		}
 	}
-	return CMString(value.String())
+	return CMString(value.String()), true
 }
 
 // TemplateLiteral [Yield, Await, Tagged] :
@@ -1922,10 +2283,17 @@ func (t *TemplateLiteral) Evaluation(vm *VM) (co CompletionValue) {
 	if t.astNoSubstitution() {
 		// NoSubstitutionTemplate
 		span := t.Spans[0]
-		return span.TV().ToValue().ToCompletion()
+		value, valid := span.TV()
+		if !valid {
+			return co.ThrowError(vm.agent, SyntaxError, "invalid escape sequence in template literal")
+		}
+		return value.ToValue().ToCompletion()
 	} else {
 		var sb CMString
-		head := t.TemplateHead.TV()
+		head, valid := t.TemplateHead.TV()
+		if !valid {
+			return co.ThrowError(vm.agent, SyntaxError, "invalid escape sequence in template literal")
+		}
 		sb += head
 		for _, span := range t.Spans {
 			sub, _, isAbrupt, rt := vm.EvalAndGetValue(span.Expression, co)
@@ -1937,7 +2305,10 @@ func (t *TemplateLiteral) Evaluation(vm *VM) (co CompletionValue) {
 				return rt
 			}
 			middle := CMString(middleValue.Data)
-			tail := span.TV()
+			tail, valid := span.TV()
+			if !valid {
+				return co.ThrowError(vm.agent, SyntaxError, "invalid escape sequence in template literal")
+			}
 			sb += middle + tail
 		}
 		return sb.ToValue().ToCompletion()
@@ -2065,7 +2436,6 @@ func (e *UpdateExpression) String() string {
 
 // MARK: - AssignmentExpression
 
-// TODO: standardlize
 // AssignmentOperator : one of
 // *= /= %= += -= <<= >>= >>>= &= ^= |= **=
 type AssignmentOperator int
@@ -2167,6 +2537,9 @@ var operatorAssignmentMap = map[TokenType]AssignmentOperator{
 	TLeftShiftEquals:          AssignmentOperatorLeftShift,
 	TRightShiftEquals:         AssignmentOperatorRightShift,
 	TUnsignedRightShiftEquals: AssignmentOperatorUnsignedRightShift,
+	TAmpersandEquals:          AssignmentOperatorBitwiseAnd,
+	TPipeEquals:               AssignmentOperatorBitwiseOr,
+	TCaretEquals:              AssignmentOperatorBitwiseXor,
 	TBitwiseAndEquals:         AssignmentOperatorBitwiseAnd,
 	TBitwiseOrEquals:          AssignmentOperatorBitwiseOr,
 	TBitwiseXorEquals:         AssignmentOperatorBitwiseXor,
@@ -2187,6 +2560,11 @@ func (l *LeftHandSideExpression) astIsArrayAssignmentPattern() bool {
 	return ok
 }
 
+func (l *LeftHandSideExpression) astIsObjectAssignmentPattern() bool {
+	_, ok := l.Expression.(*PrimaryExpressionObjectLiteral)
+	return ok
+}
+
 func (l *LeftHandSideExpression) DestructuringAssignmentEvaluation(vm *VM, value Value) (co CompletionValue) {
 	if l.astIsArrayAssignmentPattern() {
 		iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(vm.agent, value, IteratorKindSync), co)
@@ -2195,32 +2573,93 @@ func (l *LeftHandSideExpression) DestructuringAssignmentEvaluation(vm *VM, value
 		}
 		var result CompletionValue
 		for _, elem := range l.Expression.(*ArrayLiteral).ElementList {
-			switch e := elem.(type) {
-			case *ArrayElementExpression:
-				result = e.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
-				if result.IsAbrupt() {
-					return result
-				}
+			evaluator, ok := elem.(RuntimeSemanticsIteratorDestructuringAssignmentEvaluation)
+			if !ok {
+				panic("array destructuring: unsupported element variant")
+			}
+			result = evaluator.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
+			if result.IsAbrupt() {
 				if !iteratorRecord.Done {
 					return iteratorRecord.IteratorClose(result)
 				}
-			case *ArrayElementElision:
-				result = e.IteratorDestructuringAssignmentEvaluation(vm, iteratorRecord)
-				if result.IsAbrupt() {
-					return result
-				}
-				if !iteratorRecord.Done {
-					return iteratorRecord.IteratorClose(result)
-				}
-			default:
-				panic("unimplemented")
-
+				return result
 			}
 		}
-	} else {
-		panic("unimplemented")
+		if !iteratorRecord.Done {
+			return iteratorRecord.IteratorClose(UndefinedValue.ToCompletion())
+		}
+		return UndefinedValue.ToCompletion()
+	} else if l.astIsObjectAssignmentPattern() {
+		if IsUndefinedOrNull(value) {
+			return co.ThrowTypeError(vm.agent, "cannot destructure undefined or null")
+		}
+		pattern := l.Expression.(*PrimaryExpressionObjectLiteral)
+		excludedNames := make([]PropertyKey, 0)
+		for _, definition := range pattern.PropertyList.Items {
+			switch property := definition.(type) {
+			case *PropertyDefinitionIdentifierReference:
+				key := NewStringPropertyKey(property.IdentifierReference.Identifier)
+				propertyValue, isAbrupt, rt := ReturnIfAbrupt(GetV(vm.agent, value, key), co)
+				if isAbrupt {
+					return rt
+				}
+				if propertyValue == UndefinedValue && property.Initializer != nil {
+					if IsAnonymousFunctionDefinition(property.Initializer) {
+						propertyValue, isAbrupt, rt = ReturnIfAbrupt(
+							EvaluateNamedExpression(vm, property.Initializer, key),
+							co,
+						)
+					} else {
+						propertyValue, _, isAbrupt, rt = vm.EvalAndGetValue(property.Initializer, co)
+					}
+					if isAbrupt {
+						return rt
+					}
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(assignDestructuringTarget(vm, property.IdentifierReference, propertyValue), co)
+				if isAbrupt {
+					return rt
+				}
+				excludedNames = append(excludedNames, key)
+			case *PropertyDefinitionNameAndExpression:
+				propertyName, isAbrupt, rt := ReturnIfAbrupt(property.Name.Evaluation(vm), co)
+				if isAbrupt {
+					return rt
+				}
+				key, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(vm.agent, propertyName), co)
+				if isAbrupt {
+					return rt
+				}
+				propertyValue, isAbrupt, rt := ReturnIfAbrupt(GetV(vm.agent, value, key), co)
+				if isAbrupt {
+					return rt
+				}
+				target, initializer := destructuringTargetAndInitializer(property.Expression)
+				if propertyValue == UndefinedValue && initializer != nil {
+					propertyValue, _, isAbrupt, rt = vm.EvalAndGetValue(initializer, co)
+					if isAbrupt {
+						return rt
+					}
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(assignDestructuringTarget(vm, target, propertyValue), co)
+				if isAbrupt {
+					return rt
+				}
+				excludedNames = append(excludedNames, key)
+			case *PropertyDefinitionSpread:
+				rest := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
+				rest.CopyDataProperties(value, excludedNames)
+				_, isAbrupt, rt := ReturnIfAbrupt(assignDestructuringTarget(vm, property.Spread, rest.ToValue()), co)
+				if isAbrupt {
+					return rt
+				}
+			default:
+				panic("object destructuring: unsupported property variant")
+			}
+		}
+		return UndefinedValue.ToCompletion()
 	}
-	panic("unreachable")
+	panic("destructuring assignment: target is not an assignment pattern")
 }
 
 // AssignmentExpression [In, Yield, Await] :
@@ -2260,10 +2699,24 @@ func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 		_, isArrayLiteral := e.Left.Expression.(*ArrayLiteral)
 		if !isObjectLiteral && !isArrayLiteral {
 			lref := e.Left.Evaluation(vm)
+			if lref.IsAbrupt() {
+				return CompletionFrom(co, lref)
+			}
+			ref, ok := lref.value.ReferenceRecord()
+			if !ok {
+				panic("assignment target did not evaluate to a reference")
+			}
 			var rval Value
-			if IsAnonymousFunctionDefinition(e.Right) {
-				// FIXME: handle named evaluation
-				panic("")
+			if IsAnonymousFunctionDefinition(e.Right) && ExpressionAnalyze(e.Left.Expression, AnalyzeQueryIsIdentifierReference) {
+				var isAbrupt bool
+				var rt CompletionValue
+				rval, isAbrupt, rt = ReturnIfAbrupt(
+					EvaluateNamedExpression(vm, e.Right, ReferencedNameKey(ref.ReferencedName)),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
 			} else {
 				_rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
 				rval = _rval
@@ -2271,13 +2724,9 @@ func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 					return rt
 				}
 			}
-			if ref, ok := lref.value.ReferenceRecord(); ok {
-				_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(vm.agent, rval), co)
-				if isAbrupt {
-					return rt
-				}
-			} else {
-				panic("unreachable")
+			_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(vm.agent, rval), co)
+			if isAbrupt {
+				return rt
 			}
 			return rval.ToCompletion()
 		}
@@ -2292,11 +2741,51 @@ func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 		}
 		return rval.ToCompletion()
 	} else {
-		// TODO: handle &&= ||=, ??=
 		lval, lref, isAbrupt, rt := vm.EvalAndGetValue(e.Left, co)
 		if isAbrupt {
 			return rt
 		}
+		ref, ok := lref.ReferenceRecord()
+		if !ok {
+			panic("compound assignment target did not evaluate to a reference")
+		}
+
+		isLogicalAssignment := e.Operator == AssignmentOperatorAnd ||
+			e.Operator == AssignmentOperatorOr ||
+			e.Operator == AssignmentOperatorNullishCoalescing
+		if isLogicalAssignment {
+			shouldAssign := false
+			switch e.Operator {
+			case AssignmentOperatorAnd:
+				shouldAssign = lval.ToBoolean()
+			case AssignmentOperatorOr:
+				shouldAssign = !lval.ToBoolean()
+			case AssignmentOperatorNullishCoalescing:
+				shouldAssign = IsUndefinedOrNull(lval)
+			}
+			if !shouldAssign {
+				return lval.ToCompletion()
+			}
+
+			var rval Value
+			if IsAnonymousFunctionDefinition(e.Right) && ExpressionAnalyze(e.Left.Expression, AnalyzeQueryIsIdentifierReference) {
+				rval, isAbrupt, rt = ReturnIfAbrupt(
+					EvaluateNamedExpression(vm, e.Right, ReferencedNameKey(ref.ReferencedName)),
+					co,
+				)
+			} else {
+				rval, _, isAbrupt, rt = vm.EvalAndGetValue(e.Right, co)
+			}
+			if isAbrupt {
+				return rt
+			}
+			_, isAbrupt, rt = ReturnIfAbrupt(ref.PutValue(vm.agent, rval), co)
+			if isAbrupt {
+				return rt
+			}
+			return rval.ToCompletion()
+		}
+
 		rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
 		if isAbrupt {
 			return rt
@@ -2308,13 +2797,9 @@ func (e *AssignmentExpression) Evaluation(vm *VM) (co CompletionValue) {
 			return rt
 		}
 
-		if ref, ok := lref.ReferenceRecord(); ok {
-			_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(vm.agent, r), co)
-			if isAbrupt {
-				return rt
-			}
-		} else {
-			panic("unreachable")
+		_, isAbrupt, rt = ReturnIfAbrupt(ref.PutValue(vm.agent, r), co)
+		if isAbrupt {
+			return rt
 		}
 		return r.ToCompletion()
 	}
@@ -2955,7 +3440,6 @@ func (u *UnaryExpression) astIsVoid() bool {
 	return u.Operator == UnaryOperatorVoid
 }
 
-// TODO: use Number::[op], BigInt::[op]
 // spec: 13.5.3.1, 13.5.4.1, 13.5.5.1, 13.5.6.1, 13.5.7.1
 func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 	agent := vm.agent
@@ -2975,7 +3459,8 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if isAbrupt {
 			return rt
 		}
-		// TODO: B.3.6.3 isHTMLDDA
+		// This runtime has no [[IsHTMLDDA]] host exotic, so the ordinary type
+		// mapping is the complete observable behavior here.
 		return NewStringValue(val.TypeString()).ToCompletion()
 	case u.astIsAdd():
 		// 13.5.4.1
@@ -3020,7 +3505,11 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		}
 		if n, b, ok := oldValue.NumberOrBigInt(); ok {
 			if n != nil {
-				return NewNumberValue(JSNumber(^int64(n.Data))).ToCompletion()
+				intValue, isAbrupt, rt := ReturnIfAbrupt(ToInt32(agent, n), co)
+				if isAbrupt {
+					return rt
+				}
+				return NewNumberValue(JSNumber(^int32(intValue))).ToCompletion()
 			} else {
 				return b.BitwiseNot().ToCompletion()
 			}
@@ -3039,22 +3528,6 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		} else {
 			return TrueValue.ToCompletion()
 		}
-	case u.astIsTypeof():
-		// 13.5.3.1
-		val, isAbrupt, rt := ReturnIfAbrupt(u.Operand.Evaluation(vm), co)
-		if isAbrupt {
-			return rt
-		}
-		if ref, ok := val.ReferenceRecord(); ok {
-			if ref.IsUnresolvableReference() {
-				return NewStringValue("undefined").ToCompletion()
-			}
-		}
-		val, isAbrupt, rt = ReturnIfAbrupt(val.GetValue(agent), co)
-		if isAbrupt {
-			return rt
-		}
-		return NewStringValue(val.TypeString()).ToCompletion()
 	case u.astIsVoid():
 		// 13.5.2.1
 		_, _, isAbrupt, rt := vm.EvalAndGetValue(u.Operand, co)
@@ -3064,8 +3537,11 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		return UndefinedValue.ToCompletion()
 	case u.astIsDelete():
 		// 13.5.1.2
-		refValue := u.Operand.Evaluation(vm)
-		ref, ok := refValue.value.ReferenceRecord()
+		refValue, isAbrupt, rt := ReturnIfAbrupt(u.Operand.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		ref, ok := refValue.ReferenceRecord()
 		if !ok {
 			return TrueValue.ToCompletion()
 		}
@@ -3076,10 +3552,13 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 		if ref.IsPropertyReference() {
 			Assert(!ref.IsPrivateReference())
 			if ref.IsSuperReference() {
-				vm.panic(agent.ThrowException(ReferenceError, "cannot delete super property"))
+				return vm.abrupt(agent.ThrowException(ReferenceError, "cannot delete super property"))
 			}
 			v, _ := ref.Base.Value()
-			baseObj := v.ToObject(agent).value
+			baseObj, isAbrupt, rt := ReturnIfAbrupt(v.ToObject(agent), co)
+			if isAbrupt {
+				return rt
+			}
 			var referencedName PropertyKey
 			if ref.ReferencedName.PrivateName != nil {
 				panic("unreachable")
@@ -3096,7 +3575,7 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 				return rt
 			}
 			if !deleteStatus && ref.Strict {
-				vm.panic(agent.ThrowTypeError("cannot delete property"))
+				return vm.abrupt(agent.ThrowTypeError("cannot delete property"))
 			}
 			return NewBooleanValue(deleteStatus).ToCompletion()
 		} else {
@@ -3105,7 +3584,7 @@ func (u *UnaryExpression) Evaluation(vm *VM) (co CompletionValue) {
 			return NewBooleanValue(base.DeleteBinding(ref.ReferencedName.String)).ToCompletion()
 		}
 	}
-	panic("unimplemented")
+	panic("UnaryExpression: unknown operator")
 }
 
 func (u *UnaryExpression) String() string {
@@ -3114,7 +3593,6 @@ func (u *UnaryExpression) String() string {
 
 // MARK: - CallExpression
 
-// TODO: handle spread expression
 // ArgumentList[Yield, Await] :
 // AssignmentExpression[+In, ?Yield, ?Await]
 // ... AssignmentExpression[+In, ?Yield, ?Await]
@@ -3124,49 +3602,57 @@ type Arguments []Expression
 
 var _ RuntimeSemanticsArgumentListEvaluation = Arguments{}
 
-func (a Arguments) astIsAssignmentExpression() bool {
-	return len(a) == 1
+type ArgumentSpreadElement struct {
+	Spread Expression
 }
 
-// TODO
-func (a Arguments) astIsSpreadElement() bool {
-	return false
+func (a *ArgumentSpreadElement) AssignmentTargetType() AssignmentTargetType {
+	return AssignmentTargetTypeInvalid
 }
 
-func (a Arguments) isEmpty() bool {
-	return len(a) == 0
+func (a *ArgumentSpreadElement) Evaluation(vm *VM) CompletionValue {
+	return a.Spread.Evaluation(vm)
+}
+
+func (a *ArgumentSpreadElement) String() string {
+	return "..." + a.Spread.String()
 }
 
 func (a Arguments) ArgumentListEvaluation(vm *VM) (co Completion[[]Value]) {
-	if a.isEmpty() {
-		return
+	values := make([]Value, 0, len(a))
+	for _, element := range a {
+		if spread, ok := element.(*ArgumentSpreadElement); ok {
+			spreadRef, isAbrupt, rt := ReturnIfAbrupt(spread.Spread.Evaluation(vm), co)
+			if isAbrupt {
+				return rt
+			}
+			spreadValue, isAbrupt, rt := ReturnIfAbrupt(spreadRef.GetValue(vm.agent), co)
+			if isAbrupt {
+				return rt
+			}
+			iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(vm.agent, spreadValue, IteratorKindSync), co)
+			if isAbrupt {
+				return rt
+			}
+			spreadValues, isAbrupt, rt := ReturnIfAbrupt(iteratorRecord.IteratorToList(), co)
+			if isAbrupt {
+				return rt
+			}
+			values = append(values, spreadValues...)
+			continue
+		}
+		ref, isAbrupt, rt := ReturnIfAbrupt(element.Evaluation(vm), co)
+		if isAbrupt {
+			return rt
+		}
+		value, isAbrupt, rt := ReturnIfAbrupt(ref.GetValue(vm.agent), co)
+		if isAbrupt {
+			return rt
+		}
+		values = append(values, value)
 	}
-	if a.astIsAssignmentExpression() {
-		// TODO: handle spread
-		if a.astIsSpreadElement() {
-			panic("unimplemented")
-		}
-		ref := a[0].Evaluation(vm)
-		arg := ref.value.GetValue(vm.agent).value
-		co.value = []Value{arg}
-		return
-	} else {
-		// TODO: handle spread
-		last, isAbrupt, rt := ReturnIfAbrupt(a[len(a)-1].Evaluation(vm), co)
-		if isAbrupt {
-			return rt
-		}
-		v, isAbrupt, rt := ReturnIfAbrupt(last.GetValue(vm.agent), co)
-		if isAbrupt {
-			return rt
-		}
-		list, isAbrupt, rt := ReturnIfAbrupt(a[:len(a)-1].ArgumentListEvaluation(vm), co)
-		if isAbrupt {
-			return rt
-		}
-		co.value = append(list, v)
-		return
-	}
+	co.value = values
+	return
 }
 
 func (a Arguments) String() string {
@@ -3180,17 +3666,12 @@ func (a Arguments) String() string {
 	return sb
 }
 
-// TODO(WIP): Spread, Template
 // Evaluation 13.3.8.1
 // ArgumentListEvaluation
 func (a Arguments) Evaluation(vm *VM) (co CompletionValue) {
-	var values []Value
-	for _, elem := range a {
-		arg, _, isAbrupt, rt := vm.EvalAndGetValue(elem, co)
-		if isAbrupt {
-			return rt
-		}
-		values = append(values, arg)
+	values, isAbrupt, rt := ReturnIfAbrupt(a.ArgumentListEvaluation(vm), co)
+	if isAbrupt {
+		return rt
 	}
 	co.value = NewListValue(values)
 	return
@@ -3209,8 +3690,9 @@ func (a Arguments) Evaluation(vm *VM) (co CompletionValue) {
 // - MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
 type CallExpression struct {
 	Expression
-	Callee    Expression
-	Arguments Arguments
+	Callee          Expression
+	Arguments       Arguments
+	TemplateLiteral *TemplateLiteral
 }
 
 var _ Expression = (*CallExpression)(nil)
@@ -3229,11 +3711,14 @@ func (c *CallExpression) astIsFunctionCall() bool {
 // Evaluation
 // spec: 13.3.6.1
 func (c *CallExpression) Evaluation(vm *VM) (co CompletionValue) {
+	if c.TemplateLiteral != nil {
+		return c.evaluateTaggedTemplate(vm)
+	}
 	if c.astIsCover() {
 		return c.coverCallExpressionAndAsyncArrowHead(vm)
 	}
 	if !c.astIsFunctionCall() {
-		panic("unimplemented")
+		panic("CallExpression: unsupported call form")
 	}
 	// rename from func
 	f, ref, isAbrupt, rt := vm.EvalAndGetValue(c.Callee, co)
@@ -3241,19 +3726,77 @@ func (c *CallExpression) Evaluation(vm *VM) (co CompletionValue) {
 		return rt
 	}
 
-	// TODO: this ref
-	// i.This(c)
-	// i.Let("thisCall")
-
-	// TODO: IsInTailPosition
-	// i.IsInTailPosition()
-	// i.Let("tailPosition")
-
 	arguments, isAbrupt, rt := ReturnIfAbrupt(c.Arguments.Evaluation(vm), co)
 	if isAbrupt {
 		return rt
 	}
-	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, false)
+	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values)
+}
+
+// evaluateTaggedTemplate evaluates the tag before its substitution
+// expressions, then calls it with the realm-cached frozen template object.
+// spec: 13.3.11.1
+func (c *CallExpression) evaluateTaggedTemplate(vm *VM) (co CompletionValue) {
+	tag, ref, isAbrupt, rt := vm.EvalAndGetValue(c.Callee, co)
+	if isAbrupt {
+		return rt
+	}
+	templateObject := GetTemplateObject(vm.agent, c.TemplateLiteral)
+	arguments := []Value{templateObject.ToValue()}
+	for _, span := range c.TemplateLiteral.Spans {
+		if span.Expression == nil {
+			continue
+		}
+		value, _, isAbrupt, rt := vm.EvalAndGetValue(span.Expression, co)
+		if isAbrupt {
+			return rt
+		}
+		arguments = append(arguments, value)
+	}
+	return vm.EvaluateCall(tag, ref, arguments)
+}
+
+// GetTemplateObject returns the stable template object associated with one
+// source-site AST node in the current realm.
+// spec: 13.2.8.4
+func GetTemplateObject(agent *Agent, templateLiteral *TemplateLiteral) ObjectType {
+	realm := agent.CurrentRealm()
+	if realm.TemplateMap == nil {
+		realm.TemplateMap = make(map[*TemplateLiteral]ObjectType)
+	}
+	if template, ok := realm.TemplateMap[templateLiteral]; ok {
+		return template
+	}
+
+	spans := templateLiteral.Spans
+	if templateLiteral.TemplateHead != nil {
+		spans = append([]*TemplateSpan{templateLiteral.TemplateHead}, spans...)
+	}
+	template := ArrayCreate(agent, JSInt(len(spans)), nil)
+	raw := ArrayCreate(agent, JSInt(len(spans)), nil)
+	for index, span := range spans {
+		key := NewIntegerIndexPropertyKey(JSInt(index))
+		cooked, valid := span.TV()
+		cookedValue := Value(UndefinedValue)
+		if valid {
+			cookedValue = cooked.ToValue()
+		}
+		ReturnAssertNormal(template.CreateDataPropertyOrThrow(key, cookedValue))
+		ReturnAssertNormal(raw.CreateDataPropertyOrThrow(key, span.TRV().ToValue()))
+	}
+	Assert(SetIntegrityLevel(raw, IntegrityLevelFrozen))
+	template.DefinePropertyOrThrow(NewStringPropertyKey("raw"), &PropertyDescriptor{
+		Value:           raw.ToValue(),
+		Writable:        false,
+		WritableSet:     true,
+		Enumerable:      false,
+		EnumerableSet:   true,
+		Configurable:    false,
+		ConfigurableSet: true,
+	})
+	Assert(SetIntegrityLevel(template, IntegrityLevelFrozen))
+	realm.TemplateMap[templateLiteral] = template
+	return template
 }
 
 // coverCallExpressionAndAsyncArrowHead matches CallExpression : CoverCallExpressionAndAsyncArrowHead
@@ -3262,7 +3805,6 @@ func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) (co Comple
 	callee := c.Callee.(*MemberExpression)
 	expr := callee
 	memberExpr := expr
-	// TODO(XXX): is pass Arguments to evaluate directly?
 	arguments, isAbrupt, rt := ReturnIfAbrupt(c.Arguments.Evaluation(vm), co)
 	if isAbrupt {
 		return rt
@@ -3271,19 +3813,13 @@ func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) (co Comple
 	if isAbrupt {
 		return rt
 	}
-	if r, ok := ref.ReferenceRecord(); ok {
-		if !r.IsPropertyReference() && r.ReferencedName.String == "eval" {
-			panic("unimplemented")
-		}
-	}
-
-	// TODO: check is tailPosition
-	tailCall := false
-
-	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values, tailCall)
+	return vm.EvaluateCall(f, ref, arguments.(*ListValue).Values)
 }
 
 func (c *CallExpression) String() string {
+	if c.TemplateLiteral != nil {
+		return "TaggedTemplate " + c.Callee.String() + c.TemplateLiteral.String()
+	}
 	sb := "CallExpression "
 	sb += c.Callee.String() + "("
 	for i, arg := range c.Arguments {
@@ -3337,6 +3873,20 @@ func (s *VariableStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	return s.DeclarationList.VarScopedDeclarations()
 }
 
+// BoundNames returns every binding introduced by the variable declaration
+// list, including names nested in destructuring patterns.
+func (s *VariableStatement) BoundNames() (names []IdentifierName) {
+	if s == nil || s.DeclarationList == nil {
+		return
+	}
+	for _, declaration := range s.DeclarationList.Items {
+		if declaration != nil {
+			names = append(names, declaration.BoundNames()...)
+		}
+	}
+	return
+}
+
 func (s *VariableStatement) Evaluation(vm *VM) CompletionValue {
 	return s.DeclarationList.Evaluation(vm)
 }
@@ -3382,11 +3932,20 @@ func (v *VariableDeclarationList) String() string {
 	return sb
 }
 
-// VariableDeclaration [In] :
-// - BindingIdentifier Initializer[?In]
+// VariableDeclaration [In, Yield, Await] :
+// - BindingIdentifier[?Yield, ?Await] Initializer[?In, ?Yield, ?Await] opt
+// - BindingPattern[?Yield, ?Await] Initializer[?In, ?Yield, ?Await]
 type VariableDeclaration struct {
 	BindingIdentifier IdentifierName
+	BindingPattern    *BindingPattern
 	Initializer       Expression
+}
+
+func (v *VariableDeclaration) BoundNames() []IdentifierName {
+	if v.BindingPattern != nil {
+		return v.BindingPattern.BoundNames()
+	}
+	return []IdentifierName{v.BindingIdentifier}
 }
 
 // VariableDeclaration : BindingIdentifier Initializer
@@ -3395,6 +3954,18 @@ func (v *VariableDeclaration) astHasInitializer() bool {
 }
 
 func (v *VariableDeclaration) Evaluation(vm *VM) (co CompletionValue) {
+	if v.BindingPattern != nil {
+		Assert(v.Initializer != nil)
+		value, _, isAbrupt, rt := vm.EvalAndGetValue(v.Initializer, co)
+		if isAbrupt {
+			return rt
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(v.BindingPattern.BindingInitialization(vm, value, nil), co)
+		if isAbrupt {
+			return rt
+		}
+		return UndefinedValue.ToCompletion()
+	}
 	if !v.astHasInitializer() {
 		return UndefinedValue.ToCompletion()
 	} else {
@@ -3402,8 +3973,15 @@ func (v *VariableDeclaration) Evaluation(vm *VM) (co CompletionValue) {
 		lhs := vm.agent.ResolveBinding(bindingId, nil, false)
 		var value Value
 		if IsAnonymousFunctionDefinition(v.Initializer) {
-			// FIXME: handle named evaluation
-			panic("")
+			var isAbrupt bool
+			var rt CompletionValue
+			value, isAbrupt, rt = ReturnIfAbrupt(
+				EvaluateNamedExpression(vm, v.Initializer, NewStringPropertyKey(bindingId)),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
 		} else {
 			v, _, isAbrupt, rt := vm.EvalAndGetValue(v.Initializer, co)
 			value = v
@@ -3422,10 +4000,14 @@ func (v *VariableDeclaration) Evaluation(vm *VM) (co CompletionValue) {
 }
 
 func (v *VariableDeclaration) String() string {
-	if v.Initializer != nil {
-		return string(v.BindingIdentifier) + " = " + v.Initializer.String()
+	name := string(v.BindingIdentifier)
+	if v.BindingPattern != nil {
+		name = v.BindingPattern.String()
 	}
-	return string(v.BindingIdentifier)
+	if v.Initializer != nil {
+		return name + " = " + v.Initializer.String()
+	}
+	return name
 }
 
 // MARK: - EmptyStatement
@@ -3457,8 +4039,7 @@ func (s *StatementEmpty) String() string {
 // - BindingPattern[?Yield, ?Await]
 type CatchParameter struct {
 	Identifier *BindingIdentifier
-	// TODO(BM): pattern
-	Pattern *BindingPattern
+	Pattern    *BindingPattern
 }
 
 var _ RuntimeSemanticsBindingInitialization = (*CatchParameter)(nil)
@@ -3470,9 +4051,11 @@ func (c *CatchParameter) astIsIdentifier() bool {
 func (c *CatchParameter) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
 	if c.astIsIdentifier() {
 		return c.Identifier.BindingInitialization(vm, value, env)
-	} else {
-		panic("unimplemented")
 	}
+	if c.Pattern != nil {
+		return c.Pattern.BindingInitialization(vm, value, env)
+	}
+	panic("CatchParameter: missing binding variant")
 }
 
 // Catch [Yield, Await, Return] :
@@ -3486,19 +4069,27 @@ type Catch struct {
 var _ RuntimeSemanticsCatchClauseEvaluation = (*Catch)(nil)
 
 func (c *Catch) CatchClauseEvaluation(vm *VM, thrownValue Value) (co CompletionValue) {
+	if c.CatchParameter == nil {
+		return c.CatchBlock.Evaluation(vm)
+	}
 	oldEnv := vm.RunningLexicalEnvironment()
 	catchEnv := NewDeclarativeEnvironment(oldEnv)
-	// TODO(BM): handle BindingPattern
-	catchEnv.CreateMutableBinding(c.CatchParameter.Identifier.identifier, false)
+	var boundNames []IdentifierName
+	if c.CatchParameter.Identifier != nil {
+		boundNames = []IdentifierName{c.CatchParameter.Identifier.identifier}
+	} else {
+		boundNames = c.CatchParameter.Pattern.BoundNames()
+	}
+	for _, name := range boundNames {
+		catchEnv.CreateMutableBinding(name, false)
+	}
 	vm.SetRunningLexicalEnvironment(catchEnv)
+	defer vm.SetRunningLexicalEnvironment(oldEnv)
 	status := c.CatchParameter.BindingInitialization(vm, thrownValue, catchEnv)
 	if status.IsAbrupt() {
-		vm.SetRunningLexicalEnvironment(oldEnv)
 		return status
 	}
-	B := c.CatchBlock.Evaluation(vm)
-	vm.SetRunningLexicalEnvironment(oldEnv)
-	return B
+	return c.CatchBlock.Evaluation(vm)
 }
 
 // TryStatement [Yield, Await, Return] :
@@ -3519,7 +4110,7 @@ var _ Statement = (*TryStatement)(nil)
 
 func (t *TryStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 	l = append(l, t.TryBlock.StatementList.VarScopedDeclarations()...)
-	if t.Catch.CatchBlock != nil {
+	if t.Catch != nil && t.Catch.CatchBlock != nil {
 		l = append(l, t.Catch.CatchBlock.StatementList.VarScopedDeclarations()...)
 	}
 	if t.FinallyBlock != nil {
@@ -3543,8 +4134,12 @@ func (t *TryStatement) Evaluation(vm *VM) CompletionValue {
 	case t.astHasCatch() && t.astHasFinally():
 		B := CompletionHandle(t.TryBlock.Evaluation(vm))
 		var C CompletionValue
-		if B.t == CompletionTypeThrow {
-			C = CompletionHandle(t.Catch.CatchClauseEvaluation(vm, B.value))
+		if B.t == CompletionTypeThrow || B.err != nil {
+			thrownValue := B.err
+			if thrownValue == nil {
+				thrownValue = B.value
+			}
+			C = CompletionHandle(t.Catch.CatchClauseEvaluation(vm, thrownValue))
 		} else {
 			C = B
 		}
@@ -3576,8 +4171,8 @@ func (t *TryStatement) Evaluation(vm *VM) CompletionValue {
 
 func (t *TryStatement) String() string {
 	sb := "try " + t.TryBlock.String()
-	if t.Catch.CatchBlock != nil {
-		sb += " catch (" + string(t.Catch.CatchParameter.Identifier.identifier) + ") " + t.Catch.CatchBlock.String()
+	if t.Catch != nil && t.Catch.CatchBlock != nil {
+		sb += " catch " + t.Catch.CatchBlock.String()
 	}
 	if t.FinallyBlock != nil {
 		sb += " finally " + t.FinallyBlock.String()
@@ -3611,7 +4206,11 @@ func (s *StatementExpression) VarScopedDeclarations() (l []*VariableDeclaration)
 }
 
 func (s *StatementExpression) Evaluation(vm *VM) CompletionValue {
-	return s.Expression.Evaluation(vm)
+	result := s.Expression.Evaluation(vm)
+	if result.IsAbrupt() {
+		return result
+	}
+	return result.Data().GetValue(vm.agent)
 }
 
 func (s *StatementExpression) String() string {
@@ -3736,7 +4335,8 @@ func (f *FunctionBody) LexicallyDeclaredNames() (l []IdentifierName) {
 	return f.StatementList.TopLevelLexicallyDeclaredNames()
 }
 
-// TODO(spec)
+// Evaluation executes a function body after declaration instantiation.
+// spec: 10.2.1.3
 func (f *FunctionBody) Evaluation(vm *VM) CompletionValue {
 	return f.StatementList.Evaluation(vm)
 }
@@ -3787,15 +4387,14 @@ func (f *FormalParameters) ContainsExpression() bool {
 
 func (f *FormalParameters) BoundNames() (l []IdentifierName) {
 	for _, item := range f.Items {
-		var name IdentifierName
 		switch p := item.(type) {
 		case *FormalParameter:
 			l = append(l, p.BindingElement.BoundNames()...)
-			continue
 		case *FormalParameterFunctionRestParameter:
-			name = p.BindingRestElement.(*BindingRestElementIdentifier).Identifier
+			l = append(l, p.BindingRestElement.BoundNames()...)
+		default:
+			panic("FormalParameters: unknown parameter variant")
 		}
-		l = append(l, name)
 	}
 	return
 }
@@ -3844,6 +4443,8 @@ type BindingRestElement interface {
 	ASTNode
 	_bindingRestElement()
 	ContainsExpression() bool
+	BoundNames() []IdentifierName
+	RuntimeSemanticsBindingInitialization
 }
 type BindingRestElementIdentifier struct {
 	BindingRestElement
@@ -3854,8 +4455,37 @@ func (b *BindingRestElementIdentifier) ContainsExpression() bool {
 	return false
 }
 
+func (b *BindingRestElementIdentifier) BoundNames() []IdentifierName {
+	return []IdentifierName{b.Identifier}
+}
+
+func (b *BindingRestElementIdentifier) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
+	return vm.InitializeBoundName(b.Identifier, value, env)
+}
+
 func (b *BindingRestElementIdentifier) String() string {
 	return "..." + string(b.Identifier)
+}
+
+type BindingRestElementPattern struct {
+	BindingRestElement
+	Pattern *BindingPattern
+}
+
+func (b *BindingRestElementPattern) ContainsExpression() bool {
+	return b.Pattern.ContainsExpression()
+}
+
+func (b *BindingRestElementPattern) BoundNames() []IdentifierName {
+	return b.Pattern.BoundNames()
+}
+
+func (b *BindingRestElementPattern) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
+	return b.Pattern.BindingInitialization(vm, value, env)
+}
+
+func (b *BindingRestElementPattern) String() string {
+	return "..." + b.Pattern.String()
 }
 
 // MARK: - FormalParameter
@@ -3927,9 +4557,80 @@ type ObjectBindingPattern struct {
 	}
 }
 
+var _ RuntimeSemanticsBindingInitialization = (*ObjectBindingPattern)(nil)
+
 func (o *ObjectBindingPattern) ContainsExpression() bool {
-	// TODO
+	for _, group := range o.Properties {
+		for _, property := range group.BindingPropertyList {
+			if property.SingleNameBinding != nil {
+				if property.SingleNameBinding.Initializer != nil {
+					return true
+				}
+				continue
+			}
+			binding := property.PropertyNameAndBindingElement
+			if binding == nil {
+				continue
+			}
+			if _, computed := binding.PropertyName.(*ComputedPropertyName); computed {
+				return true
+			}
+			if binding.BindingElement.ContainsExpression() {
+				return true
+			}
+		}
+	}
 	return false
+}
+
+func (o *ObjectBindingPattern) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) (co CompletionValue) {
+	if IsUndefinedOrNull(value) {
+		return co.ThrowTypeError(vm.agent, "cannot destructure undefined or null")
+	}
+	excludedNames := make([]PropertyKey, 0)
+	for _, group := range o.Properties {
+		for _, property := range group.BindingPropertyList {
+			var key PropertyKey
+			var bindingElement *BindingElement
+			if property.SingleNameBinding != nil {
+				key = NewStringPropertyKey(property.SingleNameBinding.BindingIdentifier)
+				bindingElement = &BindingElement{SingleNameBinding: property.SingleNameBinding}
+			} else {
+				binding := property.PropertyNameAndBindingElement
+				Assert(binding != nil)
+				propertyName, isAbrupt, rt := ReturnIfAbrupt(binding.PropertyName.Evaluation(vm), co)
+				if isAbrupt {
+					return rt
+				}
+				key, isAbrupt, rt = ReturnIfAbrupt(ToPropertyKey(vm.agent, propertyName), co)
+				if isAbrupt {
+					return rt
+				}
+				bindingElement = binding.BindingElement
+			}
+			propertyValue, isAbrupt, rt := ReturnIfAbrupt(GetV(vm.agent, value, key), co)
+			if isAbrupt {
+				return rt
+			}
+			_, isAbrupt, rt = ReturnIfAbrupt(bindingElement.BindingInitialization(vm, propertyValue, env), co)
+			if isAbrupt {
+				return rt
+			}
+			excludedNames = append(excludedNames, key)
+		}
+		if group.BindingRestProperty != nil {
+			rest := OrdinaryObjectCreate(vm.agent, vm.agent.CurrentRealm().Intrinsics.ObjectPrototype, nil)
+			rest.CopyDataProperties(value, excludedNames)
+			_, isAbrupt, rt := ReturnIfAbrupt(
+				vm.InitializeBoundName(group.BindingRestProperty.BindingIdentifier, rest.ToValue(), env),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+		}
+	}
+	return UndefinedValue.ToCompletion()
 }
 
 func (o *ObjectBindingPattern) String() string {
@@ -3964,9 +4665,90 @@ type ArrayBindingPattern struct {
 	}
 }
 
+var _ RuntimeSemanticsBindingInitialization = (*ArrayBindingPattern)(nil)
+
 func (a *ArrayBindingPattern) ContainsExpression() bool {
-	// TODO
+	for _, element := range a.Elements {
+		if element.BindingElement != nil && element.BindingElement.ContainsExpression() {
+			return true
+		}
+		if element.BindingRestElement != nil && element.BindingRestElement.ContainsExpression() {
+			return true
+		}
+	}
 	return false
+}
+
+func (a *ArrayBindingPattern) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) (co CompletionValue) {
+	iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(vm.agent, value, IteratorKindSync), co)
+	if isAbrupt {
+		return rt
+	}
+	for _, element := range a.Elements {
+		if element.Elision {
+			if !iteratorRecord.Done {
+				next, _ := iteratorRecord.IteratorStep()
+				if next.IsAbrupt() {
+					return iteratorRecord.IteratorClose(CompletionFrom(co, next))
+				}
+			}
+			continue
+		}
+		if element.BindingRestElement != nil {
+			array := ArrayCreate(vm.agent, 0, nil)
+			nextIndex := JSInt(0)
+			for !iteratorRecord.Done {
+				next, isDone := iteratorRecord.IteratorStepValue()
+				nextValue, isAbrupt, rt := ReturnIfAbrupt(next, co)
+				if isAbrupt {
+					return rt
+				}
+				if isDone {
+					break
+				}
+				_, isAbrupt, rt = ReturnIfAbrupt(
+					array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(nextIndex), nextValue),
+					co,
+				)
+				if isAbrupt {
+					return iteratorRecord.IteratorClose(rt)
+				}
+				nextIndex++
+			}
+			_, isAbrupt, rt = ReturnIfAbrupt(
+				element.BindingRestElement.BindingInitialization(vm, array.ToValue(), env),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			continue
+		}
+
+		nextValue := Value(UndefinedValue)
+		if !iteratorRecord.Done {
+			next, isDone := iteratorRecord.IteratorStepValue()
+			var isAbrupt bool
+			nextValue, isAbrupt, rt = ReturnIfAbrupt(next, co)
+			if isAbrupt {
+				return rt
+			}
+			if isDone {
+				nextValue = UndefinedValue
+			}
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(element.BindingElement.BindingInitialization(vm, nextValue, env), co)
+		if isAbrupt {
+			if !iteratorRecord.Done {
+				return iteratorRecord.IteratorClose(rt)
+			}
+			return rt
+		}
+	}
+	if !iteratorRecord.Done {
+		return iteratorRecord.IteratorClose(UndefinedValue.ToCompletion())
+	}
+	return UndefinedValue.ToCompletion()
 }
 
 func (a *ArrayBindingPattern) String() string {
@@ -3990,13 +4772,20 @@ type BindingPattern struct {
 	ArrayBindingPattern  *ArrayBindingPattern
 }
 
+var _ RuntimeSemanticsBindingInitialization = (*BindingPattern)(nil)
+
 func (b *BindingPattern) BoundNames() (l []IdentifierName) {
 	if b.ObjectBindingPattern != nil {
 		for _, p := range b.ObjectBindingPattern.Properties {
 			for _, bp := range p.BindingPropertyList {
 				if bp.SingleNameBinding != nil {
 					l = append(l, bp.SingleNameBinding.BindingIdentifier)
+				} else if bp.PropertyNameAndBindingElement != nil {
+					l = append(l, bp.PropertyNameAndBindingElement.BindingElement.BoundNames()...)
 				}
+			}
+			if p.BindingRestProperty != nil {
+				l = append(l, p.BindingRestProperty.BindingIdentifier)
 			}
 		}
 	}
@@ -4004,6 +4793,8 @@ func (b *BindingPattern) BoundNames() (l []IdentifierName) {
 		for _, e := range b.ArrayBindingPattern.Elements {
 			if e.BindingElement != nil {
 				l = append(l, e.BindingElement.BoundNames()...)
+			} else if e.BindingRestElement != nil {
+				l = append(l, e.BindingRestElement.BoundNames()...)
 			}
 		}
 	}
@@ -4015,6 +4806,16 @@ func (b *BindingPattern) ContainsExpression() bool {
 		return b.ObjectBindingPattern.ContainsExpression()
 	}
 	return b.ArrayBindingPattern.ContainsExpression()
+}
+
+func (b *BindingPattern) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) CompletionValue {
+	if b.ObjectBindingPattern != nil {
+		return b.ObjectBindingPattern.BindingInitialization(vm, value, env)
+	}
+	if b.ArrayBindingPattern != nil {
+		return b.ArrayBindingPattern.BindingInitialization(vm, value, env)
+	}
+	panic("BindingPattern: missing object or array pattern")
 }
 
 func (b *BindingPattern) String() string {
@@ -4030,20 +4831,26 @@ func (b *BindingPattern) String() string {
 type BindingElement struct {
 	BindingPattern    *BindingPattern
 	SingleNameBinding *SingleNameBinding
+	Initializer       Expression
 }
+
+var _ RuntimeSemanticsBindingInitialization = (*BindingElement)(nil)
 
 func (b *BindingElement) IsSimpleParameterList() bool {
 	return b.SingleNameBinding != nil && b.SingleNameBinding.Initializer == nil
 }
 
 func (b *BindingElement) ContainsExpression() bool {
+	if b.Initializer != nil {
+		return true
+	}
 	if b.SingleNameBinding != nil {
 		return b.SingleNameBinding.Initializer != nil
 	}
-	if b.BindingPattern.ObjectBindingPattern != nil {
+	if b.BindingPattern != nil {
 		return b.BindingPattern.ContainsExpression()
 	}
-	panic("unreachable")
+	panic("BindingElement: missing binding variant")
 }
 
 func (b *BindingElement) BoundNames() (l []IdentifierName) {
@@ -4054,10 +4861,45 @@ func (b *BindingElement) BoundNames() (l []IdentifierName) {
 }
 
 func (b *BindingElement) String() string {
+	var result string
 	if b.SingleNameBinding != nil {
-		return b.SingleNameBinding.String()
+		result = b.SingleNameBinding.String()
+	} else {
+		result = b.BindingPattern.String()
 	}
-	return b.BindingPattern.String()
+	if b.Initializer != nil {
+		result += " = " + b.Initializer.String()
+	}
+	return result
+}
+
+func (b *BindingElement) BindingInitialization(vm *VM, value Value, env EnvironmentRecord) (co CompletionValue) {
+	initializer := b.Initializer
+	if b.SingleNameBinding != nil {
+		initializer = b.SingleNameBinding.Initializer
+	}
+	if value == UndefinedValue && initializer != nil {
+		var isAbrupt bool
+		var rt CompletionValue
+		if b.SingleNameBinding != nil && IsAnonymousFunctionDefinition(initializer) {
+			value, isAbrupt, rt = ReturnIfAbrupt(
+				EvaluateNamedExpression(vm, initializer, NewStringPropertyKey(b.SingleNameBinding.BindingIdentifier)),
+				co,
+			)
+		} else {
+			value, _, isAbrupt, rt = vm.EvalAndGetValue(initializer, co)
+		}
+		if isAbrupt {
+			return rt
+		}
+	}
+	if b.SingleNameBinding != nil {
+		return vm.InitializeBoundName(b.SingleNameBinding.BindingIdentifier, value, env)
+	}
+	if b.BindingPattern != nil {
+		return b.BindingPattern.BindingInitialization(vm, value, env)
+	}
+	panic("BindingElement: missing binding variant")
 }
 
 // MARK: - IfStatement
@@ -4156,6 +4998,9 @@ func (s *SwitchStatement) Evaluation(vm *VM) (co CompletionValue) {
 	vm.SetRunningLexicalEnvironment(blockEnv)
 	R := CompletionHandle(s.CaseBlock.CaseBlockEvaluation(vm, switchValue))
 	vm.SetRunningLexicalEnvironment(oldEnv)
+	if R.t == CompletionTypeBreak && R.target == "" {
+		return R.value.ToCompletion()
+	}
 	return R
 }
 
@@ -4167,7 +5012,16 @@ func (s *SwitchStatement) String() string {
 }
 
 func (s *SwitchStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
-	return nil
+	for _, clause := range s.CaseBlock.CaseClauses {
+		l = append(l, clause.StatementList.VarScopedDeclarations()...)
+	}
+	if s.CaseBlock.DefaultClause != nil {
+		l = append(l, s.CaseBlock.DefaultClause.StatementList.VarScopedDeclarations()...)
+	}
+	for _, clause := range s.CaseBlock.CaseClausesAfterDefault {
+		l = append(l, clause.StatementList.VarScopedDeclarations()...)
+	}
+	return
 }
 
 // CaseBlock [Yield, Await, Return] :
@@ -4179,8 +5033,9 @@ func (s *SwitchStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
 // - CaseClause[?Yield, ?Await, ?Return]
 // - CaseClauses[?Yield, ?Await, ?Return] CaseClause[?Yield, ?Await, ?Return]
 type CaseBlock struct {
-	CaseClauses   []*CaseClause
-	DefaultClause *DefaultClause
+	CaseClauses             []*CaseClause
+	DefaultClause           *DefaultClause
+	CaseClausesAfterDefault []*CaseClause
 }
 
 var (
@@ -4193,12 +5048,11 @@ func (c *CaseBlock) astHasDefault() bool {
 }
 
 func (c *CaseBlock) astIsEmpty() bool {
-	return !c.astHasDefault() && len(c.CaseClauses) == 0
+	return !c.astHasDefault() && len(c.CaseClauses) == 0 && len(c.CaseClausesAfterDefault) == 0
 }
 
 // CaseBlockEvaluation
 // spec: 14.12.2
-// TODO(WIP): handle cases after default clauses
 func (c *CaseBlock) CaseBlockEvaluation(vm *VM, input Value) (co CompletionValue) {
 	if c.astIsEmpty() {
 		co.value = UndefinedValue
@@ -4206,7 +5060,7 @@ func (c *CaseBlock) CaseBlockEvaluation(vm *VM, input Value) (co CompletionValue
 	} else if c.astHasDefault() {
 		var V Value = UndefinedValue
 		found := false
-		for _, clause := range c.CaseClauses {
+		for index, clause := range c.CaseClauses {
 			if !found {
 				f, isAbrupt, rt := ReturnIfAbrupt(clause.CaseClauseIsSelected(vm, input), co)
 				if isAbrupt {
@@ -4215,29 +5069,24 @@ func (c *CaseBlock) CaseBlockEvaluation(vm *VM, input Value) (co CompletionValue
 				found = f
 			}
 			if found {
-				R := CompletionHandle(clause.Evaluation(vm))
-				if !IsUndefinedOrNil(R.value) {
-					V = R.value
-				}
-				if R.IsAbrupt() {
-					return UpdateEmpty(R, V)
-				}
+				return c.evaluateSelectedClauses(vm, c.CaseClauses[index:], true, V)
 			}
 		}
-		defaultR := CompletionHandle(c.DefaultClause.Evaluation(vm))
-		if !IsUndefinedOrNil(defaultR.value) {
-			V = defaultR.value
+		for index, clause := range c.CaseClausesAfterDefault {
+			selected, isAbrupt, rt := ReturnIfAbrupt(clause.CaseClauseIsSelected(vm, input), co)
+			if isAbrupt {
+				return rt
+			}
+			if selected {
+				return evaluateCaseClauses(vm, c.CaseClausesAfterDefault[index:], V)
+			}
 		}
-		if defaultR.IsAbrupt() {
-			return UpdateEmpty(defaultR, V)
-		}
-		co.value = V
-		// TODO(WIP): handle cases after default clauses
-		return
+		return c.evaluateSelectedClauses(vm, nil, true, V)
 	} else {
 		var V Value = UndefinedValue
 		found := false
-		for _, clause := range c.CaseClauses {
+		clauses := append(append([]*CaseClause{}, c.CaseClauses...), c.CaseClausesAfterDefault...)
+		for index, clause := range clauses {
 			if !found {
 				f, isAbrupt, rt := ReturnIfAbrupt(clause.CaseClauseIsSelected(vm, input), co)
 				if isAbrupt {
@@ -4246,18 +5095,43 @@ func (c *CaseBlock) CaseBlockEvaluation(vm *VM, input Value) (co CompletionValue
 				found = f
 			}
 			if found {
-				R := CompletionHandle(clause.Evaluation(vm))
-				if !IsUndefinedOrNil(R.value) {
-					V = R.value
-				}
-				if R.IsAbrupt() {
-					return UpdateEmpty(R, V)
-				}
+				return evaluateCaseClauses(vm, clauses[index:], V)
 			}
 		}
 		co.value = V
 		return
 	}
+}
+
+func (c *CaseBlock) evaluateSelectedClauses(vm *VM, beforeDefault []*CaseClause, includeDefault bool, value Value) CompletionValue {
+	result := evaluateCaseClauses(vm, beforeDefault, value)
+	if result.IsAbrupt() {
+		return result
+	}
+	value = result.Data()
+	if includeDefault {
+		defaultResult := CompletionHandle(c.DefaultClause.Evaluation(vm))
+		if !IsUndefinedOrNil(defaultResult.value) {
+			value = defaultResult.value
+		}
+		if defaultResult.IsAbrupt() {
+			return UpdateEmpty(defaultResult, value)
+		}
+	}
+	return evaluateCaseClauses(vm, c.CaseClausesAfterDefault, value)
+}
+
+func evaluateCaseClauses(vm *VM, clauses []*CaseClause, value Value) CompletionValue {
+	for _, clause := range clauses {
+		result := CompletionHandle(clause.Evaluation(vm))
+		if !IsUndefinedOrNil(result.value) {
+			value = result.value
+		}
+		if result.IsAbrupt() {
+			return UpdateEmpty(result, value)
+		}
+	}
+	return value.ToCompletion()
 }
 
 func (c *CaseBlock) LexicallyScopedDeclarations() (l []ASTNode) {
@@ -4266,6 +5140,9 @@ func (c *CaseBlock) LexicallyScopedDeclarations() (l []ASTNode) {
 	}
 	if c.astHasDefault() {
 		l = append(l, c.DefaultClause.LexicallyScopedDeclarations()...)
+	}
+	for _, clause := range c.CaseClausesAfterDefault {
+		l = append(l, clause.LexicallyScopedDeclarations()...)
 	}
 	return
 }
@@ -4277,6 +5154,9 @@ func (c *CaseBlock) String() string {
 	}
 	if c.DefaultClause != nil {
 		sb += c.DefaultClause.String()
+	}
+	for _, clause := range c.CaseClausesAfterDefault {
+		sb += clause.String()
 	}
 	return sb
 }
@@ -4431,8 +5311,36 @@ type StatementDoWhile struct {
 	Body      Statement
 }
 
+var _ IterationStatement = (*StatementDoWhile)(nil)
+
 func (s *StatementDoWhile) VarScopedDeclarations() []*VariableDeclaration {
 	return s.Body.VarScopedDeclarations()
+}
+
+func (s *StatementDoWhile) Evaluation(vm *VM) CompletionValue {
+	return s.DoWhileLoopEvaluation(vm, nil)
+}
+
+// DoWhileLoopEvaluation
+// spec: 14.7.2.2
+func (s *StatementDoWhile) DoWhileLoopEvaluation(vm *VM, labelSet LabelSet) (co CompletionValue) {
+	var value Value = UndefinedValue
+	for {
+		result := s.Body.Evaluation(vm)
+		if !LoopContinues(result, labelSet) {
+			return UpdateEmpty(result, value)
+		}
+		if result.value != nil {
+			value = result.value
+		}
+		condition, _, isAbrupt, rt := vm.EvalAndGetValue(s.Condition, co)
+		if isAbrupt {
+			return rt
+		}
+		if !condition.ToBoolean() {
+			return value.ToCompletion()
+		}
+	}
 }
 
 func (s *StatementDoWhile) String() string {
@@ -4508,7 +5416,10 @@ func (s *ForStatement) isLexicalDeclaration() bool {
 // ForLoopEvaluation
 // spec: 14.7.4.2
 func (s *ForStatement) ForLoopEvaluation(vm *VM) (co CompletionValue) {
-	// TODO: label set
+	return s.forLoopEvaluation(vm, nil)
+}
+
+func (s *ForStatement) forLoopEvaluation(vm *VM, labelSet LabelSet) (co CompletionValue) {
 	if s.isVariableDeclarationList() {
 		s.Initializer.Evaluation(vm)
 		var test Expression
@@ -4520,7 +5431,7 @@ func (s *ForStatement) ForLoopEvaluation(vm *VM) (co CompletionValue) {
 			increment = s.Increment
 		}
 		var perIterationBindings []string
-		return vm.ForBodyEvaluation(test, increment, s.Body, perIterationBindings, nil)
+		return vm.ForBodyEvaluation(test, increment, s.Body, perIterationBindings, labelSet)
 	} else if s.isLexicalDeclaration() {
 		initializer := s.Initializer.(*ForStatementInitializerLexicalDeclaration).LexicalDeclaration
 		oldEnv := vm.RunningLexicalEnvironment()
@@ -4548,7 +5459,7 @@ func (s *ForStatement) ForLoopEvaluation(vm *VM) (co CompletionValue) {
 			s.Increment,
 			s.Body,
 			perIterationBindings,
-			nil,
+			labelSet,
 		)
 	} else {
 		if s.Initializer != nil {
@@ -4565,7 +5476,7 @@ func (s *ForStatement) ForLoopEvaluation(vm *VM) (co CompletionValue) {
 		if s.Increment != nil {
 			increment = s.Increment
 		}
-		return vm.ForBodyEvaluation(test, increment, s.Body, []string{}, nil)
+		return vm.ForBodyEvaluation(test, increment, s.Body, []string{}, labelSet)
 	}
 }
 
@@ -4639,9 +5550,10 @@ type ForInOfStatement struct {
 var _ RuntimeSemanticsForInOfLoopEvaluation = (*ForInOfStatement)(nil)
 
 func (f *ForInOfStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
-	if f.Initializer.ForBinding != nil && f.Initializer.ForBinding.BindingPattern == nil {
+	if f.Initializer.ForBinding != nil {
 		l = append(l, &VariableDeclaration{
 			BindingIdentifier: f.Initializer.ForBinding.BindingIdentifier,
+			BindingPattern:    f.Initializer.ForBinding.BindingPattern,
 		})
 	}
 	l = append(l, f.Body.VarScopedDeclarations()...)
@@ -4657,13 +5569,20 @@ func (f *ForInOfStatement) BoundNames() (l []IdentifierName) {
 }
 
 func (f *ForInOfStatement) Evaluation(vm *VM) (co CompletionValue) {
-	// TODO
 	var labelSet []string
-	result, isAbrupt, rt := ReturnIfAbrupt(f.ForInOfLoopEvaluation(vm, labelSet), co)
+	result := f.ForInOfLoopEvaluation(vm, labelSet)
+	if result.t == CompletionTypeBreak && result.target == "" {
+		result.t = CompletionTypeNormal
+		result.target = ""
+		if result.value == nil {
+			result.value = UndefinedValue
+		}
+	}
+	value, isAbrupt, rt := ReturnIfAbrupt(result, co)
 	if isAbrupt {
 		return rt
 	}
-	co.value = result
+	co.value = value
 	return
 }
 
@@ -4746,7 +5665,7 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co 
 			vm.ForInOfHeadEvaluation(
 				[]string{},
 				f.Expression,
-				ForInOfIterationKindEnumerate,
+				iterationKind,
 			), co)
 		if isAbrupt {
 			return rt
@@ -4755,7 +5674,7 @@ func (f *ForInOfStatement) ForInOfLoopEvaluation(vm *VM, labelSet []string) (co 
 			f.Initializer.ForBinding,
 			f.Body,
 			keyResult,
-			ForInOfIterationKindEnumerate,
+			iterationKind,
 			ForInOfLhsKindVarBinding,
 			labelSet,
 			kind,
@@ -4801,8 +5720,21 @@ const (
 )
 
 func (f *ForInOfStatement) IsDestructuring() bool {
-	// TODO:
-	return f.Initializer.ForBinding != nil && f.Initializer.ForBinding.BindingPattern != nil
+	if f.Initializer == nil {
+		return false
+	}
+	if f.Initializer.ForBinding != nil {
+		return f.Initializer.ForBinding.BindingPattern != nil
+	}
+	if f.Initializer.ForDeclaration != nil {
+		return f.Initializer.ForDeclaration.ForBinding.BindingPattern != nil
+	}
+	if lhs, ok := f.Initializer.LeftHandSideExpression.(*LeftHandSideExpression); ok {
+		return lhs.astIsArrayAssignmentPattern() || lhs.astIsObjectAssignmentPattern()
+	}
+	_, isArray := f.Initializer.LeftHandSideExpression.(*ArrayLiteral)
+	_, isObject := f.Initializer.LeftHandSideExpression.(*PrimaryExpressionObjectLiteral)
+	return isArray || isObject
 }
 
 func (f *ForInOfStatement) String() string {
@@ -4872,8 +5804,6 @@ func (f *ForBinding) BoundNames() (l []IdentifierName) {
 // ForDeclaration [Yield, Await] :
 // - LetOrConst ForBinding[?Yield, ?Await]
 type ForDeclaration struct {
-	// TODO(BM): unused, remove
-	Expression
 	LetOrConst LetOrConst
 	ForBinding *ForBinding
 }
@@ -4882,6 +5812,10 @@ var (
 	_ StaticSemanticsBoundNames                          = (*ForDeclaration)(nil)
 	_ RuntimeSemanticsForDeclarationBindingInstantiation = (*ForDeclaration)(nil)
 )
+
+func (f *ForDeclaration) Evaluation(vm *VM) CompletionValue {
+	panic("ForDeclaration is a static binding and has no direct runtime evaluation")
+}
 
 func (f *ForDeclaration) ForDeclarationBindingInstantiation(vm *VM, env EnvironmentRecord) {
 	for _, name := range f.ForBinding.BoundNames() {
@@ -4908,6 +5842,73 @@ func (f *ForDeclaration) String() string {
 	return letOrConst + " " + f.ForBinding.String()
 }
 
+// MARK: - LabelledStatement
+
+// LabelledStatement : LabelIdentifier : LabelledItem
+type LabelledStatement struct {
+	Statement
+	Label IdentifierName
+	Item  Statement
+}
+
+func (s *LabelledStatement) _statement() {}
+
+func (s *LabelledStatement) VarScopedDeclarations() []*VariableDeclaration {
+	return s.Item.VarScopedDeclarations()
+}
+
+func (s *LabelledStatement) VarDeclaredNames() []IdentifierName {
+	return s.Item.VarDeclaredNames()
+}
+
+func (s *LabelledStatement) Evaluation(vm *VM) CompletionValue {
+	return s.labelledEvaluation(vm, nil)
+}
+
+func (s *LabelledStatement) labelledEvaluation(vm *VM, labelSet LabelSet) CompletionValue {
+	labelSet = append(labelSet, string(s.Label))
+	var result CompletionValue
+	switch item := s.Item.(type) {
+	case *LabelledStatement:
+		result = item.labelledEvaluation(vm, labelSet)
+	case *BreakableStatement:
+		if item.astIsIteration() {
+			result = evaluateIterationWithLabels(vm, item.IterationStatement, labelSet)
+		} else {
+			result = item.Evaluation(vm)
+		}
+	default:
+		result = item.Evaluation(vm)
+	}
+	if result.t == CompletionTypeBreak && result.target == string(s.Label) {
+		result.t = CompletionTypeNormal
+		result.target = ""
+		if result.value == nil {
+			result.value = UndefinedValue
+		}
+	}
+	return result
+}
+
+func (s *LabelledStatement) String() string {
+	return string(s.Label) + ": " + s.Item.String()
+}
+
+func evaluateIterationWithLabels(vm *VM, iteration IterationStatement, labelSet LabelSet) CompletionValue {
+	switch statement := iteration.(type) {
+	case *WhileStatement:
+		return statement.WhileLoopEvaluation(vm, labelSet)
+	case *StatementDoWhile:
+		return statement.DoWhileLoopEvaluation(vm, labelSet)
+	case *ForStatement:
+		return statement.forLoopEvaluation(vm, labelSet)
+	case *ForInOfStatement:
+		return statement.ForInOfLoopEvaluation(vm, labelSet)
+	default:
+		panic("unknown iteration statement")
+	}
+}
+
 // MARK: - BreakStatement
 
 // BreakStatement [Yield, Await] :
@@ -4921,6 +5922,10 @@ type BreakStatement struct {
 var _ RuntimeSemanticsEvaluation = (*BreakStatement)(nil)
 
 func (s *BreakStatement) VarScopedDeclarations() (l []*VariableDeclaration) {
+	return nil
+}
+
+func (s *BreakStatement) VarDeclaredNames() []IdentifierName {
 	return nil
 }
 
@@ -4952,6 +5957,22 @@ func (s *BreakStatement) String() string {
 type StatementContinue struct {
 	Statement
 	Label IdentifierName
+}
+
+func (s *StatementContinue) _statement() {}
+
+func (s *StatementContinue) VarScopedDeclarations() []*VariableDeclaration {
+	return nil
+}
+
+func (s *StatementContinue) VarDeclaredNames() []IdentifierName {
+	return nil
+}
+
+func (s *StatementContinue) Evaluation(vm *VM) (co CompletionValue) {
+	co.t = CompletionTypeContinue
+	co.target = string(s.Label)
+	return co
 }
 
 func (s *StatementContinue) String() string {
@@ -4989,7 +6010,6 @@ func (s *ReturnStatement) Evaluation(vm *VM) (co CompletionValue) {
 		}
 		co.value = exprValue
 		co.t = CompletionTypeReturn
-		// TODO: GetGeneratorKind
 		return
 	}
 }
@@ -5017,8 +6037,14 @@ type declarationDefaultImpl struct {
 
 func DeclarationBoundNames(d Declaration) (l []IdentifierName) {
 	switch decl := d.(type) {
-	case *DeclarationHoistableFunction, *DeclarationHoistableAsyncFunction:
-		return
+	case *DeclarationHoistableFunction:
+		return decl.BoundNames()
+	case *DeclarationHoistableGenerator:
+		return decl.BoundNames()
+	case *DeclarationHoistableAsyncFunction:
+		return decl.BoundNames()
+	case *DeclarationHoistableAsyncGenerator:
+		return decl.BoundNames()
 	case *ClassDeclaration:
 		return decl.BoundNames()
 	case *LexicalDeclaration:
@@ -5033,7 +6059,6 @@ func DeclarationAnalyze(d Declaration, a AnalyzeQuery) bool {
 
 // MARK: - HoistableDeclaration
 
-// TODO: use HoistableDeclaration
 // HoistableDeclaration [Yield, Await, Default] :
 // - FunctionDeclaration[?Yield, ?Await, ?Default]
 // - GeneratorDeclaration[?Yield, ?Await, ?Default]
@@ -5041,16 +6066,44 @@ func DeclarationAnalyze(d Declaration, a AnalyzeQuery) bool {
 // - AsyncGeneratorDeclaration[?Yield, ?Await, ?Default]
 type DeclarationHoistable interface {
 	Declaration
+	_hoistableDeclaration()
+}
+
+func instantiateHoistableDeclaration(
+	agent *Agent,
+	declaration DeclarationHoistable,
+	env EnvironmentRecord,
+	privateEnv *PrivateEnvironment,
+) (string, ObjectType) {
+	switch declaration := declaration.(type) {
+	case *DeclarationHoistableFunction:
+		name := string(declaration.FunctionDeclaration.Identifier)
+		return name, declaration.FunctionDeclaration.instantiateOrdinaryFunctionObject(agent, env, privateEnv)
+	case *DeclarationHoistableGenerator:
+		name := string(declaration.GeneratorDeclaration.Identifier)
+		return name, declaration.GeneratorDeclaration.instantiateGeneratorFunctionObject(agent, env, privateEnv)
+	case *DeclarationHoistableAsyncFunction:
+		name := string(declaration.AsyncFunctionDeclaration.Identifier)
+		return name, declaration.AsyncFunctionDeclaration.instantiateAsyncFunctionObject(agent, env, privateEnv)
+	case *DeclarationHoistableAsyncGenerator:
+		name := string(declaration.AsyncGeneratorDeclaration.Identifier)
+		return name, declaration.AsyncGeneratorDeclaration.instantiateAsyncGeneratorFunctionObject(agent, env, privateEnv)
+	default:
+		panic("unknown hoistable declaration")
+	}
 }
 
 // MARK: - FunctionDeclaration
 
-// TODO: use FunctionDeclaration directly
+// DeclarationHoistableFunction adapts FunctionDeclaration to the shared
+// declaration interface used by parser productions.
 type DeclarationHoistableFunction struct {
 	DeclarationHoistable
 	*declarationDefaultImpl
 	FunctionDeclaration *FunctionDeclaration
 }
+
+func (d *DeclarationHoistableFunction) _hoistableDeclaration() {}
 
 func (d *DeclarationHoistableFunction) Evaluation(vm *VM) CompletionValue {
 	return d.FunctionDeclaration.Evaluation(vm)
@@ -5072,10 +6125,15 @@ type DeclarationHoistableAsyncFunction struct {
 	AsyncFunctionDeclaration *AsyncFunctionDeclaration
 }
 
-func (d *DeclarationHoistableAsyncFunction) _declaration() {}
+func (d *DeclarationHoistableAsyncFunction) _declaration()          {}
+func (d *DeclarationHoistableAsyncFunction) _hoistableDeclaration() {}
 
 func (d *DeclarationHoistableAsyncFunction) Evaluation(vm *VM) CompletionValue {
 	return d.AsyncFunctionDeclaration.Evaluation(vm)
+}
+
+func (d *DeclarationHoistableAsyncFunction) BoundNames() []IdentifierName {
+	return d.AsyncFunctionDeclaration.BoundNames()
 }
 
 func (d *DeclarationHoistableAsyncFunction) String() string {
@@ -5089,13 +6147,15 @@ type AsyncFunctionDeclaration struct {
 	SourceText       string
 }
 
-// TODO: not standard
+func (d *AsyncFunctionDeclaration) BoundNames() []IdentifierName {
+	if d.Identifier == "" {
+		return nil
+	}
+	return []IdentifierName{d.Identifier}
+}
+
 func (d *AsyncFunctionDeclaration) Evaluation(vm *VM) CompletionValue {
-	agent := vm.agent
-	realm := agent.CurrentRealm()
-	env := realm.GlobalEnv
-	function := d.instantiateAsyncFunctionObject(agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(d.Identifier)), (function).ToValue(), setThrowTypeIgnore)
+	// Hoistable declarations are instantiated before statement evaluation.
 	return UndefinedValue.ToCompletion()
 }
 
@@ -5128,8 +6188,14 @@ type DeclarationHoistableAsyncGenerator struct {
 	AsyncGeneratorDeclaration *AsyncGeneratorDeclaration
 }
 
+func (d *DeclarationHoistableAsyncGenerator) _hoistableDeclaration() {}
+
 func (d *DeclarationHoistableAsyncGenerator) Evaluation(vm *VM) CompletionValue {
 	return d.AsyncGeneratorDeclaration.Evaluation(vm)
+}
+
+func (d *DeclarationHoistableAsyncGenerator) BoundNames() []IdentifierName {
+	return d.AsyncGeneratorDeclaration.BoundNames()
 }
 
 func (d *DeclarationHoistableAsyncGenerator) String() string {
@@ -5143,13 +6209,15 @@ type AsyncGeneratorDeclaration struct {
 	SourceText       string
 }
 
-// TODO: not standard
+func (d *AsyncGeneratorDeclaration) BoundNames() []IdentifierName {
+	if d.Identifier == "" {
+		return nil
+	}
+	return []IdentifierName{d.Identifier}
+}
+
 func (d *AsyncGeneratorDeclaration) Evaluation(vm *VM) CompletionValue {
-	agent := vm.agent
-	realm := agent.CurrentRealm()
-	env := realm.GlobalEnv
-	function := d.instantiateAsyncGeneratorFunctionObject(agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(d.Identifier), function.ToValue(), setThrowTypeIgnore)
+	// Hoistable declarations are instantiated before statement evaluation.
 	return UndefinedValue.ToCompletion()
 }
 
@@ -5191,8 +6259,14 @@ type DeclarationHoistableGenerator struct {
 	GeneratorDeclaration *GeneratorDeclaration
 }
 
+func (d *DeclarationHoistableGenerator) _hoistableDeclaration() {}
+
 func (d *DeclarationHoistableGenerator) Evaluation(vm *VM) CompletionValue {
 	return d.GeneratorDeclaration.Evaluation(vm)
+}
+
+func (d *DeclarationHoistableGenerator) BoundNames() []IdentifierName {
+	return d.GeneratorDeclaration.BoundNames()
 }
 
 func (d *DeclarationHoistableGenerator) String() string {
@@ -5206,13 +6280,15 @@ type GeneratorDeclaration struct {
 	SourceText       string
 }
 
-// TODO: not standard
+func (d *GeneratorDeclaration) BoundNames() []IdentifierName {
+	if d.Identifier == "" {
+		return nil
+	}
+	return []IdentifierName{d.Identifier}
+}
+
 func (d *GeneratorDeclaration) Evaluation(vm *VM) CompletionValue {
-	agent := vm.agent
-	realm := agent.CurrentRealm()
-	env := realm.GlobalEnv
-	function := d.instantiateGeneratorFunctionObject(agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(CMString(d.Identifier).ToPropertyKey(), function.ToValue(), setThrowTypeIgnore)
+	// Hoistable declarations are instantiated before statement evaluation.
 	return UndefinedValue.ToCompletion()
 }
 
@@ -5223,7 +6299,7 @@ func (d *GeneratorDeclaration) instantiateGeneratorFunctionObject(agent *Agent, 
 	sourceText := d.SourceText
 	function := OrdinaryFunctionCreate(
 		agent,
-		realm.Intrinsics.FunctionPrototype,
+		realm.Intrinsics.GeneratorFunctionPrototype,
 		sourceText,
 		d.FormalParameters,
 		d.Body,
@@ -5233,7 +6309,7 @@ func (d *GeneratorDeclaration) instantiateGeneratorFunctionObject(agent *Agent, 
 	)
 
 	SetFunctionName(function.Object, NewStringPropertyKey(string(name)), "")
-	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototype, nil)
+	prototype := OrdinaryObjectCreate(agent, realm.Intrinsics.GeneratorFunctionPrototypePrototype, nil)
 	function.DefinePropertyOrThrow(NewStringPropertyKey("prototype"), &PropertyDescriptor{
 		Value:        (prototype).ToValue(),
 		Writable:     true,
@@ -5277,13 +6353,20 @@ func (d *ClassDeclaration) BoundNames() (l []IdentifierName) {
 	return
 }
 
+func (d *ClassDeclaration) IsConstantDeclaration() bool {
+	return true
+}
+
 func (d *ClassDeclaration) astHasIdentifier() bool {
 	return d.IdentifierName != ""
 }
 
 // 15.7.16
 func (d *ClassDeclaration) Evaluation(vm *VM) CompletionValue {
-	d.BindingClassDeclarationEvaluation(vm)
+	result := d.BindingClassDeclarationEvaluation(vm)
+	if result.IsAbrupt() {
+		return CompletionFrom(CompletionValue{}, result)
+	}
 	// return EMPTY
 	return UndefinedValue.ToCompletion()
 }
@@ -5297,9 +6380,12 @@ func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM) (co Complet
 		if isAbrupt {
 			return rt
 		}
-		// TODO: set [[SourceText]]
+		SetClassSourceText(value, d.SourceText)
 		env := vm.RunningLexicalEnvironment()
-		vm.InitializeBoundName(className, value.ToValue(), env)
+		_, isAbrupt, bindingResult := ReturnIfAbrupt(vm.InitializeBoundName(className, value.ToValue(), env), co)
+		if isAbrupt {
+			return bindingResult
+		}
 		co.value = value
 		return
 	} else {
@@ -5307,10 +6393,22 @@ func (d *ClassDeclaration) BindingClassDeclarationEvaluation(vm *VM) (co Complet
 		if isAbrupt {
 			return rt
 		}
-		// TODO: set [[SourceText]]
+		SetClassSourceText(value, d.SourceText)
 
 		co.value = value
 		return
+	}
+}
+
+func SetClassSourceText(class ObjectType, sourceText string) {
+	switch function := class.(type) {
+	case *ECMAScriptFunction:
+		function.SourceText = sourceText
+	case *BuiltinFunction:
+		Assert(function.AdditionalFields != nil && function.AdditionalFields.ClassConstructorFields != nil)
+		function.AdditionalFields.ClassConstructorFields.SourceText = sourceText
+	default:
+		panic("SetClassSourceText: class constructor is not a function")
 	}
 }
 
@@ -5349,8 +6447,10 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 			})
 			if lo.Contains(names, string(privateBoundIdentifier)) {
 			} else {
+				symbol := agent.CreateSymbol(string(privateBoundIdentifier))
+				symbol.IsPrivate = true
 				classPrivateEnvironment.Names = append(classPrivateEnvironment.Names, PrivateName{
-					Symbol: agent.CreateSymbol(string(privateBoundIdentifier)),
+					Symbol: symbol,
 				})
 			}
 		}
@@ -5426,6 +6526,11 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 					ClassConstructorFields: &ClassConstructorFields{},
 				},
 			})
+		// CreateBuiltinFunction installs its provisional "constructor" name.
+		// ClassDefinitionEvaluation replaces it with the explicit or inferred
+		// class name supplied by the surrounding grammar production.
+		function.DeletePropertyOrThrow(NewStringPropertyKey("name"))
+		SetFunctionName(function, className, "")
 	} else {
 		// 15.
 		constructorInfo := ReturnAssertNormal(
@@ -5433,7 +6538,7 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 		)
 		F := constructorInfo.Closure
 		MakeClassConstructor(F.(*ECMAScriptFunction))
-		SetFunctionName(F, className.(PropertyKey), "")
+		SetFunctionName(F, className, "")
 		function = F
 	}
 
@@ -5570,20 +6675,19 @@ func (c *ClassBody) ConstructorMethod() *MethodDefinition {
 }
 
 func (c *ClassBody) PrivateBoundIdentifiers() (l []PrivateIdentifierName) {
-	var propertyName PropertyName
 	for _, item := range c.ClassElementList.Items {
+		var propertyName PropertyName
 		switch i := item.(type) {
 		case *ClassElementStaticBlock, *ClassElementEmpty:
-			// ignore
+			continue
 		case *ClassElementMethodDefinition:
 			propertyName = i.MethodDefinition.PropertyName
 		case *ClassElementFieldDefinition:
 			propertyName = i.FieldDefinition.PropertyName
 		}
-	}
-	switch p := propertyName.(type) {
-	case *PropertyNameLiteralIdentifier:
-		l = append(l, PrivateIdentifierName(p.Identifier))
+		if privateName, ok := propertyName.(*PropertyNamePrivateIdentifier); ok {
+			l = append(l, privateName.Identifier)
+		}
 	}
 
 	return
@@ -5630,7 +6734,6 @@ const (
 	ClassElementKindEmpty
 )
 
-// TODO(BM): use struct
 // ClassElement [Yield, Await] :
 // - MethodDefinition[?Yield, ?Await]
 // - static MethodDefinition[?Yield, ?Await]
@@ -5697,12 +6800,7 @@ func (c *ClassElementFieldDefinition) ClassElementEvaluation(vm *VM, obj ObjectT
 func (c *ClassElementFieldDefinition) ClassFieldDefinitionEvaluation(vm *VM, homeObject ObjectType) (co Completion[*ClassFieldDefinition]) {
 	agent := vm.agent
 	realm := agent.CurrentRealm()
-	var name PropertyKeyOrPrivateName
-	value, isAbrupt, rt := ReturnIfAbrupt(RunNode(agent, c.FieldDefinition.PropertyName), co)
-	if isAbrupt {
-		return rt
-	}
-	name, isAbrupt, rt = ReturnIfAbrupt(ToPropertyKey(agent, value), co)
+	name, isAbrupt, rt := ReturnIfAbrupt(evaluateClassElementName(vm, c.FieldDefinition.PropertyName), co)
 	if isAbrupt {
 		return rt
 	}
@@ -5836,7 +6934,10 @@ func (d *LexicalDeclaration) IsConstantDeclaration() bool {
 
 // Evaluation 14.3.1.2
 func (d *LexicalDeclaration) Evaluation(vm *VM) CompletionValue {
-	d.BindingList.Evaluation(vm)
+	result := d.BindingList.Evaluation(vm)
+	if result.IsAbrupt() {
+		return result
+	}
 	// return EMPTY
 	return UndefinedValue.ToCompletion()
 }
@@ -5864,11 +6965,13 @@ func (b *BindingList) BoundNames() (l []IdentifierName) {
 }
 
 func (b *BindingList) Evaluation(vm *VM) CompletionValue {
-	var list []Value
 	for _, item := range b.Items {
-		list = append(list, item.Evaluation(vm).value)
+		result := item.Evaluation(vm)
+		if result.IsAbrupt() {
+			return result
+		}
 	}
-	return NewListValue(list).ToCompletion()
+	return UndefinedValue.ToCompletion()
 }
 
 func (b *BindingList) String() string {
@@ -5908,12 +7011,19 @@ func (l *LexicalBinding) Evaluation(vm *VM) (co CompletionValue) {
 	case l.Identifier != "" && l.Initializer == nil:
 		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
 		lhs.InitializeReferencedBinding(UndefinedValue)
+		return UndefinedValue.ToCompletion()
 	case l.Identifier != "":
 		// LexicalBinding : BindingIdentifier Initializer
 		lhs := vm.agent.ResolveBinding(l.Identifier, nil, false)
 		if IsAnonymousFunctionDefinition(l.Initializer) {
-			// FIXME: handle named evaluation
-			panic("")
+			value, isAbrupt, rt := ReturnIfAbrupt(
+				EvaluateNamedExpression(vm, l.Initializer, NewStringPropertyKey(l.Identifier)),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			lhs.InitializeReferencedBinding(value)
 		} else {
 			value, _, isAbrupt, rt := vm.EvalAndGetValue(l.Initializer, co)
 			if isAbrupt {
@@ -5923,8 +7033,22 @@ func (l *LexicalBinding) Evaluation(vm *VM) (co CompletionValue) {
 		}
 		// return EMPTY
 		return UndefinedValue.ToCompletion()
+	case l.BindingPattern != nil:
+		Assert(l.Initializer != nil)
+		value, _, isAbrupt, rt := vm.EvalAndGetValue(l.Initializer, co)
+		if isAbrupt {
+			return rt
+		}
+		_, isAbrupt, rt = ReturnIfAbrupt(
+			l.BindingPattern.BindingInitialization(vm, value, vm.RunningLexicalEnvironment()),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		return UndefinedValue.ToCompletion()
 	}
-	panic("unimplemented")
+	panic("LexicalBinding: missing binding variant")
 }
 
 func (l *LexicalBinding) String() string {
@@ -5986,13 +7110,7 @@ func (f *FunctionDeclaration) instantiateOrdinaryFunctionObject(agent *Agent, en
 // Evaluation
 // spec: 15.2.6
 func (f *FunctionDeclaration) Evaluation(vm *VM) CompletionValue {
-	// TODO(BM): match spec
-	realm := vm.agent.CurrentRealm()
-	// TODO(XXX): is it lexical env?
-	env := vm.RunningLexicalEnvironment()
-	function := f.instantiateOrdinaryFunctionObject(vm.agent, env, nil)
-	realm.GlobalEnv.ObjectRecord.BindingObject.Set(NewStringPropertyKey(string(f.Identifier)), function.ToValue(), setThrowTypeIgnore)
-	// return EMPTY
+	// Hoistable declarations are instantiated before statement evaluation.
 	return UndefinedValue.ToCompletion()
 }
 
@@ -6031,6 +7149,11 @@ type Block struct {
 
 // 14.2.2
 func (b *Block) Evaluation(vm *VM) CompletionValue {
+	oldEnv := vm.RunningLexicalEnvironment()
+	blockEnv := NewDeclarativeEnvironment(oldEnv)
+	vm.BlockDeclarationInstantiation(b.StatementList, blockEnv)
+	vm.SetRunningLexicalEnvironment(blockEnv)
+	defer vm.SetRunningLexicalEnvironment(oldEnv)
 	return b.StatementList.Evaluation(vm)
 }
 
@@ -6059,7 +7182,12 @@ func (s StatementList) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
 func StatementListItemTopLevelLexicallyDeclaredNames(item StatementListItem) (l []IdentifierName) {
 	switch t := item.(type) {
 	case *StatementListItemDeclaration:
-		return DeclarationBoundNames(t.Declaration)
+		switch t.Declaration.(type) {
+		case *LexicalDeclaration, *ClassDeclaration:
+			return DeclarationBoundNames(t.Declaration)
+		default:
+			return nil
+		}
 	case *StatementListItemStatement:
 		return
 	}
@@ -6085,6 +7213,33 @@ func (s StatementList) VarDeclaredNames() (l []IdentifierName) {
 		l = append(l, item.VarDeclaredNames()...)
 	}
 	return
+}
+
+func (s StatementList) HoistableDeclarations() (declarations []DeclarationHoistable) {
+	for _, item := range s {
+		declarationItem, ok := item.(*StatementListItemDeclaration)
+		if !ok {
+			continue
+		}
+		if declaration, ok := declarationItem.Declaration.(DeclarationHoistable); ok {
+			declarations = append(declarations, declaration)
+		}
+	}
+	return declarations
+}
+
+func (s StatementList) LexicalDeclarations() (declarations []Declaration) {
+	for _, item := range s {
+		declarationItem, ok := item.(*StatementListItemDeclaration)
+		if !ok {
+			continue
+		}
+		switch declarationItem.Declaration.(type) {
+		case *LexicalDeclaration, *ClassDeclaration:
+			declarations = append(declarations, declarationItem.Declaration)
+		}
+	}
+	return declarations
 }
 
 func (s StatementList) ContainsDirective(directive string) bool {
@@ -6177,8 +7332,11 @@ func (s *StatementListItemStatement) TopLevelLexicallyDeclaredNames() (l []Ident
 }
 
 func (s *StatementListItemStatement) LexicallyScopedDeclarations() (l []ASTNode) {
-	// TODO(WIP): LabelledStatement
 	return
+}
+
+func (s *StatementListItemStatement) LexicallyDeclaredNames() []IdentifierName {
+	return nil
 }
 
 func (s *StatementListItemStatement) VarDeclaredNames() (l []IdentifierName) {
@@ -6209,25 +7367,31 @@ type StatementListItemDeclaration struct {
 var _ ASTNode = (*StatementListItemDeclaration)(nil)
 
 func (s *StatementListItemDeclaration) TopLevelLexicallyDeclaredNames() (l []IdentifierName) {
-	return s.Declaration.BoundNames()
+	switch s.Declaration.(type) {
+	case *LexicalDeclaration, *ClassDeclaration:
+		return s.Declaration.BoundNames()
+	default:
+		return nil
+	}
 }
 
 func (s *StatementListItemDeclaration) VarDeclaredNames() (l []IdentifierName) {
-	return
+	if _, ok := s.Declaration.(DeclarationHoistable); ok {
+		return s.Declaration.BoundNames()
+	}
+	return nil
 }
 
 func (s *StatementListItemDeclaration) VarScopedDeclarations() (l []*VariableDeclaration) {
-	switch d := s.Declaration.(type) {
-	case *LexicalDeclaration:
-		for _, bindingItem := range d.BindingList.Items {
-			l = append(l, &VariableDeclaration{
-				BindingIdentifier: bindingItem.Identifier,
-				Initializer:       bindingItem.Initializer,
-			})
-		}
-	default:
-	}
-	return
+	return nil
+}
+
+func (s *StatementListItemDeclaration) LexicallyDeclaredNames() []IdentifierName {
+	return s.TopLevelLexicallyDeclaredNames()
+}
+
+func (s *StatementListItemDeclaration) LexicallyScopedDeclarations() []ASTNode {
+	return []ASTNode{s.Declaration}
 }
 
 func (s *StatementListItemDeclaration) Evaluation(vm *VM) CompletionValue {
@@ -6283,25 +7447,32 @@ var (
 	_ StaticSemanticsExportEntries  = (*Module)(nil)
 )
 
-// TODO: spec reference
+// Evaluation implements the module-body evaluation rules from ECMA-262
+// 16.2.1.14. Import declarations produce an empty completion, while later
+// items still run and inherit the last value-producing item's value.
 func (m *Module) Evaluation(vm *VM) CompletionValue {
-	var lastValue CompletionValue
+	result := CompletionValue{}
 	for _, moduleItem := range m.ModuleItemList {
+		var itemResult CompletionValue
 		switch stmt := moduleItem.(type) {
 		case *ModuleItemImportDeclaration:
-			return UndefinedValue.ToCompletion()
+			itemResult = CompletionValue{}
 		case *ModuleItemStatementListItem:
-			lastValue = stmt.Evaluation(vm)
+			itemResult = stmt.Evaluation(vm)
 		case *ModuleItemExportDeclaration:
-			lastValue = stmt.Evaluation(vm)
+			itemResult = stmt.Evaluation(vm)
 		default:
-			panic("unimplemented")
+			panic("Module.Evaluation: unknown module item")
 		}
-		if lastValue.IsAbrupt() {
-			return lastValue
+		if itemResult.value == nil && result.value != nil {
+			itemResult = UpdateEmpty(itemResult, result.value)
 		}
+		if itemResult.IsAbrupt() {
+			return itemResult
+		}
+		result = itemResult
 	}
-	return lastValue
+	return UpdateEmpty(result, UndefinedValue)
 }
 
 func (m *Module) String() string {
@@ -6314,52 +7485,8 @@ func (m *Module) moduleRequests() []string {
 
 func (m *Module) importEntries() (l []ImportEntryRecord) {
 	for _, item := range m.ModuleItemList {
-		switch stmt := item.(type) {
-		case *ModuleItemImportDeclaration:
-			moduleRequest := stmt.ImportDeclaration.ModuleSpecifier.StringValue().String()
-			if stmt.ImportDeclaration.ImportClause != nil {
-				i := stmt.ImportDeclaration.ImportClause
-				if i.ImportedDefaultBinding != "" {
-					l = append(l, ImportEntryRecord{
-						ImportName:    "default",
-						ModuleRequest: moduleRequest,
-						LocalName:     string(i.ImportedDefaultBinding),
-					})
-				} else if i.NamespaceImport != "" {
-					l = append(l, ImportEntryRecord{
-						ImportName:    ImportNameNamespaceObject,
-						ModuleRequest: moduleRequest,
-						LocalName:     string(i.NamespaceImport),
-					})
-				} else if i.NamedImports != nil {
-					for _, specifier := range i.NamedImports.Items {
-						if specifier.ModuleExportName != nil {
-							var importName ImportName
-							if specifier.ModuleExportName.IdentifierName != "" {
-								importName = ImportName(specifier.ModuleExportName.IdentifierName)
-							} else {
-								importName = ImportName(specifier.ModuleExportName.StringLiteral.StringValue().String())
-							}
-							localName := string(specifier.ImportedBinding)
-							l = append(l, ImportEntryRecord{
-								ImportName:    importName,
-								ModuleRequest: moduleRequest,
-								LocalName:     localName,
-							})
-						} else {
-							l = append(l, ImportEntryRecord{
-								ImportName:    ImportName(specifier.ImportedBinding),
-								ModuleRequest: moduleRequest,
-								LocalName:     string(specifier.ImportedBinding),
-							})
-						}
-					}
-				} else {
-					panic("unimplemented")
-				}
-			}
-		default:
-			continue
+		if stmt, ok := item.(*ModuleItemImportDeclaration); ok {
+			l = append(l, stmt.ImportDeclaration.importEntries()...)
 		}
 	}
 	return
@@ -6373,7 +7500,7 @@ func (m *Module) exportEntries() (l []ExportEntry) {
 		case *ModuleItemExportDeclaration:
 			l = append(l, stmt.exportEntries()...)
 		default:
-			panic("unimplemented")
+			panic("Module.exportEntries: unknown module item")
 		}
 	}
 	return
@@ -6384,17 +7511,26 @@ type ModuleItemList []ModuleItem
 var _ StaticSemanticsModuleRequests = (ModuleItemList)(nil)
 
 func (m ModuleItemList) String() string {
-	var sb string
-	for _, item := range m {
-		sb += item.String()
-		sb += "\n"
+	var sb strings.Builder
+	for index, item := range m {
+		if index > 0 {
+			sb.WriteByte('\n')
+		}
+		sb.WriteString(item.String())
 	}
-	return sb
+	return sb.String()
 }
 
 func (m ModuleItemList) moduleRequests() (l []string) {
+	seen := make(map[string]struct{})
 	for _, item := range m {
-		l = append(l, item.moduleRequests()...)
+		for _, request := range item.moduleRequests() {
+			if _, exists := seen[request]; exists {
+				continue
+			}
+			seen[request] = struct{}{}
+			l = append(l, request)
+		}
 	}
 	return
 }
@@ -6411,7 +7547,7 @@ func (m ModuleItemList) VarScopedDeclarations() (l []*VariableDeclaration) {
 		case *ModuleItemImportDeclaration:
 			continue
 		default:
-			panic("unimplemented")
+			panic("ModuleItemList.VarScopedDeclarations: unknown module item")
 		}
 	}
 	return
@@ -6419,7 +7555,6 @@ func (m ModuleItemList) VarScopedDeclarations() (l []*VariableDeclaration) {
 
 // MARK: - ModuleItem
 
-// TODO: convert to struct
 // ModuleItem :
 // - ImportDeclaration
 // - ExportDeclaration
@@ -6468,7 +7603,6 @@ func (m *ModuleItemImportDeclaration) String() string {
 
 // MARK: - ModuleItem: ExportDeclaration
 
-// TODO: rename
 // ExportDeclaration :
 //   - export ExportFromClause FromClause ;
 //   - export NamedExports ;
@@ -6491,13 +7625,17 @@ type ModuleItemExportDeclaration struct {
 var (
 	_ ModuleItem                   = (*ModuleItemExportDeclaration)(nil)
 	_ StaticSemanticsExportEntries = (*ModuleItemExportDeclaration)(nil)
+	_ StaticSemanticsBoundNames    = (*ModuleItemExportDeclaration)(nil)
 	_ ASTNode                      = (*ModuleItemExportDeclaration)(nil)
 )
 
-func (m *ModuleItemExportDeclaration) Evaluation(vm *VM) CompletionValue {
+// Evaluation implements ECMA-262 16.2.3.7, including initialization of the
+// synthetic *default* binding used by default expression and anonymous class
+// exports.
+func (m *ModuleItemExportDeclaration) Evaluation(vm *VM) (co CompletionValue) {
 	switch {
 	case m.ExportFrom != nil || m.NamedExports != nil:
-		return UndefinedValue.ToCompletion()
+		return
 	case m.Declaration != nil:
 		return m.Declaration.Evaluation(vm)
 	case m.VariableStatement != nil:
@@ -6505,32 +7643,62 @@ func (m *ModuleItemExportDeclaration) Evaluation(vm *VM) CompletionValue {
 	case m.DefaultHoistableDeclaration != nil:
 		return m.DefaultHoistableDeclaration.Evaluation(vm)
 	case m.DefaultClassDeclaration != nil:
-		return m.DefaultClassDeclaration.Evaluation(vm)
+		value, isAbrupt, rt := ReturnIfAbrupt(
+			m.DefaultClassDeclaration.BindingClassDeclarationEvaluation(vm),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		if m.DefaultClassDeclaration.IdentifierName == "" {
+			_, isAbrupt, rt = ReturnIfAbrupt(
+				vm.InitializeBoundName("*default*", value.ToValue(), vm.RunningLexicalEnvironment()),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+		}
+		return
 	case m.DefaultExpression != nil:
-		return m.DefaultExpression.Evaluation(vm)
+		var value Value
+		var isAbrupt bool
+		var rt CompletionValue
+		if IsAnonymousFunctionDefinition(m.DefaultExpression) {
+			value, isAbrupt, rt = ReturnIfAbrupt(
+				EvaluateNamedExpression(vm, m.DefaultExpression, NewStringPropertyKey("default")),
+				co,
+			)
+		} else {
+			value, _, isAbrupt, rt = vm.EvalAndGetValue(m.DefaultExpression, co)
+		}
+		if isAbrupt {
+			return rt
+		}
+		return vm.InitializeBoundName("*default*", value, vm.RunningLexicalEnvironment())
 	default:
-		panic("unreachable")
+		panic("ModuleItemExportDeclaration.Evaluation: missing export variant")
 	}
 }
 
 func (m *ModuleItemExportDeclaration) String() string {
 	switch {
 	case m.ExportFrom != nil:
-		panic("unimplemented")
+		return "export " + m.ExportFrom.String() + ";"
 	case m.NamedExports != nil:
-		panic("unimplemented")
+		return "export " + m.NamedExports.String() + ";"
 	case m.Declaration != nil:
-		return m.Declaration.String()
+		return "export " + m.Declaration.String()
 	case m.VariableStatement != nil:
-		return m.VariableStatement.String()
+		return "export " + m.VariableStatement.String() + ";"
 	case m.DefaultHoistableDeclaration != nil:
-		return m.DefaultHoistableDeclaration.String()
+		return "export default " + m.DefaultHoistableDeclaration.String()
 	case m.DefaultClassDeclaration != nil:
-		return m.DefaultClassDeclaration.String()
+		return "export default " + m.DefaultClassDeclaration.String()
 	case m.DefaultExpression != nil:
-		return m.DefaultExpression.String()
+		return "export default " + m.DefaultExpression.String() + ";"
 	}
-	return "ModuleItemExportDeclaration"
+	panic("ModuleItemExportDeclaration.String: missing export variant")
 }
 
 func (m *ModuleItemExportDeclaration) moduleRequests() (l []string) {
@@ -6541,33 +7709,132 @@ func (m *ModuleItemExportDeclaration) moduleRequests() (l []string) {
 }
 
 func (m *ModuleItemExportDeclaration) exportEntries() (l []ExportEntry) {
-	if m.ExportFrom != nil {
-		panic("unimplemented")
-	} else if m.NamedExports != nil {
-		panic("unimplemented")
-	} else if m.Declaration != nil {
-		boundNames := m.Declaration.BoundNames()
-		for _, name := range boundNames {
-			l = append(l, ExportEntry{
-				ExportName: string(name),
-				LocalName:  string(name),
-			})
+	switch {
+	case m.ExportFrom != nil:
+		return m.ExportFrom.ExportFromClause.exportEntriesForModule(
+			m.ExportFrom.ModuleSpecifier.StringValue().String(),
+		)
+	case m.NamedExports != nil:
+		return m.NamedExports.exportEntriesForModule("")
+	case m.Declaration != nil:
+		return localExportEntries(moduleDeclarationBoundNames(m.Declaration))
+	case m.VariableStatement != nil:
+		return localExportEntries(m.VariableStatement.BoundNames())
+	case m.DefaultHoistableDeclaration != nil:
+		return []ExportEntry{{
+			ExportName: "default",
+			LocalName:  defaultExportLocalName(moduleDeclarationBoundNames(m.DefaultHoistableDeclaration)),
+		}}
+	case m.DefaultClassDeclaration != nil:
+		localName := "*default*"
+		if m.DefaultClassDeclaration.IdentifierName != "" {
+			localName = string(m.DefaultClassDeclaration.IdentifierName)
 		}
-	} else if m.VariableStatement != nil {
-		panic("unimplemented")
-	} else if m.DefaultHoistableDeclaration != nil {
-		panic("unimplemented")
-	} else if m.DefaultClassDeclaration != nil {
-		panic("unimplemented")
-	} else if m.DefaultExpression != nil {
-		panic("unimplemented")
+		return []ExportEntry{{ExportName: "default", LocalName: localName}}
+	case m.DefaultExpression != nil:
+		return []ExportEntry{{ExportName: "default", LocalName: "*default*"}}
+	default:
+		panic("ModuleItemExportDeclaration.exportEntries: missing export variant")
+	}
+}
+
+// BoundNames returns the names introduced by an export declaration. Re-export
+// forms introduce no bindings; anonymous default exports use the synthetic
+// *default* name defined by the module semantics.
+func (m *ModuleItemExportDeclaration) BoundNames() []IdentifierName {
+	switch {
+	case m.ExportFrom != nil || m.NamedExports != nil:
+		return nil
+	case m.Declaration != nil:
+		return moduleDeclarationBoundNames(m.Declaration)
+	case m.VariableStatement != nil:
+		return m.VariableStatement.BoundNames()
+	case m.DefaultHoistableDeclaration != nil:
+		return defaultExportBoundNames(moduleDeclarationBoundNames(m.DefaultHoistableDeclaration))
+	case m.DefaultClassDeclaration != nil:
+		var names []IdentifierName
+		if m.DefaultClassDeclaration.IdentifierName != "" {
+			names = append(names, m.DefaultClassDeclaration.IdentifierName)
+		}
+		return defaultExportBoundNames(names)
+	case m.DefaultExpression != nil:
+		return []IdentifierName{"*default*"}
+	default:
+		panic("ModuleItemExportDeclaration.BoundNames: missing export variant")
+	}
+}
+
+func defaultExportBoundNames(names []IdentifierName) []IdentifierName {
+	result := append([]IdentifierName(nil), names...)
+	for _, name := range result {
+		if name == "*default*" {
+			return result
+		}
+	}
+	return append(result, "*default*")
+}
+
+func localExportEntries(names []IdentifierName) (entries []ExportEntry) {
+	for _, name := range names {
+		entries = append(entries, ExportEntry{
+			ExportName: string(name),
+			LocalName:  string(name),
+		})
 	}
 	return
+}
+
+func defaultExportLocalName(names []IdentifierName) string {
+	if len(names) == 0 {
+		return "*default*"
+	}
+	return string(names[0])
+}
+
+// moduleDeclarationBoundNames avoids relying on the legacy embedded
+// Declaration interface in hoistable wrapper nodes, whose promoted method can
+// be nil. Every concrete declaration variant is handled explicitly.
+func moduleDeclarationBoundNames(declaration Declaration) []IdentifierName {
+	switch d := declaration.(type) {
+	case *DeclarationHoistableFunction:
+		return d.FunctionDeclaration.BoundNames()
+	case *DeclarationHoistableGenerator:
+		if d.GeneratorDeclaration.Identifier == "" {
+			return nil
+		}
+		return []IdentifierName{d.GeneratorDeclaration.Identifier}
+	case *DeclarationHoistableAsyncFunction:
+		if d.AsyncFunctionDeclaration.Identifier == "" {
+			return nil
+		}
+		return []IdentifierName{d.AsyncFunctionDeclaration.Identifier}
+	case *DeclarationHoistableAsyncGenerator:
+		if d.AsyncGeneratorDeclaration.Identifier == "" {
+			return nil
+		}
+		return []IdentifierName{d.AsyncGeneratorDeclaration.Identifier}
+	case *ClassDeclaration:
+		if d.IdentifierName == "" {
+			return nil
+		}
+		return []IdentifierName{d.IdentifierName}
+	case *LexicalDeclaration:
+		return d.BoundNames()
+	default:
+		return declaration.BoundNames()
+	}
 }
 
 type ExportFrom struct {
 	ExportFromClause *ExportFromClause
 	ModuleSpecifier  *StringLiteral
+}
+
+func (e *ExportFrom) String() string {
+	if e == nil || e.ExportFromClause == nil || e.ModuleSpecifier == nil {
+		panic("ExportFrom.String: incomplete export-from node")
+	}
+	return e.ExportFromClause.String() + " from " + moduleStringLiteral(e.ModuleSpecifier)
 }
 
 // Enum
@@ -6577,15 +7844,119 @@ type ExportFromClause struct {
 	NamedExports *NamedExports
 }
 
+func (e *ExportFromClause) String() string {
+	switch {
+	case e.Star:
+		return "*"
+	case e.StarAs != nil:
+		return "* as " + e.StarAs.String()
+	case e.NamedExports != nil:
+		return e.NamedExports.String()
+	default:
+		panic("ExportFromClause.String: missing clause variant")
+	}
+}
+
+func (e *ExportFromClause) exportEntriesForModule(moduleRequest string) []ExportEntry {
+	switch {
+	case e.Star:
+		return []ExportEntry{{
+			ModuleRequest: moduleRequest,
+			ImportName:    ImportNameAllButDefault,
+		}}
+	case e.StarAs != nil:
+		return []ExportEntry{{
+			ExportName:    e.StarAs.StringValue(),
+			ModuleRequest: moduleRequest,
+			ImportName:    ImportNameAll,
+		}}
+	case e.NamedExports != nil:
+		return e.NamedExports.exportEntriesForModule(moduleRequest)
+	default:
+		panic("ExportFromClause.exportEntriesForModule: missing clause variant")
+	}
+}
+
 type NamedExports struct {
 	ExportsList *ExportsList
 }
+
+func (n *NamedExports) String() string {
+	if n == nil || n.ExportsList == nil {
+		return "{}"
+	}
+	return "{" + n.ExportsList.String() + "}"
+}
+
+func (n *NamedExports) exportEntriesForModule(moduleRequest string) []ExportEntry {
+	if n == nil || n.ExportsList == nil {
+		return nil
+	}
+	return n.ExportsList.exportEntriesForModule(moduleRequest)
+}
+
 type ExportsList struct {
 	Items []*ExportSpecifier
 }
+
+func (e *ExportsList) String() string {
+	if e == nil {
+		return ""
+	}
+	var sb strings.Builder
+	for index, item := range e.Items {
+		if index > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(item.String())
+	}
+	return sb.String()
+}
+
+func (e *ExportsList) exportEntriesForModule(moduleRequest string) (entries []ExportEntry) {
+	if e == nil {
+		return
+	}
+	for _, item := range e.Items {
+		entries = append(entries, item.exportEntryForModule(moduleRequest))
+	}
+	return
+}
+
 type ExportSpecifier struct {
 	Name  *ModuleExportName
 	Alias *ModuleExportName
+}
+
+func (e *ExportSpecifier) String() string {
+	if e == nil || e.Name == nil {
+		panic("ExportSpecifier.String: missing source name")
+	}
+	if e.Alias != nil {
+		return e.Name.String() + " as " + e.Alias.String()
+	}
+	return e.Name.String()
+}
+
+func (e *ExportSpecifier) exportEntryForModule(moduleRequest string) ExportEntry {
+	if e == nil || e.Name == nil {
+		panic("ExportSpecifier.exportEntryForModule: missing source name")
+	}
+	sourceName := e.Name.StringValue()
+	exportName := sourceName
+	if e.Alias != nil {
+		exportName = e.Alias.StringValue()
+	}
+	entry := ExportEntry{
+		ExportName:    exportName,
+		ModuleRequest: moduleRequest,
+	}
+	if moduleRequest == "" {
+		entry.LocalName = sourceName
+	} else {
+		entry.ImportName = ImportName(sourceName)
+	}
+	return entry
 }
 
 // ModuleExportName :
@@ -6597,10 +7968,38 @@ type ModuleExportName struct {
 }
 
 func (m *ModuleExportName) String() string {
+	if m == nil {
+		panic("ModuleExportName.String: nil module export name")
+	}
 	if m.IdentifierName != "" {
 		return string(m.IdentifierName)
 	}
-	return m.StringLiteral.String()
+	if m.StringLiteral != nil {
+		return moduleStringLiteral(m.StringLiteral)
+	}
+	panic("ModuleExportName.String: missing name variant")
+}
+
+// StringValue returns the semantic string represented by an IdentifierName or
+// StringLiteral ModuleExportName.
+func (m *ModuleExportName) StringValue() string {
+	if m == nil {
+		panic("ModuleExportName.StringValue: nil module export name")
+	}
+	if m.IdentifierName != "" {
+		return string(m.IdentifierName)
+	}
+	if m.StringLiteral != nil {
+		return m.StringLiteral.StringValue().String()
+	}
+	panic("ModuleExportName.StringValue: missing name variant")
+}
+
+func moduleStringLiteral(literal *StringLiteral) string {
+	if literal == nil {
+		panic("moduleStringLiteral: nil string literal")
+	}
+	return strconv.Quote(literal.StringValue().String())
 }
 
 func (m *ModuleItemExportDeclaration) _moduleItem() {}
@@ -6626,13 +8025,26 @@ func (i *ImportDeclaration) BoundNames() (l []IdentifierName) {
 	return
 }
 
+func (i *ImportDeclaration) importEntries() []ImportEntryRecord {
+	if i == nil || i.ModuleSpecifier == nil {
+		panic("ImportDeclaration.importEntries: missing module specifier")
+	}
+	if i.ImportClause == nil {
+		return nil
+	}
+	return i.ImportClause.importEntriesForModule(i.ModuleSpecifier.StringValue().String())
+}
+
 // 16.2.2.2
 
 func (i *ImportDeclaration) String() string {
-	if i.ImportClause != nil {
-		return "ImportDeclaration " + i.ImportClause.String()
+	if i == nil || i.ModuleSpecifier == nil {
+		panic("ImportDeclaration.String: missing module specifier")
 	}
-	return "ImportDeclaration"
+	if i.ImportClause == nil {
+		return "import " + moduleStringLiteral(i.ModuleSpecifier) + ";"
+	}
+	return "import " + i.ImportClause.String() + " from " + moduleStringLiteral(i.ModuleSpecifier) + ";"
 }
 
 // ImportClause :
@@ -6652,32 +8064,60 @@ type ImportClause struct {
 }
 
 func (i *ImportClause) BoundNames() (l []IdentifierName) {
+	if i == nil {
+		return
+	}
 	if i.ImportedDefaultBinding != "" {
 		l = append(l, i.ImportedDefaultBinding)
-	} else if i.NamedImports != nil {
-		for _, s := range i.NamedImports.Items {
-			if s.ImportedBinding != "" {
-				l = append(l, s.ImportedBinding)
-			}
-		}
-	} else {
-		panic("unimplemented")
+	}
+	if i.NamespaceImport != "" {
+		l = append(l, i.NamespaceImport)
+	}
+	if i.NamedImports != nil {
+		l = append(l, i.NamedImports.BoundNames()...)
+	}
+	return
+}
+
+func (i *ImportClause) importEntriesForModule(moduleRequest string) (entries []ImportEntryRecord) {
+	if i == nil {
+		return
+	}
+	if i.ImportedDefaultBinding != "" {
+		entries = append(entries, ImportEntryRecord{
+			ModuleRequest: moduleRequest,
+			ImportName:    ImportName("default"),
+			LocalName:     string(i.ImportedDefaultBinding),
+		})
+	}
+	if i.NamespaceImport != "" {
+		entries = append(entries, ImportEntryRecord{
+			ModuleRequest: moduleRequest,
+			ImportName:    ImportNameNamespaceObject,
+			LocalName:     string(i.NamespaceImport),
+		})
+	}
+	if i.NamedImports != nil {
+		entries = append(entries, i.NamedImports.importEntriesForModule(moduleRequest)...)
 	}
 	return
 }
 
 func (i *ImportClause) String() string {
-	var sb string
+	if i == nil {
+		return ""
+	}
+	var parts []string
 	if i.ImportedDefaultBinding != "" {
-		sb += string(i.ImportedDefaultBinding)
+		parts = append(parts, string(i.ImportedDefaultBinding))
 	}
 	if i.NamespaceImport != "" {
-		sb += " " + string(i.NamespaceImport)
+		parts = append(parts, "* as "+string(i.NamespaceImport))
 	}
 	if i.NamedImports != nil {
-		sb += " " + i.NamedImports.String()
+		parts = append(parts, "{"+i.NamedImports.String()+"}")
 	}
-	return sb
+	return strings.Join(parts, ", ")
 }
 
 // ImportsList :
@@ -6685,6 +8125,26 @@ func (i *ImportClause) String() string {
 // - ImportsList, ImportSpecifier
 type ImportsList struct {
 	Items []*ImportSpecifier
+}
+
+func (i *ImportsList) BoundNames() (names []IdentifierName) {
+	if i == nil {
+		return
+	}
+	for _, item := range i.Items {
+		names = append(names, item.BoundNames()...)
+	}
+	return
+}
+
+func (i *ImportsList) importEntriesForModule(moduleRequest string) (entries []ImportEntryRecord) {
+	if i == nil {
+		return
+	}
+	for _, item := range i.Items {
+		entries = append(entries, item.importEntryForModule(moduleRequest))
+	}
+	return
 }
 
 func (i *ImportsList) String() string {
@@ -6704,9 +8164,31 @@ func (i *ImportsList) String() string {
 type ImportSpecifier struct {
 	// ImportedBinding :
 	// - BindingIdentifier[~Yield, +Await]
-	// TODO: change to BindingIdentifier
+	// The parser currently stores the identifier payload directly.
 	ImportedBinding  IdentifierName
 	ModuleExportName *ModuleExportName
+}
+
+func (i *ImportSpecifier) BoundNames() []IdentifierName {
+	if i == nil || i.ImportedBinding == "" {
+		return nil
+	}
+	return []IdentifierName{i.ImportedBinding}
+}
+
+func (i *ImportSpecifier) importEntryForModule(moduleRequest string) ImportEntryRecord {
+	if i == nil || i.ImportedBinding == "" {
+		panic("ImportSpecifier.importEntryForModule: missing imported binding")
+	}
+	importName := string(i.ImportedBinding)
+	if i.ModuleExportName != nil {
+		importName = i.ModuleExportName.StringValue()
+	}
+	return ImportEntryRecord{
+		ModuleRequest: moduleRequest,
+		ImportName:    ImportName(importName),
+		LocalName:     string(i.ImportedBinding),
+	}
 }
 
 func (i *ImportSpecifier) String() string {
@@ -6753,20 +8235,21 @@ func Await(agent *Agent, value Value) (co CompletionValue) {
 	}
 	onFulfilled := CreateBuiltinFunction(agent, fulfilledClosure, 1, CMString(""), builtinFunctionArgs{})
 	var rejectedClosure BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		panic("unimplemented")
-		//prevContext := agent.RunningExecutionContext()
-		// agent.resumeExecutionContext(asyncContext)
-		//
-		//// TODO: Resume
-		//asyncContext.Suspend()
-		//Assert(prevContext == agent.RunningExecutionContext())
-		//return UndefinedValue
+		reason := argumentAt(argumentsList, 0)
+		asyncContext.Result = CompletionValue{
+			t:   CompletionTypeThrow,
+			err: reason,
+		}
+		asyncContext.awaitCh <- struct{}{}
+		return UndefinedValue
 	}
 	onRejected := CreateBuiltinFunction(agent, rejectedClosure, 1, CMString(""), builtinFunctionArgs{})
 	PerformPromiseThen(agent, promise, onFulfilled.ToValue(), onRejected.ToValue(), nil)
 
 	agent.suspendExecutionContext(asyncContext)
-	if !asyncContext.asyncCallerResumed {
+	if asyncContext.AsyncGenerator != nil {
+		asyncContext.AsyncGenerator.signalResumeCaller()
+	} else if !asyncContext.asyncCallerResumed {
 		asyncContext.asyncCallerResumed = true
 		agent.Scheduler.StartTask(asyncContext.Resume)
 	}
@@ -6806,12 +8289,152 @@ func (y *YieldExpression) Evaluation(vm *VM) (co CompletionValue) {
 	if !y.astHasAssignmentExpression() {
 		return Yield(vm.agent, UndefinedValue)
 	} else if y.hasStar {
-		panic("unimplemented")
+		return y.delegateEvaluation(vm)
 	} else {
 		value, _, isAbrupt, rt := vm.EvalAndGetValue(y.AssignmentExpression, co)
 		if isAbrupt {
 			return rt
 		}
 		return Yield(vm.agent, value)
+	}
+}
+
+// delegateEvaluation implements the iterator forwarding protocol used by
+// yield*. It deliberately keeps the resumption Completion intact so next,
+// throw, and return requests can be forwarded to the delegated iterator.
+func (y *YieldExpression) delegateEvaluation(vm *VM) (co CompletionValue) {
+	agent := vm.agent
+	generatorKind := GetGeneratorKind(agent)
+	value, _, isAbrupt, rt := vm.EvalAndGetValue(y.AssignmentExpression, co)
+	if isAbrupt {
+		return rt
+	}
+
+	iteratorKind := IteratorKindSync
+	if generatorKind == GeneratorKindAsync {
+		iteratorKind = IteratorKindAsync
+	}
+	iteratorRecord, isAbrupt, iteratorResult := ReturnIfAbrupt(
+		GetIterator(agent, value, iteratorKind),
+		Completion[*IteratorRecord]{},
+	)
+	if isAbrupt {
+		return CompletionFrom(co, iteratorResult)
+	}
+
+	awaitIteratorResult := func(result CompletionValue) CompletionValue {
+		if result.IsAbrupt() || generatorKind != GeneratorKindAsync {
+			return result
+		}
+		return Await(agent, result.value)
+	}
+	yieldIteratorResult := func(resultObject ObjectType) CompletionValue {
+		if generatorKind == GeneratorKindAsync {
+			valueResult := IteratorValue(resultObject)
+			if valueResult.IsAbrupt() {
+				return valueResult
+			}
+			return AsyncGeneratorYield(agent, valueResult.value)
+		}
+		return GeneratorYield(agent, resultObject)
+	}
+	validateIteratorResult := func(result CompletionValue) (ObjectType, CompletionValue) {
+		if result.IsAbrupt() {
+			return nil, result
+		}
+		if result.value == nil || !result.value.IsObject() {
+			return nil, co.ThrowTypeError(agent, "delegated iterator method must return an object")
+		}
+		return MustGetObject(result.value), CompletionValue{}
+	}
+
+	received := UndefinedValue.ToCompletion()
+	for {
+		var innerResult CompletionValue
+		switch received.t {
+		case CompletionTypeNormal:
+			innerResult = iteratorRecord.NextMethod.Call(
+				agent,
+				iteratorRecord.Iterator.ToValue(),
+				[]Value{received.value},
+			)
+
+		case CompletionTypeThrow:
+			throwMethod := GetMethodCompletion(
+				agent,
+				iteratorRecord.Iterator.ToValue(),
+				NewStringPropertyKey("throw"),
+			)
+			if throwMethod.IsAbrupt() {
+				return CompletionFrom(co, throwMethod)
+			}
+			if throwMethod.Data() == nil {
+				closeCompletion := CompletionValue{}
+				if generatorKind == GeneratorKindAsync {
+					closeCompletion = iteratorRecord.AsyncIteratorClose(agent, closeCompletion)
+				} else {
+					closeCompletion = iteratorRecord.IteratorClose(closeCompletion)
+				}
+				if closeCompletion.IsAbrupt() {
+					return closeCompletion
+				}
+				return co.ThrowTypeError(agent, "delegated iterator does not provide a throw method")
+			}
+			innerResult = throwMethod.Data().Call(
+				iteratorRecord.Iterator.ToValue(),
+				[]Value{received.Error()},
+			)
+
+		case CompletionTypeReturn:
+			returnMethod := GetMethodCompletion(
+				agent,
+				iteratorRecord.Iterator.ToValue(),
+				NewStringPropertyKey("return"),
+			)
+			if returnMethod.IsAbrupt() {
+				return CompletionFrom(co, returnMethod)
+			}
+			if returnMethod.Data() == nil {
+				returnValue := received.value
+				if generatorKind == GeneratorKindAsync {
+					awaited := Await(agent, returnValue)
+					if awaited.IsAbrupt() {
+						return awaited
+					}
+					returnValue = awaited.value
+				}
+				return CompletionValue{t: CompletionTypeReturn, value: returnValue}
+			}
+			innerResult = returnMethod.Data().Call(
+				iteratorRecord.Iterator.ToValue(),
+				[]Value{received.value},
+			)
+
+		default:
+			panic("yield* received an invalid completion")
+		}
+
+		innerResult = awaitIteratorResult(innerResult)
+		innerResultObject, abruptResult := validateIteratorResult(innerResult)
+		if abruptResult.IsAbrupt() {
+			return abruptResult
+		}
+		doneResult := IteratorComplete(innerResultObject)
+		if doneResult.IsAbrupt() {
+			return CompletionFrom(co, doneResult)
+		}
+		if doneResult.Data() {
+			iteratorRecord.Done = true
+			innerValue := IteratorValue(innerResultObject)
+			if innerValue.IsAbrupt() {
+				return innerValue
+			}
+			if received.t == CompletionTypeReturn {
+				return CompletionValue{t: CompletionTypeReturn, value: innerValue.value}
+			}
+			return innerValue
+		}
+
+		received = yieldIteratorResult(innerResultObject)
 	}
 }

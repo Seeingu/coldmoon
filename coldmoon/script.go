@@ -76,7 +76,6 @@ func (s *ScriptRecord) evaluateInCurrentContext() CompletionValue {
 	Assert(context.ECMAScriptCode != nil)
 	lexicalEnv := context.ECMAScriptCode.LexicalEnvironment
 	variableEnv := context.ECMAScriptCode.VariableEnvironment
-	script := s.ECMAScriptCode
 
 	for _, declaration := range s.Static.LexicalDeclarations {
 		switch declaration := declaration.(type) {
@@ -97,25 +96,17 @@ func (s *ScriptRecord) evaluateInCurrentContext() CompletionValue {
 
 	seen := make(map[IdentifierName]bool)
 	for _, decl := range s.Static.VarDeclarations {
-		varName := decl.BindingIdentifier
-		if _, ok := seen[varName]; !ok {
-			createVariableBinding(variableEnv, string(varName))
-			seen[varName] = true
+		for _, varName := range decl.BoundNames() {
+			if _, ok := seen[varName]; !ok {
+				createVariableBinding(variableEnv, string(varName))
+				seen[varName] = true
+			}
 		}
 	}
 
-	for _, item := range script.StatementList {
-		declarationItem, ok := item.(*StatementListItemDeclaration)
-		if !ok {
-			continue
-		}
-		hoistable, ok := declarationItem.Declaration.(*DeclarationHoistableFunction)
-		if !ok {
-			continue
-		}
-		functionDeclaration := hoistable.FunctionDeclaration
-		name := string(functionDeclaration.Identifier)
-		function := functionDeclaration.instantiateOrdinaryFunctionObject(agent, lexicalEnv, nil)
+	privateEnv := context.ECMAScriptCode.PrivateEnvironment
+	for _, declaration := range s.Static.HoistableDeclarations {
+		name, function := instantiateHoistableDeclaration(agent, declaration, lexicalEnv, privateEnv)
 		createVariableBinding(variableEnv, name)
 		variableEnv.SetMutableBinding(name, function.ToValue(), false)
 	}

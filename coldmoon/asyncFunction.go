@@ -42,6 +42,7 @@ func AsyncFunctionStart(agent *Agent, promiseCapability *PromiseCapability, asyn
 	runningContext := agent.RunningExecutionContext()
 	asyncContext := runningContext
 	agent.Scheduler.StartTask(func() {
+		defer agent.releaseAsyncContinuationContext(asyncContext)
 		AsyncBlockStart(agent, promiseCapability, asyncFunction, asyncContext)
 	})
 	asyncContext.Suspend()

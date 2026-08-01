@@ -1,8 +1,6 @@
 package coldmoon
 
 import (
-	"strings"
-
 	"github.com/samber/lo"
 )
 
@@ -16,6 +14,7 @@ type Parser struct {
 	inClassConstructor      bool
 	inIteration             bool
 	inBreakable             bool
+	activeLabels            map[string]bool
 	inModule                bool
 	callExpressionForbidden bool
 	ctx                     ParserContext
@@ -23,9 +22,10 @@ type Parser struct {
 
 func NewParser(sourceText string, ctx ParserContext) *Parser {
 	return &Parser{
-		SourceText: sourceText,
-		tokenizer:  NewTokenizer(sourceText),
-		ctx:        ctx,
+		SourceText:   sourceText,
+		tokenizer:    NewTokenizer(sourceText),
+		activeLabels: make(map[string]bool),
+		ctx:          ctx,
 	}
 }
 
@@ -105,7 +105,7 @@ func (p *Parser) exportDeclaration() *ModuleItemExportDeclaration {
 	} else if d, ok := parserRecoverOk(p, p.declaration); ok {
 		m.Declaration = d
 	} else {
-		panic("exportDeclaration: unimplemented")
+		panic("exportDeclaration: expected export clause or declaration")
 	}
 	return m
 }
@@ -122,6 +122,7 @@ func (p *Parser) exportFrom() *ExportFrom {
 }
 
 func (p *Parser) exportFromClause() (e *ExportFromClause) {
+	e = &ExportFromClause{}
 	if p.tokenizer.Match(TStar) {
 		if p.tokenizer.Match(TAs) {
 			e.StarAs, _ = p.moduleExportName()
@@ -322,7 +323,7 @@ func (p *Parser) acceptContextHigherThan(t TokenType) *acceptContext {
 
 func (p *Parser) acceptContext(t TokenType) *acceptContext {
 	switch t {
-	case TLeftParen:
+	case TLeftParen, TTemplateHead, TNoSubstitutionTemplate:
 		return &acceptContext{
 			precedence: 18,
 		}
@@ -402,7 +403,22 @@ func (p *Parser) acceptContext(t TokenType) *acceptContext {
 			precedence:    3,
 			associativity: associativeLeft,
 		}
-	case TEquals, TPlusEquals, TMinusEquals, TStarEquals, TStarStarEquals, TPercentEquals, TLeftShiftEquals, TRightShiftEquals, TUnsignedRightShiftEquals, TAmpersandEquals, TCaretEquals, TPipeEquals:
+	case TEquals,
+		TPlusEquals,
+		TMinusEquals,
+		TStarEquals,
+		TStarStarEquals,
+		TDivideEquals,
+		TPercentEquals,
+		TLeftShiftEquals,
+		TRightShiftEquals,
+		TUnsignedRightShiftEquals,
+		TAmpersandEquals,
+		TCaretEquals,
+		TPipeEquals,
+		TAmpersandAmpersandEquals,
+		TPipePipeEquals,
+		TQuestionQuestionEquals:
 		return &acceptContext{
 			precedence:    2,
 			associativity: associativeRight,
@@ -491,9 +507,18 @@ func (p *Parser) statementList() (list StatementList) {
 
 func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 	inFunctionBodyBefore := p.inFunctionBody
+	inIterationBefore := p.inIteration
+	inBreakableBefore := p.inBreakable
+	activeLabelsBefore := p.activeLabels
 	p.inFunctionBody = true
+	p.inIteration = false
+	p.inBreakable = false
+	p.activeLabels = make(map[string]bool)
 	defer func() {
 		p.inFunctionBody = inFunctionBodyBefore
+		p.inIteration = inIterationBefore
+		p.inBreakable = inBreakableBefore
+		p.activeLabels = activeLabelsBefore
 	}()
 
 	list := p.statementList()
@@ -507,10 +532,21 @@ func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 func (p *Parser) statementListItem() (stmt StatementListItem) {
 	t := p.tokenizer.CurrentToken
 	switch t.Type {
-	case TAsync, TFunction, TLet, TConst, TClass:
+	case TFunction, TLet, TConst, TClass:
 		d := p.declaration()
 		stmt = &StatementListItemDeclaration{
 			Declaration: d,
+		}
+	case TAsync:
+		if p.tokenizer.NextToken.Type == TFunction && !p.hasLineTerminatorBetween(t, p.tokenizer.NextToken) {
+			d := p.declaration()
+			stmt = &StatementListItemDeclaration{
+				Declaration: d,
+			}
+		} else {
+			stmt = &StatementListItemStatement{
+				Statement: p.statement(),
+			}
 		}
 	default:
 		s := p.statement()
@@ -527,11 +563,27 @@ func (p *Parser) statementListItem() (stmt StatementListItem) {
 }
 
 func (p *Parser) automaticSemicolonInsertion() {
-	p.tokenizer.Match(TSemicolon)
+	if p.tokenizer.Match(TSemicolon) {
+		return
+	}
+	if p.tokenizer.CurrentToken.Type == TRightBrace || p.tokenizer.CurrentToken.Type == TEOF {
+		return
+	}
+	if p.followedByLineTerminator(p.tokenizer.PreviousToken) {
+		return
+	}
+	panic("automaticSemicolonInsertion: expected semicolon")
 }
 
 func (p *Parser) statement() Statement {
 	t := p.tokenizer.CurrentToken
+	if t.Type == TSlash {
+		p.tokenizer.ReinterpretCurrentSlashAsRegularExpression()
+		t = p.tokenizer.CurrentToken
+	}
+	if t.Type == TIdentifier && p.tokenizer.NextToken.Type == TColon {
+		return p.labelledStatement()
+	}
 	switch t.Type {
 	case TVar:
 		return p.variableStatement()
@@ -544,6 +596,7 @@ func (p *Parser) statement() Statement {
 		return p.blockStatement()
 	case TDebugger:
 		p.tokenizer.Next()
+		p.automaticSemicolonInsertion()
 		return &StatementDebugger{}
 	case TIf:
 		return p.ifStatement()
@@ -566,17 +619,55 @@ func (p *Parser) statement() Statement {
 	}
 }
 
-func (p *Parser) breakStatement() *BreakStatement {
-	p.tokenizer.MustMatch(TBreak)
-	if !p.inBreakable {
-		panic("breakStatement: not in breakable")
+func (p *Parser) labelledStatement() Statement {
+	label := p.tokenizer.CurrentToken.Value
+	if _, exists := p.activeLabels[label]; exists {
+		panic("labelledStatement: duplicate label")
 	}
+	p.tokenizer.Next()
+	p.tokenizer.MustMatch(TColon)
+	p.activeLabels[label] = p.labelledItemIsIteration()
+	defer delete(p.activeLabels, label)
+	return &LabelledStatement{
+		Label: IdentifierName(label),
+		Item:  p.statement(),
+	}
+}
 
+// labelledItemIsIteration looks through a chain such as `first: second: for`
+// so every label in the chain is a valid continue target while the loop body
+// is being parsed.
+func (p *Parser) labelledItemIsIteration() bool {
+	p.tokenizer.store()
+	defer p.tokenizer.restore()
+	for p.tokenizer.CurrentToken.Type == TIdentifier && p.tokenizer.NextToken.Type == TColon {
+		p.tokenizer.Next()
+		p.tokenizer.Next()
+	}
+	switch p.tokenizer.CurrentToken.Type {
+	case TWhile, TDo, TFor:
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *Parser) breakStatement() *BreakStatement {
+	keyword := p.tokenizer.CurrentToken
+	p.tokenizer.MustMatch(TBreak)
 	t := p.tokenizer.CurrentToken
 	var label string
-	if t.Type == TIdentifier {
+	if !p.followedByLineTerminator(keyword) && t.Type == TIdentifier {
 		label = t.Value
 		p.tokenizer.Next()
+	}
+	if label == "" && !p.inBreakable {
+		panic("breakStatement: not in breakable")
+	}
+	if label != "" {
+		if _, exists := p.activeLabels[label]; !exists {
+			panic("breakStatement: undefined label")
+		}
 	}
 	p.automaticSemicolonInsertion()
 	return &BreakStatement{
@@ -585,15 +676,25 @@ func (p *Parser) breakStatement() *BreakStatement {
 }
 
 func (p *Parser) continueStatement() *StatementContinue {
+	keyword := p.tokenizer.CurrentToken
 	p.tokenizer.MustMatch(TContinue)
-	if !p.inIteration {
-		panic("continueStatement: not in iteration")
-	}
 	t := p.tokenizer.CurrentToken
 	var label string
-	if t.Type == TIdentifier {
+	if !p.followedByLineTerminator(keyword) && t.Type == TIdentifier {
 		label = t.Value
 		p.tokenizer.Next()
+	}
+	if label == "" && !p.inIteration {
+		panic("continueStatement: not in iteration")
+	}
+	if label != "" {
+		iterationTarget, exists := p.activeLabels[label]
+		if !exists {
+			panic("continueStatement: undefined label")
+		}
+		if !iterationTarget {
+			panic("continueStatement: label does not target an iteration statement")
+		}
 	}
 	p.automaticSemicolonInsertion()
 	return &StatementContinue{
@@ -605,6 +706,7 @@ func (p *Parser) throwStatement() *ThrowStatement {
 	p.tokenizer.MustMatch(TThrow)
 	p.noLineTerminatorHere()
 	expr := p.expression(p.acceptContextLowest())
+	p.automaticSemicolonInsertion()
 	return &ThrowStatement{
 		Expression: expr,
 	}
@@ -620,26 +722,33 @@ func (p *Parser) tryStatement() *TryStatement {
 		p.tokenizer.Next()
 		if p.tokenizer.CurrentToken.Type == TLeftParen {
 			p.tokenizer.Next()
-			catchParameter = &CatchParameter{
-				Identifier: &BindingIdentifier{
+			catchParameter = &CatchParameter{}
+			if p.tokenizer.CurrentToken.Type == TLeftBrace || p.tokenizer.CurrentToken.Type == TLeftBracket {
+				catchParameter.Pattern = p.bindingPattern()
+			} else {
+				catchParameter.Identifier = &BindingIdentifier{
 					identifier: p.bindingIdentifier(),
-				},
+				}
 			}
 			p.tokenizer.MustMatch(TRightParen)
 		}
 		catch = p.block()
 	}
-	if p.tokenizer.CurrentToken.Type == TFinally {
+	if p.tokenizer.Match(TFinally) {
 		finally = p.block()
 	}
 	if catch == nil && finally == nil {
 		panic("tryStatement: expected catch or finally")
 	}
-	return &TryStatement{
-		Catch: &Catch{
+	var catchClause *Catch
+	if catch != nil {
+		catchClause = &Catch{
 			CatchParameter: catchParameter,
 			CatchBlock:     catch,
-		},
+		}
+	}
+	return &TryStatement{
+		Catch:        catchClause,
 		TryBlock:     block,
 		FinallyBlock: finally,
 	}
@@ -649,6 +758,9 @@ func (p *Parser) bindingRestElement() (b BindingRestElement, ok bool) {
 	if !p.tokenizer.Match(TDotDotDot) {
 		return
 	}
+	if p.tokenizer.CurrentToken.Type == TLeftBrace || p.tokenizer.CurrentToken.Type == TLeftBracket {
+		return &BindingRestElementPattern{Pattern: p.bindingPattern()}, true
+	}
 	identifier := p.bindingIdentifier()
 	b = &BindingRestElementIdentifier{
 		Identifier: identifier,
@@ -657,10 +769,26 @@ func (p *Parser) bindingRestElement() (b BindingRestElement, ok bool) {
 }
 
 func (p *Parser) bindingElement() (b *BindingElement, ok bool) {
+	if p.tokenizer.CurrentToken.Type == TLeftBrace || p.tokenizer.CurrentToken.Type == TLeftBracket {
+		pattern := p.bindingPattern()
+		var initializer Expression
+		if p.tokenizer.Match(TEquals) {
+			initializer = p.expression(p.acceptContextHigherThan(TComma))
+		}
+		return &BindingElement{
+			BindingPattern: pattern,
+			Initializer:    initializer,
+		}, true
+	}
+
+	t := p.tokenizer.CurrentToken.Type
+	if t != TIdentifier && t != TAwait && t != TYield && t != TAsync {
+		return nil, false
+	}
 	identifier := p.bindingIdentifier()
 	var init Expression
 	if p.tokenizer.Match(TEquals) {
-		init = p.expression(p.acceptContextLowest())
+		init = p.expression(p.acceptContextHigherThan(TComma))
 	}
 	b = &BindingElement{
 		SingleNameBinding: &SingleNameBinding{
@@ -682,7 +810,6 @@ func (p *Parser) formalParameters() *FormalParameters {
 			items = append(items, &FormalParameterFunctionRestParameter{
 				BindingRestElement: b,
 			})
-			p.tokenizer.Match(TComma)
 			break
 		} else if b, ok := p.bindingElement(); ok {
 			items = append(items, &FormalParameter{
@@ -708,8 +835,8 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
 	functionBody := p.functionBody(FunctionTypeNormal)
-	endIndex := p.tokenizer.CurrentEndIndex()
 	p.tokenizer.MustMatch(TRightBrace)
+	endIndex := p.tokenizer.PreviousToken.EndIndex
 	sourceText := p.SourceText[startOffset:endIndex]
 	return &FunctionDeclaration{
 		Identifier:       identifier,
@@ -720,8 +847,9 @@ func (p *Parser) functionDeclaration() *FunctionDeclaration {
 }
 
 func (p *Parser) asyncArrowFunction() *AsyncArrowFunction {
-	startOffset := p.tokenizer.Index
-	p.tokenizer.Match(TAsync)
+	startOffset := p.tokenizer.CurrentStartIndex()
+	p.tokenizer.MustMatch(TAsync)
+	p.noLineTerminatorHere()
 	var params *FormalParameters
 	if p.tokenizer.Match(TLeftParen) {
 		params = p.formalParameters()
@@ -740,6 +868,7 @@ func (p *Parser) asyncArrowFunction() *AsyncArrowFunction {
 			},
 		}
 	}
+	p.noLineTerminatorHere()
 	p.tokenizer.MustMatch(TArrow)
 	var body *FunctionBody
 	if p.tokenizer.Match(TLeftBrace) {
@@ -757,7 +886,7 @@ func (p *Parser) asyncArrowFunction() *AsyncArrowFunction {
 			},
 		}
 	}
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
 	return &AsyncArrowFunction{
 		FormalParameters: params,
 		SourceText:       sourceText,
@@ -766,11 +895,12 @@ func (p *Parser) asyncArrowFunction() *AsyncArrowFunction {
 }
 
 func (p *Parser) asyncFunctionExpression() *AsyncFunctionExpression {
-	startOffset := p.tokenizer.Index
-	p.tokenizer.Match(TAsync)
+	startOffset := p.tokenizer.CurrentStartIndex()
+	p.tokenizer.MustMatch(TAsync)
+	p.noLineTerminatorHere()
 	p.tokenizer.MustMatch(TFunction)
 	var identifier IdentifierName
-	if p.tokenizer.CurrentToken.Type == TIdentifier {
+	if isBindingIdentifierToken(p.tokenizer.CurrentToken.Type) {
 		identifier = p.bindingIdentifier()
 	}
 	p.tokenizer.MustMatch(TLeftParen)
@@ -779,7 +909,7 @@ func (p *Parser) asyncFunctionExpression() *AsyncFunctionExpression {
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeAsync)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.Index]
+	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
 	return &AsyncFunctionExpression{
 		Identifier:       identifier,
 		FormalParameters: params,
@@ -790,17 +920,21 @@ func (p *Parser) asyncFunctionExpression() *AsyncFunctionExpression {
 
 func (p *Parser) asyncGeneratorExpression() *PrimaryExpressionAsyncGeneratorExpression {
 	startOffset := p.tokenizer.CurrentStartIndex()
-	p.tokenizer.Match(TAsync)
+	p.tokenizer.MustMatch(TAsync)
+	p.noLineTerminatorHere()
 	p.tokenizer.MustMatch(TFunction)
 	p.tokenizer.MustMatch(TStar)
-	identifier := p.bindingIdentifier()
+	var identifier IdentifierName
+	if isBindingIdentifierToken(p.tokenizer.CurrentToken.Type) {
+		identifier = p.bindingIdentifier()
+	}
 	p.tokenizer.MustMatch(TLeftParen)
 	params := p.formalParameters()
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeAsyncGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
 	return &PrimaryExpressionAsyncGeneratorExpression{
 		IdentifierName:   identifier,
 		FormalParameters: params,
@@ -823,7 +957,7 @@ func (p *Parser) generatorExpression() *GeneratorExpression {
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
 	return &GeneratorExpression{
 		IdentifierName:   identifier,
 		FormalParameters: params,
@@ -836,7 +970,7 @@ func (p *Parser) functionExpression() *FunctionExpression {
 	startOffset := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TFunction)
 	var identifier IdentifierName
-	if p.tokenizer.CurrentToken.Type == TIdentifier {
+	if isBindingIdentifierToken(p.tokenizer.CurrentToken.Type) {
 		identifier = p.bindingIdentifier()
 	}
 	p.tokenizer.MustMatch(TLeftParen)
@@ -845,7 +979,7 @@ func (p *Parser) functionExpression() *FunctionExpression {
 	p.tokenizer.MustMatch(TLeftBrace)
 	functionBody := p.functionBody(FunctionTypeNormal)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
 	return &FunctionExpression{
 		Identifier:       identifier,
 		FormalParameters: params,
@@ -855,7 +989,9 @@ func (p *Parser) functionExpression() *FunctionExpression {
 }
 
 func (p *Parser) noLineTerminatorHere() {
-	// TODO
+	if p.followedByLineTerminator(p.tokenizer.PreviousToken) {
+		panic("line terminator not allowed here")
+	}
 }
 
 func (p *Parser) classDeclaration() *ClassDeclaration {
@@ -863,7 +999,7 @@ func (p *Parser) classDeclaration() *ClassDeclaration {
 	p.tokenizer.MustMatch(TClass)
 	identifier := p.bindingIdentifier()
 	classTail := p.classTail()
-	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[startIndex:p.tokenizer.PreviousToken.EndIndex]
 	return &ClassDeclaration{
 		IdentifierName: identifier,
 		ClassTail:      classTail,
@@ -918,7 +1054,7 @@ func (p *Parser) classElement() ClassElement {
 			}
 		}
 		if def, ok := parserRecoverOk(p, func() *MethodDefinition {
-			return p.methodDefinition(MethodDefinitionTypeNil)
+			return p.methodDefinition(MethodDefinitionTypeNil, true)
 		}); ok {
 			return &ClassElementMethodDefinition{
 				MethodDefinition: def,
@@ -933,7 +1069,7 @@ func (p *Parser) classElement() ClassElement {
 		}
 	} else {
 		if def, ok := parserRecoverOk(p, func() *MethodDefinition {
-			return p.methodDefinition(MethodDefinitionTypeNil)
+			return p.methodDefinition(MethodDefinitionTypeNil, true)
 		}); ok {
 			return &ClassElementMethodDefinition{
 				MethodDefinition: def,
@@ -948,7 +1084,7 @@ func (p *Parser) classElement() ClassElement {
 }
 
 func (p *Parser) fieldDefinition() *FieldDefinition {
-	propertyName, ok := p.propertyName()
+	propertyName, ok := p.classElementName()
 	Assert(ok)
 	var initializer Expression
 	if p.tokenizer.Match(TEquals) {
@@ -996,15 +1132,25 @@ func (p *Parser) bindingList() *BindingList {
 }
 
 func (p *Parser) lexicalBinding() *LexicalBinding {
-	identifier := p.bindingIdentifier()
+	var identifier IdentifierName
+	var pattern *BindingPattern
+	if p.tokenizer.CurrentToken.Type == TLeftBrace || p.tokenizer.CurrentToken.Type == TLeftBracket {
+		pattern = p.bindingPattern()
+	} else {
+		identifier = p.bindingIdentifier()
+	}
 	var init Expression
 	if p.tokenizer.CurrentToken.Type == TEquals {
 		p.tokenizer.Next()
 		init = p.expression(p.acceptContextHigherThan(TComma))
 	}
+	if pattern != nil && init == nil {
+		panic("lexicalBinding: a binding pattern requires an initializer")
+	}
 	return &LexicalBinding{
-		Identifier:  identifier,
-		Initializer: init,
+		Identifier:     identifier,
+		BindingPattern: pattern,
+		Initializer:    init,
 	}
 }
 
@@ -1023,6 +1169,7 @@ func (p *Parser) hoistableDeclaration() DeclarationHoistable {
 	} else if t.Type == TAsync {
 		startOffset := p.tokenizer.CurrentStartIndex()
 		p.tokenizer.MustMatch(TAsync)
+		p.noLineTerminatorHere()
 		p.tokenizer.MustMatch(TFunction)
 		if p.tokenizer.CurrentToken.Type == TStar {
 			d := p.asyncGeneratorDeclaration(startOffset)
@@ -1035,7 +1182,7 @@ func (p *Parser) hoistableDeclaration() DeclarationHoistable {
 		}
 
 	}
-	panic("unimplemented")
+	panic("hoistableDeclaration: expected function declaration")
 }
 
 func (p *Parser) asyncFunctionDeclaration(startOffset int) *AsyncFunctionDeclaration {
@@ -1046,7 +1193,7 @@ func (p *Parser) asyncFunctionDeclaration(startOffset int) *AsyncFunctionDeclara
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeAsync)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
 	return &AsyncFunctionDeclaration{
 		Identifier:       identifier,
 		FormalParameters: params,
@@ -1064,7 +1211,7 @@ func (p *Parser) asyncGeneratorDeclaration(startOffset int) *AsyncGeneratorDecla
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeAsyncGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
 	return &AsyncGeneratorDeclaration{
 		Identifier:       identifier,
 		FormalParameters: formalParams,
@@ -1084,7 +1231,7 @@ func (p *Parser) generatorDeclaration() *GeneratorDeclaration {
 	p.tokenizer.MustMatch(TLeftBrace)
 	functionBody := p.functionBody(FunctionTypeGenerator)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[startOffset:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
 	return &GeneratorDeclaration{
 		Identifier:       identifier,
 		FormalParameters: formalParams,
@@ -1104,7 +1251,7 @@ func (p *Parser) declaration() Declaration {
 	if t.Type == TLet || t.Type == TConst {
 		return p.lexicalDeclaration()
 	}
-	panic("unimplemented")
+	panic("declaration: expected hoistable, class, or lexical declaration")
 }
 
 func (p *Parser) breakableStatement() *BreakableStatement {
@@ -1129,16 +1276,25 @@ func (p *Parser) switchStatement() *SwitchStatement {
 	expression := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
 	p.tokenizer.MustMatch(TLeftBrace)
-	var cases []*CaseClause
+	var casesBeforeDefault []*CaseClause
+	var casesAfterDefault []*CaseClause
 	var defaultClause *DefaultClause
 	for {
 		if p.tokenizer.CurrentToken.Type == TRightBrace {
 			break
 		}
 		if p.tokenizer.CurrentToken.Type == TDefault {
+			if defaultClause != nil {
+				panic("switchStatement: duplicate default clause")
+			}
 			defaultClause = p.defaultClause()
 		} else if p.tokenizer.CurrentToken.Type == TCase {
-			cases = append(cases, p.caseClause())
+			clause := p.caseClause()
+			if defaultClause == nil {
+				casesBeforeDefault = append(casesBeforeDefault, clause)
+			} else {
+				casesAfterDefault = append(casesAfterDefault, clause)
+			}
 		} else {
 			panic("switchStatement: expected case or default")
 		}
@@ -1147,8 +1303,9 @@ func (p *Parser) switchStatement() *SwitchStatement {
 	return &SwitchStatement{
 		Expression: expression,
 		CaseBlock: &CaseBlock{
-			CaseClauses:   cases,
-			DefaultClause: defaultClause,
+			CaseClauses:             casesBeforeDefault,
+			DefaultClause:           defaultClause,
+			CaseClausesAfterDefault: casesAfterDefault,
 		},
 	}
 }
@@ -1163,6 +1320,9 @@ func (p *Parser) caseClause() *CaseClause {
 		if tt == TCase || tt == TDefault || tt == TRightBrace {
 			break
 		}
+		if tt == TEOF {
+			panic("caseClause: unterminated switch statement")
+		}
 		statements = append(statements, p.statementListItem())
 	}
 	return &CaseClause{
@@ -1174,20 +1334,14 @@ func (p *Parser) caseClause() *CaseClause {
 func (p *Parser) defaultClause() *DefaultClause {
 	p.tokenizer.MustMatch(TDefault)
 	p.tokenizer.MustMatch(TColon)
-	var hasBrace bool
-	if p.tokenizer.Match(TLeftBrace) {
-		hasBrace = true
-	}
 	var statements []StatementListItem
-	// TODO: handle end of block
 	for {
 		tt := p.tokenizer.CurrentToken.Type
-		if tt == TRightBrace {
-			if hasBrace {
-				p.tokenizer.Next()
-				continue
-			}
+		if tt == TCase || tt == TDefault || tt == TRightBrace {
 			break
+		}
+		if tt == TEOF {
+			panic("defaultClause: unterminated switch statement")
 		}
 		statements = append(statements, p.statementListItem())
 	}
@@ -1286,8 +1440,129 @@ func (p *Parser) forBinding() *ForBinding {
 }
 
 func (p *Parser) bindingPattern() *BindingPattern {
-	// TODO:
-	panic("unimplemented")
+	switch p.tokenizer.CurrentToken.Type {
+	case TLeftBrace:
+		return &BindingPattern{ObjectBindingPattern: p.objectBindingPattern()}
+	case TLeftBracket:
+		return &BindingPattern{ArrayBindingPattern: p.arrayBindingPattern()}
+	default:
+		panic("bindingPattern: expected object or array binding pattern")
+	}
+}
+
+func (p *Parser) objectBindingPattern() *ObjectBindingPattern {
+	p.tokenizer.MustMatch(TLeftBrace)
+	pattern := &ObjectBindingPattern{}
+	if p.tokenizer.Match(TRightBrace) {
+		return pattern
+	}
+
+	properties := &struct {
+		BindingPropertyList []BindingProperty
+		BindingRestProperty *BindingRestProperty
+	}{}
+	for {
+		if p.tokenizer.Match(TDotDotDot) {
+			properties.BindingRestProperty = &BindingRestProperty{
+				BindingIdentifier: p.bindingIdentifier(),
+			}
+			if p.tokenizer.CurrentToken.Type == TComma {
+				panic("objectBindingPattern: rest property must be last")
+			}
+			break
+		}
+
+		properties.BindingPropertyList = append(properties.BindingPropertyList, p.bindingProperty())
+		if !p.tokenizer.Match(TComma) || p.tokenizer.CurrentToken.Type == TRightBrace {
+			break
+		}
+	}
+	p.tokenizer.MustMatch(TRightBrace)
+	pattern.Properties = append(pattern.Properties, properties)
+	return pattern
+}
+
+func (p *Parser) bindingProperty() BindingProperty {
+	t := p.tokenizer.CurrentToken
+	if (t.Type == TIdentifier || t.Type == TAwait || t.Type == TYield || t.Type == TAsync) && p.tokenizer.NextToken.Type != TColon {
+		identifier := p.bindingIdentifier()
+		var initializer Expression
+		if p.tokenizer.Match(TEquals) {
+			initializer = p.expression(p.acceptContextHigherThan(TComma))
+		}
+		return BindingProperty{
+			SingleNameBinding: &SingleNameBinding{
+				BindingIdentifier: identifier,
+				Initializer:       initializer,
+			},
+		}
+	}
+
+	propertyName, ok := p.propertyName()
+	if !ok {
+		panic("bindingProperty: expected property name")
+	}
+	p.tokenizer.MustMatch(TColon)
+	bindingElement, ok := p.bindingElement()
+	if !ok {
+		panic("bindingProperty: expected binding element")
+	}
+	return BindingProperty{
+		PropertyNameAndBindingElement: &struct {
+			PropertyName   PropertyName
+			BindingElement *BindingElement
+		}{
+			PropertyName:   propertyName,
+			BindingElement: bindingElement,
+		},
+	}
+}
+
+func (p *Parser) arrayBindingPattern() *ArrayBindingPattern {
+	p.tokenizer.MustMatch(TLeftBracket)
+	pattern := &ArrayBindingPattern{}
+	for {
+		if p.tokenizer.Match(TRightBracket) {
+			return pattern
+		}
+		if p.tokenizer.Match(TComma) {
+			pattern.Elements = append(pattern.Elements, &struct {
+				Elision            bool
+				BindingRestElement BindingRestElement
+				BindingElement     *BindingElement
+			}{Elision: true})
+			continue
+		}
+		if p.tokenizer.CurrentToken.Type == TDotDotDot {
+			restElement, ok := p.bindingRestElement()
+			Assert(ok)
+			pattern.Elements = append(pattern.Elements, &struct {
+				Elision            bool
+				BindingRestElement BindingRestElement
+				BindingElement     *BindingElement
+			}{BindingRestElement: restElement})
+			if p.tokenizer.CurrentToken.Type == TComma {
+				panic("arrayBindingPattern: rest element must be last")
+			}
+			p.tokenizer.MustMatch(TRightBracket)
+			return pattern
+		}
+
+		bindingElement, ok := p.bindingElement()
+		if !ok {
+			panic("arrayBindingPattern: expected binding element")
+		}
+		pattern.Elements = append(pattern.Elements, &struct {
+			Elision            bool
+			BindingRestElement BindingRestElement
+			BindingElement     *BindingElement
+		}{BindingElement: bindingElement})
+		if p.tokenizer.Match(TComma) {
+			continue
+		}
+		p.tokenizer.MustMatch(TRightBracket)
+		return pattern
+	}
 }
 
 func (p *Parser) forStatement() *ForStatement {
@@ -1299,7 +1574,6 @@ func (p *Parser) forStatement() *ForStatement {
 		init = &ForStatementInitializerVariable{
 			VariableStatement: p.variableStatement(),
 		}
-		p.tokenizer.MustMatch(TSemicolon)
 	} else if t.Type == TLet || t.Type == TConst {
 		init = &ForStatementInitializerLexicalDeclaration{
 			LexicalDeclaration: p.lexicalDeclaration(),
@@ -1335,7 +1609,9 @@ func (p *Parser) doWhileStatement() *StatementDoWhile {
 	p.tokenizer.MustMatch(TLeftParen)
 	condition := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
-	p.tokenizer.MustMatch(TSemicolon)
+	// A terminating semicolon may always be inserted after a do-while
+	// statement, even when the following token is on the same line.
+	p.tokenizer.Match(TSemicolon)
 
 	return &StatementDoWhile{
 		Body:      body,
@@ -1359,6 +1635,7 @@ func (p *Parser) whileStatement() *WhileStatement {
 // MARK: - CompletionTypeReturn
 
 func (p *Parser) returnStatement() *ReturnStatement {
+	keyword := p.tokenizer.CurrentToken
 	p.tokenizer.MustMatch(TReturn)
 	t := p.tokenizer.CurrentToken
 
@@ -1366,8 +1643,8 @@ func (p *Parser) returnStatement() *ReturnStatement {
 		panic("returnStatement: not in function")
 	}
 
-	if t.Type == TSemicolon {
-		p.tokenizer.Next()
+	if t.Type == TSemicolon || t.Type == TRightBrace || t.Type == TEOF || p.followedByLineTerminator(keyword) {
+		p.automaticSemicolonInsertion()
 		return &ReturnStatement{}
 	}
 	expr := p.expression(p.acceptContextLowest())
@@ -1419,7 +1696,6 @@ func (p *Parser) importCall() (*ExpressionImportCall, bool) {
 	p.tokenizer.MustMatch(TLeftParen)
 	e := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
-	p.automaticSemicolonInsertion()
 	return &ExpressionImportCall{
 		Expression: e,
 	}, true
@@ -1440,10 +1716,20 @@ func (p *Parser) superCall() (*SuperCall, bool) {
 	}, true
 }
 
+func (p *Parser) hasLineTerminatorBetween(previous, next Token) bool {
+	if previous.EndIndex < 0 || next.StartIndex < previous.EndIndex || next.StartIndex > len(p.tokenizer.SourceText) {
+		return false
+	}
+	for _, ch := range p.tokenizer.SourceText[previous.EndIndex:next.StartIndex] {
+		if lo.Contains(lineTerminators, ch) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *Parser) followedByLineTerminator(previous Token) bool {
-	gap := p.tokenizer.SourceText[previous.EndIndex:p.tokenizer.CurrentToken.StartIndex]
-	// TODO: check in `lineTerminators`
-	return strings.Contains(string(gap), "\n")
+	return p.hasLineTerminatorBetween(previous, p.tokenizer.CurrentToken)
 }
 
 func (p *Parser) yieldExpression() (*YieldExpression, bool) {
@@ -1454,9 +1740,11 @@ func (p *Parser) yieldExpression() (*YieldExpression, bool) {
 	if p.followedByLineTerminator(t) {
 		return &YieldExpression{AssignmentExpression: nil}, true
 	}
+	hasStar := p.tokenizer.Match(TStar)
 	e := p.expression(p.acceptContextHigherThan(TYield))
 	return &YieldExpression{
 		AssignmentExpression: e,
+		hasStar:              hasStar,
 	}, true
 }
 
@@ -1651,10 +1939,44 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 		if p.callExpressionForbidden {
 			return nil
 		}
+		if chain, ok := left.(*OptionalExpression); ok {
+			chain.Properties = append(chain.Properties, &OptionalExpressionProperty{
+				Arguments: p.arguments(),
+				Call:      true,
+			})
+			return chain
+		}
 		return p.callExpression(left)
+	case TTemplateHead, TNoSubstitutionTemplate:
+		if _, optional := left.(*OptionalExpression); optional {
+			panic("optional chains cannot be used as tagged template tags")
+		}
+		return &CallExpression{
+			Callee:          left,
+			TemplateLiteral: p.templateLiteral(true),
+		}
 	case TLeftBracket, TDot:
+		if chain, ok := left.(*OptionalExpression); ok {
+			member := p.memberExpression(left)
+			property := &OptionalExpressionProperty{}
+			switch memberProperty := member.Property.(type) {
+			case *ASTPropertyExpression:
+				property.Expression = memberProperty.Expression
+			case *ASTPropertyIdentifier:
+				property.Identifier = memberProperty.Identifier
+			case *ASTPropertyPrivateIdentifier:
+				property.PrivateIdentifier = memberProperty.Identifier
+			default:
+				panic("optional chain: unknown member property")
+			}
+			chain.Properties = append(chain.Properties, property)
+			return chain
+		}
 		return p.memberExpression(left)
 	case TPlusPlus, TMinusMinus:
+		if p.followedByLineTerminator(p.tokenizer.PreviousToken) {
+			return nil
+		}
 		update, ok := p.updateExpression(left)
 		if !ok {
 			panic("secondaryExpression: expected update expression")
@@ -1696,6 +2018,7 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 		TMinusEquals,
 		TStarEquals,
 		TStarStarEquals,
+		TDivideEquals,
 		TPercentEquals,
 		TLeftShiftEquals,
 		TRightShiftEquals,
@@ -1714,24 +2037,35 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 
 func (p *Parser) optionalExpression(left Expression) *OptionalExpression {
 	p.tokenizer.MustMatch(TQuestionDot)
-	var arguments Arguments
-	var expr Expression
-	var identifier IdentifierName
-	if p.tokenizer.Match(TLeftParen) {
-		arguments = p.arguments()
+	property := &OptionalExpressionProperty{Optional: true}
+	if p.tokenizer.CurrentToken.Type == TLeftParen {
+		property.Arguments = p.arguments()
+		property.Call = true
 	} else if p.tokenizer.Match(TLeftBracket) {
-		expr = p.expression(p.acceptContextLowest())
+		property.Expression = p.expression(p.acceptContextLowest())
 		p.tokenizer.MustMatch(TRightBracket)
 	} else {
-		identifier = p.identifierReference().Identifier
+		token := p.tokenizer.CurrentToken
+		if token.Type == TPrivateIdentifier {
+			property.PrivateIdentifier = PrivateIdentifierName(token.Value)
+			p.tokenizer.Next()
+		} else {
+			if token.Type != TIdentifier {
+				if _, isKeyword := keywordsMap[token.Value]; !isKeyword {
+					panic("optional chain: expected property name")
+				}
+			}
+			property.Identifier = IdentifierName(token.Value)
+			p.tokenizer.Next()
+		}
+	}
+	if chain, ok := left.(*OptionalExpression); ok {
+		chain.Properties = append(chain.Properties, property)
+		return chain
 	}
 	return &OptionalExpression{
-		Expr: left,
-		Property: &OptionalExpressionProperty{
-			Arguments:  arguments,
-			Expression: expr,
-			Identifier: identifier,
-		},
+		Expr:       left,
+		Properties: []*OptionalExpressionProperty{property},
 	}
 }
 
@@ -1779,7 +2113,6 @@ func (p *Parser) conditionalExpression(left Expression, accept *acceptContext) *
 	consequent := p.expression(accept)
 	p.tokenizer.MustMatch(TColon)
 	alternate := p.expression(accept)
-	p.automaticSemicolonInsertion()
 	return &ConditionalExpression{
 		Test:       left,
 		Consequent: consequent,
@@ -1861,6 +2194,16 @@ func (p *Parser) memberExpression(left Expression) *MemberExpression {
 	} else if token.Type == TDot {
 		p.tokenizer.Next()
 		identifier := p.tokenizer.CurrentToken
+		if identifier.Type == TPrivateIdentifier {
+			p.tokenizer.Next()
+			property = &ASTPropertyPrivateIdentifier{
+				Identifier: PrivateIdentifierName(identifier.Value),
+			}
+			return &MemberExpression{
+				Member:   left,
+				Property: property,
+			}
+		}
 		if identifier.Type != TIdentifier {
 			// keyword after dot is treated as identifier
 			if _, ok := keywordsMap[identifier.Value]; !ok {
@@ -1921,7 +2264,14 @@ func (p *Parser) arguments() Arguments {
 		if t.Type == TRightParen {
 			break
 		}
-		expr := p.expression(p.acceptContextHigherThan(TComma))
+		var expr Expression
+		if p.tokenizer.Match(TDotDotDot) {
+			expr = &ArgumentSpreadElement{
+				Spread: p.expression(p.acceptContextHigherThan(TComma)),
+			}
+		} else {
+			expr = p.expression(p.acceptContextHigherThan(TComma))
+		}
 		p.tokenizer.Match(TComma)
 		list = append(list, expr)
 	}
@@ -1930,7 +2280,7 @@ func (p *Parser) arguments() Arguments {
 }
 
 func (p *Parser) arrowFunction() *ArrowFunction {
-	startOffset := p.tokenizer.Index
+	startOffset := p.tokenizer.CurrentStartIndex()
 	var params *FormalParameters
 	if p.tokenizer.Match(TLeftParen) {
 		params = p.formalParameters()
@@ -1948,8 +2298,8 @@ func (p *Parser) arrowFunction() *ArrowFunction {
 			Items: items,
 		}
 	}
-	p.tokenizer.MustMatch(TArrow)
 	p.noLineTerminatorHere()
+	p.tokenizer.MustMatch(TArrow)
 	var body *FunctionBody
 	if p.tokenizer.Match(TLeftBrace) {
 		body = p.functionBody(FunctionTypeNormal)
@@ -1969,7 +2319,7 @@ func (p *Parser) arrowFunction() *ArrowFunction {
 	return &ArrowFunction{
 		FormalParameters: params,
 		Body:             body,
-		SourceText:       p.SourceText[startOffset:p.tokenizer.Index],
+		SourceText:       p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex],
 	}
 }
 
@@ -1984,7 +2334,7 @@ func (p *Parser) parenthesizedExpression() *ParenthesizedExpression {
 
 func (p *Parser) identifierReference() *IdentifierReference {
 	t := p.tokenizer.CurrentToken
-	types := []TokenType{TIdentifier, TAwait, TYield}
+	types := []TokenType{TIdentifier, TAwait, TYield, TAsync}
 	if !lo.Contains(types, t.Type) {
 		panic("identifierReference: expected identifierOrKeyword")
 	}
@@ -1995,16 +2345,25 @@ func (p *Parser) identifierReference() *IdentifierReference {
 	}
 }
 
-// TODO(BM): should return BindingIdentifier
+// Most AST declarations store the StringValue of BindingIdentifier directly
+// as IdentifierName, so the parser returns that representation here.
 func (p *Parser) bindingIdentifier() IdentifierName {
 	t := p.tokenizer.CurrentToken
-	types := []TokenType{TIdentifier, TAwait, TYield}
-	if !lo.Contains(types, t.Type) {
+	if !isBindingIdentifierToken(t.Type) {
 		panic("identifierReference: expected identifierOrKeyword")
 	}
 	name := t.Value
 	p.tokenizer.Next()
 	return IdentifierName(name)
+}
+
+func isBindingIdentifierToken(tokenType TokenType) bool {
+	switch tokenType {
+	case TIdentifier, TAwait, TYield, TAsync:
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *Parser) primaryExpression() PrimaryExpression {
@@ -2035,31 +2394,41 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		}
 		return p.functionExpression()
 	case TAsync:
-		p.tokenizer.MustMatch(TAsync)
-		if p.tokenizer.NextToken.Type == TStar {
-			return p.asyncGeneratorExpression()
+		if p.hasLineTerminatorBetween(t, p.tokenizer.NextToken) {
+			return p.identifierReference()
 		}
-		if p.tokenizer.CurrentToken.Type == TLeftParen {
-			return p.asyncArrowFunction()
+		if p.tokenizer.NextToken.Type == TArrow {
+			return p.arrowFunction()
 		}
-		return p.asyncFunctionExpression()
+		if p.tokenizer.NextToken.Type == TFunction {
+			if expression, ok := parserRecoverOk(p, p.asyncGeneratorExpression); ok {
+				return expression
+			}
+			return p.asyncFunctionExpression()
+		}
+		if p.tokenizer.NextToken.Type == TLeftParen || p.tokenizer.NextToken.Type == TIdentifier {
+			if expression, ok := parserRecoverOk(p, p.asyncArrowFunction); ok {
+				return expression
+			}
+		}
+		return p.identifierReference()
 	case TRegularExpression:
 		return p.regularExpressionLiteral()
 	case TClass:
 		return p.classExpression()
 	case TTemplateHead, TNoSubstitutionTemplate:
-		return p.templateLiteral()
+		return p.templateLiteral(false)
 	default:
 		literal := p.literal()
 		return literal
 	}
 }
 
-func (p *Parser) templateLiteral() *TemplateLiteral {
+func (p *Parser) templateLiteral(tagged bool) *TemplateLiteral {
 	if p.tokenizer.CurrentToken.Type == TNoSubstitutionTemplate {
 		text := p.tokenizer.CurrentToken.Value
 		p.tokenizer.Next()
-		return &TemplateLiteral{
+		literal := &TemplateLiteral{
 			SourceText: text,
 			Spans: []*TemplateSpan{
 				{
@@ -2068,6 +2437,10 @@ func (p *Parser) templateLiteral() *TemplateLiteral {
 				},
 			},
 		}
+		if _, valid := literal.Spans[0].TV(); !tagged && !valid {
+			panic("invalid escape sequence in untagged template")
+		}
+		return literal
 	}
 	startIndex := p.tokenizer.CurrentStartIndex()
 	templateHead := p.tokenizer.CurrentToken
@@ -2095,24 +2468,35 @@ func (p *Parser) templateLiteral() *TemplateLiteral {
 		expr = p.expression(p.acceptContextLowest())
 	}
 	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
-	return &TemplateLiteral{
+	literal := &TemplateLiteral{
 		TemplateHead: &TemplateSpan{
 			Text: templateHead.Value,
 		},
 		Spans:      spans,
 		SourceText: sourceText,
 	}
+	if !tagged {
+		if _, valid := literal.TemplateHead.TV(); !valid {
+			panic("invalid escape sequence in untagged template")
+		}
+		for _, span := range literal.Spans {
+			if _, valid := span.TV(); !valid {
+				panic("invalid escape sequence in untagged template")
+			}
+		}
+	}
+	return literal
 }
 
 func (p *Parser) classExpression() *ClassExpression {
 	startIndex := p.tokenizer.CurrentStartIndex()
 	p.tokenizer.MustMatch(TClass)
 	var identifier IdentifierName
-	if p.tokenizer.Match(TIdentifier) {
+	if isBindingIdentifierToken(p.tokenizer.CurrentToken.Type) {
 		identifier = p.bindingIdentifier()
 	}
 	classTail := p.classTail()
-	sourceText := p.SourceText[startIndex:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[startIndex:p.tokenizer.PreviousToken.EndIndex]
 	return &ClassExpression{
 		IdentifierName: identifier,
 		ClassTail:      classTail,
@@ -2203,7 +2587,21 @@ func (p *Parser) propertyName() (PropertyName, bool) {
 	return propertyName, true
 }
 
-func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefinition {
+func (p *Parser) classElementName() (PropertyName, bool) {
+	token := p.tokenizer.CurrentToken
+	if token.Type != TPrivateIdentifier {
+		return p.propertyName()
+	}
+	if token.Value == "#constructor" {
+		panic("class element private name cannot be #constructor")
+	}
+	p.tokenizer.Next()
+	return &PropertyNamePrivateIdentifier{
+		Identifier: PrivateIdentifierName(token.Value),
+	}, true
+}
+
+func (p *Parser) methodDefinition(methodType MethodDefinitionType, privateNamesAllowed bool) *MethodDefinition {
 	inMethodDefinition := p.inMethodDefinition
 	inClassConstructor := p.inClassConstructor
 	p.inMethodDefinition = true
@@ -2214,10 +2612,16 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 	}()
 	if methodType == MethodDefinitionTypeNil {
 		if p.tokenizer.Match(TStar) {
-			return p.methodDefinition(MethodDefinitionTypeGenerator)
+			return p.methodDefinition(MethodDefinitionTypeGenerator, privateNamesAllowed)
 		}
 	}
-	propertyName, ok := p.propertyName()
+	var propertyName PropertyName
+	var ok bool
+	if privateNamesAllowed {
+		propertyName, ok = p.classElementName()
+	} else {
+		propertyName, ok = p.propertyName()
+	}
 	if methodType == MethodDefinitionTypeNil && ok {
 		literal, ok := propertyName.(LiteralPropertyName)
 		if p.tokenizer.CurrentToken.Type != TLeftParen && ok {
@@ -2225,15 +2629,15 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 			isSet := literal.LiteralString() == "set"
 			if literal.LiteralString() == "async" {
 				if p.tokenizer.CurrentToken.Type == TStar {
-					return p.methodDefinition(MethodDefinitionTypeAsyncGenerator)
+					return p.methodDefinition(MethodDefinitionTypeAsyncGenerator, privateNamesAllowed)
 				}
-				return p.methodDefinition(MethodDefinitionTypeAsync)
+				return p.methodDefinition(MethodDefinitionTypeAsync, privateNamesAllowed)
 			}
 			if isGet {
-				return p.methodDefinition(MethodDefinitionTypeGet)
+				return p.methodDefinition(MethodDefinitionTypeGet, privateNamesAllowed)
 			}
 			if isSet {
-				return p.methodDefinition(MethodDefinitionTypeSet)
+				return p.methodDefinition(MethodDefinitionTypeSet, privateNamesAllowed)
 			}
 		}
 	}
@@ -2244,7 +2648,7 @@ func (p *Parser) methodDefinition(methodType MethodDefinitionType) *MethodDefini
 	p.tokenizer.MustMatch(TLeftBrace)
 	body := p.functionBody(FunctionTypeNormal)
 	p.tokenizer.MustMatch(TRightBrace)
-	sourceText := p.SourceText[start:p.tokenizer.CurrentStartIndex()]
+	sourceText := p.SourceText[start:p.tokenizer.PreviousToken.EndIndex]
 	m := MethodDefinitionTypeMethod
 	if methodType != MethodDefinitionTypeNil {
 		m = methodType
@@ -2309,7 +2713,7 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		}
 	default:
 		if method, ok := parserRecoverOk(p, func() *MethodDefinition {
-			return p.methodDefinition(MethodDefinitionTypeNil)
+			return p.methodDefinition(MethodDefinitionTypeNil, false)
 		}); ok {
 			return &PropertyDefinitionMethodDefinition{
 				method,
@@ -2328,10 +2732,15 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 	} else {
 		identifier, ok := propertyName.(*PropertyNameLiteralIdentifier)
 		Assert(ok)
+		var initializer Expression
+		if p.tokenizer.Match(TEquals) {
+			initializer = p.expression(accept)
+		}
 		return &PropertyDefinitionIdentifierReference{
 			IdentifierReference: &IdentifierReference{
 				Identifier: identifier.Identifier,
 			},
+			Initializer: initializer,
 		}
 	}
 }
@@ -2422,6 +2831,7 @@ func (p *Parser) stringLiteral() *StringLiteral {
 func (p *Parser) variableStatement() *VariableStatement {
 	p.tokenizer.MustMatch(TVar)
 	list := p.variableDeclarationList()
+	p.automaticSemicolonInsertion()
 	return &VariableStatement{
 		DeclarationList: list,
 	}
@@ -2446,13 +2856,23 @@ func (p *Parser) variableDeclarationList() *VariableDeclarationList {
 }
 
 func (p *Parser) variableDeclaration() *VariableDeclaration {
-	identifier := p.bindingIdentifier()
+	var identifier IdentifierName
+	var pattern *BindingPattern
+	if p.tokenizer.CurrentToken.Type == TLeftBrace || p.tokenizer.CurrentToken.Type == TLeftBracket {
+		pattern = p.bindingPattern()
+	} else {
+		identifier = p.bindingIdentifier()
+	}
 	var init Expression
 	if p.tokenizer.Match(TEquals) {
 		init = p.expression(p.acceptContextHigherThan(TComma))
 	}
+	if pattern != nil && init == nil {
+		panic("variableDeclaration: a binding pattern requires an initializer")
+	}
 	return &VariableDeclaration{
 		BindingIdentifier: identifier,
+		BindingPattern:    pattern,
 		Initializer:       init,
 	}
 }

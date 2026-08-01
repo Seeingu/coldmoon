@@ -4,15 +4,18 @@ package coldmoon
 // parsed. Runtime evaluation consumes this record instead of rediscovering
 // static facts through AST interface assertions.
 type ScriptStaticSemantics struct {
-	VarDeclarations     []*VariableDeclaration
-	LexicalDeclarations []Declaration
+	VarDeclarations       []*VariableDeclaration
+	LexicalDeclarations   []Declaration
+	HoistableDeclarations []DeclarationHoistable
 }
 
 // FunctionBodyStaticSemantics is the declaration snapshot for a function body.
 type FunctionBodyStaticSemantics struct {
-	ParameterNames  []IdentifierName
-	VarDeclarations []*VariableDeclaration
-	LexicalNames    []IdentifierName
+	ParameterNames        []IdentifierName
+	VarDeclarations       []*VariableDeclaration
+	HoistableDeclarations []DeclarationHoistable
+	LexicalDeclarations   []Declaration
+	LexicalNames          []IdentifierName
 }
 
 // ModuleStaticSemantics is the import/export snapshot for a parsed Module.
@@ -33,7 +36,13 @@ func (StaticSemantics) AnalyzeScript(script *Script) ScriptStaticSemantics {
 	}
 	for _, item := range script.StatementList {
 		declarationItem, ok := item.(*StatementListItemDeclaration)
-		if ok {
+		if !ok {
+			continue
+		}
+		switch declaration := declarationItem.Declaration.(type) {
+		case DeclarationHoistable:
+			result.HoistableDeclarations = append(result.HoistableDeclarations, declaration)
+		case *LexicalDeclaration, *ClassDeclaration:
 			result.LexicalDeclarations = append(result.LexicalDeclarations, declarationItem.Declaration)
 		}
 	}
@@ -47,9 +56,11 @@ func (StaticSemantics) AnalyzeFunctionBody(
 	parameters *FormalParameters,
 ) FunctionBodyStaticSemantics {
 	return FunctionBodyStaticSemantics{
-		ParameterNames:  parameters.BoundNames(),
-		VarDeclarations: body.VarScopedDeclarations(),
-		LexicalNames:    body.LexicallyDeclaredNames(),
+		ParameterNames:        parameters.BoundNames(),
+		VarDeclarations:       body.VarScopedDeclarations(),
+		HoistableDeclarations: body.StatementList.HoistableDeclarations(),
+		LexicalDeclarations:   body.StatementList.LexicalDeclarations(),
+		LexicalNames:          body.LexicallyDeclaredNames(),
 	}
 }
 

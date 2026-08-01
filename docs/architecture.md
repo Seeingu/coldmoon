@@ -73,6 +73,25 @@ Completion conversion preserves the completion type, target, and error while
 changing only its generic payload type. This keeps `return`, `break`,
 `continue`, and `throw` intact across helper boundaries.
 
+## Iterator consumption boundaries
+
+Iterator acquisition preserves language completions from the iterator method
+and `next` lookup. Once a record exists, failures from `next`, `done`, and
+`value` are returned directly and mark that record done; consumers do not call
+`return` again for them.
+
+Once a consumer has obtained an item, failures introduced while consuming that
+item have a different boundary. `Map`, `Set`, and `Object.fromEntries` close the
+iterator when entry validation, entry property access, or the collection adder
+completes abruptly. The close is observable exactly once. An original throw
+takes precedence over a failure from the iterator's `return` getter or method,
+but the getter and method still run for their side effects.
+
+Completion-aware callers use `GetMethodCompletion`,
+`GetIteratorFromMethodCompletion`, `IteratorStepValue`, and `IteratorClose`.
+The panic-style wrappers remain only for older algorithms that have not yet
+migrated to explicit completion propagation.
+
 ## Module graph
 
 Each Agent owns one `ModuleGraph`. The host first resolves a referrer and
@@ -97,6 +116,17 @@ all intrinsics on a private draft, reflects over the completed intrinsic record
 to reject any missing field, installs restricted function properties, and only
 then marks the Realm ready. Global object/environment publication and default
 global bindings reject a building Realm.
+
+Intrinsic construction is split into dependency-checked phases: foundations,
+iteration/callables, the standard library, typed arrays, utility namespaces,
+and errors. Each phase validates the key products of earlier phases before it
+runs, so an unsafe reorder fails at the phase boundary with the missing
+intrinsic named explicitly.
+
+Function calls currently use the VM's eager execution path. Proper tail calls
+require a continuation trampoline and are intentionally not exposed through a
+dormant call-site flag; adding them is an execution-engine change rather than
+an expression-evaluator toggle.
 
 Global constructor exposure is a declarative mapping from JavaScript names to
 `IntrinsicName`. This keeps global publication on the same lookup path used by

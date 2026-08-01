@@ -29,7 +29,7 @@ type Object struct {
 	ObjectType
 	typeName string
 	data     *Data
-	// ref is used to store the reference of the object
+	// ref preserves the concrete ObjectType for implementations that embed Object.
 	ref ObjectType
 }
 
@@ -43,10 +43,9 @@ func (o *Object) GetId() uint64 {
 	return o.data.id
 }
 
-// Ref returns the reference of the object
-// If the object does not have a reference, it returns itself
+// Ref returns the concrete object when Object is embedded by another ObjectType.
+// A directly-created ordinary Object refers to itself.
 func (o *Object) Ref() ObjectType {
-	// TODO(BM): replace ref by using ObjectType directly
 	if o.ref == nil {
 		return o
 	}
@@ -64,6 +63,7 @@ func NewObject(agent *Agent, prototype ObjectType, typeName string) *Object {
 			internalSlotNames: map[string]any{},
 			internalMethods:   NewInternalMethods(),
 			propertyStorage:   NewPropertyStorage(),
+			privateElements:   make(map[PrivateName]*PrivateElement),
 		},
 	}
 	return o
@@ -100,8 +100,8 @@ func (o *Object) HasSlot(name string) bool {
 	return v != nil
 }
 
-// TODO: implement spec
-// 14.7.5.9
+// EnumerateObjectProperties implements the iterator creation step of 14.7.5.9;
+// the enumeration algorithm itself lives in ForInIterator.
 func (o *Object) EnumerateObjectProperties() ObjectType {
 	return CreateForInIterator(o.Agent(), o.Ref())
 }
@@ -130,9 +130,29 @@ func (o *Object) propertyStorage() *PropertyStorage {
 	return &o.data.propertyStorage
 }
 
-// TODO: check is ordinary
 func (o *Object) IsOrdinary() bool {
-	return o.Prototype() != nil
+	methods := o.internalMethods()
+	usesOrdinaryEssentialMethods := pkg.FuncEqual(methods.GetPrototypeOf, InternalGetPrototypeOf) &&
+		pkg.FuncEqual(methods.SetPrototypeOf, InternalSetPrototypeOf) &&
+		pkg.FuncEqual(methods.IsExtensible, InternalIsExtensible) &&
+		pkg.FuncEqual(methods.PreventExtensions, InternalPreventExtensions) &&
+		pkg.FuncEqual(methods.GetOwnProperty, InternalGetOwnProperty) &&
+		pkg.FuncEqual(methods.DefineOwnProperty, InternalDefineOwnProperty) &&
+		pkg.FuncEqual(methods.HasProperty, InternalHasProperty) &&
+		pkg.FuncEqual(methods.Get, InternalGet) &&
+		pkg.FuncEqual(methods.Set, InternalSet) &&
+		pkg.FuncEqual(methods.Delete, InternalDelete) &&
+		pkg.FuncEqual(methods.OwnPropertyKeys, InternalOwnPropertyKeys)
+	if !usesOrdinaryEssentialMethods {
+		return false
+	}
+
+	if _, isECMAScriptFunction := o.Ref().(*ECMAScriptFunction); isECMAScriptFunction {
+		return methods.Call != nil &&
+			(methods.Construct == nil || pkg.FuncEqual(methods.Construct, ECMAScriptFunctionConstruct))
+	}
+
+	return methods.Call == nil && methods.Construct == nil
 }
 
 // OrdinaryToPrimitive
@@ -147,7 +167,10 @@ func (o *Object) OrdinaryToPrimitive(hint PreferredType) (co CompletionValue) {
 	}
 
 	for _, name := range methodNames {
-		method := o.Get(NewStringPropertyKey(name))
+		method, isAbrupt, rt := ReturnIfAbrupt(o.GetCompletion(NewStringPropertyKey(name)), co)
+		if isAbrupt {
+			return rt
+		}
 		if IsCallable(method) {
 			r := method.CallNoArgs(o.ToValue())
 			result, isAbrupt, rt := ReturnIfAbrupt(r, co)
@@ -190,15 +213,22 @@ func (o *Object) IsExtensible() bool {
 	return o.internalMethods().IsExtensible(o)
 }
 
-// TODO(BM): return CompletionValue
+// GetCompletion performs the completion-aware Get abstract operation.
+// Accessor and Proxy trap failures remain throw completions instead of escaping
+// through a Go assertion or panic.
 // spec: 7.3.2
-func (o *Object) Get(key PropertyKey) Value {
+func (o *Object) GetCompletion(key PropertyKey) CompletionValue {
 	r := o.internalMethods().Get(o.Ref(), key, o.ToValue())
-	// FIXME: no need when return CompletionValue
 	if r.t == CompletionTypeReturn {
-		return r.value
+		r.t = CompletionTypeNormal
 	}
-	return ReturnAssertNormal(r)
+	return r
+}
+
+// Get is the legacy value-only compatibility wrapper. New algorithms that can
+// return a completion must use GetCompletion and propagate its abrupt result.
+func (o *Object) Get(key PropertyKey) Value {
+	return ReturnAssertNormal(o.GetCompletion(key))
 }
 
 // Set
@@ -416,7 +446,13 @@ func (o *Object) LengthOfArrayLike() (co Completion[JSInt]) {
 // 7.3.22
 func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) (co Completion[ObjectType]) {
 	objectRef := o.Ref()
-	c := objectRef.Get(NewStringPropertyKey("constructor"))
+	c, isAbrupt, rt := ReturnIfAbrupt(
+		objectRef.GetCompletion(NewStringPropertyKey("constructor")),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if c == UndefinedValue {
 		co.value = defaultConstructor
 		return
@@ -426,7 +462,13 @@ func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) (co Completio
 		return
 	}
 	cObject := MustGetObject(c)
-	s := cObject.Get(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies]))
+	s, isAbrupt, rt := ReturnIfAbrupt(
+		cObject.GetCompletion(NewSymbolPropertyKey(WellKnownSymbols[WellKnownSymbolsSpecies])),
+		co,
+	)
+	if isAbrupt {
+		return rt
+	}
 	if s == UndefinedValue || s == NullValue {
 		co.value = defaultConstructor
 		return
@@ -435,8 +477,7 @@ func (o *Object) SpeciesConstructor(defaultConstructor ObjectType) (co Completio
 		co.value = MustGetObject(s)
 		return
 	}
-	co.value = defaultConstructor
-	return
+	return co.ThrowTypeError(objectRef.Agent(), "@@species is not a constructor")
 }
 
 func (o *Object) ToCompletion() (co Completion[ObjectType]) {
@@ -512,7 +553,7 @@ func (o *Object) CopyDataProperties(source Value, excludedItems []PropertyKey) {
 
 // 7.3.27
 func (o *Object) PrivateFieldAdd(privateName PrivateName, value Value) {
-	// TODO: HostEnsureCanAddPrivateElement
+	o.Agent().HostHooks.HostEnsureCanAddPrivateElement()
 	entry := o.PrivateElementFind(privateName)
 	if entry != nil {
 		o.Agent().ThrowTypeError("private field already exists")
@@ -580,6 +621,34 @@ func (o *Object) PrivateGet(privateName PrivateName) (co CompletionValue) {
 		return getter.Call(o.ToValue(), []Value{})
 	}
 	panic("unreachable")
+}
+
+// PrivateSet updates a private field or invokes a private accessor's setter.
+// Private methods and getter-only accessors are intentionally not writable.
+// spec: 7.3.31
+func (o *Object) PrivateSet(privateName PrivateName, value Value) (co CompletionValue) {
+	entry := o.PrivateElementFind(privateName)
+	if entry == nil {
+		return co.ThrowTypeError(o.Agent(), "PrivateSet failed: private element was not found")
+	}
+	switch entry.Kind {
+	case PrivateElementKindField:
+		entry.Value = value
+		return
+	case PrivateElementKindMethod:
+		return co.ThrowTypeError(o.Agent(), "PrivateSet failed: private method is not writable")
+	case PrivateElementKindAccessor:
+		if entry.Set == nil {
+			return co.ThrowTypeError(o.Agent(), "PrivateSet failed: setter is undefined")
+		}
+		_, isAbrupt, rt := ReturnIfAbrupt(entry.Set.Call(o.ToValue(), []Value{value}), co)
+		if isAbrupt {
+			return rt
+		}
+		return
+	default:
+		panic("PrivateSet: unknown private element kind")
+	}
 }
 
 // MARK: - InitializeInstanceElements
@@ -1131,7 +1200,13 @@ func NewObjectPrototypeWithObject(realm *Realm, object ObjectType) ObjectType {
 		}
 
 		symbol := WellKnownSymbols[WellKnownSymbolsToStringTag]
-		tagValue := o.Get(NewSymbolPropertyKey(symbol))
+		tagValue, isAbrupt, rt := ReturnIfAbrupt(
+			o.GetCompletion(NewSymbolPropertyKey(symbol)),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 
 		var tag string
 		if stringTag, ok := tagValue.(*StringValue); ok {

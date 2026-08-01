@@ -1,6 +1,9 @@
 package coldmoon
 
 import (
+	"math"
+	"strings"
+
 	"github.com/Seeingu/coldmoon/pkg"
 )
 
@@ -13,7 +16,14 @@ const (
 
 type TypedArrayName int
 
+// String implements fmt.Stringer for diagnostics and delegates to the exact
+// ECMAScript constructor name.
 func (t TypedArrayName) String() string {
+	return t.ECMAScriptName()
+}
+
+// ECMAScriptName returns the specification-visible typed-array name.
+func (t TypedArrayName) ECMAScriptName() string {
 	switch t {
 	case TypedArrayNameInt8:
 		return "Int8Array"
@@ -326,7 +336,22 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return typedArraySubarray(agent, this, start, end)
 	}
 	taToLocaleString := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		panic("not implemented")
+		var co CompletionValue
+		record := ValidateTypedArray(agent, this, SeqCst)
+		length := TypedArrayLength(record)
+		parts := make([]string, 0, int(length))
+		for index := JSInt(0); index < length; index++ {
+			element := record.TypedArray.Get(NewIntegerIndexPropertyKey(index))
+			localized, isAbrupt, rt := ReturnIfAbrupt(
+				ValueInvoke(agent, element, NewStringPropertyKey("toLocaleString"), arguments),
+				co,
+			)
+			if isAbrupt {
+				return rt
+			}
+			parts = append(parts, localized.String())
+		}
+		return NewStringValue(strings.Join(parts, ","))
 	}
 	taValues := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		O := this
@@ -384,11 +409,10 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 			return UndefinedValue
 		}
 		name := o.(*TypedArrayObject).TypedArrayName
-		// TODO: should not use internal String() method
-		return NewStringValue(name.String())
+		return NewStringValue(name.ECMAScriptName())
 	}
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsToStringTag, builtinAccessorParams{
-		Setter: toStringTag,
+		Getter: toStringTag,
 	})
 	return typedArray
 }
@@ -530,16 +554,24 @@ func SetTypedArrayFromTypedArray(agent *Agent, target *TypedArrayObject, targetO
 	targetByteIndex := targetByteOffset + targetOffset*targetElementSize
 	limit := targetByteIndex + srcLength*targetElementSize
 	if srcType == targetType {
-		for targetByteIndex < limit {
-			value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, srcElementSize, true, Relaxed)
-			SetValueInBuffer(agent, targetBuffer, targetByteIndex, JSNumber(value).ToValue(), targetElementSize, true, Relaxed)
-			srcByteIndex += srcElementSize
-			targetByteIndex += targetElementSize
-		}
+		CopyDataBlockBytes(
+			targetBuffer.Data(),
+			targetByteIndex,
+			srcBuffer.Data(),
+			srcByteIndex,
+			limit-targetByteIndex,
+		)
 	} else {
 		for targetByteIndex < limit {
-			value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, srcElementSize, true, Relaxed)
-			SetValueInBuffer(agent, targetBuffer, targetByteIndex, NewNumberValue(JSNumber(value)), targetElementSize, true, Relaxed)
+			raw := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, srcElementSize, true, Relaxed)
+			SetTypedArrayValueInBuffer(
+				agent,
+				targetBuffer,
+				targetByteIndex,
+				typedArrayValueFromRaw(srcType, raw),
+				targetType,
+				Relaxed,
+			)
 			srcByteIndex += srcElementSize
 			targetByteIndex += targetElementSize
 		}
@@ -735,8 +767,7 @@ func NewTypedArrayNameConstructor(realm *Realm, name TypedArrayName) ObjectType 
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		return typedArrayBehavior(agent, name, thisArgument, argumentsList, newTarget)
 	}
-	// TODO: should not use String()
-	object := CreateBuiltinFunction(agent, behavior, 3, CMString(name.String()), builtinFunctionArgs{
+	object := CreateBuiltinFunction(agent, behavior, 3, CMString(name.ECMAScriptName()), builtinFunctionArgs{
 		realm:         realm,
 		prototype:     realm.Intrinsics.TypedArrayConstructor,
 		isConstructor: true,
@@ -825,10 +856,15 @@ func AllocateTypedArray(agent *Agent, constructorName TypedArrayName, newTarget 
 }
 
 func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *TypedArrayObject {
+	contentType := TypedArrayContentTypeNumber
+	if name == TypedArrayNameBigInt64 || name == TypedArrayNameBigUint64 {
+		contentType = TypedArrayContentTypeBigInt
+	}
 	object := &TypedArrayObject{
 		Object:            NewObject(agent, proto, "TypedArray "+name.String()),
 		ViewedArrayBuffer: nil,
 		TypedArrayName:    name,
+		ContentType:       contentType,
 	}
 	object.ref = object
 	internalMethods := object.internalMethods()
@@ -867,19 +903,12 @@ func TypedArrayCreate(agent *Agent, name TypedArrayName, proto ObjectType) *Type
 			if !o.(*TypedArrayObject).IsValidIntegerIndex(agent, i) {
 				return
 			}
-			// TODO: Only check for undefined
-			//if !desc.Enumerable {
-			//	return false
-			//}
-			//if !desc.Configurable {
-			//	return false
-			//}
-			//if !desc.Writable {
-			//	return false
-			//}
-			//if desc.IsAccessorDescriptor() {
-			//	return false
-			//}
+			if desc.IsAccessorDescriptor() ||
+				(desc.ConfigurableSet && !desc.Configurable) ||
+				(desc.EnumerableSet && !desc.Enumerable) ||
+				(desc.WritableSet && !desc.Writable) {
+				return
+			}
 			if desc.Value != nil {
 				TypedArraySetElement(agent, o.(*TypedArrayObject), i, desc.Value)
 			}
@@ -947,13 +976,12 @@ func TypedArraySetElement(agent *Agent, O *TypedArrayObject, index JSInt, value 
 	offset := O.ByteOffset
 	elementSize := TypedArrayElementSize(O)
 	byteIndexInBuffer := offset + index*elementSize
-	SetValueInBuffer(
+	SetTypedArrayValueInBuffer(
 		agent,
 		O.ViewedArrayBuffer,
 		byteIndexInBuffer,
 		numValue,
-		elementSize,
-		true,
+		O.TypedArrayName,
 		Relaxed,
 	)
 	return
@@ -987,7 +1015,20 @@ func TypedArrayGetElement(agent *Agent, O *TypedArrayObject, index JSInt) Value 
 	elementSize := TypedArrayElementSize(O)
 	byteIndexInBuffer := offset + index*elementSize
 	u := GetValueFromBuffer(agent, O.ViewedArrayBuffer, byteIndexInBuffer, elementSize, true, Relaxed)
-	return NewNumberValue(JSNumber(u))
+	return typedArrayValueFromRaw(O.TypedArrayName, u)
+}
+
+func typedArrayValueFromRaw(elementType TypedArrayName, raw uint64) Value {
+	switch elementType {
+	case TypedArrayNameUint8Clamped:
+		return NewNumberValue(JSNumber(uint8(raw)))
+	case TypedArrayNameFloat32:
+		return NewNumberValue(JSNumber(math.Float32frombits(uint32(raw))))
+	case TypedArrayNameFloat64:
+		return NewNumberValue(JSNumber(math.Float64frombits(raw)))
+	default:
+		return atomicRawValue(elementType, raw)
+	}
 }
 
 func AllocateTypedArrayBuffer(agent *Agent, O *TypedArrayObject, length JSInt) {
@@ -1065,14 +1106,13 @@ func InitializeTypedArrayFromTypedArray(agent *Agent, O, srcArray *TypedArrayObj
 		targetByteIndex := JSInt(0)
 		count := elementLength
 		for count > 0 {
-			value := GetValueFromBuffer(agent, srcData, srcByteIndex, getTypedArraySizeFromName(srcType), true, Relaxed)
-			SetValueInBuffer(
+			raw := GetValueFromBuffer(agent, srcData, srcByteIndex, srcElementSize, true, Relaxed)
+			SetTypedArrayValueInBuffer(
 				agent,
 				NewArrayBufferLike(data.Data()),
 				targetByteIndex,
-				NewNumberValue(JSNumber(value)),
-				getTypedArraySizeFromName(srcType),
-				true,
+				typedArrayValueFromRaw(srcType, raw),
+				elementType,
 				Relaxed)
 			srcByteIndex += srcElementSize
 			targetByteIndex += elementSize
@@ -1321,31 +1361,10 @@ func typedArrayCopyWith(agent *Agent, this Value, target, start, end Value) (co 
 		length = TypedArrayLength(taRecord)
 		elementSize := TypedArrayElementSize(ta)
 		byteOffset := ta.ByteOffset
-		bufferByteLimit := (length * elementSize) + byteOffset
 		toByteIndex := (targetIndex * elementSize) + byteOffset
 		fromByteIndex := (startIndex * elementSize) + byteOffset
 		countBytes := count * elementSize
-		var dir JSInt
-		if fromByteIndex < toByteIndex &&
-			toByteIndex < fromByteIndex+countBytes {
-			fromByteIndex += countBytes - 1
-			toByteIndex += countBytes - 1
-			dir = -1
-		} else {
-			dir = 1
-		}
-		for countBytes > 0 {
-			if fromByteIndex < bufferByteLimit &&
-				toByteIndex < bufferByteLimit {
-				value := GetValueFromBuffer(agent, buffer, fromByteIndex, elementSize, true, Relaxed)
-				SetValueInBuffer(agent, buffer, toByteIndex, JSNumber(value).ToValue(), elementSize, true, Relaxed)
-				fromByteIndex += dir
-				toByteIndex += dir
-				countBytes--
-			} else {
-				countBytes = 0
-			}
-		}
+		CopyDataBlockBytes(buffer.Data(), toByteIndex, buffer.Data(), fromByteIndex, countBytes)
 	}
 	co.value = ta.ToValue()
 	return
@@ -1821,13 +1840,13 @@ func typedArraySlice(agent *Agent, this Value, start, end Value) (co CompletionV
 			srcByteOffset := ta.ByteOffset
 			srcByteIndex := startIndex*elementSize + srcByteOffset
 			targetByteIndex := A.ByteOffset
-			endByteIndex := targetByteIndex + countBytes*elementSize
-			for targetByteIndex < endByteIndex {
-				value := GetValueFromBuffer(agent, srcBuffer, srcByteIndex, elementSize, true, Relaxed)
-				SetValueInBuffer(agent, targetBuffer, targetByteIndex, JSNumber(value).ToValue(), elementSize, true, Relaxed)
-				srcByteIndex += elementSize
-				targetByteIndex += elementSize
-			}
+			CopyDataBlockBytes(
+				targetBuffer.Data(),
+				targetByteIndex,
+				srcBuffer.Data(),
+				srcByteIndex,
+				countBytes*elementSize,
+			)
 		} else {
 			n := JSInt(0)
 			k := startIndex

@@ -248,6 +248,9 @@ loop:
 	varDeclarations := static.VarDeclarations
 	lexicalNames := static.LexicalNames
 	var functionNames []IdentifierName
+	for _, declaration := range static.HoistableDeclarations {
+		functionNames = append(functionNames, declaration.BoundNames()...)
+	}
 
 	argumentsObjectNeeded := true
 	if function.ThisMode == ThisModeLexical {
@@ -303,45 +306,31 @@ loop:
 	}
 
 	for i, item := range formals.Items {
-		e := env
+		bindingEnvironment := env
+		if hasDuplicates {
+			bindingEnvironment = nil
+		}
+		vm := calleeContext.VM
+		Assert(vm != nil)
 		switch param := item.(type) {
 		case *FormalParameter:
-			name := param.BindingElement.SingleNameBinding.BindingIdentifier
-			initializer := param.BindingElement.SingleNameBinding.Initializer
 			value := pkg.SliceSafeGet(argumentsList, i)
 			if value == nil {
 				value = UndefinedValue
 			}
-			ref := agent.ResolveBinding(string(name), e, strict)
-			if initializer != nil {
-				node := RunNode(agent, &ExpressionStatement{
-					Expression: initializer,
-				})
-				value = node.Data()
-			}
-			if e == nil || hasDuplicates {
-				_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(agent, value), co)
-				if isAbrupt {
-					return rt
-				}
-			} else {
-				ref.InitializeReferencedBinding(value)
+			_, isAbrupt, rt := ReturnIfAbrupt(param.BindingElement.BindingInitialization(vm, value, bindingEnvironment), co)
+			if isAbrupt {
+				return rt
 			}
 		case *FormalParameterFunctionRestParameter:
-			name := param.BindingRestElement.(*BindingRestElementIdentifier).Identifier
-			ref := agent.ResolveBinding(string(name), e, strict)
 			array := ArrayCreate(agent, 0, nil)
 			rest := argumentsList[i:]
 			for j, value := range rest {
 				array.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(JSInt(j)), value)
 			}
-			if e == nil {
-				_, isAbrupt, rt := ReturnIfAbrupt(ref.PutValue(agent, array.ToValue()), co)
-				if isAbrupt {
-					return rt
-				}
-			} else {
-				ref.InitializeReferencedBinding(array.ToValue())
+			_, isAbrupt, rt := ReturnIfAbrupt(param.BindingRestElement.BindingInitialization(vm, array.ToValue(), bindingEnvironment), co)
+			if isAbrupt {
+				return rt
 			}
 		default:
 			panic("unreachable")
@@ -355,11 +344,12 @@ loop:
 			instantiatedVarNames[IdentifierName(paramBinding)] = true
 		}
 		for _, declaration := range varDeclarations {
-			varName := declaration.BindingIdentifier
-			if _, exists := instantiatedVarNames[varName]; !exists {
-				instantiatedVarNames[varName] = true
-				env.CreateMutableBinding(string(varName), false)
-				env.InitializeBinding(string(varName), UndefinedValue)
+			for _, varName := range declaration.BoundNames() {
+				if _, exists := instantiatedVarNames[varName]; !exists {
+					instantiatedVarNames[varName] = true
+					env.CreateMutableBinding(string(varName), false)
+					env.InitializeBinding(string(varName), UndefinedValue)
+				}
 			}
 		}
 		varEnv = env
@@ -368,24 +358,51 @@ loop:
 		calleeContext.ECMAScriptCode.VariableEnvironment = varEnv
 		instantiatedVarNames := make(map[IdentifierName]bool)
 		for _, declaration := range varDeclarations {
-			varName := declaration.BindingIdentifier
-			if _, exists := instantiatedVarNames[varName]; !exists {
-				instantiatedVarNames[varName] = true
-				varEnv.CreateMutableBinding(string(varName), false)
-				var initialValue Value
-				if !lo.Contains(parameterNames, varName) || lo.Contains(functionNames, varName) {
-				} else {
-					value := env.GetBindingValue(agent, string(varName), false)
-					initialValue = value.Data()
+			for _, varName := range declaration.BoundNames() {
+				if _, exists := instantiatedVarNames[varName]; !exists {
+					instantiatedVarNames[varName] = true
+					varEnv.CreateMutableBinding(string(varName), false)
+					var initialValue Value
+					if !lo.Contains(parameterNames, varName) || lo.Contains(functionNames, varName) {
+					} else {
+						value := env.GetBindingValue(agent, string(varName), false)
+						initialValue = value.Data()
+					}
+					varEnv.InitializeBinding(string(varName), initialValue)
 				}
-				varEnv.InitializeBinding(string(varName), initialValue)
 			}
+		}
+	}
+
+	instantiatedFunctions := make(map[string]bool)
+	privateEnv := calleeContext.ECMAScriptCode.PrivateEnvironment
+	for i := len(static.HoistableDeclarations) - 1; i >= 0; i-- {
+		declaration := static.HoistableDeclarations[i]
+		name, functionObject := instantiateHoistableDeclaration(agent, declaration, varEnv, privateEnv)
+		if instantiatedFunctions[name] {
+			continue
+		}
+		instantiatedFunctions[name] = true
+		if !varEnv.HasBinding(name) {
+			varEnv.CreateMutableBinding(name, false)
+			varEnv.InitializeBinding(name, functionObject.ToValue())
+		} else {
+			varEnv.SetMutableBinding(name, functionObject.ToValue(), false)
 		}
 	}
 
 	lexEnv := varEnv
 	if !strict {
 		lexEnv = NewDeclarativeEnvironment(varEnv)
+	}
+	for _, declaration := range static.LexicalDeclarations {
+		for _, name := range declaration.BoundNames() {
+			if IsConstantDeclaration(declaration) {
+				lexEnv.CreateImmutableBinding(name, true)
+			} else {
+				lexEnv.CreateMutableBinding(name, false)
+			}
+		}
 	}
 	calleeContext.ECMAScriptCode.LexicalEnvironment = lexEnv
 	co.value = UndefinedValue
@@ -518,8 +535,11 @@ func OrdinaryFunctionCreate(
 
 // 10.2.4
 func AddRestrictedFunctionProperties(F ObjectType, realm *Realm) {
-	// TODO: Assert
+	Assert(realm != nil)
+	Assert(realm.Intrinsics != nil)
 	thrower := realm.Intrinsics.ThrowTypeError
+	Assert(thrower != nil)
+	Assert(IsCallable(thrower.ToValue()))
 	F.DefinePropertyOrThrow(NewStringPropertyKey("caller"), &PropertyDescriptor{
 		Get:          thrower,
 		Set:          thrower,
@@ -642,8 +662,10 @@ func SetFunctionName(function ObjectType, key PropertyKeyOrPrivateName, prefix s
 		}
 	case StringPropertyKey:
 		name = k.Value
+	case PropertyKeyOrPrivateNameName:
+		name = k.PrivateName.Symbol.Description
 	default:
-		panic("unimplemented")
+		panic(fmt.Sprintf("unsupported function name type %T", key))
 	}
 
 	builtinFunction, isBuiltinFunction := function.(*BuiltinFunction)

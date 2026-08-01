@@ -1,7 +1,9 @@
 package coldmoon
 
 import (
+	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/Seeingu/coldmoon/pkg"
 
@@ -17,6 +19,8 @@ type RegExpObject struct {
 }
 
 type RegExpRecord struct {
+	HasIndices           bool
+	Global               bool
 	IgnoreCase           bool
 	Multiline            bool
 	Unicode              bool
@@ -74,9 +78,6 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		if r.Object.Get(NewStringPropertyKey("hasIndices")).ToBoolean() {
 			f += "d"
 		}
-		if r.Object.Get(NewStringPropertyKey("dotAll")).ToBoolean() {
-			f += "s"
-		}
 		if r.Object.Get(NewStringPropertyKey("global")).ToBoolean() {
 			f += "g"
 		}
@@ -86,14 +87,17 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		if r.Object.Get(NewStringPropertyKey("multiline")).ToBoolean() {
 			f += "m"
 		}
-		if r.Object.Get(NewStringPropertyKey("sticky")).ToBoolean() {
-			f += "y"
+		if r.Object.Get(NewStringPropertyKey("dotAll")).ToBoolean() {
+			f += "s"
 		}
 		if r.Object.Get(NewStringPropertyKey("unicode")).ToBoolean() {
 			f += "u"
 		}
 		if r.Object.Get(NewStringPropertyKey("unicodeSets")).ToBoolean() {
 			f += "v"
+		}
+		if r.Object.Get(NewStringPropertyKey("sticky")).ToBoolean() {
+			f += "y"
 		}
 		return NewStringValue(f)
 	}
@@ -119,7 +123,7 @@ func NewRegExpPrototype(realm *Realm) ObjectType {
 		}
 		src := ToString(agent, r.Get(NewStringPropertyKey("source")))
 		_flags := ToString(agent, r.Get(NewStringPropertyKey("flags")))
-		return NewStringValue("/" + EscapeRegExpPattern(src.String(), _flags.String()) + "/")
+		return NewStringValue("/" + src.String() + "/" + _flags.String())
 	}
 	exec := func(this Value, arguments []Value, _ ObjectType) CompletionConvertable[Value] {
 		if !this.IsObject() {
@@ -390,6 +394,10 @@ func RegExpHasFlag(agent *Agent, R Value, flag string) CompletionValue {
 	}
 	var f bool
 	switch flag {
+	case "d":
+		f = r.RegExpRecord.HasIndices
+	case "g":
+		f = r.RegExpRecord.Global
 	case "s":
 		f = r.RegExpRecord.DotAll
 	case "m":
@@ -409,14 +417,20 @@ func RegExpHasFlag(agent *Agent, R Value, flag string) CompletionValue {
 }
 
 func EscapeRegExpPattern(P string, F string) string {
-	// TODO
-	if F == "" {
-		return P
+	// The flags participate in the specification's parse-text validation, but
+	// the concrete source escapes below are identical for every flag set.
+	_ = F
+	if P == "" {
+		return "(?:)"
 	}
-	if F == "u" {
-		return P
-	}
-	return P
+	replacer := strings.NewReplacer(
+		"/", `\/`,
+		"\n", `\n`,
+		"\r", `\r`,
+		"\u2028", `\u2028`,
+		"\u2029", `\u2029`,
+	)
+	return replacer.Replace(P)
 }
 
 type MatchRecord struct {
@@ -448,8 +462,9 @@ func RegExpExec(agent *Agent, regExp *RegExpObject, s string) (co Completion[Val
 // 22.2.7.2
 // return null, object, or throw
 func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) (co Completion[Value]) {
-	length := len(s)
-	lastIndex := int(ReturnAssertNormal(ToLength(agent, regExp.Get(NewStringPropertyKey("lastIndex")))))
+	codeUnits := utf16.Encode([]rune(s))
+	length := JSInt(len(codeUnits))
+	lastIndex := ReturnAssertNormal(ToLength(agent, regExp.Get(NewStringPropertyKey("lastIndex"))))
 
 	flags := regExp.OriginalFlags
 	global := strings.Contains(flags, "g")
@@ -462,53 +477,66 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) (co Complet
 
 	matcher := regExp.RegExpMatcher
 	fullUnicode := strings.Contains(flags, "u") || strings.Contains(flags, "v")
-	matchSucceeded := false
-	input := s
-	if fullUnicode {
-		input = s
-	}
-
-	var matchRecord *MatchRecord
+	input := regexpInputCharacters(codeUnits, fullUnicode)
 	var match *regexp2.Match
-	for !matchSucceeded {
+	for {
 		if lastIndex > length {
 			if global || sticky {
-				regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeIgnore)
+				_, isAbrupt, rt := ReturnIfAbrupt(
+					regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
 			}
 			co.value = NullValue
 			return
 		}
-		r, err := matcher.FindStringMatch(input[lastIndex:])
-
+		inputIndex := int(lastIndex)
+		if fullUnicode {
+			inputIndex = codePointIndexForStringIndex(codeUnits, lastIndex)
+		}
+		r, err := matcher.FindRunesMatchStartingAt(input, inputIndex)
 		if err != nil {
-			if sticky {
-				regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow)
-				co.value = NullValue
-				return
-			}
-			lastIndex++
 			co.err = NewStringValue(err.Error())
 			return
-		} else if r == nil {
+		}
+		if r == nil || (sticky && r.Index != inputIndex) {
+			if global || sticky {
+				_, isAbrupt, rt := ReturnIfAbrupt(
+					regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(0), setThrowTypeThrow),
+					co,
+				)
+				if isAbrupt {
+					return rt
+				}
+			}
 			co.value = NullValue
 			return
-		} else {
-			match = r
-			matchSucceeded = true
-			matchRecord = &MatchRecord{
-				StartIndex: JSInt(lastIndex + match.Index),
-				EndIndex:   JSInt(lastIndex + match.Index + match.Length),
-			}
 		}
+		match = r
+		break
 	}
+
+	matchRecord := regexpMatchRecord(s, fullUnicode, match.Index, match.Length)
+	lastIndex = matchRecord.StartIndex
 	e := matchRecord.EndIndex
 	if fullUnicode {
-		// TODO: GetStringIndex
+		Assert(e <= length)
 	}
 	if global || sticky {
-		regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(JSNumber(e)), setThrowTypeIgnore)
+		_, isAbrupt, rt := ReturnIfAbrupt(
+			regExp.Set(NewStringPropertyKey("lastIndex"), NewNumberValue(JSNumber(e)), setThrowTypeThrow),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 	}
-	n := JSInt(len(match.Captures))
+	matchedGroups := match.Groups()
+	n := JSInt(len(matchedGroups))
+	Assert(int(n)-1 == regExp.RegExpRecord.CapturingGroupsCount)
 	Assert(float64(n) < POW_2_32-1)
 
 	A := ArrayCreate(agent, n, nil)
@@ -518,19 +546,23 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) (co Complet
 	A.CreateDataPropertyOrThrow(NewStringPropertyKey("input"), NewStringValue(s))
 
 	indices := make([]*MatchRecord, n)
-	indices = append(indices, matchRecord)
+	indices[0] = matchRecord
 
 	matchedSubstr := NewStringValue(GetMatchString(agent, s, matchRecord))
 	A.CreateDataPropertyOrThrow(NewStringPropertyKey("0"), matchedSubstr)
 
 	var groups Value
 	var hasGroups bool
-	if regExp.RegExpRecord.CapturingGroupsCount > 0 {
+	for i := 1; i < len(matchedGroups); i++ {
+		if _, err := strconv.Atoi(matchedGroups[i].Name); err != nil {
+			hasGroups = true
+			break
+		}
+	}
+	if hasGroups {
 		groups = (OrdinaryObjectCreate(agent, nil, nil)).ToValue()
-		hasGroups = true
 	} else {
 		groups = UndefinedValue
-		hasGroups = false
 	}
 
 	A.CreateDataPropertyOrThrow(NewStringPropertyKey("groups"), groups)
@@ -539,25 +571,20 @@ func RegExpBuiltinExec(agent *Agent, regExp *RegExpObject, s string) (co Complet
 	for i < n {
 		var captureI *MatchRecord
 		var capturedValue Value
-		if i >= JSInt(len(match.Captures)) {
-			indices = append(indices, nil)
+		group := matchedGroups[i]
+		if len(group.Captures) == 0 {
 			capturedValue = UndefinedValue
 		} else {
-			captureI = &MatchRecord{
-				StartIndex: JSInt(match.Captures[i].Index),
-				EndIndex:   JSInt(match.Captures[i].Index + match.Captures[i].Length),
-			}
+			captureI = regexpMatchRecord(s, fullUnicode, group.Index, group.Length)
 			capturedValue = NewStringValue(GetMatchString(agent, s, captureI))
-			indices = append(indices, captureI)
 		}
+		indices[i] = captureI
 		A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(i), capturedValue)
 
-		if hasGroups {
-			groupName := match.Groups()[i].Name
+		groupName := group.Name
+		if _, err := strconv.Atoi(groupName); err != nil {
 			MustGetObject(groups).CreateDataPropertyOrThrow(NewStringPropertyKey(groupName), capturedValue)
 			groupNames[i-1] = groupName
-		} else {
-			groupNames[i-1] = ""
 		}
 
 		i++
@@ -576,19 +603,87 @@ func AdvanceStringIndex(s string, index JSInt, unicode bool) JSInt {
 	if !unicode {
 		return index + 1
 	}
-	length := JSInt(len(s))
+	codeUnits := utf16.Encode([]rune(s))
+	length := JSInt(len(codeUnits))
 	if index+1 >= length {
 		return index + 1
 	}
-	// TODO: code point at
-	cp := s[index]
-	return JSInt(cp) + index
+	first := codeUnits[index]
+	if first < 0xD800 || first > 0xDBFF {
+		return index + 1
+	}
+	second := codeUnits[index+1]
+	if second < 0xDC00 || second > 0xDFFF {
+		return index + 1
+	}
+	return index + 2
+}
+
+// GetStringIndex converts a Unicode code point index into ECMAScript's
+// UTF-16 code-unit index. Out-of-range code point indices map to the string
+// length, as required by the RegExp abstract operation.
+func GetStringIndex(s string, codePointIndex JSInt) JSInt {
+	if codePointIndex <= 0 {
+		return 0
+	}
+	codeUnitIndex := JSInt(0)
+	for i, codePoint := range []rune(s) {
+		if JSInt(i) == codePointIndex {
+			return codeUnitIndex
+		}
+		if codePoint > 0xFFFF {
+			codeUnitIndex += 2
+		} else {
+			codeUnitIndex++
+		}
+	}
+	return codeUnitIndex
+}
+
+func regexpInputCharacters(codeUnits []uint16, fullUnicode bool) []rune {
+	if fullUnicode {
+		return utf16.Decode(codeUnits)
+	}
+	input := make([]rune, len(codeUnits))
+	for i, codeUnit := range codeUnits {
+		input[i] = rune(codeUnit)
+	}
+	return input
+}
+
+func codePointIndexForStringIndex(codeUnits []uint16, stringIndex JSInt) int {
+	codePointIndex := 0
+	for codeUnitIndex := JSInt(0); codeUnitIndex < JSInt(len(codeUnits)); codePointIndex++ {
+		width := JSInt(1)
+		if codeUnits[codeUnitIndex] >= 0xD800 && codeUnits[codeUnitIndex] <= 0xDBFF &&
+			codeUnitIndex+1 < JSInt(len(codeUnits)) &&
+			codeUnits[codeUnitIndex+1] >= 0xDC00 && codeUnits[codeUnitIndex+1] <= 0xDFFF {
+			width = 2
+		}
+		if stringIndex < codeUnitIndex+width {
+			return codePointIndex
+		}
+		codeUnitIndex += width
+	}
+	return codePointIndex
+}
+
+func regexpMatchRecord(s string, fullUnicode bool, index int, length int) *MatchRecord {
+	start := JSInt(index)
+	end := JSInt(index + length)
+	if fullUnicode {
+		start = GetStringIndex(s, start)
+		end = GetStringIndex(s, end)
+	}
+	return &MatchRecord{StartIndex: start, EndIndex: end}
 }
 
 // 22.2.7.6
 func GetMatchString(agent *Agent, s string, match *MatchRecord) string {
 	Assert(match.StartIndex <= match.EndIndex)
-	return s[match.StartIndex:match.EndIndex]
+	codeUnits := utf16.Encode([]rune(s))
+	Assert(match.EndIndex <= JSInt(len(codeUnits)))
+	return string(utf16.Decode(codeUnits[match.StartIndex:match.EndIndex]))
 }
 
 // 22.2.7.7
@@ -617,12 +712,11 @@ func MakeMatchIndicesIndexPairArray(agent *Agent, s string, indices []*MatchReco
 	i := 0
 	for i < n {
 		var matchIndexPair Value = UndefinedValue
-		var matchIndices *MatchRecord
-		if i < len(indices) {
-			matchIndices = indices[i]
+		matchIndices := indices[i]
+		if matchIndices != nil {
 			matchIndexPair = (GetMatchIndexPair(agent, s, matchIndices)).ToValue()
 		}
-		A.CreateDataPropertyOrThrow(NewStringPropertyKey(groupNames[i]), matchIndexPair)
+		A.CreateDataPropertyOrThrow(NewIntegerIndexPropertyKey(JSInt(i)), matchIndexPair)
 		if i > 0 && groupNames[i-1] != "" {
 			MustGetObject(groups).CreateDataPropertyOrThrow(NewStringPropertyKey(groupNames[i-1]), matchIndexPair)
 		}

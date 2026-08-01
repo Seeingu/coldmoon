@@ -1,3 +1,5 @@
+.PHONY: build build-all test test262 fmt
+
 build: main.go coldmoon/
 	go build -o main.exe .
 

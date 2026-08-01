@@ -414,7 +414,8 @@ type ArgGetterSetterCaptures struct {
 	Env  EnvironmentRecord
 }
 
-// TODO: maybe can be removed
+// AdditionalFields stores the class-specific slots carried by built-in class
+// constructors. Other built-in closures use AdditionalFieldsV2 instead.
 type AdditionalFields struct {
 	ClassConstructorFields *ClassConstructorFields
 }
@@ -439,8 +440,7 @@ func stepsReject(
 		return UndefinedValue
 	}
 	alreadyResolved.Value = true
-	promise.PromiseState = PromiseStateRejected
-	promise.PromiseResult = argumentAt(arguments, 0)
+	RejectPromise(agent, promise, argumentAt(arguments, 0))
 	return UndefinedValue
 }
 
@@ -551,11 +551,6 @@ func TriggerPromiseReactions(agent *Agent, reactions []*PromiseReaction, argumen
 	}
 }
 
-type PromiseJobReactionCaptures struct {
-	Agent    *Agent
-	Reaction *PromiseReaction
-	Argument Value
-}
 type PromiseJobThenableReactionCaptures struct {
 	Agent            *Agent
 	PromiseToResolve *PromiseObject
@@ -579,18 +574,7 @@ type PromiseReactionJob struct {
 
 // 27.2.2.1
 func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Value) *PromiseReactionJob {
-	captures := &PromiseJobReactionCaptures{
-		Agent:    agent,
-		Reaction: reaction,
-		Argument: argument,
-	}
-
-	// TODO(BM): use outer env directly
-	fun := func(_captures any) Value {
-		captures := _captures.(*PromiseJobReactionCaptures)
-		agent := captures.Agent
-		reaction := captures.Reaction
-		argument := captures.Argument
+	fun := func(any) Value {
 		promiseCapability := reaction.Capability
 		t := reaction.Type
 		handler := reaction.Handler
@@ -599,16 +583,20 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 			if t == PromiseReactionTypeFulfill {
 				handlerResult.value = argument
 			} else {
-				handlerResult.err = agent.exception
+				Assert(t == PromiseReactionTypeReject)
+				handlerResult.t = CompletionTypeThrow
+				handlerResult.err = argument
 			}
 		} else {
-			handlerResult.value = agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument}).value
+			handlerResult = agent.HostHooks.HostCallJobCallback(handler, UndefinedValue, []Value{argument})
 		}
 		if promiseCapability == nil {
+			Assert(!handlerResult.IsAbrupt())
 			return UndefinedValue
 		}
-		if handlerResult.IsError() {
+		if handlerResult.IsAbrupt() {
 			reason := handlerResult.Error()
+			Assert(reason != nil)
 			return promiseCapability.Reject.Call(
 				UndefinedValue, []Value{reason},
 			).value
@@ -620,8 +608,7 @@ func NewPromiseReactionJob(agent *Agent, reaction *PromiseReaction, argument Val
 		}
 	}
 	job := &Job{
-		Fun:      fun,
-		Captures: captures,
+		Fun: fun,
 	}
 	var handlerRealm *Realm
 	if reaction.Handler != nil {

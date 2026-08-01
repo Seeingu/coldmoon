@@ -499,12 +499,13 @@ func NewNumberConstructor(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("isNaN"), isNaN, 1)
 	object.defineBuiltinFunction(realm, CMString("isSafeInteger"), isSafeInteger, 1)
 
-	// TODO: do not use magic number
-	object.defineBuiltinProperty(CMString("EPSILON"), NewFrozenPropertyDescriptor(NewNumberValue(2.220446049250313e-16)))
-	object.defineBuiltinProperty(CMString("MAX_SAFE_INTEGER"), NewFrozenPropertyDescriptor(NewNumberValue(9007199254740991)))
-	object.defineBuiltinProperty(CMString("MIN_SAFE_INTEGER"), NewFrozenPropertyDescriptor(NewNumberValue(-9007199254740991)))
-	object.defineBuiltinProperty(CMString("MAX_VALUE"), NewFrozenPropertyDescriptor(NewNumberValue(1.7976931348623157e+308)))
-	object.defineBuiltinProperty(CMString("MIN_VALUE"), NewFrozenPropertyDescriptor(NewNumberValue(5e-324)))
+	epsilon := math.Nextafter(1, 2) - 1
+	maxSafeInteger := POW_2_53 - 1
+	object.defineBuiltinProperty(CMString("EPSILON"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(epsilon))))
+	object.defineBuiltinProperty(CMString("MAX_SAFE_INTEGER"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(maxSafeInteger))))
+	object.defineBuiltinProperty(CMString("MIN_SAFE_INTEGER"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(-maxSafeInteger))))
+	object.defineBuiltinProperty(CMString("MAX_VALUE"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(math.MaxFloat64))))
+	object.defineBuiltinProperty(CMString("MIN_VALUE"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(math.SmallestNonzeroFloat64))))
 	object.defineBuiltinProperty(CMString("NEGATIVE_INFINITY"), NewFrozenPropertyDescriptor(NegativeInfinityValue))
 	object.defineBuiltinProperty(CMString("POSITIVE_INFINITY"), NewFrozenPropertyDescriptor(InfinityValue))
 	object.defineBuiltinProperty(CMString("NaN"), NewFrozenPropertyDescriptor(NaNValue))

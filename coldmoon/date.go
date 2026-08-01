@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -772,13 +773,25 @@ func msFromTime(t JSNumber) JSNumber {
 	return JSNumber(time.UnixMilli(int64(t)).UTC().Nanosecond() / int(time.Millisecond))
 }
 
-func GetNamedTimeZoneOffsetNanoseconds(tz string, t float64) int {
-	// TODO
-	return 0
+func GetNamedTimeZoneOffsetNanoseconds(tz string, epochNanoseconds float64) int64 {
+	Assert(!math.IsNaN(epochNanoseconds) && !math.IsInf(epochNanoseconds, 0))
+
+	location, err := time.LoadLocation(tz)
+	Assert(err == nil)
+
+	// Date time values have millisecond precision, so the offset in effect at
+	// the containing epoch second is sufficient here. Using Floor keeps times
+	// before the epoch on the correct side of a time-zone transition.
+	epochSeconds := math.Floor(epochNanoseconds / float64(time.Second))
+	instant := time.Unix(int64(epochSeconds), 0).In(location)
+	_, offsetSeconds := instant.Zone()
+	return int64(offsetSeconds) * int64(time.Second)
 }
 
 func SystemTimeZoneIdentifier() string {
-	// TODO
+	// The runtime does not currently expose a host hook that can provide a
+	// primary IANA identifier. ECMAScript permits implementations without
+	// political time-zone data to use UTC as their system time zone.
 	return "UTC"
 }
 
@@ -852,8 +865,7 @@ func MakeFullYear(year JSNumber) JSNumber {
 	if year.IsNaN() {
 		return JSNumberNaN
 	}
-	// TODO
-	truncated := year
+	truncated := JSNumber(math.Trunc(float64(year)))
 	if truncated >= 0 && truncated <= 99 {
 		return 1900 + truncated
 	}
@@ -1069,8 +1081,10 @@ func NewDateConstructor(realm *Realm) ObjectType {
 
 // 21.4.1.25
 func LocalTime(tv JSNumber) JSNumber {
-	// TODO
-	return tv
+	timeZone := SystemTimeZoneIdentifier()
+	offsetNanoseconds := GetNamedTimeZoneOffsetNanoseconds(timeZone, float64(tv)*1e6)
+	offsetMilliseconds := math.Trunc(float64(offsetNanoseconds) / 1e6)
+	return tv + JSNumber(offsetMilliseconds)
 }
 
 // DateTimeStringFormat parses a string and returns a time value.
@@ -1094,18 +1108,48 @@ func DateTimeStringFormat(s string) JSNumber {
 }
 
 func DateString(t JSNumber) string {
-	// TODO
-	return ""
+	weekDayNames := [...]string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
+	monthNames := [...]string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+
+	year := int64(YearFromTime(t))
+	yearString := fmt.Sprintf("%04d", year)
+	if year < 0 {
+		yearString = fmt.Sprintf("-%04d", -year)
+	}
+
+	return fmt.Sprintf(
+		"%s %s %02d %s",
+		weekDayNames[int(WeekDay(t))],
+		monthNames[int(MonthFromTime(t))],
+		int(DateFromTime(t)),
+		yearString,
+	)
 }
 
 func TimeString(t JSNumber) string {
-	// TODO
-	return ""
+	return fmt.Sprintf(
+		"%02d:%02d:%02d GMT",
+		int(HourFromTime(t)),
+		int(MinFromTime(t)),
+		int(SecFromTime(t)),
+	)
 }
 
 func TimeZoneString(tv JSNumber) string {
-	// TODO
-	return ""
+	timeZone := SystemTimeZoneIdentifier()
+	offsetNanoseconds := GetNamedTimeZoneOffsetNanoseconds(timeZone, float64(tv)*1e6)
+	offsetMilliseconds := int64(math.Trunc(float64(offsetNanoseconds) / 1e6))
+
+	sign := "+"
+	if offsetMilliseconds < 0 {
+		sign = "-"
+		offsetMilliseconds = -offsetMilliseconds
+	}
+	totalMinutes := offsetMilliseconds / int64(MS_PER_MIN)
+	hours := totalMinutes / 60
+	minutes := totalMinutes % 60
+
+	return fmt.Sprintf("%s%02d%02d", sign, hours, minutes)
 }
 
 // 21.4.4.41.4
@@ -1113,16 +1157,13 @@ func ToDateString(tv JSNumber) string {
 	if !tv.IsValidDateTime() {
 		return InvalidDate
 	}
-	t := LocalTime(tv)
-
-	s := time.UnixMilli(int64(t))
-	return s.Format(JsDateFormat)
+	localTime := LocalTime(tv)
+	return DateString(localTime) + " " + TimeString(localTime) + TimeZoneString(tv)
 }
 
 // MARK: - Date constants
 
 const (
-	JsDateFormat = "Mon Jan _2 2006 15:04:05 MST-0700"
 	DateMaxValue = 8640000000000000
 	InvalidDate  = "Invalid Date"
 )

@@ -2,9 +2,9 @@ package coldmoon
 
 import (
 	"math"
-	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type constructorProperties struct {
@@ -261,9 +261,13 @@ func NewParseFloat(realm *Realm) ObjectType {
 func NewDecodeURI(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var decodeURI BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		uriString := ToString(agent, argumentAt(arguments, 0)).String()
+		var co CompletionValue
+		uriString, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, argumentAt(arguments, 0)), co)
+		if isAbrupt {
+			return rt
+		}
 		preserveEscapeSet := ";/?:@&=+$,#"
-		return NewStringValue(decode(agent, uriString, preserveEscapeSet))
+		return decode(agent, uriString.Data, preserveEscapeSet)
 	}
 	return CreateBuiltinFunction(agent, decodeURI, 1, CMString("decodeURI"), builtinFunctionArgs{
 		realm: realm,
@@ -273,9 +277,13 @@ func NewDecodeURI(realm *Realm) ObjectType {
 func NewDecodeURIComponent(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var decodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		uriString := ToString(agent, argumentAt(arguments, 0)).String()
+		var co CompletionValue
+		uriString, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, argumentAt(arguments, 0)), co)
+		if isAbrupt {
+			return rt
+		}
 		preserveEscapeSet := ""
-		return NewStringValue(decode(agent, uriString, preserveEscapeSet))
+		return decode(agent, uriString.Data, preserveEscapeSet)
 	}
 	return CreateBuiltinFunction(agent, decodeURIComponent, 1, CMString("decodeURIComponent"), builtinFunctionArgs{
 		realm: realm,
@@ -285,9 +293,13 @@ func NewDecodeURIComponent(realm *Realm) ObjectType {
 func NewEncodeURI(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var encodeURI BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		uriString := ToString(agent, argumentAt(arguments, 0)).String()
+		var co CompletionValue
+		uriString, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, argumentAt(arguments, 0)), co)
+		if isAbrupt {
+			return rt
+		}
 		extraUnescaped := ";/?:@&=+$,#"
-		return NewStringValue(encode(agent, uriString, extraUnescaped))
+		return encode(agent, uriString.Data, extraUnescaped)
 	}
 	return CreateBuiltinFunction(agent, encodeURI, 1, CMString("encodeURI"), builtinFunctionArgs{
 		realm: realm,
@@ -297,25 +309,151 @@ func NewEncodeURI(realm *Realm) ObjectType {
 func NewEncodeURIComponent(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var encodeURIComponent BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		uriString := ToString(agent, argumentAt(arguments, 0)).String()
+		var co CompletionValue
+		uriString, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, argumentAt(arguments, 0)), co)
+		if isAbrupt {
+			return rt
+		}
 		extraUnescaped := ""
-		return NewStringValue(encode(agent, uriString, extraUnescaped))
+		return encode(agent, uriString.Data, extraUnescaped)
 	}
 	return CreateBuiltinFunction(agent, encodeURIComponent, 1, CMString("encodeURIComponent"), builtinFunctionArgs{
 		realm: realm,
 	})
 }
 
-func decode(agent *Agent, uriString string, reservedSet string) string {
-	// TODO:
-	return url.QueryEscape(uriString)
+// decode implements the Decode abstract operation from 19.2.6.6.
+func decode(agent *Agent, uriString string, preserveEscapeSet string) (co CompletionValue) {
+	var result strings.Builder
+	result.Grow(len(uriString))
+
+	for k := 0; k < len(uriString); {
+		if uriString[k] != '%' {
+			result.WriteByte(uriString[k])
+			k++
+			continue
+		}
+
+		if k+3 > len(uriString) {
+			return co.ThrowError(agent, URIError, "malformed URI sequence")
+		}
+		escapeStart := k
+		firstOctet, ok := parseURIHexOctet(uriString[k+1], uriString[k+2])
+		if !ok {
+			return co.ThrowError(agent, URIError, "malformed URI sequence")
+		}
+		k += 3
+
+		sequenceLength := leadingOneBits(firstOctet)
+		if sequenceLength == 0 {
+			if strings.ContainsRune(preserveEscapeSet, rune(firstOctet)) {
+				result.WriteString(uriString[escapeStart:k])
+			} else {
+				result.WriteByte(firstOctet)
+			}
+			continue
+		}
+		if sequenceLength == 1 || sequenceLength > 4 {
+			return co.ThrowError(agent, URIError, "malformed URI sequence")
+		}
+
+		octets := make([]byte, 1, sequenceLength)
+		octets[0] = firstOctet
+		for len(octets) < sequenceLength {
+			if k+3 > len(uriString) || uriString[k] != '%' {
+				return co.ThrowError(agent, URIError, "malformed URI sequence")
+			}
+			continuationOctet, ok := parseURIHexOctet(uriString[k+1], uriString[k+2])
+			if !ok {
+				return co.ThrowError(agent, URIError, "malformed URI sequence")
+			}
+			octets = append(octets, continuationOctet)
+			k += 3
+		}
+
+		if !utf8.Valid(octets) {
+			return co.ThrowError(agent, URIError, "malformed URI sequence")
+		}
+		_, decodedSize := utf8.DecodeRune(octets)
+		if decodedSize != len(octets) {
+			return co.ThrowError(agent, URIError, "malformed URI sequence")
+		}
+		result.Write(octets)
+	}
+
+	return NewStringValue(result.String()).ToCompletion()
 }
 
-func encode(agent *Agent, s string, extraUnescaped string) string {
-	// TODO:
-	r, err := url.QueryUnescape(s)
-	if err != nil {
-		panic("url.QueryUnescape error")
+// encode implements the Encode abstract operation from 19.2.6.5.
+func encode(agent *Agent, uriString string, extraUnescaped string) (co CompletionValue) {
+	const hexDigits = "0123456789ABCDEF"
+
+	var result strings.Builder
+	result.Grow(len(uriString))
+	for k := 0; k < len(uriString); {
+		codePoint, size := utf8.DecodeRuneInString(uriString[k:])
+		if codePoint == utf8.RuneError && size == 1 {
+			// A lone UTF-16 surrogate is represented internally using its
+			// WTF-8 byte sequence, which is not valid UTF-8. Other malformed
+			// internal strings cannot be URI encoded either.
+			return co.ThrowError(agent, URIError, "malformed URI sequence")
+		}
+
+		if size == 1 && isURIUnescaped(uriString[k], extraUnescaped) {
+			result.WriteByte(uriString[k])
+			k++
+			continue
+		}
+
+		for _, octet := range []byte(uriString[k : k+size]) {
+			result.WriteByte('%')
+			result.WriteByte(hexDigits[octet>>4])
+			result.WriteByte(hexDigits[octet&0x0f])
+		}
+		k += size
 	}
-	return r
+
+	return NewStringValue(result.String()).ToCompletion()
+}
+
+func isURIUnescaped(codeUnit byte, extraUnescaped string) bool {
+	if codeUnit >= 'a' && codeUnit <= 'z' ||
+		codeUnit >= 'A' && codeUnit <= 'Z' ||
+		codeUnit >= '0' && codeUnit <= '9' {
+		return true
+	}
+	return strings.ContainsRune("-_.!~*'()"+extraUnescaped, rune(codeUnit))
+}
+
+func parseURIHexOctet(high, low byte) (byte, bool) {
+	highValue, ok := uriHexDigitValue(high)
+	if !ok {
+		return 0, false
+	}
+	lowValue, ok := uriHexDigitValue(low)
+	if !ok {
+		return 0, false
+	}
+	return highValue<<4 | lowValue, true
+}
+
+func uriHexDigitValue(digit byte) (byte, bool) {
+	switch {
+	case digit >= '0' && digit <= '9':
+		return digit - '0', true
+	case digit >= 'a' && digit <= 'f':
+		return digit - 'a' + 10, true
+	case digit >= 'A' && digit <= 'F':
+		return digit - 'A' + 10, true
+	default:
+		return 0, false
+	}
+}
+
+func leadingOneBits(octet byte) int {
+	count := 0
+	for mask := byte(0x80); octet&mask != 0; mask >>= 1 {
+		count++
+	}
+	return count
 }

@@ -18,6 +18,42 @@ func TestCompletionFromPreservesAbruptControlFlow(t *testing.T) {
 	}
 }
 
+func TestReturnIfAbruptPreservesSameTypedReturnValue(t *testing.T) {
+	want := NewStringValue("returned")
+	completion := CompletionValue{
+		t:     CompletionTypeReturn,
+		value: want,
+	}
+
+	_, abrupt, propagated := ReturnIfAbrupt(completion, CompletionValue{})
+	if !abrupt {
+		t.Fatal("return completion was not abrupt")
+	}
+	if propagated.t != CompletionTypeReturn {
+		t.Fatalf("completion type = %v, want return", propagated.t)
+	}
+	if propagated.value != want {
+		t.Fatalf("return value = %v, want %v", propagated.value, want)
+	}
+}
+
+func TestUpdateEmptyPreservesAbruptCompletion(t *testing.T) {
+	result := CompletionValue{
+		t:      CompletionTypeContinue,
+		target: "outer",
+	}
+	updated := UpdateEmpty(result, UndefinedValue)
+	if updated.t != CompletionTypeContinue {
+		t.Fatalf("completion type = %v, want continue", updated.t)
+	}
+	if updated.target != "outer" {
+		t.Fatalf("target = %q, want outer", updated.target)
+	}
+	if updated.value != UndefinedValue {
+		t.Fatalf("value = %#v, want undefined", updated.value)
+	}
+}
+
 func TestBuiltinBoundaryConvertsThrownValuesAndNilResults(t *testing.T) {
 	InitializeConstants()
 	agent := NewAgent()

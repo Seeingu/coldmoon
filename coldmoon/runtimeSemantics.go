@@ -70,7 +70,7 @@ type RuntimeSemanticsIteratorDestructuringAssignmentEvaluation interface {
 
 // 15.3.4
 type RuntimeSemanticsInstantiateArrowFunctionExpression interface {
-	InstantiateArrowFunctionExpression(vm *VM, name string) Value
+	InstantiateArrowFunctionExpression(vm *VM, name PropertyKeyOrPrivateName) Value
 }
 
 // RuntimeSemanticsMethodDefinitionEvaluation
@@ -87,7 +87,7 @@ type RuntimeSemanticsChainEvaluation interface {
 }
 
 type DefineMethodRecord struct {
-	Key     PropertyKey
+	Key     PropertyKeyOrPrivateName
 	Closure ObjectType
 }
 

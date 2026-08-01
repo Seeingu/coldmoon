@@ -13,8 +13,8 @@ func TestStaticSemanticsSnapshotsScriptDeclarations(t *testing.T) {
 	if len(static.LexicalDeclarations) != 1 {
 		t.Fatalf("lexical declaration count = %d, want 1", len(static.LexicalDeclarations))
 	}
-	if len(static.VarDeclarations) != 2 {
-		t.Fatalf("var-scoped declaration count = %d, want 2", len(static.VarDeclarations))
+	if len(static.VarDeclarations) != 1 {
+		t.Fatalf("var-scoped declaration count = %d, want 1", len(static.VarDeclarations))
 	}
 }
 

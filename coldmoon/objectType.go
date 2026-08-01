@@ -9,7 +9,8 @@ type ObjectType interface {
 	SetPrototype(p ObjectType)
 	// 14.7.5.9
 	EnumerateObjectProperties() ObjectType
-	// TODO: assert constructor is a function
+	// constructor must be an ECMAScript or built-in function object with
+	// [[PrivateMethods]] and [[Fields]] internal slots.
 	InitializeInstanceElements(constructor ObjectType)
 	CreateDataProperty(key PropertyKey, value Value) bool
 	DeletePropertyOrThrow(key PropertyKey) bool
@@ -23,6 +24,7 @@ type ObjectType interface {
 		predicate Value,
 		thisArg Value,
 	) Completion[FoundResult]
+	GetCompletion(key PropertyKey) CompletionValue
 	Get(key PropertyKey) Value
 	Set(key PropertyKey, value Value, throw setThrowType) CompletionValue
 	Agent() *Agent
@@ -40,6 +42,7 @@ type ObjectType interface {
 	// PrivateMethodOrAccessorAdd 7.3.28
 	PrivateMethodOrAccessorAdd(method *PrivateElement)
 	PrivateGet(privateName PrivateName) CompletionValue
+	PrivateSet(privateName PrivateName, value Value) CompletionValue
 	ToCompletion() Completion[ObjectType]
 	ToValue() Value
 	// --- internal methods ---

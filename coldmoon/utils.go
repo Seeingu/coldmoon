@@ -1,7 +1,9 @@
 package coldmoon
 
-// TODO(BM): use object.defineBuiltinFunction
-// Deprecated
+// DefineBuiltinFunction installs a host-provided built-in function using the
+// same descriptor attributes as engine intrinsics. This exported adapter is
+// intentionally kept for host packages such as runtime; code inside coldmoon
+// should call Object.defineBuiltinFunction directly.
 func DefineBuiltinFunction(
 	realm *Realm,
 	name PropertyConvertable,
@@ -9,20 +11,7 @@ func DefineBuiltinFunction(
 	fn BehaviorFn,
 	length JSInt,
 ) {
-	functionName := name
-	f := CreateBuiltinFunction(
-		realm.Agent,
-		fn,
-		length,
-		functionName,
-		builtinFunctionArgs{realm: realm},
-	)
-	object.defineBuiltinProperty(name, &PropertyDescriptor{
-		Value:        f.ToValue(),
-		Writable:     true,
-		Enumerable:   false,
-		Configurable: true,
-	})
+	object.Ref().defineBuiltinFunction(realm, name, fn, length)
 }
 
 func IsUndefinedOrNil(v Value) bool {

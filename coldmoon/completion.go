@@ -57,11 +57,16 @@ func (c Completion[T]) ThrowError(agent *Agent, errorType ExceptionType, msg str
 }
 
 // CompletionFrom changes the payload type of other while preserving every
-// control-flow field. The payload itself cannot be copied across generic types.
+// control-flow field. When both completions use the same payload type, the
+// payload is retained as well (notably for return completions propagated
+// through ReturnIfAbrupt).
 func CompletionFrom[T any, U any](a Completion[T], other Completion[U]) Completion[T] {
 	a.err = other.err
 	a.t = other.t
 	a.target = other.target
+	if value, ok := any(other.value).(T); ok {
+		a.value = value
+	}
 	return a
 }
 

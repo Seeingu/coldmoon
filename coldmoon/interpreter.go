@@ -30,18 +30,20 @@ func (v *VM) RunningPrivateEnvironment() *PrivateEnvironment {
 	return v.agent.RunningExecutionContext().ECMAScriptCode.PrivateEnvironment
 }
 
-// TODO(BM): error handling
-func (v *VM) panic(err Value) {
-	panic(err)
+// abrupt converts a language exception into a throw completion. AST
+// evaluation must propagate language failures through completion records;
+// Go panics are reserved for interpreter invariants.
+func (v *VM) abrupt(err Value) (co CompletionValue) {
+	co.t = CompletionTypeThrow
+	co.err = err
+	return
 }
 
-// TODO(BM): rename completion
-// Deprecated
-// Completion
+// CompletionHandle preserves an existing completion record. It remains as a
+// named identity operation because several algorithms mirror the spec's
+// Completion abstract operation directly.
 // spec: 5.2.3.1
 func CompletionHandle[T any](completion Completion[T]) Completion[T] {
-	// do nothing
-	// - received `completion` is already a completion record
 	return completion
 }
 
@@ -56,8 +58,8 @@ func CompletionHandleV2[T any](c CompletionConvertable[T]) Completion[T] {
 
 // ReturnIfAbrupt
 // spec: 5.2.3.3
-// caller should return `rt` if `isAbrupt` is true
-// TODO: can we simplify caller code?
+// The tuple form lets callers propagate a completion while converting its
+// result type without discarding the normal value.
 func ReturnIfAbrupt[T any, RT any](completion Completion[T], returnCompletion Completion[RT]) (value T, isAbrupt bool, rt Completion[RT]) {
 	value = completion.value
 	if completion.IsAbrupt() {
@@ -83,10 +85,9 @@ func (v *VM) InitializeBoundName(name string, value Value, env EnvironmentRecord
 	if env != nil {
 		env.InitializeBinding(name, value)
 		return
-	} else {
-		lhs := v.agent.ResolveBinding(name, nil, true)
-		return lhs.PutValue(v.agent, value)
 	}
+	lhs := v.agent.ResolveBinding(name, nil, true)
+	return lhs.PutValue(v.agent, value)
 }
 
 // EvaluatePropertyAccessWithExpressionKey
@@ -318,9 +319,11 @@ func (v *VM) ApplyStringOrNumericBinaryOperator(left, right Value, op BinaryOper
 	panic("unreachable")
 }
 
-// EvaluateCall ( func, ref, arguments, tailPosition )
+// EvaluateCall evaluates an eager call using the receiver encoded in ref.
+// This VM does not expose a tail-call trampoline; keeping a dormant
+// tailPosition parameter caused callers to imply support that did not exist.
 // spec: 13.3.6.2
-func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) (co CompletionValue) {
+func (v *VM) EvaluateCall(fun, ref Value, arguments []Value) (co CompletionValue) {
 	agent := v.agent
 	if rr, ok := ref.ReferenceRecord(); ok &&
 		!rr.IsPropertyReference() &&
@@ -356,7 +359,6 @@ func (v *VM) EvaluateCall(fun, ref Value, arguments []Value, tailPosition bool) 
 		co.err = agent.ThrowTypeError("function is not callable")
 		return
 	}
-	// TODO: WIP: tailPosition
 	value, isAbrupt, rt := ReturnIfAbrupt(fun.Call(agent, thisValue, arguments), co)
 	if isAbrupt {
 		return rt
@@ -376,7 +378,9 @@ func (v *VM) ForBodyEvaluation(
 	labelSet LabelSet,
 ) (co CompletionValue) {
 	var V Value = UndefinedValue
-	CreatePerIterationEnvironment(perIterationBindings)
+	if status := v.CreatePerIterationEnvironment(perIterationBindings); status.IsAbrupt() {
+		return status
+	}
 	for {
 		if test != nil {
 			testValue, _, isAbrupt, rt := v.EvalAndGetValue(test, co)
@@ -394,7 +398,9 @@ func (v *VM) ForBodyEvaluation(
 		if !IsUndefinedOrNil(result.value) {
 			V = result.value
 		}
-		CreatePerIterationEnvironment(perIterationBindings)
+		if status := v.CreatePerIterationEnvironment(perIterationBindings); status.IsAbrupt() {
+			return status
+		}
 		if increment != nil {
 			incRef := increment.Evaluation(v)
 			incRef.value.GetValue(v.agent)
@@ -412,27 +418,30 @@ func (v *VM) ForInOfHeadEvaluation(
 	agent := v.agent
 	oldEnv := v.RunningLexicalEnvironment()
 	if len(uninitializedBoundNames) > 0 {
-		// TODO: Assert: uninitializedBoundNames has no duplicate entries.
+		seenNames := make(map[string]bool, len(uninitializedBoundNames))
+		for _, name := range uninitializedBoundNames {
+			Assert(!seenNames[name])
+			seenNames[name] = true
+		}
 		newEnv := NewDeclarativeEnvironment(oldEnv)
 		for _, name := range uninitializedBoundNames {
 			newEnv.CreateMutableBinding(name, false)
 		}
 		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = newEnv
 	}
-	exprRef, isAbrupt, rt := ReturnIfAbrupt(expr.Evaluation(v), co)
+	exprCompletion := expr.Evaluation(v)
+	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
+	exprRef, isAbrupt, rt := ReturnIfAbrupt(exprCompletion, co)
 	if isAbrupt {
 		return rt
 	}
-	agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
 	exprValue, isAbrupt, rt := ReturnIfAbrupt(exprRef.GetValue(agent), co)
 	if isAbrupt {
 		return rt
 	}
 	if iterationKind == ForInOfIterationKindEnumerate {
 		if IsUndefinedOrNil(exprValue) || exprValue == NullValue {
-			// TODO: return { [[Type]]: BREAK, [[Value]]: EMPTY, [[Target]]: EMPTY }
 			co.t = CompletionTypeBreak
-			// return EMPTY
 			return
 		}
 		obj := exprValue.ToObject(agent).value
@@ -474,14 +483,32 @@ func (v *VM) ForInOfBodyEvaluation(
 	agent := v.agent
 	oldEnv := v.RunningLexicalEnvironment()
 	var V Value = UndefinedValue
-	// TODO:
 	destructuring := false
-	if destructuring {
+	switch lhs := lhs.(type) {
+	case *ForBinding:
+		destructuring = lhs.BindingPattern != nil
+	case *ForDeclaration:
+		destructuring = lhs.ForBinding.BindingPattern != nil
+	case *LeftHandSideExpression:
+		destructuring = lhs.astIsArrayAssignmentPattern() || lhs.astIsObjectAssignmentPattern()
+	case Expression:
+		_, isArray := lhs.(*ArrayLiteral)
+		_, isObject := lhs.(*PrimaryExpressionObjectLiteral)
+		destructuring = isArray || isObject
 	}
 	for {
-		nextResultValue := ReturnAssertNormal(iteratorRecord.NextMethod.Call(agent, iteratorRecord.Iterator.ToValue(), nil))
+		nextResultValue, isAbrupt, rt := ReturnIfAbrupt(
+			iteratorRecord.NextMethod.Call(agent, iteratorRecord.Iterator.ToValue(), nil),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if iteratorKind == IteratorKindAsync {
-			panic("unimplemented")
+			nextResultValue, isAbrupt, rt = ReturnIfAbrupt(Await(agent, nextResultValue), co)
+			if isAbrupt {
+				return rt
+			}
 		}
 		nextResult, ok := nextResultValue.GetObject()
 		if !ok {
@@ -500,33 +527,40 @@ func (v *VM) ForInOfBodyEvaluation(
 		if isAbrupt {
 			return rt
 		}
+		var status CompletionValue
+		iterationEnvActive := false
 		if lhsKind == ForInOfLhsKindAssignment || lhsKind == ForInOfLhsKindVarBinding {
 			if destructuring {
 				if lhsKind == ForInOfLhsKindAssignment {
-					// TODO
+					assignmentPattern, ok := lhs.(*LeftHandSideExpression)
+					if !ok {
+						expression, expressionOK := lhs.(Expression)
+						if !expressionOK {
+							return co.ThrowTypeError(agent, "for-in/of destructuring target is not an expression")
+						}
+						assignmentPattern = &LeftHandSideExpression{Expression: expression}
+					}
+					status = assignmentPattern.DestructuringAssignmentEvaluation(v, nextValue)
 				} else {
-					// TODO
+					binding := lhs.(*ForBinding)
+					status = binding.BindingPattern.BindingInitialization(v, nextValue, nil)
 				}
 			} else {
 				if lhsKind == ForInOfLhsKindVarBinding {
 					lhsName := lhs.(*ForBinding).BindingIdentifier
 					lhsRef := agent.ResolveBinding(lhsName, nil, true)
-					_, isAbrupt, rt := ReturnIfAbrupt(lhsRef.PutValue(agent, nextValue), co)
-					if isAbrupt {
-						return rt
-					}
+					status = lhsRef.PutValue(agent, nextValue)
 				} else {
-					lhsValue, isAbrupt, rt := ReturnIfAbrupt(lhs.Evaluation(v), co)
-					if isAbrupt {
-						return rt
-					}
-					lhsRef, ok := lhsValue.ReferenceRecord()
-					if !ok {
-						return co.ThrowTypeError(agent, "for-in target is not assignable")
-					}
-					_, isAbrupt, rt = ReturnIfAbrupt(lhsRef.PutValue(agent, nextValue), co)
-					if isAbrupt {
-						return rt
+					lhsValue := lhs.Evaluation(v)
+					if lhsValue.IsAbrupt() {
+						status = lhsValue
+					} else {
+						lhsRef, ok := lhsValue.value.ReferenceRecord()
+						if !ok {
+							status = co.ThrowTypeError(agent, "for-in target is not assignable")
+						} else {
+							status = lhsRef.PutValue(agent, nextValue)
+						}
 					}
 				}
 			}
@@ -535,27 +569,39 @@ func (v *VM) ForInOfBodyEvaluation(
 			iterationEnv := NewDeclarativeEnvironment(oldEnv)
 			f.ForDeclarationBindingInstantiation(v, iterationEnv)
 			agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = iterationEnv
+			iterationEnvActive = true
 			if destructuring {
-				// TODO
+				status = f.ForBinding.BindingPattern.BindingInitialization(v, nextValue, iterationEnv)
 			} else {
 				lhsName := lhs.(StaticSemanticsBoundNames).BoundNames()[0]
-				lhsRef := agent.ResolveBinding(lhsName, nil, true)
-				// TODO: should return status
-				lhsRef.InitializeReferencedBinding(nextValue)
+				status = v.InitializeBoundName(lhsName, nextValue, iterationEnv)
 			}
 		}
-		// TODO: handle status
+		if status.IsAbrupt() {
+			if iterationEnvActive {
+				v.SetRunningLexicalEnvironment(oldEnv)
+			}
+			if iterationKind == ForInOfIterationKindEnumerate {
+				return status
+			}
+			if iteratorKind == IteratorKindAsync {
+				return iteratorRecord.AsyncIteratorClose(agent, status)
+			}
+			return iteratorRecord.IteratorClose(status)
+		}
 		result := stmt.Evaluation(v)
-		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
+		if iterationEnvActive {
+			agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = oldEnv
+		}
 		if !LoopContinues(result, labelSet) {
 			if iterationKind == ForInOfIterationKindEnumerate {
 				return UpdateEmpty(result, V)
 			} else {
-				Assert(iterationKind == ForInOfIterationKindIterate)
-				UpdateEmpty(result, V)
+				Assert(iterationKind == ForInOfIterationKindIterate ||
+					iterationKind == ForInOfIterationKindAsyncIterate)
+				result = UpdateEmpty(result, V)
 				if iteratorKind == IteratorKindAsync {
-					// TODO: AsyncIteratorClose
-					panic("unimplemented")
+					return iteratorRecord.AsyncIteratorClose(agent, result)
 				}
 				return iteratorRecord.IteratorClose(result)
 			}
@@ -582,18 +628,9 @@ func (v *VM) BlockDeclarationInstantiation(code StaticSemanticsLexicallyScopedDe
 				}
 			}
 		}
-		if d, ok := decl.(RuntimeSemanticsInstantiateFunctionObject); ok {
-			fn := boundNames[0]
-			fo := d.InstantiateFunctionObject(env, privateEnv)
-			if !env.HasBinding(fn) {
-				env.InitializeBinding(fn, fo.ToValue())
-			} else {
-				_, ok := decl.(*FunctionDeclaration)
-				Assert(ok)
-				env.SetMutableBinding(fn, fo.ToValue(), false)
-			}
-		} else {
-			panic("unreachable")
+		if declaration, ok := decl.(DeclarationHoistable); ok {
+			name, functionObject := instantiateHoistableDeclaration(v.agent, declaration, env, privateEnv)
+			env.InitializeBinding(name, functionObject.ToValue())
 		}
 	}
 }
@@ -612,8 +649,27 @@ func (v *VM) EvalAndGetValue(node ASTNode, co CompletionValue) (Value, Value, bo
 	return value, ref, false, rt
 }
 
-func CreatePerIterationEnvironment(perIterationBindings []string) {
-	// TODO
+// CreatePerIterationEnvironment copies loop-scoped bindings into a fresh
+// declarative environment so closures from different iterations retain
+// distinct cells.
+// spec: 14.7.4.4
+func (v *VM) CreatePerIterationEnvironment(perIterationBindings []string) (co CompletionValue) {
+	if len(perIterationBindings) == 0 {
+		return UndefinedValue.ToCompletion()
+	}
+
+	lastIterationEnv := v.RunningLexicalEnvironment()
+	thisIterationEnv := NewDeclarativeEnvironment(lastIterationEnv.OuterEnv())
+	for _, bindingName := range perIterationBindings {
+		thisIterationEnv.CreateMutableBinding(bindingName, false)
+		lastValue := lastIterationEnv.GetBindingValue(v.agent, bindingName, true)
+		if lastValue.IsAbrupt() {
+			return CompletionFrom(co, lastValue)
+		}
+		thisIterationEnv.InitializeBinding(bindingName, lastValue.Data())
+	}
+	v.SetRunningLexicalEnvironment(thisIterationEnv)
+	return UndefinedValue.ToCompletion()
 }
 
 // LoopContinues
@@ -622,17 +678,28 @@ func LoopContinues(result CompletionValue, labelSet LabelSet) bool {
 	if result.t == CompletionTypeNormal && result.err == nil {
 		return true
 	}
-	// TODO: check target
+	if result.t != CompletionTypeContinue {
+		return false
+	}
+	if result.target == "" {
+		return true
+	}
+	for _, label := range labelSet {
+		if label == result.target {
+			return true
+		}
+	}
 	return false
 }
 
 // UpdateEmpty
 // spec: 6.2.4.3
 func UpdateEmpty(result CompletionValue, V Value) CompletionValue {
-	if result.value != nil || result.err != nil {
+	if result.value != nil {
 		return result
 	}
-	return V.ToCompletion()
+	result.value = V
+	return result
 }
 
 func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {
@@ -644,6 +711,10 @@ func RunNode(agent *Agent, node ASTNode) (co Completion[Value]) {
 	}()
 	if functionBody, ok := node.(*FunctionBody); ok {
 		vm2.containedInStrictCode = functionBody.Strict
+	}
+	if _, ok := node.(*Module); ok {
+		// Module code is always strict, regardless of directive prologues.
+		vm2.containedInStrictCode = true
 	}
 	return runtimeSemantics.Evaluate(node)
 }

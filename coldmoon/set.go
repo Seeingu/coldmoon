@@ -58,7 +58,7 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		var co CompletionValue
 		iterable := pkg.SliceSafeGet(argumentsList, 0)
 		if newTarget == nil {
-			return agent.ThrowTypeError("new target is nil")
+			return co.ThrowTypeError(agent, "Set constructor requires new")
 		}
 		o := OrdinaryCreateFromConstructor(agent, newTarget, "%SetObject.prototype%", nil)
 		s := &SetObject{
@@ -70,9 +70,15 @@ func NewSetConstructor(realm *Realm) ObjectType {
 		if IsUndefinedOrNil(iterable) {
 			return s.ToValue()
 		}
-		adder := s.Get(NewStringPropertyKey("add"))
+		adder, isAbrupt, rt := ReturnIfAbrupt(
+			s.internalMethods().Get(s, NewStringPropertyKey("add"), s.ToValue()),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		if !IsCallable(adder) {
-			return agent.ThrowTypeError("adder is not callable")
+			return co.ThrowTypeError(agent, "Set adder is not callable")
 		}
 		iteratorRecord, isAbrupt, rt := ReturnIfAbrupt(GetIterator(agent, iterable, IteratorKindSync), co)
 		if isAbrupt {
@@ -87,7 +93,10 @@ func NewSetConstructor(realm *Realm) ObjectType {
 			if isDone {
 				return s.ToValue()
 			}
-			adder.Call(agent, s.ToValue(), []Value{nextItem})
+			status := adder.Call(agent, s.ToValue(), []Value{nextItem})
+			if status.IsAbrupt() {
+				return iteratorRecord.IteratorClose(status)
+			}
 		}
 	}
 	object := CreateBuiltinFunction(agent, behavior, 0, CMString("SetObject"), builtinFunctionArgs{

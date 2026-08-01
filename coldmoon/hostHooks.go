@@ -30,7 +30,7 @@ func HostEnqueuePromiseJob(agent *Agent, job *Job, realm *Realm) {
 }
 
 func HostPromiseRejectionTracker(promise *PromiseObject, operation PromiseRejectionTrackerOperation) {
-	// TODO
+	// The default host does not report promise rejection lifecycle events.
 }
 
 func HostCallJobCallback(callback *JobCallback, this Value, arguments []Value) CompletionValue {

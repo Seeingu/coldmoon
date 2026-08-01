@@ -1,5 +1,12 @@
 package coldmoon
 
+import (
+	"math"
+	"math/big"
+	"sync"
+	"time"
+)
+
 // 25.4.3.1
 func ValidateIntegerTypedArray(agent *Agent, typedArray Value, waitable bool) (c Completion[*TypedArrayWithBufferWitnessRecord]) {
 	taRecord := ValidateTypedArray(agent, typedArray, Relaxed)
@@ -11,9 +18,12 @@ func ValidateIntegerTypedArray(agent *Agent, typedArray Value, waitable bool) (c
 			return
 		}
 	} else {
-		size := getTypedArraySizeFromName(name)
-		if !IsUnclampedIntegerElementType(size) &&
-			!IsBigIntElementType(size) {
+		switch name {
+		case TypedArrayNameInt8, TypedArrayNameUint8,
+			TypedArrayNameInt16, TypedArrayNameUint16,
+			TypedArrayNameInt32, TypedArrayNameUint32,
+			TypedArrayNameBigInt64, TypedArrayNameBigUint64:
+		default:
 			c.err = agent.ThrowTypeError("non-waitable typed array")
 			return
 		}
@@ -38,6 +48,20 @@ const (
 	AtomicOpNotify
 	AtomicOpXor
 )
+
+type atomicWaitLocation struct {
+	block     *DataBlock
+	byteIndex JSInt
+}
+
+type atomicWaiter struct {
+	wake chan struct{}
+}
+
+var atomicsWaiters = struct {
+	sync.Mutex
+	queues map[atomicWaitLocation][]*atomicWaiter
+}{queues: make(map[atomicWaitLocation][]*atomicWaiter)}
 
 // 25.4.3.3
 func ValidateAtomicAccessOnIntegerTypedArray(
@@ -87,22 +111,15 @@ func AtomicReadModifyWrite(
 		return rt
 	}
 	typedArray := MustGetObject(typedArrayValue).(*TypedArrayObject)
-	var numericValue Value
-	if typedArray.ContentType == TypedArrayContentTypeBigInt {
-		n, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
-		if isAbrupt {
-			return rt
-		}
-		numericValue = n
-	} else {
-		n, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
-		if isAbrupt {
-			return rt
-		}
-		numericValue = n.ToValue()
+	numericValue, isAbrupt, rt := ReturnIfAbrupt(atomicNumericValue(agent, typedArray.ContentType, value), co)
+	if isAbrupt {
+		return rt
 	}
 
-	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
+	_, isAbrupt, rt = ReturnIfAbrupt(RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer), co)
+	if isAbrupt {
+		return rt
+	}
 
 	buffer := typedArray.ViewedArrayBuffer
 	elementType := TypedArrayElementType(typedArray)
@@ -125,38 +142,83 @@ func GetModifySetValueInBuffer(
 
 	block := arrayBuffer.Data()
 	isLittleEndian := agent.IsLittleEndian
-	_ = NumericToRawBytes(value, size, isLittleEndian)
-	var rawBytesRead []byte
-	// TODO: atom calculation
-	if IsSharedArrayBuffer(arrayBuffer) {
-		rawBytesRead = GetRawBytesFromSharedBlock(block, byteIndex, size, false, Relaxed)
-	} else {
-		rawBytesRead = block.Slice(byteIndex, byteIndex+size)
-	}
+	valueRaw := RawBytesToNumeric(size, NumericToRawBytes(value, elementType, isLittleEndian), isLittleEndian)
+	rawBytesRead := block.AtomicModify(byteIndex, size, func(previousBytes []byte) []byte {
+		previous := RawBytesToNumeric(size, previousBytes, isLittleEndian)
+		var target uint64
+		switch op {
+		case AtomicOpAdd:
+			target = previous + valueRaw
+		case AtomicOpAnd:
+			target = previous & valueRaw
+		case AtomicOpExchange:
+			target = valueRaw
+		case AtomicOpOr:
+			target = previous | valueRaw
+		case AtomicOpSub:
+			target = previous - valueRaw
+		case AtomicOpXor:
+			target = previous ^ valueRaw
+		default:
+			panic("GetModifySetValueInBuffer: unsupported atomic operation")
+		}
+		if size < 8 {
+			target &= (uint64(1) << uint(size*8)) - 1
+		}
+		return rawUint64ToBytes(target, size, isLittleEndian)
+	})
 	previous := RawBytesToNumeric(size, rawBytesRead, isLittleEndian)
-	v := uint64(value.(*NumberValue).Data)
+	co.value = atomicRawValue(elementType, previous)
+	return
+}
 
-	// TODO: Lock
-	var target uint64
-	switch op {
-	case AtomicOpAdd:
-		target = previous + v
-	case AtomicOpAnd:
-		target = previous & v
-	case AtomicOpExchange:
-		target = v
-	case AtomicOpOr:
-		target = previous | v
-	case AtomicOpSub:
-		target = previous - v
-	case AtomicOpXor:
-		target = previous ^ v
+func rawUint64ToBytes(raw uint64, size JSInt, isLittleEndian bool) []byte {
+	return rawUint64Bytes(raw, size, isLittleEndian)
+}
+
+func atomicRawValue(elementType TypedArrayName, raw uint64) Value {
+	switch elementType {
+	case TypedArrayNameInt8:
+		return NewNumberValue(JSNumber(int8(raw)))
+	case TypedArrayNameUint8:
+		return NewNumberValue(JSNumber(uint8(raw)))
+	case TypedArrayNameInt16:
+		return NewNumberValue(JSNumber(int16(raw)))
+	case TypedArrayNameUint16:
+		return NewNumberValue(JSNumber(uint16(raw)))
+	case TypedArrayNameInt32:
+		return NewNumberValue(JSNumber(int32(raw)))
+	case TypedArrayNameUint32:
+		return NewNumberValue(JSNumber(uint32(raw)))
+	case TypedArrayNameBigInt64:
+		return NewBigIntValue(big.NewInt(int64(raw)))
+	case TypedArrayNameBigUint64:
+		return NewBigIntValue(new(big.Int).SetUint64(raw))
 	default:
-		panic("unimplemented")
+		panic("atomicRawValue: non-integer typed array")
 	}
-	block.Set(byteIndex, NumericToRawBytes(JSNumber(target).ToValue(), size, isLittleEndian))
-	// return previous
-	co.value = JSNumber(previous).ToValue()
+}
+
+func atomicNumericValue(agent *Agent, contentType TypedArrayContentType, value Value) (co CompletionValue) {
+	if contentType == TypedArrayContentTypeBigInt {
+		bigint, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
+		if isAbrupt {
+			return rt
+		}
+		co.value = bigint
+		return
+	}
+	number, isAbrupt, rt := ReturnIfAbrupt(value.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
+	if number.IsNaN() {
+		co.value = NewNumberValue(0)
+	} else if number.IsFinite() {
+		co.value = NewNumberValue(number.Truncate())
+	} else {
+		co.value = number
+	}
 	return
 }
 
@@ -218,26 +280,32 @@ func NewAtomics(realm *Realm) ObjectType {
 		return FalseValue
 	}
 	atomicsLoad := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		var co CompletionValue
 		typedArray := argumentAt(argumentsList, 0)
 		index := argumentAt(argumentsList, 1)
-		byteIndexInBuffer := ValidateAtomicAccessOnIntegerTypedArray(
-			agent,
-			typedArray,
-			index,
-			false)
+		byteIndexInBuffer, isAbrupt, rt := ReturnIfAbrupt(
+			ValidateAtomicAccessOnIntegerTypedArray(agent, typedArray, index, false),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
 		ta := MustGetObject(typedArray).(*TypedArrayObject)
-		RevalidateAtomicAccess(agent, ta, byteIndexInBuffer.Data())
+		_, isAbrupt, rt = ReturnIfAbrupt(RevalidateAtomicAccess(agent, ta, byteIndexInBuffer), co)
+		if isAbrupt {
+			return rt
+		}
 
 		buffer := ta.ViewedArrayBuffer
-		v := GetValueFromBuffer(
+		raw := GetValueFromBuffer(
 			agent,
 			buffer,
-			byteIndexInBuffer.Data(),
+			byteIndexInBuffer,
 			getTypedArraySizeFromName(ta.TypedArrayName),
 			true,
 			SeqCst,
 		)
-		return JSNumber(v).ToValue()
+		return atomicRawValue(ta.TypedArrayName, raw)
 	}
 	atomicsOr := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		typedArray := argumentAt(argumentsList, 0)
@@ -258,10 +326,10 @@ func NewAtomics(realm *Realm) ObjectType {
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpSub)
 	}
 	atomicsWait := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		panic("not implemented")
+		return atomicWaitOperation(agent, argumentAt(argumentsList, 0), argumentAt(argumentsList, 1), argumentAt(argumentsList, 2), argumentAt(argumentsList, 3))
 	}
 	atomicsNotify := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		panic("not implemented")
+		return atomicNotifyOperation(agent, argumentAt(argumentsList, 0), argumentAt(argumentsList, 1), argumentAt(argumentsList, 2))
 	}
 	atomicsXor := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		typedArray := argumentAt(argumentsList, 0)
@@ -286,6 +354,163 @@ func NewAtomics(realm *Realm) ObjectType {
 	return object
 }
 
+func atomicWaitOperation(agent *Agent, typedArrayValue, index, expectedValue, timeoutValue Value) (co CompletionValue) {
+	taRecord, isAbrupt, rt := ReturnIfAbrupt(ValidateIntegerTypedArray(agent, typedArrayValue, true), co)
+	if isAbrupt {
+		return rt
+	}
+	typedArray := taRecord.TypedArray
+	buffer := typedArray.ViewedArrayBuffer
+	if !IsSharedArrayBuffer(buffer) {
+		return co.ThrowTypeError(agent, "Atomics.wait requires a SharedArrayBuffer")
+	}
+	byteIndex, isAbrupt, rt := ReturnIfAbrupt(ValidateAtomicAccess(agent, taRecord, index), co)
+	if isAbrupt {
+		return rt
+	}
+
+	var expected Value
+	if typedArray.TypedArrayName == TypedArrayNameBigInt64 {
+		value, isAbrupt, rt := ReturnIfAbrupt(ToBigInt64(expectedValue, agent), co)
+		if isAbrupt {
+			return rt
+		}
+		expected = NewBigIntValue(big.NewInt(value))
+	} else {
+		value, isAbrupt, rt := ReturnIfAbrupt(ToInt32(agent, expectedValue), co)
+		if isAbrupt {
+			return rt
+		}
+		expected = NewNumberValue(JSNumber(value))
+	}
+	timeout, isAbrupt, rt := ReturnIfAbrupt(timeoutValue.ToNumber(agent), co)
+	if isAbrupt {
+		return rt
+	}
+	timeoutMilliseconds := timeout.Data.ToFloat()
+	if math.IsNaN(timeoutMilliseconds) || math.IsInf(timeoutMilliseconds, 1) {
+		timeoutMilliseconds = math.Inf(1)
+	} else if timeoutMilliseconds < 0 || math.IsInf(timeoutMilliseconds, -1) {
+		timeoutMilliseconds = 0
+	}
+
+	location := atomicWaitLocation{block: buffer.Data(), byteIndex: byteIndex}
+	expectedBytes := NumericToRawBytes(expected, typedArray.TypedArrayName, agent.IsLittleEndian)
+	atomicsWaiters.Lock()
+	currentBytes := buffer.Data().Slice(byteIndex, byteIndex+JSInt(len(expectedBytes)))
+	if !byteListsEqual(currentBytes, expectedBytes) {
+		atomicsWaiters.Unlock()
+		return NewStringValue("not-equal").ToCompletion()
+	}
+	if timeoutMilliseconds == 0 {
+		atomicsWaiters.Unlock()
+		return NewStringValue("timed-out").ToCompletion()
+	}
+	waiter := &atomicWaiter{wake: make(chan struct{})}
+	atomicsWaiters.queues[location] = append(atomicsWaiters.queues[location], waiter)
+	atomicsWaiters.Unlock()
+
+	if math.IsInf(timeoutMilliseconds, 1) || timeoutMilliseconds > float64(math.MaxInt64)/float64(time.Millisecond) {
+		<-waiter.wake
+		return NewStringValue("ok").ToCompletion()
+	}
+	timer := time.NewTimer(time.Duration(timeoutMilliseconds * float64(time.Millisecond)))
+	defer timer.Stop()
+	select {
+	case <-waiter.wake:
+		return NewStringValue("ok").ToCompletion()
+	case <-timer.C:
+		atomicsWaiters.Lock()
+		removed := removeAtomicWaiterLocked(location, waiter)
+		atomicsWaiters.Unlock()
+		if removed {
+			return NewStringValue("timed-out").ToCompletion()
+		}
+		// A notifier removed this waiter at the same instant as the timer.
+		<-waiter.wake
+		return NewStringValue("ok").ToCompletion()
+	}
+}
+
+func atomicNotifyOperation(agent *Agent, typedArrayValue, index, countValue Value) (co CompletionValue) {
+	taRecord, isAbrupt, rt := ReturnIfAbrupt(ValidateIntegerTypedArray(agent, typedArrayValue, true), co)
+	if isAbrupt {
+		return rt
+	}
+	byteIndex, isAbrupt, rt := ReturnIfAbrupt(ValidateAtomicAccess(agent, taRecord, index), co)
+	if isAbrupt {
+		return rt
+	}
+	limit := math.MaxInt
+	if !IsUndefinedOrNil(countValue) {
+		count, isAbrupt, rt := ReturnIfAbrupt(countValue.ToNumber(agent), co)
+		if isAbrupt {
+			return rt
+		}
+		countNumber := count.Data.ToFloat()
+		if math.IsNaN(countNumber) || countNumber <= 0 || math.IsInf(countNumber, -1) {
+			limit = 0
+		} else if !math.IsInf(countNumber, 1) {
+			countNumber = math.Trunc(countNumber)
+			if countNumber < float64(limit) {
+				limit = int(countNumber)
+			}
+		}
+	}
+	buffer := taRecord.TypedArray.ViewedArrayBuffer
+	if !IsSharedArrayBuffer(buffer) || limit == 0 {
+		return NewNumberValue(0).ToCompletion()
+	}
+
+	location := atomicWaitLocation{block: buffer.Data(), byteIndex: byteIndex}
+	atomicsWaiters.Lock()
+	queue := atomicsWaiters.queues[location]
+	count := len(queue)
+	if count > limit {
+		count = limit
+	}
+	selected := append([]*atomicWaiter(nil), queue[:count]...)
+	if count == len(queue) {
+		delete(atomicsWaiters.queues, location)
+	} else {
+		atomicsWaiters.queues[location] = queue[count:]
+	}
+	for _, waiter := range selected {
+		close(waiter.wake)
+	}
+	atomicsWaiters.Unlock()
+	return NewNumberValue(JSNumber(count)).ToCompletion()
+}
+
+func removeAtomicWaiterLocked(location atomicWaitLocation, target *atomicWaiter) bool {
+	queue := atomicsWaiters.queues[location]
+	for index, waiter := range queue {
+		if waiter != target {
+			continue
+		}
+		queue = append(queue[:index], queue[index+1:]...)
+		if len(queue) == 0 {
+			delete(atomicsWaiters.queues, location)
+		} else {
+			atomicsWaiters.queues[location] = queue
+		}
+		return true
+	}
+	return false
+}
+
+func byteListsEqual(left, right []byte) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
 // MARK: - Internal
 
 func atomicsCompareExchange(
@@ -303,53 +528,29 @@ func atomicsCompareExchange(
 	typedArray := MustGetObject(typedArrayValue).(*TypedArrayObject)
 	buffer := typedArray.ViewedArrayBuffer
 	block := buffer.Data()
-	var expected Value
-	var replacement Value
-	if typedArray.ContentType == TypedArrayContentTypeBigInt {
-		_expected, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, expectedValue), co)
-		if isAbrupt {
-			return rt
-		}
-		expected = _expected
-		_replacement, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, replacementValue), co)
-		if isAbrupt {
-			return rt
-		}
-		replacement = _replacement
-	} else {
-		_expected, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, expectedValue), co)
-		if isAbrupt {
-			return rt
-		}
-		expected = _expected.ToValue()
-		_replacement, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, replacementValue), co)
-		if isAbrupt {
-			return rt
-		}
-		replacement = _replacement.ToValue()
+	expected, isAbrupt, rt := ReturnIfAbrupt(atomicNumericValue(agent, typedArray.ContentType, expectedValue), co)
+	if isAbrupt {
+		return rt
+	}
+	replacement, isAbrupt, rt := ReturnIfAbrupt(atomicNumericValue(agent, typedArray.ContentType, replacementValue), co)
+	if isAbrupt {
+		return rt
 	}
 
-	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
+	_, isAbrupt, rt = ReturnIfAbrupt(RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer), co)
+	if isAbrupt {
+		return rt
+	}
 	isLittleEndian := agent.IsLittleEndian
 	elementType := TypedArrayElementType(typedArray)
 	size := getTypedArraySizeFromName(elementType)
 
-	expectedBytes := NumericToRawBytes(expected, size, isLittleEndian)
-	replacementBytes := NumericToRawBytes(replacement, size, isLittleEndian)
+	expectedBytes := NumericToRawBytes(expected, elementType, isLittleEndian)
+	replacementBytes := NumericToRawBytes(replacement, elementType, isLittleEndian)
 
-	var rawBytesRead []byte
-	if IsSharedArrayBuffer(buffer) {
-		rawBytesRead = GetRawBytesFromSharedBlock(block, byteIndexInBuffer, size, false, Relaxed)
-	} else {
-		rawBytesRead = block.Slice(byteIndexInBuffer, byteIndexInBuffer+size)
-	}
+	rawBytesRead := block.AtomicCompareExchange(byteIndexInBuffer, expectedBytes, replacementBytes)
 	previous := RawBytesToNumeric(size, rawBytesRead, isLittleEndian)
-	expectedUint := RawBytesToNumeric(size, expectedBytes, isLittleEndian)
-	if previous == expectedUint {
-		block.Set(byteIndexInBuffer, replacementBytes)
-	}
-
-	co.value = JSNumber(previous).ToValue()
+	co.value = atomicRawValue(elementType, previous)
 	return
 }
 
@@ -366,32 +567,23 @@ func atomicStore(
 		return rt
 	}
 	typedArray := MustGetObject(typedArrayValue).(*TypedArrayObject)
-	var v Value
-	if typedArray.ContentType == TypedArrayContentTypeBigInt {
-		vv, isAbrupt, rt := ReturnIfAbrupt(ToBigInt(agent, value), co)
-		if isAbrupt {
-			return rt
-		}
-		v = vv
-	} else {
-		_v, isAbrupt, rt := ReturnIfAbrupt(ToIntegerOrInfinity(agent, value), co)
-		if isAbrupt {
-			return rt
-		}
-		v = _v.ToValue()
+	v, isAbrupt, rt := ReturnIfAbrupt(atomicNumericValue(agent, typedArray.ContentType, value), co)
+	if isAbrupt {
+		return rt
 	}
-	RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer)
+	_, isAbrupt, rt = ReturnIfAbrupt(RevalidateAtomicAccess(agent, typedArray, byteIndexInBuffer), co)
+	if isAbrupt {
+		return rt
+	}
 	elementType := TypedArrayElementType(typedArray)
-	size := getTypedArraySizeFromName(elementType)
 	buffer := typedArray.ViewedArrayBuffer
 
-	SetValueInBuffer(
+	SetTypedArrayValueInBuffer(
 		agent,
 		buffer,
 		byteIndexInBuffer,
 		v,
-		size,
-		true,
+		elementType,
 		SeqCst,
 	)
 	co.value = v

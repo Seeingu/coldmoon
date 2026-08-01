@@ -3,6 +3,7 @@ package coldmoon
 import (
 	"encoding/binary"
 	"math"
+	"math/big"
 )
 
 // ArrayBufferLike Enum
@@ -20,7 +21,10 @@ func (a *ArrayBufferLike) Data() *DataBlock {
 }
 
 func (a *ArrayBufferLike) ByteLength() JSInt {
-	return a.Data().Size()
+	if a.ArrayBuffer != nil {
+		return a.ArrayBuffer.ArrayBufferByteLength
+	}
+	return JSInt(a.SharedArrayBuffer.ArrayBufferByteLength.Load())
 }
 
 func (a *ArrayBufferLike) MaxByteLength() JSInt {
@@ -32,9 +36,11 @@ func (a *ArrayBufferLike) MaxByteLength() JSInt {
 
 func NewArrayBufferLike(object ObjectType) *ArrayBufferLike {
 	switch o := object.(type) {
+	case *ArrayBufferLike:
+		return o
 	case *ArrayBufferObject:
 		a := &ArrayBufferLike{Object: o.Object, ArrayBuffer: o}
-		a.ref = o
+		a.ref = a
 		return a
 	case *SharedArrayBufferObject:
 		a := &ArrayBufferLike{Object: o.Object, SharedArrayBuffer: o}
@@ -66,12 +72,13 @@ func AllocateArrayBuffer(agent *Agent, constructor ObjectType, byteLength JSInt,
 		}
 	}
 	object := OrdinaryCreateFromConstructor(agent, constructor, "%ArrayBuffer.prototype%", nil)
-	arrayBuffer := &ArrayBufferObject{
-		Object:                object,
-		ArrayBufferData:       CreateByteDataBlock(agent, byteLength),
-		ArrayBufferByteLength: byteLength,
+	arrayBufferObject := &ArrayBufferObject{
+		Object:                   object,
+		ArrayBufferData:          CreateByteDataBlock(agent, byteLength),
+		ArrayBufferByteLength:    byteLength,
+		ArrayBufferMaxByteLength: maxByteLength,
 	}
-	co.value = arrayBuffer
+	co.value = NewArrayBufferLike(arrayBufferObject)
 	return
 }
 
@@ -82,7 +89,7 @@ func CloneArrayBuffer(agent *Agent, srcBuffer *ArrayBufferLike, srcByteOffset JS
 	Assert(!IsDetachedBuffer(srcBuffer))
 	targetBuffer := AllocateArrayBuffer(agent, realm.Intrinsics.ArrayBufferConstructor, srcLength, 0)
 	srcBlock := srcBuffer.Data()
-	targetBlock := targetBuffer.Data().(*ArrayBufferObject).ArrayBufferData
+	targetBlock := NewArrayBufferLike(targetBuffer.Data()).Data()
 	CopyDataBlockBytes(targetBlock, 0, srcBlock, srcByteOffset, srcLength)
 	return targetBuffer
 }
@@ -134,7 +141,7 @@ const (
 // 25.1.3.2
 func ArrayBufferByteLength(buffer *ArrayBufferLike, memoryOrder MemoryOrder) JSInt {
 	Assert(!IsDetachedBuffer(buffer))
-	return buffer.Data().Size()
+	return buffer.ByteLength()
 }
 
 // 25.1.3.8
@@ -172,7 +179,7 @@ func GetValueFromBuffer(
 	if IsSharedArrayBuffer(arrayBuffer) {
 		rawValue = GetRawBytesFromSharedBlock(block, byteIndex, elementSize, isTypedArray, order)
 	} else {
-		rawValue = block.data[byteIndex : byteIndex+elementSize]
+		rawValue = block.Slice(byteIndex, byteIndex+elementSize)
 	}
 
 	return RawBytesToNumeric(elementSize, rawValue, agent.IsLittleEndian)
@@ -183,30 +190,114 @@ func IsSharedArrayBuffer(buffer *ArrayBufferLike) bool {
 }
 
 // 25.1.3.17
-func NumericToRawBytes(value Value, size JSInt, isLittleEndian bool) []byte {
+//
+// NumericToRawBytes encodes a numeric value according to the element type.
+// In particular, Float32 and Float64 use their IEEE-754 bit patterns; their
+// byte widths alone are not enough to distinguish them from integer elements.
+func NumericToRawBytes(value Value, elementType TypedArrayName, isLittleEndian bool) []byte {
+	size := getTypedArraySizeFromName(elementType)
+	var raw uint64
+	switch elementType {
+	case TypedArrayNameFloat32:
+		numeric, ok := value.(*NumberValue)
+		if !ok {
+			panic("Float32 encoding requires a Number")
+		}
+		raw = uint64(math.Float32bits(float32(numeric.Data.ToFloat())))
+	case TypedArrayNameFloat64:
+		numeric, ok := value.(*NumberValue)
+		if !ok {
+			panic("Float64 encoding requires a Number")
+		}
+		raw = math.Float64bits(numeric.Data.ToFloat())
+	case TypedArrayNameBigInt64, TypedArrayNameBigUint64:
+		numeric, ok := value.(*BigIntValue)
+		if !ok {
+			panic("BigInt typed-array encoding requires a BigInt")
+		}
+		modulus := new(big.Int).Lsh(big.NewInt(1), uint(size*8))
+		normalized := new(big.Int).Mod(new(big.Int).Set(numeric.Data), modulus)
+		raw = normalized.Uint64()
+	default:
+		numeric, ok := value.(*NumberValue)
+		if !ok {
+			panic("Number typed-array encoding requires a Number")
+		}
+		n := numeric.Data.ToFloat()
+		if elementType == TypedArrayNameUint8Clamped {
+			switch {
+			case math.IsNaN(n), n <= 0:
+				raw = 0
+			case n >= 255:
+				raw = 255
+			default:
+				raw = uint64(math.RoundToEven(n))
+			}
+			break
+		}
+		if !math.IsNaN(n) && !math.IsInf(n, 0) {
+			modulus := math.Ldexp(1, int(size*8))
+			n = math.Mod(math.Trunc(n), modulus)
+			if n < 0 {
+				n += modulus
+			}
+			raw = uint64(n)
+		}
+	}
+	return rawUint64Bytes(raw, size, isLittleEndian)
+}
+
+// numericToRawIntegerBytes supports the older size-based buffer operations
+// used by DataView. Typed arrays must use NumericToRawBytes so that the element
+// kind, rather than only its width, controls the representation.
+func numericToRawIntegerBytes(value Value, size JSInt, isLittleEndian bool) []byte {
+	var raw uint64
+	switch numeric := value.(type) {
+	case *NumberValue:
+		n := numeric.Data.ToFloat()
+		if !math.IsNaN(n) && !math.IsInf(n, 0) {
+			modulus := math.Ldexp(1, int(size*8))
+			n = math.Mod(math.Trunc(n), modulus)
+			if n < 0 {
+				n += modulus
+			}
+			raw = uint64(n)
+		}
+	case *BigIntValue:
+		modulus := new(big.Int).Lsh(big.NewInt(1), uint(size*8))
+		normalized := new(big.Int).Mod(new(big.Int).Set(numeric.Data), modulus)
+		raw = normalized.Uint64()
+	default:
+		panic("numericToRawIntegerBytes requires a Number or BigInt")
+	}
+	return rawUint64Bytes(raw, size, isLittleEndian)
+}
+
+func rawUint64Bytes(raw uint64, size JSInt, isLittleEndian bool) []byte {
 	rawBytes := make([]byte, size)
-	n := value.(*NumberValue).Data
 	switch size {
 	case 1:
-		rawBytes[0] = byte(n)
+		rawBytes[0] = byte(raw)
 	case 2:
 		if isLittleEndian {
-			binary.LittleEndian.PutUint16(rawBytes, uint16(n))
+			binary.LittleEndian.PutUint16(rawBytes, uint16(raw))
 		} else {
-			binary.BigEndian.PutUint16(rawBytes, uint16(n))
+			binary.BigEndian.PutUint16(rawBytes, uint16(raw))
 		}
 	case 4:
 		if isLittleEndian {
-			binary.LittleEndian.PutUint32(rawBytes, uint32(n))
+			binary.LittleEndian.PutUint32(rawBytes, uint32(raw))
 		} else {
-			binary.BigEndian.PutUint32(rawBytes, uint32(n))
+			binary.BigEndian.PutUint32(rawBytes, uint32(raw))
 		}
 	case 8:
 		if isLittleEndian {
-			binary.LittleEndian.PutUint64(rawBytes, uint64(n))
+			binary.LittleEndian.PutUint64(rawBytes, raw)
 		} else {
-			binary.BigEndian.PutUint64(rawBytes, uint64(n))
+			binary.BigEndian.PutUint64(rawBytes, raw)
 		}
+	default:
+		panic("unsupported numeric element size")
 	}
 	return rawBytes
 }
@@ -224,8 +315,23 @@ func SetValueInBuffer(
 	Assert(byteIndex+size <= arrayBuffer.ByteLength())
 	block := arrayBuffer.Data()
 	elementSize := size
-	rawBytes := NumericToRawBytes(value, elementSize, agent.IsLittleEndian)
+	rawBytes := numericToRawIntegerBytes(value, elementSize, agent.IsLittleEndian)
 	block.Set(byteIndex, rawBytes)
+}
+
+func SetTypedArrayValueInBuffer(
+	agent *Agent,
+	arrayBuffer *ArrayBufferLike,
+	byteIndex JSInt,
+	value Value,
+	elementType TypedArrayName,
+	order MemoryOrder,
+) {
+	Assert(!IsDetachedBuffer(arrayBuffer))
+	elementSize := getTypedArraySizeFromName(elementType)
+	Assert(byteIndex+elementSize <= arrayBuffer.ByteLength())
+	rawBytes := NumericToRawBytes(value, elementType, agent.IsLittleEndian)
+	arrayBuffer.Data().Set(byteIndex, rawBytes)
 }
 
 // 25.1.3.14
@@ -392,17 +498,20 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 	}
 	resizable := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireInternalSlot[*ArrayBufferLike](this)
-		return NewBooleanValue(IsFixedLengthArrayBuffer(o))
+		return NewBooleanValue(!IsFixedLengthArrayBuffer(o))
 	}
 	resize := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		var co CompletionValue
+		o := RequireInternalSlot[*ArrayBufferLike](this)
 		newByteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, argumentAt(arguments, 0)), co)
 		if isAbrupt {
 			return rt
 		}
-		o := RequireInternalSlot[*ArrayBufferLike](this)
 		if IsDetachedBuffer(o) {
 			return co.ThrowTypeError(agent, "is detached")
+		}
+		if IsFixedLengthArrayBuffer(o) {
+			return co.ThrowTypeError(agent, "ArrayBuffer is not resizable")
 		}
 		if newByteLength > o.MaxByteLength() {
 			return co.ThrowError(agent, RangeError, "newByteLength > maxByteLength")
@@ -412,7 +521,12 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 			return UndefinedValue
 		}
 
-		// TODO: Resize
+		oldBlock := o.Data()
+		newBlock := CreateByteDataBlock(agent, newByteLength)
+		copyLength := newByteLength.Min(o.ArrayBuffer.ArrayBufferByteLength)
+		CopyDataBlockBytes(newBlock, 0, oldBlock, 0, copyLength)
+		o.ArrayBuffer.ArrayBufferData = newBlock
+		o.ArrayBuffer.ArrayBufferByteLength = newByteLength
 
 		return UndefinedValue
 	}
