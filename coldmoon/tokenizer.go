@@ -39,15 +39,50 @@ type Tokenizer struct {
 	NextToken     Token
 	cachedStates  pkg.Stack[*cachedState]
 	isTemplate    bool
+	sourceName    string
+}
+
+func (t *Tokenizer) parseFailure(message string) *parseFailure {
+	start := t.Index
+	end := start
+	incomplete := t.atEnd()
+	if !incomplete {
+		end++
+	}
+	return &parseFailure{
+		message:    message,
+		start:      start,
+		end:        end,
+		incomplete: incomplete,
+		sourceName: t.sourceName,
+		sourceText: string(t.SourceText),
+	}
+}
+
+func (t *Tokenizer) currentParseFailure(message string) *parseFailure {
+	token := t.CurrentToken
+	return &parseFailure{
+		message:    message,
+		start:      token.StartIndex,
+		end:        token.EndIndex,
+		incomplete: token.Type == TEOF,
+		sourceName: t.sourceName,
+		sourceText: string(t.SourceText),
+	}
 }
 
 func NewTokenizer(sourceText string) *Tokenizer {
+	return newTokenizer(sourceText, "")
+}
+
+func newTokenizer(sourceText string, sourceName string) *Tokenizer {
 	source := []rune(sourceText)
 	tokenizer := &Tokenizer{
 		SourceText: source,
 		Index:      0,
 		line:       1,
 		Length:     len(source),
+		sourceName: sourceName,
 	}
 	tokenizer.Peek()
 	tokenizer.Peek()
@@ -328,14 +363,14 @@ func (t *Tokenizer) peek() Token {
 			return t.identifierOrKeyword()
 		}
 	}
-	panic("unhandled token: " + string(ch))
+	panic(t.parseFailure("unhandled token: " + string(ch)))
 }
 
 func (t *Tokenizer) privateIdentifier() Token {
 	start := t.Index
 	t.step()
 	if t.atEnd() || !lo.Contains(identifierStartCharset, t.SourceText[t.Index]) {
-		panic("private identifier requires an identifier name")
+		panic(t.parseFailure("private identifier requires an identifier name"))
 	}
 	for !t.atEnd() && lo.Contains(identifierCharset, t.SourceText[t.Index]) {
 		t.step()
@@ -360,10 +395,11 @@ func (t *Tokenizer) templateMiddleOrTail() Token {
 				t.isTemplate = true
 				return t.newTokenAt(start, TTemplateMiddle, string(t.SourceText[start:t.Index-2]))
 			}
+			continue
 		}
 		t.step()
 	}
-	panic("unterminated template")
+	panic(t.parseFailure("unterminated template"))
 }
 
 func (t *Tokenizer) templateHead() Token {
@@ -382,10 +418,11 @@ func (t *Tokenizer) templateHead() Token {
 				t.isTemplate = true
 				return t.newTokenAt(start, TTemplateHead, string(t.SourceText[start:t.Index-2]))
 			}
+			continue
 		}
 		t.step()
 	}
-	panic("unterminated template")
+	panic(t.parseFailure("unterminated template"))
 }
 
 // skipTemplateEscape keeps escaped backticks and dollar signs inside the
@@ -395,7 +432,7 @@ func (t *Tokenizer) templateHead() Token {
 func (t *Tokenizer) skipTemplateEscape() {
 	t.step()
 	if t.atEnd() {
-		panic("unterminated template escape")
+		panic(t.parseFailure("unterminated template escape"))
 	}
 	if t.SourceText[t.Index] == '\r' {
 		t.step()
@@ -429,7 +466,7 @@ func (t *Tokenizer) comment(commentType string) string {
 			}
 			t.step()
 		}
-		panic("unterminated block comment")
+		panic(t.parseFailure("unterminated block comment"))
 	}
 	return ""
 }
@@ -447,7 +484,7 @@ func (t *Tokenizer) string() Token {
 			return t.newTokenAt(start, TString, value.String())
 		}
 		if lo.Contains(lineTerminators, ch) {
-			panic("unterminated string")
+			panic(t.parseFailure("unterminated string"))
 		}
 		if ch != '\\' {
 			value.WriteRune(ch)
@@ -457,7 +494,7 @@ func (t *Tokenizer) string() Token {
 
 		t.step()
 		if t.atEnd() {
-			panic("unterminated string escape")
+			panic(t.parseFailure("unterminated string escape"))
 		}
 		escaped := t.SourceText[t.Index]
 		t.step()
@@ -483,7 +520,7 @@ func (t *Tokenizer) string() Token {
 			value.WriteRune(escaped)
 		}
 	}
-	panic("unterminated string")
+	panic(t.parseFailure("unterminated string"))
 }
 
 // MARK: - Number
@@ -516,14 +553,14 @@ func (t *Tokenizer) number() Token {
 	if base != 10 {
 		integer, ok := new(big.Int).SetString(value, base)
 		if !ok {
-			panic("invalid numeric literal")
+			panic(t.parseFailure("invalid numeric literal"))
 		}
 		value = integer.Text(10)
 	}
 
 	if isBigInt {
 		if base == 10 && len(value) > 1 && value[0] == '0' {
-			panic("invalid decimal BigInt literal with a leading zero")
+			panic(t.parseFailure("invalid decimal BigInt literal with a leading zero"))
 		}
 		return t.newTokenAt(start, TBigInt, value)
 	}
@@ -546,12 +583,12 @@ func (t *Tokenizer) parseDigits(validDigits []rune, required bool) string {
 			break
 		}
 		if digitCount == 0 || t.Index+1 >= t.Length || !lo.Contains(validDigits, t.SourceText[t.Index+1]) {
-			panic("invalid numeric separator")
+			panic(t.parseFailure("invalid numeric separator"))
 		}
 		t.step()
 	}
 	if required && digitCount == 0 {
-		panic("numeric literal requires at least one digit")
+		panic(t.parseFailure("numeric literal requires at least one digit"))
 	}
 	return value.String()
 }
@@ -587,7 +624,7 @@ func (t *Tokenizer) ensureNumericLiteralBoundary() {
 		return
 	}
 	if lo.Contains(identifierCharset, t.SourceText[t.Index]) {
-		panic("identifier cannot immediately follow a numeric literal")
+		panic(t.parseFailure("identifier cannot immediately follow a numeric literal"))
 	}
 }
 
@@ -774,12 +811,12 @@ func (t *Tokenizer) regularExpression() Token {
 	for !t.atEnd() {
 		ch := t.SourceText[t.Index]
 		if lo.Contains(lineTerminators, ch) {
-			panic("unterminated regular expression literal")
+			panic(t.parseFailure("unterminated regular expression literal"))
 		}
 		if ch == '\\' {
 			t.step()
 			if t.atEnd() || lo.Contains(lineTerminators, t.SourceText[t.Index]) {
-				panic("unterminated regular expression escape")
+				panic(t.parseFailure("unterminated regular expression escape"))
 			}
 			t.step()
 			continue
@@ -796,7 +833,7 @@ func (t *Tokenizer) regularExpression() Token {
 		t.step()
 	}
 	if !terminated {
-		panic("unterminated regular expression literal")
+		panic(t.parseFailure("unterminated regular expression literal"))
 	}
 	value := string(t.SourceText[patternStart : t.Index-1])
 	return t.newTokenAt(tokenStart, TRegularExpression, value)
@@ -830,7 +867,7 @@ func (t *Tokenizer) MustMatch(tokenType TokenType) {
 	if t.Match(tokenType) {
 		return
 	}
-	panic("unexpected token: " + t.CurrentToken.Value)
+	panic(t.currentParseFailure("unexpected token: " + t.CurrentToken.Value))
 }
 
 // 12.3

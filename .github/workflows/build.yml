@@ -27,7 +27,10 @@ jobs:
           go-version-file: go.mod
 
       - name: Build
-        run: make build-all
+        run: make build
 
       - name: Run tests
-        run: go test -v ./...
+        run: make test
+
+      - name: Smoke test CLI
+        run: make cli-smoke

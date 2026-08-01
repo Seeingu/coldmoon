@@ -51,15 +51,6 @@ func newConsoleState(stdout, stderr io.Writer, now func() time.Time) *consoleSta
 	}
 }
 
-func jsPrint(_ coldmoon.Value, arguments []coldmoon.Value, _ coldmoon.ObjectType) coldmoon.CompletionConvertable[coldmoon.Value] {
-	parts := make([]string, 0, len(arguments))
-	for _, argument := range arguments {
-		parts = append(parts, formatConsoleValue(argument))
-	}
-	fmt.Fprintln(os.Stdout, strings.Join(parts, " "))
-	return coldmoon.UndefinedValue
-}
-
 // CreateConsole creates a WHATWG-style terminal console. Informational output
 // is written to stdout, while warnings, errors, and failed assertions use
 // stderr. Each returned object owns independent count, group, and timer state.
@@ -336,7 +327,7 @@ func formatConsoleArguments(agent *coldmoon.Agent, arguments []coldmoon.Value) [
 	if !isString || len(arguments) == 1 {
 		parts := make([]string, 0, len(arguments))
 		for _, argument := range arguments {
-			parts = append(parts, formatConsoleValue(argument))
+			parts = append(parts, FormatValue(argument))
 		}
 		return parts
 	}
@@ -377,7 +368,7 @@ func formatConsoleArguments(agent *coldmoon.Agent, arguments []coldmoon.Value) [
 
 	parts := []string{formatted.String()}
 	for _, argument := range arguments[nextArgument:] {
-		parts = append(parts, formatConsoleValue(argument))
+		parts = append(parts, FormatValue(argument))
 	}
 	return parts
 }
@@ -397,7 +388,9 @@ func formatConsoleNumber(agent *coldmoon.Agent, value coldmoon.Value, integer bo
 	return strconv.FormatFloat(math.Trunc(number.Data.ToFloat()), 'f', -1, 64)
 }
 
-func formatConsoleValue(value coldmoon.Value) string {
+// FormatValue returns the plain-text representation used by terminal hosts for
+// a single JavaScript value.
+func FormatValue(value coldmoon.Value) string {
 	if value == nil {
 		return "undefined"
 	}
@@ -413,7 +406,7 @@ func formatConsoleDirectory(value coldmoon.Value) string {
 	}
 	object, ok := value.GetObject()
 	if !ok {
-		return formatConsoleValue(value)
+		return FormatValue(value)
 	}
 	keys := consoleEnumerableStringKeys(object)
 	if len(keys) == 0 {
@@ -421,7 +414,7 @@ func formatConsoleDirectory(value coldmoon.Value) string {
 	}
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
-		parts = append(parts, fmt.Sprintf("%s: %s", key.Value, formatConsoleValue(object.Get(key))))
+		parts = append(parts, fmt.Sprintf("%s: %s", key.Value, FormatValue(object.Get(key))))
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
 }
@@ -463,7 +456,7 @@ func formatConsoleTable(value coldmoon.Value, propertiesValue coldmoon.Value) (s
 				if len(propertyFilter) > 0 && !containsConsoleColumn(propertyFilter, entryKey.Value) {
 					continue
 				}
-				row.values[entryKey.Value] = formatConsoleValue(entryObject.Get(entryKey))
+				row.values[entryKey.Value] = FormatValue(entryObject.Get(entryKey))
 				if _, seen := seenColumns[entryKey.Value]; !seen {
 					columns = append(columns, entryKey.Value)
 					seenColumns[entryKey.Value] = struct{}{}
@@ -472,7 +465,7 @@ func formatConsoleTable(value coldmoon.Value, propertiesValue coldmoon.Value) (s
 		} else {
 			const valueColumn = "Values"
 			if len(propertyFilter) == 0 || containsConsoleColumn(propertyFilter, valueColumn) {
-				row.values[valueColumn] = formatConsoleValue(entry)
+				row.values[valueColumn] = FormatValue(entry)
 				if _, seen := seenColumns[valueColumn]; !seen {
 					columns = append(columns, valueColumn)
 					seenColumns[valueColumn] = struct{}{}
@@ -554,6 +547,17 @@ func renderConsoleTable(rows []consoleTableRow, columns []string) string {
 	return strings.Join(lines, "\n")
 }
 
-func definePrint(realm *coldmoon.Realm) {
-	coldmoon.DefineBuiltinFunction(realm, coldmoon.CMString("print"), realm.GlobalObject, jsPrint, 1)
+func definePrint(realm *coldmoon.Realm, writer io.Writer) {
+	if writer == nil {
+		writer = io.Discard
+	}
+	behavior := func(_ coldmoon.Value, arguments []coldmoon.Value, _ coldmoon.ObjectType) coldmoon.CompletionConvertable[coldmoon.Value] {
+		parts := make([]string, 0, len(arguments))
+		for _, argument := range arguments {
+			parts = append(parts, FormatValue(argument))
+		}
+		fmt.Fprintln(writer, strings.Join(parts, " "))
+		return coldmoon.UndefinedValue
+	}
+	coldmoon.DefineBuiltinFunction(realm, coldmoon.CMString("print"), realm.GlobalObject, behavior, 1)
 }

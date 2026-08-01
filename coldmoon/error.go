@@ -6,6 +6,9 @@ type ErrorObject struct {
 	*Object
 	Name    string
 	Message string
+	// hostCause retains an originating Go host failure for diagnostics without
+	// exposing it as an ECMAScript-visible property.
+	hostCause error
 }
 
 var errorInternalSet SetFn = func(o ObjectType, p PropertyKey, v Value, receiver Value) Completion[bool] {

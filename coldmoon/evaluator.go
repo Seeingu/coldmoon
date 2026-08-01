@@ -1,5 +1,7 @@
 package coldmoon
 
+import "errors"
+
 func fatalOnError(result Value) {
 	if o, ok := result.GetObject(); ok {
 		if e, ok := o.(*ErrorObject); ok {
@@ -17,40 +19,30 @@ func EvaluateModule(filePath string, realm *Realm) {
 		return
 	}
 	module := loaded.Data().(*SourceTextModule)
-	var result Value
-	p := module.LoadRequestedModules()
-	switch p.PromiseState {
-	case PromiseStatePending:
-		panic("unreachable")
-	case PromiseStateFulfilled:
-		module.Link()
-		if agent.exception != nil {
-			fatalOnError(agent.exception)
-		}
-		p = module.Evaluate()
-		switch p.PromiseState {
-		case PromiseStatePending:
-			panic("unreachable")
-		case PromiseStateFulfilled:
-			result = UndefinedValue
-		case PromiseStateRejected:
-			result = p.PromiseResult
-		}
-	case PromiseStateRejected:
-		result = p.PromiseResult
-	}
-	fatalOnError(result)
-	agent.Scheduler.RunUntilIdle()
+	_, err := evaluateModuleRecord(Source{Name: filePath, Kind: SourceModule}, realm, module)
+	legacyFatal(err)
 }
 
 func Evaluate(source string, realm *Realm) {
-	agent := realm.Agent
-	result := ParseScript(source, realm, nil).Evaluate()
-	if o, ok := result.GetObject(); ok {
-		if e, ok := o.(*ErrorObject); ok {
-			println("Return Error: ", e.Message)
-			panic(e)
-		}
+	_, err := EvaluateSource(Source{
+		Text: source,
+		Name: "file.js",
+		Kind: SourceScript,
+	}, realm)
+	legacyFatal(err)
+}
+
+func legacyFatal(err error) {
+	if err == nil {
+		return
 	}
-	agent.Scheduler.RunUntilIdle()
+	var diagnostic *Diagnostic
+	if errors.As(err, &diagnostic) && diagnostic.Thrown != nil {
+		// Preserve the embedding entry points' historical behavior: Error
+		// objects panic, while primitive throws are returned only by the safe
+		// interface.
+		fatalOnError(diagnostic.Thrown)
+		return
+	}
+	panic(err)
 }

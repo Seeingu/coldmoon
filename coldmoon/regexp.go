@@ -355,8 +355,11 @@ func NewRegExpConstructor(realm *Realm) ObjectType {
 			p = pattern
 			f = flags
 		}
-		o := RegExpAlloc(agent, target)
+		o := RegExpAlloc(agent, newTarget)
 		initialize := RegExpInitialize(agent, o, p, f)
+		if initialize.IsAbrupt() {
+			return CompletionFrom(CompletionValue{}, initialize)
+		}
 		return initialize.Data().ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 2, CMString("RegExp"), builtinFunctionArgs{

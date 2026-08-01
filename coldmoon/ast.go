@@ -2374,7 +2374,7 @@ type UpdateExpression struct {
 }
 
 func (e *UpdateExpression) AssignmentTargetType() AssignmentTargetType {
-	return AssignmentTargetTypeSimple
+	return AssignmentTargetTypeInvalid
 }
 
 func (e *UpdateExpression) isPrefix() bool {

@@ -1,7 +1,10 @@
-.PHONY: build build-all test test262 fmt
+.PHONY: build build-all test test262 fmt cli-smoke
 
-build: main.go coldmoon/
-	go build -o main.exe .
+BINARY := bin/coldmoon$(shell go env GOEXE)
+
+build:
+	mkdir -p bin
+	go build -o $(BINARY) .
 
 build-all: build
 
@@ -13,3 +16,8 @@ test262:
 
 fmt: coldmoon tests
 	gofumpt -w -l .
+
+cli-smoke: build
+	$(BINARY) --version
+	$(BINARY) --help
+	$(BINARY) -e 'console.log("coldmoon cli smoke")'

@@ -41,15 +41,15 @@ func NewModuleGraph(agent *Agent) *ModuleGraph {
 func (g *ModuleGraph) Load(referrer ImportedModuleReferrer, specifier string, hostDefined HostDefined) (co CompletionModule) {
 	loader := g.agent.HostHooks.HostLoadModule
 	if loader == nil {
-		return co.ThrowError(g.agent, TypeError, "module loading is not configured by the host")
+		return g.loadFailure(fmt.Errorf("module loading is not configured by the host"))
 	}
 
 	resolution, err := loader.Resolve(referrer, specifier, hostDefined)
 	if err != nil {
-		return co.ThrowError(g.agent, TypeError, err.Error())
+		return g.loadFailure(err)
 	}
 	if resolution.Identity == "" {
-		return co.ThrowError(g.agent, TypeError, fmt.Sprintf("module %q has no canonical identity", specifier))
+		return g.loadFailure(fmt.Errorf("module %q has no canonical identity", specifier))
 	}
 
 	realm := referrer.RealmRecord()
@@ -64,7 +64,7 @@ func (g *ModuleGraph) Load(referrer ImportedModuleReferrer, specifier string, ho
 
 	sourceText, err := loader.Load(resolution)
 	if err != nil {
-		return co.ThrowError(g.agent, TypeError, err.Error())
+		return g.loadFailure(err)
 	}
 	module := ParseModule(sourceText, realm, resolution.HostDefined)
 	module.Identity = resolution.Identity
@@ -73,7 +73,33 @@ func (g *ModuleGraph) Load(referrer ImportedModuleReferrer, specifier string, ho
 	return
 }
 
+func (g *ModuleGraph) loadFailure(cause error) (co CompletionModule) {
+	co = co.ThrowError(g.agent, TypeError, cause.Error())
+	if object, ok := co.Error().GetObject(); ok {
+		if exception, ok := object.(*ErrorObject); ok {
+			exception.hostCause = cause
+		}
+	}
+	return co
+}
+
 // Size returns the number of canonical Realm-local records in the graph.
 func (g *ModuleGraph) Size() int {
 	return len(g.modules)
+}
+
+// cacheSource publishes a host-provided entry module before its dependencies
+// load. This lets an import cycle that resolves back to the entry identity
+// converge on the same SourceTextModule record.
+func (g *ModuleGraph) cacheSource(realm *Realm, identity string, module *SourceTextModule) *SourceTextModule {
+	module.Identity = identity
+	if identity == "" {
+		return module
+	}
+	key := moduleCacheKey{realm: realm, identity: identity}
+	if existing, ok := g.modules[key]; ok {
+		return existing
+	}
+	g.modules[key] = module
+	return module
 }
