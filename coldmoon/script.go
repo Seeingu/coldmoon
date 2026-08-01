@@ -25,7 +25,22 @@ func (s *ScriptRecord) ToReferrer() ImportedModuleReferrer {
 // ParseScript
 // 16.1.5
 func ParseScript(sourceText string, realm *Realm, hostDefined *HostDefined) *ScriptRecord {
-	script := NewParser(sourceText, ParserContext{FileName: "file.js"}).Parse()
+	fileName := "file.js"
+	baseDir := ""
+	if hostDefined != nil {
+		if hostDefined.FileName != "" {
+			fileName = hostDefined.FileName
+		}
+		baseDir = hostDefined.BaseDir
+	}
+	return parseScript(sourceText, realm, hostDefined, ParserContext{
+		FileName: fileName,
+		BaseDir:  baseDir,
+	})
+}
+
+func parseScript(sourceText string, realm *Realm, hostDefined *HostDefined, context ParserContext) *ScriptRecord {
+	script := NewParser(sourceText, context).Parse()
 
 	s := &ScriptRecord{
 		Realm:          realm,
@@ -43,6 +58,14 @@ func ParseScript(sourceText string, realm *Realm, hostDefined *HostDefined) *Scr
 
 // 16.1.6
 func (s *ScriptRecord) Evaluate() Value {
+	result := s.evaluateCompletion()
+	if result.IsError() {
+		return result.Error()
+	}
+	return result.Data()
+}
+
+func (s *ScriptRecord) evaluateCompletion() CompletionValue {
 	agent := s.Realm.Agent
 
 	globalEnv := s.Realm.GlobalEnv
@@ -60,11 +83,7 @@ func (s *ScriptRecord) Evaluate() Value {
 	scope := agent.enterExecutionContext(scriptContext)
 	defer scope.Leave()
 
-	result := s.evaluateInCurrentContext()
-	if result.IsError() {
-		return result.Error()
-	}
-	return result.Data()
+	return s.evaluateInCurrentContext()
 }
 
 // evaluateInCurrentContext evaluates the script using the lexical and variable
@@ -76,6 +95,38 @@ func (s *ScriptRecord) evaluateInCurrentContext() CompletionValue {
 	Assert(context.ECMAScriptCode != nil)
 	lexicalEnv := context.ECMAScriptCode.LexicalEnvironment
 	variableEnv := context.ECMAScriptCode.VariableEnvironment
+	if globalEnv, ok := variableEnv.(*GlobalEnvironment); ok {
+		for _, declaration := range s.Static.VarDeclarations {
+			for _, name := range declaration.BoundNames() {
+				if globalEnv.DeclarativeRecord.HasBinding(string(name)) {
+					var completion CompletionValue
+					return completion.ThrowError(agent, SyntaxError, fmt.Sprintf("Identifier %q has already been declared", name))
+				}
+			}
+		}
+		for _, declaration := range s.Static.HoistableDeclarations {
+			for _, name := range declaration.BoundNames() {
+				if globalEnv.DeclarativeRecord.HasBinding(string(name)) {
+					var completion CompletionValue
+					return completion.ThrowError(agent, SyntaxError, fmt.Sprintf("Identifier %q has already been declared", name))
+				}
+			}
+		}
+	}
+	lexicalNames := make(map[IdentifierName]bool)
+	for _, declaration := range s.Static.LexicalDeclarations {
+		for _, name := range declaration.BoundNames() {
+			hasExistingDeclaration := lexicalEnv.HasBinding(string(name))
+			if globalEnv, ok := lexicalEnv.(*GlobalEnvironment); ok {
+				hasExistingDeclaration = globalEnv.HasLexicalDeclaration(string(name)) || globalEnv.HasVarDeclaration(string(name))
+			}
+			if lexicalNames[name] || hasExistingDeclaration {
+				var completion CompletionValue
+				return completion.ThrowError(agent, SyntaxError, fmt.Sprintf("Identifier %q has already been declared", name))
+			}
+			lexicalNames[name] = true
+		}
+	}
 
 	for _, declaration := range s.Static.LexicalDeclarations {
 		switch declaration := declaration.(type) {

@@ -14,6 +14,14 @@ type GlobalEnvironment struct {
 
 var _ EnvironmentRecord = (*GlobalEnvironment)(nil)
 
+func (g *GlobalEnvironment) HasLexicalDeclaration(name string) bool {
+	return g.DeclarativeRecord.HasBinding(name)
+}
+
+func (g *GlobalEnvironment) HasVarDeclaration(name string) bool {
+	return lo.Contains(g.VarNames, name)
+}
+
 func (g *GlobalEnvironment) CreateGlobalVarBinding(name string, deletable bool) {
 	objRec := g.ObjectRecord
 	globalObject := objRec.BindingObject

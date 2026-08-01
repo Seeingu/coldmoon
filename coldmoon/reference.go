@@ -168,8 +168,34 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) (co CompletionValu
 
 	env, _ := r.Base.Env()
 	referencedName := r.ReferencedName.String
+	if binding, ok := declarativeBinding(env, referencedName); ok {
+		if binding.Value == nil {
+			return co.ThrowError(agent, ReferenceError, "Binding is not initialized")
+		}
+		if !binding.Mutable {
+			return co.ThrowTypeError(agent, "Assignment to constant variable")
+		}
+	}
 	env.SetMutableBinding(referencedName, value, r.Strict)
 	return
+}
+
+func declarativeBinding(environment EnvironmentRecord, name string) (*Binding, bool) {
+	var declarative *DeclarativeEnvironment
+	switch environment := environment.(type) {
+	case *DeclarativeEnvironment:
+		declarative = environment
+	case *GlobalEnvironment:
+		declarative = environment.DeclarativeRecord
+	case *FunctionEnvironment:
+		declarative = environment.DeclarativeEnvironment
+	case *ModuleEnvironment:
+		declarative = environment.DeclarativeEnvironment
+	default:
+		return nil, false
+	}
+	binding, ok := declarative.Bindings[name]
+	return binding, ok
 }
 
 // 6.2.5.7

@@ -1,6 +1,8 @@
 package coldmoon
 
 import (
+	"strconv"
+
 	"github.com/samber/lo"
 )
 
@@ -18,20 +20,80 @@ type Parser struct {
 	inModule                bool
 	callExpressionForbidden bool
 	ctx                     ParserContext
+	speculation             []bool
+}
+
+func (p *Parser) parseFailure(message string) *parseFailure {
+	token := p.tokenizer.CurrentToken
+	return &parseFailure{
+		message:    message,
+		start:      token.StartIndex,
+		end:        token.EndIndex,
+		incomplete: token.Type == TEOF,
+		committed:  p.speculationCommitted(),
+		sourceName: p.ctx.FileName,
+		sourceText: p.SourceText,
+	}
+}
+
+func (p *Parser) speculationCommitted() bool {
+	return len(p.speculation) > 0 && p.speculation[len(p.speculation)-1]
+}
+
+func (p *Parser) commitSpeculation() {
+	if len(p.speculation) > 0 {
+		p.speculation[len(p.speculation)-1] = true
+	}
+}
+
+func (p *Parser) earlyError(message string) *parseFailure {
+	failure := p.parseFailure(message)
+	failure.incomplete = false
+	return failure
 }
 
 func NewParser(sourceText string, ctx ParserContext) *Parser {
 	return &Parser{
 		SourceText:   sourceText,
-		tokenizer:    NewTokenizer(sourceText),
+		tokenizer:    newTokenizer(sourceText, ctx.FileName),
 		activeLabels: make(map[string]bool),
 		ctx:          ctx,
 	}
 }
 
 func (p *Parser) Parse() *Script {
-	return &Script{
+	script := &Script{
 		StatementList: p.ParseNode(),
+	}
+	p.tokenizer.MustMatch(TEOF)
+	p.validateScriptEarlyErrors(script)
+	return script
+}
+
+func (p *Parser) validateScriptEarlyErrors(script *Script) {
+	static := (StaticSemantics{}).AnalyzeScript(script)
+	lexicalNames := make(map[IdentifierName]bool)
+	for _, declaration := range static.LexicalDeclarations {
+		for _, name := range declaration.BoundNames() {
+			if lexicalNames[name] {
+				panic(p.earlyError("Identifier \"" + string(name) + "\" has already been declared"))
+			}
+			lexicalNames[name] = true
+		}
+	}
+	for _, declaration := range static.VarDeclarations {
+		for _, name := range declaration.BoundNames() {
+			if lexicalNames[name] {
+				panic(p.earlyError("Identifier \"" + string(name) + "\" has already been declared"))
+			}
+		}
+	}
+	for _, declaration := range static.HoistableDeclarations {
+		for _, name := range declaration.BoundNames() {
+			if lexicalNames[name] {
+				panic(p.earlyError("Identifier \"" + string(name) + "\" has already been declared"))
+			}
+		}
 	}
 }
 
@@ -42,7 +104,52 @@ func (p *Parser) ParseModule() *Module {
 		p.inModule = inModule
 	}()
 
-	return p.module()
+	module := p.module()
+	p.tokenizer.MustMatch(TEOF)
+	p.validateModuleEarlyErrors(module)
+	return module
+}
+
+func (p *Parser) validateModuleEarlyErrors(module *Module) {
+	lexicalNames := make(map[IdentifierName]bool)
+	declaredNames := make(map[IdentifierName]bool)
+	addLexicalName := func(name IdentifierName) {
+		if lexicalNames[name] {
+			panic(p.earlyError("Identifier \"" + string(name) + "\" has already been declared"))
+		}
+		lexicalNames[name] = true
+		declaredNames[name] = true
+	}
+	for _, entry := range module.importEntries() {
+		addLexicalName(IdentifierName(entry.LocalName))
+	}
+	for _, declaration := range moduleLexicallyScopedDeclarations(module) {
+		for _, name := range declaration.boundNames {
+			addLexicalName(name)
+		}
+	}
+	for _, declaration := range moduleVarScopedDeclarations(module) {
+		for _, name := range declaration.BoundNames() {
+			if lexicalNames[name] {
+				panic(p.earlyError("Identifier \"" + string(name) + "\" has already been declared"))
+			}
+			declaredNames[name] = true
+		}
+	}
+
+	exportedNames := make(map[string]bool)
+	for _, entry := range module.exportEntries() {
+		if entry.ImportName == ImportNameAllButDefault {
+			continue
+		}
+		if exportedNames[entry.ExportName] {
+			panic(p.earlyError("Duplicate export \"" + entry.ExportName + "\""))
+		}
+		exportedNames[entry.ExportName] = true
+		if entry.ModuleRequest == "" && entry.LocalName != "" && !declaredNames[IdentifierName(entry.LocalName)] {
+			panic(p.earlyError("Exported binding \"" + entry.LocalName + "\" is not declared"))
+		}
+	}
 }
 
 func (p *Parser) module() *Module {
@@ -71,7 +178,7 @@ func (p *Parser) moduleItem() ModuleItem {
 		return p.importDeclaration()
 	case TExport:
 		return p.exportDeclaration()
-	case TEOF:
+	case TEOF, TRightBrace:
 		return nil
 	default:
 		item := p.statementListItem()
@@ -94,7 +201,7 @@ func (p *Parser) exportDeclaration() *ModuleItemExportDeclaration {
 		}); ok {
 			m.DefaultExpression = e
 		} else {
-			panic("exportDeclaration: expected hoistable declaration, class declaration or expression")
+			panic(p.parseFailure("exportDeclaration: expected hoistable declaration, class declaration or expression"))
 		}
 	} else if e, ok := parserRecoverOk(p, p.exportFrom); ok {
 		m.ExportFrom = e
@@ -105,7 +212,7 @@ func (p *Parser) exportDeclaration() *ModuleItemExportDeclaration {
 	} else if d, ok := parserRecoverOk(p, p.declaration); ok {
 		m.Declaration = d
 	} else {
-		panic("exportDeclaration: expected export clause or declaration")
+		panic(p.parseFailure("exportDeclaration: expected export clause or declaration"))
 	}
 	return m
 }
@@ -135,7 +242,7 @@ func (p *Parser) exportFromClause() (e *ExportFromClause) {
 		e.NamedExports = n
 		return
 	}
-	panic("exportFromClause: expected * or named exports")
+	panic(p.parseFailure("exportFromClause: expected * or named exports"))
 }
 
 func (p *Parser) moduleExportName() (m *ModuleExportName, ok bool) {
@@ -572,7 +679,7 @@ func (p *Parser) automaticSemicolonInsertion() {
 	if p.followedByLineTerminator(p.tokenizer.PreviousToken) {
 		return
 	}
-	panic("automaticSemicolonInsertion: expected semicolon")
+	panic(p.parseFailure("automaticSemicolonInsertion: expected semicolon"))
 }
 
 func (p *Parser) statement() Statement {
@@ -619,10 +726,18 @@ func (p *Parser) statement() Statement {
 	}
 }
 
+func (p *Parser) requiredStatement(context string) Statement {
+	statement := p.statement()
+	if statement == nil {
+		panic(p.parseFailure(context + ": expected statement"))
+	}
+	return statement
+}
+
 func (p *Parser) labelledStatement() Statement {
 	label := p.tokenizer.CurrentToken.Value
 	if _, exists := p.activeLabels[label]; exists {
-		panic("labelledStatement: duplicate label")
+		panic(p.earlyError("labelledStatement: duplicate label"))
 	}
 	p.tokenizer.Next()
 	p.tokenizer.MustMatch(TColon)
@@ -630,7 +745,7 @@ func (p *Parser) labelledStatement() Statement {
 	defer delete(p.activeLabels, label)
 	return &LabelledStatement{
 		Label: IdentifierName(label),
-		Item:  p.statement(),
+		Item:  p.requiredStatement("labelledStatement"),
 	}
 }
 
@@ -662,11 +777,11 @@ func (p *Parser) breakStatement() *BreakStatement {
 		p.tokenizer.Next()
 	}
 	if label == "" && !p.inBreakable {
-		panic("breakStatement: not in breakable")
+		panic(p.earlyError("breakStatement: not in breakable"))
 	}
 	if label != "" {
 		if _, exists := p.activeLabels[label]; !exists {
-			panic("breakStatement: undefined label")
+			panic(p.earlyError("breakStatement: undefined label"))
 		}
 	}
 	p.automaticSemicolonInsertion()
@@ -685,15 +800,15 @@ func (p *Parser) continueStatement() *StatementContinue {
 		p.tokenizer.Next()
 	}
 	if label == "" && !p.inIteration {
-		panic("continueStatement: not in iteration")
+		panic(p.earlyError("continueStatement: not in iteration"))
 	}
 	if label != "" {
 		iterationTarget, exists := p.activeLabels[label]
 		if !exists {
-			panic("continueStatement: undefined label")
+			panic(p.earlyError("continueStatement: undefined label"))
 		}
 		if !iterationTarget {
-			panic("continueStatement: label does not target an iteration statement")
+			panic(p.earlyError("continueStatement: label does not target an iteration statement"))
 		}
 	}
 	p.automaticSemicolonInsertion()
@@ -738,7 +853,7 @@ func (p *Parser) tryStatement() *TryStatement {
 		finally = p.block()
 	}
 	if catch == nil && finally == nil {
-		panic("tryStatement: expected catch or finally")
+		panic(p.parseFailure("tryStatement: expected catch or finally"))
 	}
 	var catchClause *Catch
 	if catch != nil {
@@ -817,7 +932,7 @@ func (p *Parser) formalParameters() *FormalParameters {
 			})
 			p.tokenizer.Match(TComma)
 		} else {
-			panic("formalParameters: expected binding element")
+			panic(p.parseFailure("formalParameters: expected binding element"))
 		}
 	}
 
@@ -870,6 +985,7 @@ func (p *Parser) asyncArrowFunction() *AsyncArrowFunction {
 	}
 	p.noLineTerminatorHere()
 	p.tokenizer.MustMatch(TArrow)
+	p.commitSpeculation()
 	var body *FunctionBody
 	if p.tokenizer.Match(TLeftBrace) {
 		body = p.functionBody(FunctionTypeAsync)
@@ -990,7 +1106,7 @@ func (p *Parser) functionExpression() *FunctionExpression {
 
 func (p *Parser) noLineTerminatorHere() {
 	if p.followedByLineTerminator(p.tokenizer.PreviousToken) {
-		panic("line terminator not allowed here")
+		panic(p.earlyError("line terminator not allowed here"))
 	}
 }
 
@@ -1085,7 +1201,9 @@ func (p *Parser) classElement() ClassElement {
 
 func (p *Parser) fieldDefinition() *FieldDefinition {
 	propertyName, ok := p.classElementName()
-	Assert(ok)
+	if !ok {
+		panic(p.parseFailure("class field requires a property name"))
+	}
 	var initializer Expression
 	if p.tokenizer.Match(TEquals) {
 		initializer = p.expression(p.acceptContextLowest())
@@ -1104,10 +1222,17 @@ func (p *Parser) lexicalDeclaration() *LexicalDeclaration {
 	} else if t.Type == TConst {
 		lexicalType = LetOrConstConst
 	} else {
-		panic("lexicalDeclaration: expected let or const")
+		panic(p.parseFailure("lexicalDeclaration: expected let or const"))
 	}
 	p.tokenizer.Next()
 	list := p.bindingList()
+	if lexicalType == LetOrConstConst {
+		for _, binding := range list.Items {
+			if binding.Initializer == nil {
+				panic(p.parseFailure("Missing initializer in const declaration"))
+			}
+		}
+	}
 	p.automaticSemicolonInsertion()
 	return &LexicalDeclaration{
 		Type:        lexicalType,
@@ -1145,7 +1270,7 @@ func (p *Parser) lexicalBinding() *LexicalBinding {
 		init = p.expression(p.acceptContextHigherThan(TComma))
 	}
 	if pattern != nil && init == nil {
-		panic("lexicalBinding: a binding pattern requires an initializer")
+		panic(p.parseFailure("lexicalBinding: a binding pattern requires an initializer"))
 	}
 	return &LexicalBinding{
 		Identifier:     identifier,
@@ -1182,7 +1307,7 @@ func (p *Parser) hoistableDeclaration() DeclarationHoistable {
 		}
 
 	}
-	panic("hoistableDeclaration: expected function declaration")
+	panic(p.parseFailure("hoistableDeclaration: expected function declaration"))
 }
 
 func (p *Parser) asyncFunctionDeclaration(startOffset int) *AsyncFunctionDeclaration {
@@ -1251,7 +1376,7 @@ func (p *Parser) declaration() Declaration {
 	if t.Type == TLet || t.Type == TConst {
 		return p.lexicalDeclaration()
 	}
-	panic("declaration: expected hoistable, class, or lexical declaration")
+	panic(p.parseFailure("declaration: expected hoistable, class, or lexical declaration"))
 }
 
 func (p *Parser) breakableStatement() *BreakableStatement {
@@ -1285,7 +1410,7 @@ func (p *Parser) switchStatement() *SwitchStatement {
 		}
 		if p.tokenizer.CurrentToken.Type == TDefault {
 			if defaultClause != nil {
-				panic("switchStatement: duplicate default clause")
+				panic(p.earlyError("switchStatement: duplicate default clause"))
 			}
 			defaultClause = p.defaultClause()
 		} else if p.tokenizer.CurrentToken.Type == TCase {
@@ -1296,7 +1421,7 @@ func (p *Parser) switchStatement() *SwitchStatement {
 				casesAfterDefault = append(casesAfterDefault, clause)
 			}
 		} else {
-			panic("switchStatement: expected case or default")
+			panic(p.parseFailure("switchStatement: expected case or default"))
 		}
 	}
 	p.tokenizer.MustMatch(TRightBrace)
@@ -1321,7 +1446,7 @@ func (p *Parser) caseClause() *CaseClause {
 			break
 		}
 		if tt == TEOF {
-			panic("caseClause: unterminated switch statement")
+			panic(p.parseFailure("caseClause: unterminated switch statement"))
 		}
 		statements = append(statements, p.statementListItem())
 	}
@@ -1341,7 +1466,7 @@ func (p *Parser) defaultClause() *DefaultClause {
 			break
 		}
 		if tt == TEOF {
-			panic("defaultClause: unterminated switch statement")
+			panic(p.parseFailure("defaultClause: unterminated switch statement"))
 		}
 		statements = append(statements, p.statementListItem())
 	}
@@ -1371,7 +1496,7 @@ func (p *Parser) iterationStatement() IterationStatement {
 		}
 		return p.forStatement()
 	default:
-		panic("iterationStatement: expected do, while or for")
+		panic(p.parseFailure("iterationStatement: expected do, while or for"))
 	}
 }
 
@@ -1397,12 +1522,13 @@ func (p *Parser) forInOfStatement() *ForInOfStatement {
 	} else if p.tokenizer.Match(TOf) {
 		statementType = ForInOfStatementTypeOf
 	} else {
-		panic("forInOfStatement: expected in or of")
+		panic(p.parseFailure("forInOfStatement: expected in or of"))
 	}
+	p.commitSpeculation()
 
 	expression := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
-	body := p.statement()
+	body := p.requiredStatement("forInOfStatement")
 
 	return &ForInOfStatement{
 		Type:        statementType,
@@ -1420,7 +1546,7 @@ func (p *Parser) forDeclaration() *ForDeclaration {
 	} else if p.tokenizer.Match(TConst) {
 		letOrConst = LetOrConstConst
 	} else {
-		panic("forDeclaration: expected let or const")
+		panic(p.parseFailure("forDeclaration: expected let or const"))
 	}
 	return &ForDeclaration{
 		LetOrConst: letOrConst,
@@ -1446,7 +1572,7 @@ func (p *Parser) bindingPattern() *BindingPattern {
 	case TLeftBracket:
 		return &BindingPattern{ArrayBindingPattern: p.arrayBindingPattern()}
 	default:
-		panic("bindingPattern: expected object or array binding pattern")
+		panic(p.parseFailure("bindingPattern: expected object or array binding pattern"))
 	}
 }
 
@@ -1467,7 +1593,7 @@ func (p *Parser) objectBindingPattern() *ObjectBindingPattern {
 				BindingIdentifier: p.bindingIdentifier(),
 			}
 			if p.tokenizer.CurrentToken.Type == TComma {
-				panic("objectBindingPattern: rest property must be last")
+				panic(p.parseFailure("objectBindingPattern: rest property must be last"))
 			}
 			break
 		}
@@ -1500,12 +1626,12 @@ func (p *Parser) bindingProperty() BindingProperty {
 
 	propertyName, ok := p.propertyName()
 	if !ok {
-		panic("bindingProperty: expected property name")
+		panic(p.parseFailure("bindingProperty: expected property name"))
 	}
 	p.tokenizer.MustMatch(TColon)
 	bindingElement, ok := p.bindingElement()
 	if !ok {
-		panic("bindingProperty: expected binding element")
+		panic(p.parseFailure("bindingProperty: expected binding element"))
 	}
 	return BindingProperty{
 		PropertyNameAndBindingElement: &struct {
@@ -1542,7 +1668,7 @@ func (p *Parser) arrayBindingPattern() *ArrayBindingPattern {
 				BindingElement     *BindingElement
 			}{BindingRestElement: restElement})
 			if p.tokenizer.CurrentToken.Type == TComma {
-				panic("arrayBindingPattern: rest element must be last")
+				panic(p.parseFailure("arrayBindingPattern: rest element must be last"))
 			}
 			p.tokenizer.MustMatch(TRightBracket)
 			return pattern
@@ -1550,7 +1676,7 @@ func (p *Parser) arrayBindingPattern() *ArrayBindingPattern {
 
 		bindingElement, ok := p.bindingElement()
 		if !ok {
-			panic("arrayBindingPattern: expected binding element")
+			panic(p.parseFailure("arrayBindingPattern: expected binding element"))
 		}
 		pattern.Elements = append(pattern.Elements, &struct {
 			Elision            bool
@@ -1592,7 +1718,7 @@ func (p *Parser) forStatement() *ForStatement {
 		increment = p.expression(p.acceptContextLowest())
 	}
 	p.tokenizer.MustMatch(TRightParen)
-	body := p.statement()
+	body := p.requiredStatement("forStatement")
 
 	return &ForStatement{
 		Initializer: init,
@@ -1604,7 +1730,7 @@ func (p *Parser) forStatement() *ForStatement {
 
 func (p *Parser) doWhileStatement() *StatementDoWhile {
 	p.tokenizer.MustMatch(TDo)
-	body := p.statement()
+	body := p.requiredStatement("doWhileStatement")
 	p.tokenizer.MustMatch(TWhile)
 	p.tokenizer.MustMatch(TLeftParen)
 	condition := p.expression(p.acceptContextLowest())
@@ -1624,7 +1750,7 @@ func (p *Parser) whileStatement() *WhileStatement {
 	p.tokenizer.MustMatch(TLeftParen)
 	condition := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
-	body := p.statement()
+	body := p.requiredStatement("whileStatement")
 
 	return &WhileStatement{
 		Condition: condition,
@@ -1640,7 +1766,7 @@ func (p *Parser) returnStatement() *ReturnStatement {
 	t := p.tokenizer.CurrentToken
 
 	if !p.inFunctionBody {
-		panic("returnStatement: not in function")
+		panic(p.earlyError("returnStatement: not in function"))
 	}
 
 	if t.Type == TSemicolon || t.Type == TRightBrace || t.Type == TEOF || p.followedByLineTerminator(keyword) {
@@ -1661,11 +1787,11 @@ func (p *Parser) ifStatement() *IfStatement {
 	p.tokenizer.MustMatch(TLeftParen)
 	condition := p.expression(p.acceptContextLowest())
 	p.tokenizer.MustMatch(TRightParen)
-	consequent := p.statement()
+	consequent := p.requiredStatement("ifStatement")
 
 	var alternate Statement
 	if p.tokenizer.Match(TElse) {
-		alternate = p.statement()
+		alternate = p.requiredStatement("ifStatement else")
 	}
 
 	return &IfStatement{
@@ -1679,7 +1805,7 @@ func (p *Parser) expressionStatement() *StatementExpression {
 	expr := p.expression(p.acceptContextLowest())
 	p.automaticSemicolonInsertion()
 	if expr == nil {
-		panic("expressionStatement: expected expression")
+		panic(p.parseFailure("expressionStatement: expected expression"))
 	}
 
 	return &StatementExpression{
@@ -1709,7 +1835,7 @@ func (p *Parser) superCall() (*SuperCall, bool) {
 	p.tokenizer.Next()
 	args := p.arguments()
 	if !p.inClassConstructor {
-		panic("superCall: not in class constructor")
+		panic(p.earlyError("superCall: not in class constructor"))
 	}
 	return &SuperCall{
 		Arguments: args,
@@ -1833,7 +1959,7 @@ func (p *Parser) importMeta() *MetaPropertyImportMeta {
 	p.tokenizer.MustMatch(TDot)
 	p.tokenizer.MustMatch(TIdentifier)
 	if !p.inModule {
-		panic("importMeta: not in module")
+		panic(p.earlyError("importMeta: not in module"))
 	}
 	return &MetaPropertyImportMeta{}
 }
@@ -1843,12 +1969,16 @@ func (p *Parser) newTarget() (m *MetaPropertyNewTarget, ok bool) {
 	if t.Type != TNew || p.tokenizer.NextToken.Type != TDot {
 		return
 	}
+	p.tokenizer.store()
 	p.tokenizer.MustMatch(TNew)
 	p.tokenizer.MustMatch(TDot)
 	identifier := p.tokenizer.CurrentToken
 	if identifier.Value != "target" {
+		p.tokenizer.restore()
 		return
 	}
+	p.tokenizer.Next()
+	p.tokenizer.popCachedState()
 	return &MetaPropertyNewTarget{}, true
 }
 
@@ -1871,11 +2001,11 @@ func (p *Parser) updateExpression(primaryExpression Expression) (*UpdateExpressi
 		updateType = UpdateExpressionTypePostfix
 	}
 
-	if updateType == UpdateExpressionTypePrefix && expr.AssignmentTargetType() != AssignmentTargetTypeSimple {
-		panic("updateExpression: invalid assignment target for prefix")
+	if updateType == UpdateExpressionTypePrefix && !isSimpleAssignmentTarget(expr) {
+		panic(p.earlyError("updateExpression: invalid assignment target for prefix"))
 	}
-	if updateType == UpdateExpressionTypePrefix && expr.AssignmentTargetType() != AssignmentTargetTypeSimple {
-		panic("updateExpression: invalid assignment target for postfix")
+	if updateType == UpdateExpressionTypePostfix && !isSimpleAssignmentTarget(expr) {
+		panic(p.earlyError("updateExpression: invalid assignment target for postfix"))
 	}
 
 	return &UpdateExpression{
@@ -1883,6 +2013,19 @@ func (p *Parser) updateExpression(primaryExpression Expression) (*UpdateExpressi
 		Type:     updateType,
 		Operand:  expr,
 	}, true
+}
+
+func isSimpleAssignmentTarget(expression Expression) bool {
+	switch expression := expression.(type) {
+	case *IdentifierReference, *MemberExpression, *SuperPropertyExpression, *SuperPropertyIdentifier:
+		return true
+	case *ParenthesizedExpression:
+		return isSimpleAssignmentTarget(expression.Expression)
+	case *ExpressionPrimary:
+		return isSimpleAssignmentTarget(expression.PrimaryExpression)
+	default:
+		return false
+	}
 }
 
 func (p *Parser) expression(accept *acceptContext) Expression {
@@ -1949,7 +2092,7 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 		return p.callExpression(left)
 	case TTemplateHead, TNoSubstitutionTemplate:
 		if _, optional := left.(*OptionalExpression); optional {
-			panic("optional chains cannot be used as tagged template tags")
+			panic(p.earlyError("optional chains cannot be used as tagged template tags"))
 		}
 		return &CallExpression{
 			Callee:          left,
@@ -2031,7 +2174,7 @@ func (p *Parser) secondaryExpression(left Expression, accept *acceptContext) Exp
 		TQuestionQuestionEquals:
 		return p.assignmentExpression(left, accept)
 	default:
-		panic("secondaryExpression: unexpected token " + t.Value + " after " + left.String())
+		panic(p.parseFailure("unexpected token " + strconv.Quote(t.Value) + " after expression"))
 	}
 }
 
@@ -2052,7 +2195,7 @@ func (p *Parser) optionalExpression(left Expression) *OptionalExpression {
 		} else {
 			if token.Type != TIdentifier {
 				if _, isKeyword := keywordsMap[token.Value]; !isKeyword {
-					panic("optional chain: expected property name")
+					panic(p.parseFailure("optional chain: expected property name"))
 				}
 			}
 			property.Identifier = IdentifierName(token.Value)
@@ -2071,6 +2214,16 @@ func (p *Parser) optionalExpression(left Expression) *OptionalExpression {
 
 func (p *Parser) assignmentExpression(left Expression, accept *acceptContext) *AssignmentExpression {
 	t := p.tokenizer.CurrentToken
+	validTarget := isSimpleAssignmentTarget(left)
+	if t.Type == TEquals {
+		switch left.(type) {
+		case *PrimaryExpressionObjectLiteral, *ArrayLiteral:
+			validTarget = true
+		}
+	}
+	if !validTarget {
+		panic(p.earlyError("invalid assignment target"))
+	}
 	p.tokenizer.Next()
 	right := p.expression(accept)
 	return &AssignmentExpression{
@@ -2207,7 +2360,7 @@ func (p *Parser) memberExpression(left Expression) *MemberExpression {
 		if identifier.Type != TIdentifier {
 			// keyword after dot is treated as identifier
 			if _, ok := keywordsMap[identifier.Value]; !ok {
-				panic("memberExpression: expected identifier")
+				panic(p.parseFailure("memberExpression: expected identifier"))
 			}
 		}
 		p.tokenizer.Next()
@@ -2289,7 +2442,7 @@ func (p *Parser) arrowFunction() *ArrowFunction {
 		var items []FormalParametersItem
 		bindingElement, ok := p.bindingElement()
 		if !ok {
-			panic("arrowFunction: expected bindingElement")
+			panic(p.parseFailure("arrowFunction: expected bindingElement"))
 		}
 		items = append(items, &FormalParameter{
 			BindingElement: bindingElement,
@@ -2300,6 +2453,7 @@ func (p *Parser) arrowFunction() *ArrowFunction {
 	}
 	p.noLineTerminatorHere()
 	p.tokenizer.MustMatch(TArrow)
+	p.commitSpeculation()
 	var body *FunctionBody
 	if p.tokenizer.Match(TLeftBrace) {
 		body = p.functionBody(FunctionTypeNormal)
@@ -2336,7 +2490,7 @@ func (p *Parser) identifierReference() *IdentifierReference {
 	t := p.tokenizer.CurrentToken
 	types := []TokenType{TIdentifier, TAwait, TYield, TAsync}
 	if !lo.Contains(types, t.Type) {
-		panic("identifierReference: expected identifierOrKeyword")
+		panic(p.parseFailure("identifierReference: expected identifierOrKeyword"))
 	}
 	name := t.Value
 	p.tokenizer.Next()
@@ -2350,7 +2504,7 @@ func (p *Parser) identifierReference() *IdentifierReference {
 func (p *Parser) bindingIdentifier() IdentifierName {
 	t := p.tokenizer.CurrentToken
 	if !isBindingIdentifierToken(t.Type) {
-		panic("identifierReference: expected identifierOrKeyword")
+		panic(p.parseFailure("identifierReference: expected identifierOrKeyword"))
 	}
 	name := t.Value
 	p.tokenizer.Next()
@@ -2378,9 +2532,7 @@ func (p *Parser) primaryExpression() PrimaryExpression {
 		return p.objectLiteral()
 	case TIdentifier:
 		if p.tokenizer.NextToken.Type == TArrow {
-			if e, ok := parserRecoverOk(p, p.arrowFunction); ok {
-				return e
-			}
+			return p.arrowFunction()
 		}
 		return p.identifierReference()
 	case TLeftParen:
@@ -2438,7 +2590,7 @@ func (p *Parser) templateLiteral(tagged bool) *TemplateLiteral {
 			},
 		}
 		if _, valid := literal.Spans[0].TV(); !tagged && !valid {
-			panic("invalid escape sequence in untagged template")
+			panic(p.earlyError("invalid escape sequence in untagged template"))
 		}
 		return literal
 	}
@@ -2477,11 +2629,11 @@ func (p *Parser) templateLiteral(tagged bool) *TemplateLiteral {
 	}
 	if !tagged {
 		if _, valid := literal.TemplateHead.TV(); !valid {
-			panic("invalid escape sequence in untagged template")
+			panic(p.earlyError("invalid escape sequence in untagged template"))
 		}
 		for _, span := range literal.Spans {
 			if _, valid := span.TV(); !valid {
-				panic("invalid escape sequence in untagged template")
+				panic(p.earlyError("invalid escape sequence in untagged template"))
 			}
 		}
 	}
@@ -2593,7 +2745,7 @@ func (p *Parser) classElementName() (PropertyName, bool) {
 		return p.propertyName()
 	}
 	if token.Value == "#constructor" {
-		panic("class element private name cannot be #constructor")
+		panic(p.earlyError("class element private name cannot be #constructor"))
 	}
 	p.tokenizer.Next()
 	return &PropertyNamePrivateIdentifier{
@@ -2721,7 +2873,9 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		}
 	}
 	propertyName, ok := p.propertyName()
-	Assert(ok)
+	if !ok {
+		panic(p.parseFailure("object literal requires a property definition"))
+	}
 
 	if p.tokenizer.Match(TColon) {
 		value := p.expression(accept)
@@ -2731,7 +2885,9 @@ func (p *Parser) propertyDefinition() PropertyDefinition {
 		}
 	} else {
 		identifier, ok := propertyName.(*PropertyNameLiteralIdentifier)
-		Assert(ok)
+		if !ok {
+			panic(p.parseFailure("object literal property requires ':'"))
+		}
 		var initializer Expression
 		if p.tokenizer.Match(TEquals) {
 			initializer = p.expression(accept)
@@ -2798,7 +2954,7 @@ func (p *Parser) literal() Literal {
 		defer p.tokenizer.Next()
 		return &LiteralUndefined{}
 	default:
-		panic("literal: unhandled token")
+		panic(p.parseFailure("unexpected token " + strconv.Quote(t.Value)))
 	}
 }
 
@@ -2820,7 +2976,7 @@ func (p *Parser) numericLiteral() *NumericLiteral {
 func (p *Parser) stringLiteral() *StringLiteral {
 	t := p.tokenizer.CurrentToken
 	if t.Type != TString {
-		panic("stringLiteral: expected string")
+		panic(p.parseFailure("stringLiteral: expected string"))
 	}
 	p.tokenizer.Next()
 	return &StringLiteral{
@@ -2838,19 +2994,9 @@ func (p *Parser) variableStatement() *VariableStatement {
 }
 
 func (p *Parser) variableDeclarationList() *VariableDeclarationList {
-	var list []*VariableDeclaration
-	for {
-		if declaration, ok := parserRecoverOk(p, p.variableDeclaration); ok {
-			list = append(list, declaration)
-		} else {
-			break
-		}
-		if p.tokenizer.CurrentToken.Type == TComma {
-			p.tokenizer.Next()
-			continue
-		} else {
-			break
-		}
+	list := []*VariableDeclaration{p.variableDeclaration()}
+	for p.tokenizer.Match(TComma) {
+		list = append(list, p.variableDeclaration())
 	}
 	return &VariableDeclarationList{Items: list}
 }
@@ -2868,7 +3014,7 @@ func (p *Parser) variableDeclaration() *VariableDeclaration {
 		init = p.expression(p.acceptContextHigherThan(TComma))
 	}
 	if pattern != nil && init == nil {
-		panic("variableDeclaration: a binding pattern requires an initializer")
+		panic(p.parseFailure("variableDeclaration: a binding pattern requires an initializer"))
 	}
 	return &VariableDeclaration{
 		BindingIdentifier: identifier,
@@ -2895,12 +3041,26 @@ func (p *Parser) block() *Block {
 
 func parserRecoverOk[T any](p *Parser, f func() T) (r T, ok bool) {
 	p.tokenizer.store()
+	p.speculation = append(p.speculation, false)
 	defer func() {
-		if r := recover(); r != nil {
+		if recovered := recover(); recovered != nil {
+			failure, parseError := recovered.(*parseFailure)
+			committed := p.speculationCommitted()
+			p.speculation = p.speculation[:len(p.speculation)-1]
+			if !parseError {
+				p.tokenizer.popCachedState()
+				panic(recovered)
+			}
+			if committed || failure.committed {
+				failure.committed = true
+				p.tokenizer.popCachedState()
+				panic(failure)
+			}
 			// fmt.Println("parser recovered from: ", pkg.GetFunctionName(f), r)
 			p.tokenizer.restore()
 			ok = false
 		} else {
+			p.speculation = p.speculation[:len(p.speculation)-1]
 			p.tokenizer.popCachedState()
 		}
 	}()

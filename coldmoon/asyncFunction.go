@@ -1,7 +1,5 @@
 package coldmoon
 
-import "fmt"
-
 func NewAsyncFunctionConstructor(realm *Realm) ObjectType {
 	agent := realm.Agent
 	var behavior BehaviorFn = func(thisArgument Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -69,7 +67,6 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 					UndefinedValue, []Value{result.value}),
 			)
 		} else {
-			fmt.Println("async block throw", result.Error().String())
 			ReturnAssertNormal(
 				promiseCapability.Reject.Call(
 					UndefinedValue, []Value{result.Error()}),

@@ -5,6 +5,58 @@ Coldmoon separates ECMAScript semantics in `coldmoon` from host bindings in
 execution contexts, objects, promises, and module records. Host packages install
 terminal and Test262 globals without owning language execution.
 
+## CLI orchestration
+
+`internal/cli` is the command-line boundary. Its sole public operation,
+`Run(Invocation) int`, receives the complete argument vector, working
+directory, stdin, stdout, stderr, TTY state, and version as injected values. It
+parses the command contract, owns one Agent and Realm for the invocation, and
+returns a stable process status. It never calls `os.Exit`.
+
+The root `main` package is deliberately thin: it resolves operating-system
+state, constructs the `Invocation`, and exits with the returned status. This
+keeps command parsing and execution testable without mutating global process
+state. A file, inline source, stdin batch, and REPL submission all pass through
+the same source boundary. `--interactive` reuses the Realm created for the
+successful preceding batch operation.
+
+## Safe source execution
+
+The `coldmoon` package describes an entry point as `Source`: text, display name,
+base directory, and script-or-module kind. `CheckSource` parses only that entry
+point and does not resolve or load its imports. `EvaluateSource` parses, links
+when needed, executes, and drains the Agent scheduler before returning. The
+older `ParseScript`, `ParseModule`, `Evaluate`, and `EvaluateModule` entry
+points remain compatibility wrappers over the same implementation.
+
+For module evaluation, a file source uses its containing directory as
+`Source.BaseDir`; inline and stdin sources use the invocation working directory.
+Relative import resolution starts from that base.
+
+Expected failures cross this boundary as a typed `Diagnostic`. A diagnostic
+preserves its category, JavaScript error name and message, source name,
+optional span and source line, incomplete-input classification, original thrown
+value, and cause. Syntax failures and known JavaScript abrupt completions are
+converted; internal invariant failures remain Go panics. The CLI can therefore
+render stable user diagnostics without hiding engine defects, and the REPL can
+request continuation based on `Incomplete` rather than error-message matching.
+
+## Terminal host ownership
+
+The terminal host owns host-visible terminal bindings, not program execution or
+process lifetime. `TerminalOptions` supplies stdout, stderr, and argv to
+`RegisterTerminalRuntimeWithOptions`; `RegisterTerminalRuntime` remains the
+compatibility adapter that uses OS defaults. Console methods, the global
+`print`, CLI print mode, and REPL result display share the same JavaScript value
+formatting contract.
+
+The only Node-style process surface is `process.argv`, installed as an ordinary
+mutable JavaScript Array. The CLI determines its entries from the input form,
+while the terminal runtime only publishes the injected values. In the
+CLI-facing path, console and global `print` output flows through the writers
+owned by the host boundary; expected source failures return diagnostics rather
+than writing directly to process output.
+
 ## Runtime scheduling
 
 Every `Agent` owns one `Scheduler`. The scheduler is responsible for:
