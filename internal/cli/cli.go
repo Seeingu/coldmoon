@@ -85,7 +85,12 @@ func Run(invocation Invocation) int {
 		return 0
 	}
 
-	value, err := coldmoon.EvaluateSource(prepared.source, realm)
+	var value coldmoon.Value
+	if prepared.moduleIdentity != "" {
+		value, err = coldmoon.EvaluateSourceWithModuleIdentity(prepared.source, prepared.moduleIdentity, realm)
+	} else {
+		value, err = coldmoon.EvaluateSource(prepared.source, realm)
+	}
 	if err != nil {
 		renderError(invocation.Stderr, err)
 		return 1
@@ -100,9 +105,10 @@ func Run(invocation Invocation) int {
 }
 
 type preparedInput struct {
-	source      coldmoon.Source
-	processArgv []string
-	hasSource   bool
+	source         coldmoon.Source
+	moduleIdentity string
+	processArgv    []string
+	hasSource      bool
 }
 
 func prepareInput(invocation Invocation, options commandOptions) (preparedInput, error) {
@@ -136,8 +142,9 @@ func prepareInput(invocation Invocation, options commandOptions) (preparedInput,
 				BaseDir: filepath.Dir(path),
 				Kind:    selectedSourceKind(options.inputType, coldmoon.SourceModule),
 			},
-			processArgv: append([]string{executable, path}, options.arguments...),
-			hasSource:   true,
+			moduleIdentity: path,
+			processArgv:    append([]string{executable, path}, options.arguments...),
+			hasSource:      true,
 		}, nil
 	}
 	if options.stdin || (!invocation.StdinIsTTY && !options.interactive) {

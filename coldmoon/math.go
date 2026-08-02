@@ -18,7 +18,7 @@ func NewMathObject(realm *Realm) ObjectType {
 	object.defineBuiltinProperty(CMString("LOG2E"), NewFrozenPropertyDescriptor(NewNumberValue(math.Log2E)))
 	object.defineBuiltinProperty(CMString("LOG10E"), NewFrozenPropertyDescriptor(NewNumberValue(math.Log10E)))
 	object.defineBuiltinProperty(CMString("PI"), NewFrozenPropertyDescriptor(NewNumberValue(math.Pi)))
-	object.defineBuiltinProperty(CMString("SQRT1_2"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(math.Sqrt(1/2)))))
+	object.defineBuiltinProperty(CMString("SQRT1_2"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(math.Sqrt(0.5)))))
 	object.defineBuiltinProperty(CMString("SQRT2"), NewFrozenPropertyDescriptor(NewNumberValue(JSNumber(math.Sqrt2))))
 	object.defineToStringTag("Math")
 

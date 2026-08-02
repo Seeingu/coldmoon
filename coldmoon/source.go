@@ -25,10 +25,12 @@ const (
 	SourceModule
 )
 
-// Source is a complete ECMAScript input together with its host identity.
+// Source is a complete ECMAScript input together with its host context.
 type Source struct {
-	Text    string
-	Name    string
+	Text string
+	// Name is the display name used in diagnostics and parser context.
+	Name string
+	// BaseDir supplies the host context for resolving relative module imports.
 	BaseDir string
 	Kind    SourceKind
 }
@@ -106,24 +108,58 @@ func CheckSource(source Source, _ *Realm) (err error) {
 	return nil
 }
 
-// EvaluateSource parses and executes source, translating expected language
-// failures into Diagnostic while allowing implementation panics to surface.
+// EvaluateSource parses and executes a fresh source, translating expected
+// language failures into Diagnostic while allowing implementation panics to
+// surface. Module sources evaluated here are temporary and are never cached by
+// their diagnostic Name.
 func EvaluateSource(source Source, realm *Realm) (value Value, err error) {
+	return evaluateSource(source, "", realm)
+}
+
+// EvaluateSourceWithModuleIdentity parses and executes source using the
+// host-canonical identity supplied for a module entry. The identity must match
+// ModuleLoader.Resolve when an import can cycle back to this entry. A cache hit
+// reuses the Realm-local record without parsing source.Text again. Script
+// sources and empty identities retain EvaluateSource's temporary semantics.
+func EvaluateSourceWithModuleIdentity(source Source, moduleIdentity string, realm *Realm) (value Value, err error) {
+	return evaluateSource(source, moduleIdentity, realm)
+}
+
+// evaluateSource owns the shared parser, execution, diagnostic, and scheduler
+// boundary; moduleIdentity is kept separate so Source.Name remains display-only.
+func evaluateSource(source Source, moduleIdentity string, realm *Realm) (value Value, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
+			expectedFailure := false
 			switch recovered := recovered.(type) {
 			case *parseFailure:
 				value = nil
 				err = syntaxDiagnostic(source, recovered)
+				expectedFailure = true
 			case Value:
-				value = nil
-				err = thrownDiagnostic(DiagnosticRuntime, source, recovered, nil)
+				// A synchronous source failure takes precedence over a later
+				// asynchronous failure encountered while draining scheduled work.
+				if err == nil {
+					value = nil
+					err = thrownDiagnostic(DiagnosticRuntime, source, recovered, nil)
+				}
+				expectedFailure = true
 			default:
 				panic(recovered)
+			}
+			if expectedFailure && realm != nil {
+				// Expected failures still cross the same scheduler boundary as a
+				// normal completion. An invariant panic from the drain remains fatal.
+				realm.Agent.Scheduler.drainUntilIdle()
 			}
 		}
 	}()
 
+	if source.Kind == SourceModule {
+		if module := realm.Agent.ModuleGraph.cachedSource(realm, moduleIdentity); module != nil {
+			return evaluateModuleRecord(source, realm, module)
+		}
+	}
 	script, module := parseSource(source, realm)
 	if script != nil {
 		result := script.evaluateCompletion()
@@ -132,41 +168,69 @@ func EvaluateSource(source Source, realm *Realm) (value Value, err error) {
 			if thrown == nil {
 				thrown = result.Data()
 			}
-			return nil, thrownDiagnostic(DiagnosticRuntime, source, thrown, nil)
+			value = nil
+			err = thrownDiagnostic(DiagnosticRuntime, source, thrown, nil)
+		} else {
+			value = result.Data()
 		}
-		realm.Agent.Scheduler.RunUntilIdle()
-		return result.Data(), nil
+		if scheduledFailure := realm.Agent.Scheduler.drainUntilIdle(); err == nil && scheduledFailure != nil {
+			value = nil
+			err = thrownDiagnostic(DiagnosticRuntime, source, scheduledFailure, nil)
+		}
+		return value, err
 	}
 
-	module = realm.Agent.ModuleGraph.cacheSource(realm, source.Name, module)
+	module = realm.Agent.ModuleGraph.cacheSource(realm, moduleIdentity, module)
 	return evaluateModuleRecord(source, realm, module)
 }
 
-func evaluateModuleRecord(source Source, realm *Realm, module *SourceTextModule) (Value, error) {
+func evaluateModuleRecord(source Source, realm *Realm, module *SourceTextModule) (value Value, err error) {
+	var scheduledFailure Value
+	drain := func() {
+		failure := realm.Agent.Scheduler.drainUntilIdle()
+		if scheduledFailure == nil {
+			scheduledFailure = failure
+		}
+	}
+
 	loaded := module.LoadRequestedModules()
 	if loaded.PromiseState == PromiseStatePending {
-		realm.Agent.Scheduler.RunUntilIdle()
+		drain()
 	}
 	if loaded.PromiseState == PromiseStateRejected {
-		return nil, thrownDiagnostic(DiagnosticLink, source, loaded.PromiseResult, nil)
+		err = thrownDiagnostic(DiagnosticLink, source, loaded.PromiseResult, nil)
 	}
-	if loaded.PromiseState != PromiseStateFulfilled {
+	if loaded.PromiseState != PromiseStateFulfilled && err == nil {
 		panic("module loading did not settle")
 	}
 
-	if thrown := module.Link(); thrown != nil {
-		return nil, thrownDiagnostic(DiagnosticLink, source, thrown, nil)
+	if err == nil {
+		if thrown := module.Link(); thrown != nil {
+			err = thrownDiagnostic(DiagnosticLink, source, thrown, nil)
+		}
 	}
-	evaluated := module.Evaluate()
-	realm.Agent.Scheduler.RunUntilIdle()
-	switch evaluated.PromiseState {
-	case PromiseStateFulfilled:
-		return UndefinedValue, nil
-	case PromiseStateRejected:
-		return nil, thrownDiagnostic(DiagnosticRuntime, source, evaluated.PromiseResult, nil)
-	default:
-		panic("module evaluation did not settle")
+	if err == nil {
+		evaluated := module.Evaluate()
+		drain()
+		switch evaluated.PromiseState {
+		case PromiseStateFulfilled:
+			value = UndefinedValue
+		case PromiseStateRejected:
+			err = thrownDiagnostic(DiagnosticRuntime, source, evaluated.PromiseResult, nil)
+		default:
+			panic("module evaluation did not settle")
+		}
 	}
+
+	// Loading and evaluation may already have drained the scheduler. The final
+	// pass is intentionally unconditional so link and early failure paths obey
+	// the same return boundary without duplicating cleanup at every branch.
+	drain()
+	if err == nil && scheduledFailure != nil {
+		value = nil
+		err = thrownDiagnostic(DiagnosticRuntime, source, scheduledFailure, nil)
+	}
+	return value, err
 }
 
 func parseSource(source Source, realm *Realm) (*ScriptRecord, *SourceTextModule) {

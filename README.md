@@ -27,19 +27,28 @@ make build
 The executable is written to `bin/coldmoon` (`bin/coldmoon.exe` when Go's
 `GOEXE` is `.exe`). `make build-all` remains an alias for `make build`.
 
-Run the bounded test suite and the CLI smoke test with:
+Run the bounded test suite, race checks, and the CLI smoke test with:
 
 ```bash
 make test
+make race
 make cli-smoke
 ```
 
-The regular test command is bounded and skips the full Test262 coverage scan.
-Run the compatibility suite explicitly with:
+The regular and race test commands are bounded and skip the full Test262
+coverage scan. CI runs both before the CLI smoke test. Run the compatibility
+suite explicitly with:
 
 ```bash
 make test262
 ```
+
+## Embedding
+
+For Go embedders, `Source.Name` is now diagnostic-only. `EvaluateSource` treats
+module input as temporary; callers that previously relied on `Source.Name` as a
+module cache key should migrate to `EvaluateSourceWithModuleIdentity` and pass
+the same canonical identity returned by their module loader.
 
 ## CLI
 

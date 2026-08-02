@@ -5,7 +5,11 @@ import (
 	"math/rand"
 	"reflect"
 	"strings"
+	"sync/atomic"
+	"time"
 )
+
+var nextRealmRandomSeed = time.Now().UnixNano()
 
 type realmState uint8
 
@@ -45,7 +49,10 @@ func CreateRealm(agent *Agent) *Realm {
 	r := &Realm{
 		Agent:      agent,
 		Intrinsics: &Intrinsics{},
-		state:      realmStateBuilding,
+		// Seed each Realm independently while retaining the public rand.Rand
+		// value seam that embedders can replace for deterministic execution.
+		Rng:   *rand.New(rand.NewSource(atomic.AddInt64(&nextRealmRandomSeed, 1))),
+		state: realmStateBuilding,
 	}
 	r.createIntrinsics()
 	if missing := missingIntrinsicFields(r.Intrinsics); len(missing) > 0 {

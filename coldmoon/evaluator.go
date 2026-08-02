@@ -13,14 +13,38 @@ func fatalOnError(result Value) {
 
 func EvaluateModule(filePath string, realm *Realm) {
 	agent := realm.Agent
+	source := Source{Name: filePath, Kind: SourceModule}
+	var evaluationErr error
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			switch recovered := recovered.(type) {
+			case *parseFailure:
+				evaluationErr = syntaxDiagnostic(source, recovered)
+			case Value:
+				evaluationErr = thrownDiagnostic(DiagnosticRuntime, source, recovered, nil)
+			default:
+				panic(recovered)
+			}
+		}
+		// This outer boundary also covers root loading and parsing, which occur
+		// before evaluateModuleRecord takes ownership of scheduler draining.
+		if scheduledFailure := agent.Scheduler.drainUntilIdle(); evaluationErr == nil && scheduledFailure != nil {
+			evaluationErr = thrownDiagnostic(DiagnosticRuntime, source, scheduledFailure, nil)
+		}
+		legacyFatal(evaluationErr)
+	}()
+
 	loaded := agent.ModuleGraph.Load(realm.ToReferrer(), filePath, HostDefined{})
 	if loaded.IsAbrupt() {
-		fatalOnError(loaded.Error())
+		thrown := loaded.Error()
+		if thrown == nil {
+			panic("module graph returned an invalid abrupt completion")
+		}
+		evaluationErr = thrownDiagnostic(DiagnosticLink, source, thrown, nil)
 		return
 	}
 	module := loaded.Data().(*SourceTextModule)
-	_, err := evaluateModuleRecord(Source{Name: filePath, Kind: SourceModule}, realm, module)
-	legacyFatal(err)
+	_, evaluationErr = evaluateModuleRecord(source, realm, module)
 }
 
 func Evaluate(source string, realm *Realm) {

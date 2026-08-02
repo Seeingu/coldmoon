@@ -2071,7 +2071,10 @@ func (e *SuperCall) Evaluation(vm *VM) (co CompletionValue) {
 	if !IsConstructor(f) {
 		return co.ThrowTypeError(agent, "SuperCall: not a constructor")
 	}
-	result := MustGetObject(f).Construct(argList, newTarget).value
+	result, isAbrupt, rt := ReturnIfAbrupt(MustGetObject(f).Construct(argList, newTarget), co)
+	if isAbrupt {
+		return rt
+	}
 	thisER := agent.GetThisEnvironment().(*FunctionEnvironment)
 	thisER.BindThisValue(result.ToValue())
 	F := thisER.FunctionObject
@@ -3216,6 +3219,9 @@ func (e *EqualityExpression) Evaluation(vm *VM) (co CompletionValue) {
 		return rt
 	}
 	rval, _, isAbrupt, rt := vm.EvalAndGetValue(e.Right, co)
+	if isAbrupt {
+		return rt
+	}
 
 	switch e.Operator {
 	case EqualityOperatorEqual:
@@ -3311,30 +3317,42 @@ func (e *RelationalExpression) Evaluation(vm *VM) (co CompletionValue) {
 		return rt
 	}
 	switch e.Operator {
-	case RelationalOperatorLessThan, RelationalOperatorGreaterThan:
-		var order isLessThanOrder
-		if e.Operator == RelationalOperatorLessThan {
-			order = IsLessThanOrderLeftFirst
-		} else {
-			order = IsLessThanOrderRightFirst
-		}
-		isLessThan, isAbrupt, rt := ReturnIfAbrupt(IsLessThan(vm.agent, lval, rval, order), co)
+	case RelationalOperatorLessThan:
+		isLessThan, isAbrupt, rt := ReturnIfAbrupt(
+			IsLessThan(vm.agent, lval, rval, IsLessThanOrderLeftFirst),
+			co,
+		)
 		if isAbrupt {
 			return rt
 		}
-		return isLessThan.ToCompletion()
-	case RelationalOperatorLessThanOrEqual, RelationalOperatorGreaterThanOrEqual:
-		var order isLessThanOrder
-		if e.Operator == RelationalOperatorLessThanOrEqual {
-			order = IsLessThanOrderRightFirst
-		} else {
-			order = IsLessThanOrderLeftFirst
-		}
-		isLessThan, isAbrupt, rt := ReturnIfAbrupt(IsLessThan(vm.agent, rval, lval, order), co)
+		return NewBooleanValue(isLessThan != UndefinedValue && isLessThan.ToBoolean()).ToCompletion()
+	case RelationalOperatorGreaterThan:
+		isLessThan, isAbrupt, rt := ReturnIfAbrupt(
+			IsLessThan(vm.agent, rval, lval, IsLessThanOrderRightFirst),
+			co,
+		)
 		if isAbrupt {
 			return rt
 		}
-		return NewBooleanValue(!isLessThan.ToBoolean()).ToCompletion()
+		return NewBooleanValue(isLessThan != UndefinedValue && isLessThan.ToBoolean()).ToCompletion()
+	case RelationalOperatorLessThanOrEqual:
+		isLessThan, isAbrupt, rt := ReturnIfAbrupt(
+			IsLessThan(vm.agent, rval, lval, IsLessThanOrderRightFirst),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(isLessThan != UndefinedValue && !isLessThan.ToBoolean()).ToCompletion()
+	case RelationalOperatorGreaterThanOrEqual:
+		isLessThan, isAbrupt, rt := ReturnIfAbrupt(
+			IsLessThan(vm.agent, lval, rval, IsLessThanOrderLeftFirst),
+			co,
+		)
+		if isAbrupt {
+			return rt
+		}
+		return NewBooleanValue(isLessThan != UndefinedValue && !isLessThan.ToBoolean()).ToCompletion()
 	case RelationalOperatorInstanceof:
 		return NewBooleanValue(vm.InstanceOfOperator(lval, rval)).ToCompletion()
 	case RelationalOperatorIn:
@@ -6462,26 +6480,46 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 		protoParent = realm.Intrinsics.ObjectPrototype
 		constructorParent = realm.Intrinsics.FunctionPrototype
 	} else {
-		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = classEnv
-		superclassRef := RunNode(agent,
-			&StatementExpression{
-				Expression: c.ClassHeritage,
-			},
-		)
-		agent.RunningExecutionContext().ECMAScriptCode.LexicalEnvironment = env
-		superclass := superclassRef.Data().GetValue(agent).value
-		if superclass == nil {
+		state := agent.RunningExecutionContext().ECMAScriptCode
+		superclassResult := func() CompletionValue {
+			state.LexicalEnvironment = classEnv
+			defer func() {
+				// Heritage evaluation runs in the class environment, but every
+				// completion must restore the surrounding lexical environment.
+				state.LexicalEnvironment = env
+			}()
+			return RunNode(agent, &StatementExpression{Expression: c.ClassHeritage})
+		}()
+		superclassRef, isAbrupt, rt := ReturnIfAbrupt(superclassResult, returnCompletion)
+		if isAbrupt {
+			return rt
+		}
+		superclass, isAbrupt, rt := ReturnIfAbrupt(superclassRef.GetValue(agent), returnCompletion)
+		if isAbrupt {
+			return rt
+		}
+		if superclass == NullValue {
 			protoParent = nil
 			constructorParent = realm.Intrinsics.FunctionPrototype
 		} else if !IsConstructor(superclass) {
-			panic("TypeError: superclass is not a constructor")
+			return returnCompletion.ThrowTypeError(agent, "superclass is not a constructor")
 		} else {
-			protoParentValue := MustGetObject(superclass).Get(NewStringPropertyKey("prototype"))
-			if !protoParentValue.IsObject() {
-				panic("TypeError: prototype is not an object")
+			superclassObject := MustGetObject(superclass)
+			protoParentValue, isAbrupt, rt := ReturnIfAbrupt(
+				superclassObject.GetCompletion(NewStringPropertyKey("prototype")),
+				returnCompletion,
+			)
+			if isAbrupt {
+				return rt
 			}
-			protoParent = MustGetObject(protoParentValue)
-			constructorParent = MustGetObject(superclass)
+			if protoParentValue == NullValue {
+				protoParent = nil
+			} else if object, ok := protoParentValue.GetObject(); ok {
+				protoParent = object
+			} else {
+				return returnCompletion.ThrowTypeError(agent, "prototype is not an object or null")
+			}
+			constructorParent = superclassObject
 		}
 	}
 
@@ -6495,7 +6533,8 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 		var defaultConstructor BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 			args := arguments
 			if newTarget == nil {
-				return agent.ThrowTypeError("class must be invoked with 'new'")
+				var completion CompletionValue
+				return completion.ThrowTypeError(agent, "class must be invoked with 'new'")
 			}
 
 			F := agent.ActiveFunctionObject()
@@ -6503,13 +6542,19 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 			var result ObjectType
 			if classConstructorFields.ConstructorKind == ConstructorKindDerived {
 				fun := function.internalMethods().GetPrototypeOf(function)
-				if !IsConstructor((fun).ToValue()) {
-					panic("TypeError: prototype is not a constructor")
+				if fun == nil || !IsConstructor(fun.ToValue()) {
+					var completion CompletionValue
+					return completion.ThrowTypeError(agent, "prototype is not a constructor")
 				}
-				result = fun.Construct(args, newTarget).value
+				constructed := fun.Construct(args, newTarget)
+				if constructed.IsAbrupt() {
+					return CompletionFrom(CompletionValue{}, constructed)
+				}
+				result = constructed.Data()
 			} else {
 				result = OrdinaryCreateFromConstructor(agent, newTarget, "%Object.prototype", nil)
 			}
+			result.InitializeInstanceElements(F)
 			return result.ToValue()
 		}
 
@@ -6638,10 +6683,16 @@ func (c *ClassTail) ClassDefinitionEvaluation(vm *VM, classBinding string, class
 		classEnv.InitializeBinding(classBinding, function.ToValue())
 	}
 
-	if ObjectIs[*ECMAScriptFunction](function) {
-		e := ObjectAs[*ECMAScriptFunction](function)
-		e.privateMethods = instancePrivateMethods.Data()
-		function.(InternalSlotFields).SetFields(instanceFields)
+	switch function := function.(type) {
+	case *ECMAScriptFunction:
+		function.privateMethods = instancePrivateMethods.Data()
+		function.SetFields(instanceFields)
+	case *BuiltinFunction:
+		fields := function.AdditionalFields.ClassConstructorFields
+		fields.PrivateMethods = instancePrivateMethods.Data()
+		fields.Fields = instanceFields
+	default:
+		panic("class constructor has no field storage")
 	}
 
 	for _, method := range staticPrivateMethods.Data() {

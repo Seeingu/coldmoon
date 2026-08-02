@@ -109,23 +109,53 @@ func (s *Scheduler) StartTask(run func()) {
 }
 
 // RunJobs drains promise jobs in FIFO order. Each job is removed before it is
-// run, so repeated drains never execute a completed job again.
+// run, so repeated drains never execute a completed job again. The first
+// language-level failure is rethrown after all currently reachable jobs drain.
 func (s *Scheduler) RunJobs() {
+	if thrown := s.drainJobs(); thrown != nil {
+		panic(thrown)
+	}
+}
+
+// drainJobs records the first JavaScript throw while continuing through jobs
+// reachable from the queue; non-language panics remain engine failures.
+func (s *Scheduler) drainJobs() Value {
+	var firstFailure Value
 	for {
 		job := s.takeJob()
 		if job == nil {
-			return
+			return firstFailure
 		}
-		s.runJob(job)
+		if failure := s.runJob(job); firstFailure == nil {
+			firstFailure = failure
+		}
 	}
 }
 
 // RunUntilIdle drains promise jobs, timers, and finite asynchronous tasks until
-// no work remains. Jobs queued by other jobs are handled in the same turn.
+// no work remains. Jobs queued by other jobs are handled in the same turn. A
+// language-level job or timer failure is rethrown after remaining work drains.
 func (s *Scheduler) RunUntilIdle() {
+	if thrown := s.drainUntilIdle(); thrown != nil {
+		panic(thrown)
+	}
+}
+
+// drainUntilIdle implements the scheduler's deep-module contract. It records
+// the first expected JavaScript failure while continuing to drain; invariant
+// panics still escape immediately rather than being mistaken for source errors.
+func (s *Scheduler) drainUntilIdle() Value {
+	var firstFailure Value
 	for {
-		s.RunJobs()
-		if s.runDueTimers() {
+		jobFailure := s.drainJobs()
+		if firstFailure == nil {
+			firstFailure = jobFailure
+		}
+		ranTimers, timerFailure := s.runDueTimers()
+		if firstFailure == nil {
+			firstFailure = timerFailure
+		}
+		if ranTimers {
 			continue
 		}
 
@@ -134,7 +164,7 @@ func (s *Scheduler) RunUntilIdle() {
 			continue
 		}
 		if activeTasks == 0 && !hasTimer {
-			return
+			return firstFailure
 		}
 
 		if hasTimer {
@@ -176,7 +206,19 @@ func (s *Scheduler) takeJob() *QueuedPromiseJob {
 	return job
 }
 
-func (s *Scheduler) runJob(job *QueuedPromiseJob) {
+func (s *Scheduler) runJob(job *QueuedPromiseJob) (failure Value) {
+	defer func() {
+		recovered := recover()
+		s.agent.waitForAsyncContinuations()
+		if recovered == nil {
+			return
+		}
+		if thrown, ok := recovered.(Value); ok {
+			failure = thrown
+			return
+		}
+		panic(recovered)
+	}()
 	func() {
 		var hostScope *ExecutionContextScope
 		if !s.agent.hasExecutionContext() {
@@ -198,22 +240,28 @@ func (s *Scheduler) runJob(job *QueuedPromiseJob) {
 		}()
 		job.job.Fun(job.job.Captures)
 	}()
-	s.agent.waitForAsyncContinuations()
+	return nil
 }
 
-func (s *Scheduler) runDueTimers() bool {
-	ran := false
+func (s *Scheduler) runDueTimers() (ran bool, firstFailure Value) {
 	for {
 		timer, ok := s.takeDueTimer()
 		if !ok {
-			return ran
+			return ran, firstFailure
 		}
 		ran = true
 		result := timer.run()
 		if result.IsAbrupt() {
-			panic(result.Error())
+			if result.t != CompletionTypeThrow || result.Error() == nil {
+				panic("scheduler timer returned an invalid abrupt completion")
+			}
+			if firstFailure == nil {
+				firstFailure = result.Error()
+			}
 		}
-		s.RunJobs()
+		if jobFailure := s.drainJobs(); firstFailure == nil {
+			firstFailure = jobFailure
+		}
 	}
 }
 

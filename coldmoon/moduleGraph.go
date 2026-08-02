@@ -88,16 +88,25 @@ func (g *ModuleGraph) Size() int {
 	return len(g.modules)
 }
 
-// cacheSource publishes a host-provided entry module before its dependencies
-// load. This lets an import cycle that resolves back to the entry identity
-// converge on the same SourceTextModule record.
+// cachedSource returns the Realm-local entry for an explicit canonical identity.
+// Empty identities are temporary inputs and therefore never have cache entries.
+func (g *ModuleGraph) cachedSource(realm *Realm, identity string) *SourceTextModule {
+	if identity == "" {
+		return nil
+	}
+	return g.modules[moduleCacheKey{realm: realm, identity: identity}]
+}
+
+// cacheSource publishes a host-provided entry module with an explicit canonical
+// identity before its dependencies load. An empty identity deliberately skips
+// caching because display names and parse context are not module identities.
 func (g *ModuleGraph) cacheSource(realm *Realm, identity string, module *SourceTextModule) *SourceTextModule {
 	module.Identity = identity
 	if identity == "" {
 		return module
 	}
 	key := moduleCacheKey{realm: realm, identity: identity}
-	if existing, ok := g.modules[key]; ok {
+	if existing := g.cachedSource(realm, identity); existing != nil {
 		return existing
 	}
 	g.modules[key] = module

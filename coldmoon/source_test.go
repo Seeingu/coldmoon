@@ -361,7 +361,107 @@ func TestEvaluateSourceExecutesModule(t *testing.T) {
 	}
 }
 
-func TestEvaluateSourceUsesCanonicalNameForRelativeImportCycle(t *testing.T) {
+// TestEvaluateSourceDoesNotCacheTemporaryModulesByDisplayName protects Source's
+// diagnostic name from accidentally becoming a canonical module identity.
+func TestEvaluateSourceDoesNotCacheTemporaryModulesByDisplayName(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+
+	if _, err := EvaluateSource(Source{
+		Text: `globalThis.moduleRuns = "A";`,
+		Name: "repl-module",
+		Kind: SourceModule,
+	}, realm); err != nil {
+		t.Fatalf("first EvaluateSource returned error: %v", err)
+	}
+	if _, err := EvaluateSource(Source{
+		Text: `globalThis.moduleRuns += "B";`,
+		Name: "repl-module",
+		Kind: SourceModule,
+	}, realm); err != nil {
+		t.Fatalf("second EvaluateSource returned error: %v", err)
+	}
+
+	value := realm.GlobalObject.Get(NewStringPropertyKey("moduleRuns"))
+	if value.String() != "AB" {
+		t.Fatalf("moduleRuns = %q, want AB", value.String())
+	}
+}
+
+// TestEvaluateSourceReusesCanonicalModuleIdentity verifies that embedders can
+// opt into ECMAScript's one-record-per-identity semantics independently of the
+// diagnostic display name.
+func TestEvaluateSourceReusesCanonicalModuleIdentity(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+
+	if _, err := EvaluateSourceWithModuleIdentity(Source{
+		Text: `globalThis.canonicalRuns = "A";`,
+		Name: "first-display-name",
+		Kind: SourceModule,
+	}, "memory:entry", realm); err != nil {
+		t.Fatalf("first EvaluateSource returned error: %v", err)
+	}
+	if _, err := EvaluateSourceWithModuleIdentity(Source{
+		// A cache hit occurs before parsing, so later text for the same identity
+		// cannot replace or invalidate the canonical module record.
+		Text: `export const = ;`,
+		Name: "second-display-name",
+		Kind: SourceModule,
+	}, "memory:entry", realm); err != nil {
+		t.Fatalf("second EvaluateSource returned error: %v", err)
+	}
+
+	value := realm.GlobalObject.Get(NewStringPropertyKey("canonicalRuns"))
+	if value.String() != "A" {
+		t.Fatalf("canonicalRuns = %q, want A from the reused module record", value.String())
+	}
+	if size := realm.Agent.ModuleGraph.Size(); size != 1 {
+		t.Fatalf("module graph size = %d, want 1", size)
+	}
+}
+
+// TestEvaluateSourceScopesCanonicalModuleIdentityToRealm prevents records from
+// leaking across Realm boundaries inside one Agent-owned ModuleGraph.
+func TestEvaluateSourceScopesCanonicalModuleIdentityToRealm(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	firstRealm := agent.CurrentRealm()
+	InitializeHostDefinedRealm(agent, nil)
+	secondRealm := agent.CurrentRealm()
+
+	if _, err := EvaluateSourceWithModuleIdentity(Source{
+		Text: `globalThis.realmMarker = "first";`,
+		Name: "first.js",
+		Kind: SourceModule,
+	}, "memory:shared", firstRealm); err != nil {
+		t.Fatalf("first Realm evaluation returned error: %v", err)
+	}
+	if _, err := EvaluateSourceWithModuleIdentity(Source{
+		Text: `globalThis.realmMarker = "second";`,
+		Name: "second.js",
+		Kind: SourceModule,
+	}, "memory:shared", secondRealm); err != nil {
+		t.Fatalf("second Realm evaluation returned error: %v", err)
+	}
+
+	if got := firstRealm.GlobalObject.Get(NewStringPropertyKey("realmMarker")).String(); got != "first" {
+		t.Fatalf("first Realm marker = %q, want first", got)
+	}
+	if got := secondRealm.GlobalObject.Get(NewStringPropertyKey("realmMarker")).String(); got != "second" {
+		t.Fatalf("second Realm marker = %q, want second", got)
+	}
+	if size := agent.ModuleGraph.Size(); size != 2 {
+		t.Fatalf("module graph size = %d, want one record per Realm", size)
+	}
+}
+
+func TestEvaluateSourceUsesCanonicalIdentityForRelativeImportCycle(t *testing.T) {
 	InitializeConstants()
 	agent := NewAgent()
 	InitializeHostDefinedRealm(agent, nil)
@@ -375,14 +475,14 @@ export const dep = 41;`,
 	}
 	agent.HostHooks.HostLoadModule = loader
 
-	_, err := EvaluateSource(Source{
+	_, err := EvaluateSourceWithModuleIdentity(Source{
 		Text: `import { dep } from "./dep.js";
 export const root = 1;
 globalThis.cycleAnswer = dep + 1;`,
-		Name:    "/app/main.js",
+		Name:    "main.js",
 		BaseDir: "/app",
 		Kind:    SourceModule,
-	}, realm)
+	}, "/app/main.js", realm)
 	if err != nil {
 		t.Fatalf("EvaluateSource returned error: %v", err)
 	}
@@ -654,6 +754,165 @@ func TestEvaluateSourceReturnsAsynchronousCallbackDiagnostic(t *testing.T) {
 	}
 }
 
+// TestEvaluateSourceDrainsSchedulerAfterAbruptScript verifies that scheduled
+// host work is not stranded when synchronous JavaScript evaluation fails.
+func TestEvaluateSourceDrainsSchedulerAfterAbruptScript(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+
+	agent.Scheduler.ScheduleTimer(0, func() (completion CompletionValue) {
+		return completion.ThrowTypeError(agent, "asynchronous failure")
+	})
+	ran := false
+	agent.Scheduler.ScheduleTimer(0, func() CompletionValue {
+		ran = true
+		return UndefinedValue.ToCompletion()
+	})
+
+	_, err := EvaluateSource(Source{Text: `throw "boom";`, Name: "abrupt.js", Kind: SourceScript}, realm)
+	var diagnostic *Diagnostic
+	if !errors.As(err, &diagnostic) || diagnostic.Message != "boom" {
+		t.Fatalf("error = %#v, want the synchronous boom diagnostic", err)
+	}
+	if !ran {
+		t.Fatal("scheduler did not drain after abrupt script completion")
+	}
+}
+
+// TestEvaluateSourceDrainsSchedulerAfterParseFailure keeps parser diagnostics
+// inside the same scheduler return boundary as successfully parsed sources.
+func TestEvaluateSourceDrainsSchedulerAfterParseFailure(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+
+	ran := false
+	agent.Scheduler.ScheduleTimer(0, func() CompletionValue {
+		ran = true
+		return UndefinedValue.ToCompletion()
+	})
+
+	_, err := EvaluateSource(Source{Text: `const = ;`, Name: "parse.js", Kind: SourceScript}, realm)
+	var diagnostic *Diagnostic
+	if !errors.As(err, &diagnostic) || diagnostic.Category != DiagnosticSyntax {
+		t.Fatalf("error = %#v, want syntax diagnostic", err)
+	}
+	if !ran {
+		t.Fatal("scheduler did not drain after source parse failure")
+	}
+}
+
+// TestEvaluateModuleDrainsSchedulerAfterRootLoadFailure protects the legacy
+// wrapper from stranding Agent work before it reports the original load error.
+func TestEvaluateModuleDrainsSchedulerAfterRootLoadFailure(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	agent.HostHooks.HostLoadModule = &memoryModuleLoader{
+		sources:   map[string]string{},
+		loadCount: make(map[string]int),
+	}
+
+	agent.Scheduler.ScheduleTimer(0, func() (completion CompletionValue) {
+		return completion.ThrowTypeError(agent, "asynchronous failure")
+	})
+	ran := false
+	agent.Scheduler.ScheduleTimer(0, func() CompletionValue {
+		ran = true
+		return UndefinedValue.ToCompletion()
+	})
+
+	var recovered any
+	func() {
+		defer func() {
+			recovered = recover()
+		}()
+		EvaluateModule("/missing.js", realm)
+	}()
+
+	errorObject, ok := recovered.(*ErrorObject)
+	if !ok {
+		t.Fatalf("recovered = %T, want *ErrorObject", recovered)
+	}
+	if errorObject.Message != "module not found: /missing.js" {
+		t.Fatalf("load error = %q, want original module load failure", errorObject.Message)
+	}
+	if !ran {
+		t.Fatal("legacy module wrapper did not drain after root load failure")
+	}
+}
+
+// TestEvaluateModuleDrainsSchedulerAfterRootParseFailure verifies that the
+// legacy wrapper translates expected parser failures at the same return boundary.
+func TestEvaluateModuleDrainsSchedulerAfterRootParseFailure(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+	agent.HostHooks.HostLoadModule = &memoryModuleLoader{
+		sources: map[string]string{
+			"/invalid.js": `export const = ;`,
+		},
+		loadCount: make(map[string]int),
+	}
+
+	ran := false
+	agent.Scheduler.ScheduleTimer(0, func() CompletionValue {
+		ran = true
+		return UndefinedValue.ToCompletion()
+	})
+
+	var recovered any
+	func() {
+		defer func() {
+			recovered = recover()
+		}()
+		EvaluateModule("/invalid.js", realm)
+	}()
+
+	diagnostic, ok := recovered.(*Diagnostic)
+	if !ok || diagnostic.Category != DiagnosticSyntax {
+		t.Fatalf("recovered = %#v, want syntax *Diagnostic", recovered)
+	}
+	if !ran {
+		t.Fatal("legacy module wrapper did not drain after root parse failure")
+	}
+}
+
+// TestEvaluateSourceDrainsPromiseJobsAfterLanguageFailures ensures multiple
+// expected job failures cannot escape a recovery defer and strand later work.
+func TestEvaluateSourceDrainsPromiseJobsAfterLanguageFailures(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	InitializeHostDefinedRealm(agent, nil)
+	realm := agent.CurrentRealm()
+
+	for _, message := range []string{"first job failure", "second job failure"} {
+		message := message
+		agent.Scheduler.EnqueuePromiseJob(&Job{Fun: func(any) Value {
+			panic(agent.ThrowTypeError(message))
+		}}, realm)
+	}
+	ran := false
+	agent.Scheduler.EnqueuePromiseJob(&Job{Fun: func(any) Value {
+		ran = true
+		return UndefinedValue
+	}}, realm)
+
+	_, err := EvaluateSource(Source{Text: `1;`, Name: "jobs.js", Kind: SourceScript}, realm)
+	var diagnostic *Diagnostic
+	if !errors.As(err, &diagnostic) || diagnostic.Message != "first job failure" {
+		t.Fatalf("error = %#v, want first promise job failure", err)
+	}
+	if !ran {
+		t.Fatal("scheduler stranded a promise job after language failures")
+	}
+}
+
 func TestEvaluateSourceDoesNotRecoverAsynchronousInvariantPanic(t *testing.T) {
 	InitializeConstants()
 	agent := NewAgent()
@@ -715,6 +974,8 @@ func TestEvaluateSourceReturnsInvalidRegExpDiagnostic(t *testing.T) {
 	}
 }
 
+// TestEvaluateSourceReturnsModuleLoadingDiagnostic verifies that the typed link
+// error wins while scheduler work queued behind the failure still drains.
 func TestEvaluateSourceReturnsModuleLoadingDiagnostic(t *testing.T) {
 	InitializeConstants()
 	agent := NewAgent()
@@ -724,6 +985,14 @@ func TestEvaluateSourceReturnsModuleLoadingDiagnostic(t *testing.T) {
 		sources:   map[string]string{},
 		loadCount: make(map[string]int),
 	}
+	agent.Scheduler.ScheduleTimer(0, func() (completion CompletionValue) {
+		return completion.ThrowTypeError(agent, "later asynchronous failure")
+	})
+	ran := false
+	agent.Scheduler.ScheduleTimer(0, func() CompletionValue {
+		ran = true
+		return UndefinedValue.ToCompletion()
+	})
 
 	_, err := EvaluateSource(Source{
 		Text:    `import {} from "./missing.js";`,
@@ -740,5 +1009,8 @@ func TestEvaluateSourceReturnsModuleLoadingDiagnostic(t *testing.T) {
 	}
 	if diagnostic.Cause == nil || diagnostic.Unwrap() != diagnostic.Cause {
 		t.Fatalf("cause = %#v, want original module loader error", diagnostic.Cause)
+	}
+	if !ran {
+		t.Fatal("scheduler did not drain after module loading failure")
 	}
 }
