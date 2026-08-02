@@ -1,6 +1,7 @@
 package coldmoon
 
 import (
+	"math/rand"
 	"strings"
 	"testing"
 )
@@ -20,6 +21,35 @@ func TestCreateRealmPublishesCompleteIntrinsics(t *testing.T) {
 		if realm.Intrinsics.Get(binding.intrinsic) == nil {
 			t.Fatalf("global binding %q resolves to a nil intrinsic", binding.name)
 		}
+	}
+}
+
+// TestCreateRealmInitializesIndependentReplaceableRandomSources protects both
+// production diversity and the deterministic RNG seam exposed to embedders.
+func TestCreateRealmInitializesIndependentReplaceableRandomSources(t *testing.T) {
+	InitializeConstants()
+	agent := NewAgent()
+	first := CreateRealm(agent)
+	second := CreateRealm(agent)
+
+	allEqual := true
+	for range 8 {
+		firstValue := first.Rng.Float64()
+		secondValue := second.Rng.Float64()
+		if firstValue < 0 || firstValue >= 1 || secondValue < 0 || secondValue >= 1 {
+			t.Fatalf("Realm random values out of range: %v, %v", firstValue, secondValue)
+		}
+		allEqual = allEqual && firstValue == secondValue
+	}
+	if allEqual {
+		t.Fatal("independently created Realms shared the same random sequence")
+	}
+
+	first.Rng = *rand.New(rand.NewSource(42))
+	want := first.Rng.Float64()
+	first.Rng = *rand.New(rand.NewSource(42))
+	if got := first.Rng.Float64(); got != want {
+		t.Fatalf("replacement random source produced %v, want deterministic %v", got, want)
 	}
 }
 

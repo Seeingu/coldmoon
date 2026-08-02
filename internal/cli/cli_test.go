@@ -586,6 +586,44 @@ func TestRunInlineModuleResolvesImportsFromInvocationDirectory(t *testing.T) {
 	}
 }
 
+// TestRunFileModulePublishesCanonicalEntryIdentity verifies that a dependency
+// importing the file entry converges on the already parsed module record.
+func TestRunFileModulePublishesCanonicalEntryIdentity(t *testing.T) {
+	directory := t.TempDir()
+	entry := filepath.Join(directory, "main.js")
+	dependency := filepath.Join(directory, "dep.js")
+	if err := os.WriteFile(entry, []byte(`
+import { dep } from "./dep.js";
+export const root = 1;
+console.log(dep);
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dependency, []byte(`
+import { root } from "./main.js";
+export const dep = 41;
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := Run(Invocation{
+		Argv:   []string{"/tmp/coldmoon", entry},
+		Cwd:    directory,
+		Stdin:  strings.NewReader(""),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+
+	if exitCode != 0 {
+		t.Fatalf("Run() exit code = %d, want 0; stderr = %q", exitCode, stderr.String())
+	}
+	if got := stdout.String(); got != "41\n" {
+		t.Fatalf("stdout = %q, want one entry-module evaluation", got)
+	}
+}
+
 func TestRunInputTypeScriptOverridesFileModuleDefault(t *testing.T) {
 	directory := t.TempDir()
 	entry := filepath.Join(directory, "entry.js")
@@ -633,6 +671,36 @@ func TestRunReturnsOneForUncaughtJavaScriptError(t *testing.T) {
 	}
 	if got := stderr.String(); got != "<eval>: TypeError: boom\n" {
 		t.Fatalf("stderr = %q, want uncaught error diagnostic", got)
+	}
+}
+
+// TestRunRendersClassHeritageTypeErrorWithoutStack verifies that an expected
+// class-definition failure stays inside the CLI diagnostic boundary.
+func TestRunRendersClassHeritageTypeErrorWithoutStack(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := Run(Invocation{
+		Argv:   []string{"/tmp/coldmoon", "-e", `class Invalid extends 1 {}`},
+		Cwd:    t.TempDir(),
+		Stdin:  strings.NewReader(""),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
+
+	if exitCode != 1 {
+		t.Fatalf("Run() exit code = %d, want 1", exitCode)
+	}
+	if got := stdout.String(); got != "" {
+		t.Fatalf("stdout = %q, want empty", got)
+	}
+	got := stderr.String()
+	if !strings.Contains(got, "<eval>: TypeError: superclass is not a constructor") {
+		t.Fatalf("stderr = %q, want class heritage diagnostic", got)
+	}
+	for _, leaked := range []string{"panic:", "goroutine", ".go:"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("stderr leaked Go implementation detail %q: %q", leaked, got)
+		}
 	}
 }
 

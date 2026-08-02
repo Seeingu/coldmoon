@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/bits-and-blooms/bitset"
 	"github.com/dlclark/regexp2"
@@ -553,35 +554,96 @@ func IsLessThan(agent *Agent, x, y Value, order isLessThanOrder) (co CompletionV
 		}
 		py = _py
 	} else {
-		_px, isAbrupt, rt := ReturnIfAbrupt(y.ToPrimitive(agent, PreferredTypeNumber), co)
-		if isAbrupt {
-			return rt
-		}
-		px = _px
-		_py, isAbrupt, rt := ReturnIfAbrupt(x.ToPrimitive(agent, PreferredTypeNumber), co)
+		_py, isAbrupt, rt := ReturnIfAbrupt(y.ToPrimitive(agent, PreferredTypeNumber), co)
 		if isAbrupt {
 			return rt
 		}
 		py = _py
+		_px, isAbrupt, rt := ReturnIfAbrupt(x.ToPrimitive(agent, PreferredTypeNumber), co)
+		if isAbrupt {
+			return rt
+		}
+		px = _px
 	}
 	pxString, isPxString := px.(*StringValue)
-	pyString, isPyString := px.(*StringValue)
+	pyString, isPyString := py.(*StringValue)
 	if isPxString && isPyString {
-		return NewBooleanValue(pxString.Data < pyString.Data).ToCompletion()
-	} else {
-		nx, isAbrupt, rt := ReturnIfAbrupt(px.ToNumber(agent), co)
-		if isAbrupt {
-			return rt
-		}
-		ny, isAbrupt, rt := ReturnIfAbrupt(py.ToNumber(agent), co)
-		if isAbrupt {
-			return rt
-		}
-		if nx.IsNaN() || ny.IsNaN() {
-			return FalseValue.ToCompletion()
-		}
-		return NewBooleanValue(nx.Data < ny.Data).ToCompletion()
+		return NewBooleanValue(utf16LessThan(pxString.Data, pyString.Data)).ToCompletion()
 	}
+	pxBigInt, isPxBigInt := px.(*BigIntValue)
+	pyBigInt, isPyBigInt := py.(*BigIntValue)
+	if isPxBigInt && isPyString {
+		ny, ok := StringToBigInt(pyString)
+		if !ok {
+			return UndefinedValue.ToCompletion()
+		}
+		return NewBooleanValue(pxBigInt.LessThan(ny)).ToCompletion()
+	}
+	if isPxString && isPyBigInt {
+		nx, ok := StringToBigInt(pxString)
+		if !ok {
+			return UndefinedValue.ToCompletion()
+		}
+		return NewBooleanValue(nx.LessThan(pyBigInt)).ToCompletion()
+	}
+
+	nx, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, px), co)
+	if isAbrupt {
+		return rt
+	}
+	ny, isAbrupt, rt := ReturnIfAbrupt(ToNumeric(agent, py), co)
+	if isAbrupt {
+		return rt
+	}
+	nxNumber, nxIsNumber := nx.(*NumberValue)
+	nyNumber, nyIsNumber := ny.(*NumberValue)
+	if (nxIsNumber && nxNumber.IsNaN()) || (nyIsNumber && nyNumber.IsNaN()) {
+		return UndefinedValue.ToCompletion()
+	}
+	if nxIsNumber && nyIsNumber {
+		return NewBooleanValue(nxNumber.Data < nyNumber.Data).ToCompletion()
+	}
+	nxBigInt, nxIsBigInt := nx.(*BigIntValue)
+	nyBigInt, nyIsBigInt := ny.(*BigIntValue)
+	if nxIsBigInt && nyIsBigInt {
+		return NewBooleanValue(nxBigInt.LessThan(nyBigInt)).ToCompletion()
+	}
+	Assert((nxIsNumber && nyIsBigInt) || (nxIsBigInt && nyIsNumber))
+	if (nxIsNumber && nxNumber.IsNegativeInf()) || (nyIsNumber && nyNumber.IsPositiveInf()) {
+		return TrueValue.ToCompletion()
+	}
+	if (nxIsNumber && nxNumber.IsPositiveInf()) || (nyIsNumber && nyNumber.IsNegativeInf()) {
+		return FalseValue.ToCompletion()
+	}
+	return NewBooleanValue(numericRat(nx).Cmp(numericRat(ny)) < 0).ToCompletion()
+}
+
+// utf16LessThan compares ECMAScript String code units rather than Go's UTF-8
+// bytes or Unicode scalar values.
+func utf16LessThan(x, y string) bool {
+	xUnits := utf16.Encode([]rune(x))
+	yUnits := utf16.Encode([]rune(y))
+	limit := min(len(xUnits), len(yUnits))
+	for i := range limit {
+		if xUnits[i] != yUnits[i] {
+			return xUnits[i] < yUnits[i]
+		}
+	}
+	return len(xUnits) < len(yUnits)
+}
+
+// numericRat gives finite Number and BigInt values one exact mathematical
+// representation for the mixed-type comparison required by IsLessThan.
+func numericRat(value Value) *big.Rat {
+	switch value := value.(type) {
+	case *NumberValue:
+		if result := new(big.Rat).SetFloat64(float64(value.Data)); result != nil {
+			return result
+		}
+	case *BigIntValue:
+		return new(big.Rat).SetInt(value.Data)
+	}
+	panic("IsLessThan received a non-finite or non-numeric value")
 }
 
 // 7.2.14

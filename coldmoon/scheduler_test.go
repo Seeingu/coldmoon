@@ -81,6 +81,63 @@ func TestSchedulerRunsTimersByDeadlineAndInsertionOrder(t *testing.T) {
 	}
 }
 
+// TestSchedulerDrainsRemainingTimersBeforeRethrowing verifies that one expected
+// JavaScript failure cannot strand later work in the same Agent scheduler.
+func TestSchedulerDrainsRemainingTimersBeforeRethrowing(t *testing.T) {
+	agent, _ := newSchedulerTestAgent(t)
+	var order []int
+	agent.Scheduler.ScheduleTimer(0, func() (completion CompletionValue) {
+		order = append(order, 1)
+		return completion.ThrowTypeError(agent, "first timer failed")
+	})
+	agent.Scheduler.ScheduleTimer(0, func() CompletionValue {
+		order = append(order, 2)
+		return UndefinedValue.ToCompletion()
+	})
+
+	var recovered any
+	func() {
+		defer func() {
+			recovered = recover()
+		}()
+		agent.Scheduler.RunUntilIdle()
+	}()
+
+	if _, ok := recovered.(Value); !ok {
+		t.Fatalf("recovered = %T, want JavaScript Value", recovered)
+	}
+	if !reflect.DeepEqual(order, []int{1, 2}) {
+		t.Fatalf("timer order = %v, want [1 2]", order)
+	}
+	// A second drain proves the first call left no failed or successful timer
+	// behind after reporting the recorded language error.
+	agent.Scheduler.RunUntilIdle()
+}
+
+// TestSchedulerRejectsNonThrowTimerAbruptCompletion keeps internal control-flow
+// completions from being mislabeled (or silently discarded) as JavaScript errors.
+func TestSchedulerRejectsNonThrowTimerAbruptCompletion(t *testing.T) {
+	agent, _ := newSchedulerTestAgent(t)
+	agent.Scheduler.ScheduleTimer(0, func() CompletionValue {
+		return CompletionValue{t: CompletionTypeBreak}
+	})
+
+	var recovered any
+	func() {
+		defer func() {
+			recovered = recover()
+		}()
+		agent.Scheduler.RunUntilIdle()
+	}()
+
+	if recovered == nil {
+		t.Fatal("RunUntilIdle accepted a non-throw abrupt timer completion")
+	}
+	if _, ok := recovered.(Value); ok {
+		t.Fatalf("recovered = %T, want an invariant panic rather than a JavaScript Value", recovered)
+	}
+}
+
 func TestSchedulerWaitsForTrackedTasksAndTheirJobs(t *testing.T) {
 	agent, _ := newSchedulerTestAgent(t)
 	realm := agent.CurrentRealm()

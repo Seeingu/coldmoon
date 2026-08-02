@@ -22,12 +22,24 @@ successful preceding batch operation.
 
 ## Safe source execution
 
-The `coldmoon` package describes an entry point as `Source`: text, display name,
-base directory, and script-or-module kind. `CheckSource` parses only that entry
-point and does not resolve or load its imports. `EvaluateSource` parses, links
-when needed, executes, and drains the Agent scheduler before returning. The
-older `ParseScript`, `ParseModule`, `Evaluate`, and `EvaluateModule` entry
-points remain compatibility wrappers over the same implementation.
+The `coldmoon` package describes an entry point as `Source`: text, diagnostic
+display name, base directory, and script-or-module kind. `Source.Name` never
+participates in caching. `EvaluateSource` treats modules as temporary inputs
+that are parsed and evaluated independently each time. Embedders opt into a
+Realm-local canonical module record with `EvaluateSourceWithModuleIdentity`.
+Once published, later inputs with the same Realm and identity reuse that record
+without parsing their replacement text.
+The identity must match the value returned by the host's module resolver when an
+import cycle can resolve back to the entry. `Source.BaseDir` only supplies
+relative-import context.
+
+`CheckSource` parses only the entry point and does not resolve or load its
+imports. `EvaluateSource` parses, links when needed, executes, and drains the
+Agent scheduler before returning. A synchronous source diagnostic takes
+precedence over a later asynchronous language failure, but all remaining work
+still drains; invariant panics remain fatal. The older `ParseScript`,
+`ParseModule`, `Evaluate`, and `EvaluateModule` entry points remain compatibility
+wrappers over the same implementation.
 
 For module evaluation, a file source uses its containing directory as
 `Source.BaseDir`; inline and stdin sources use the invocation working directory.
@@ -64,7 +76,9 @@ Every `Agent` owns one `Scheduler`. The scheduler is responsible for:
 - draining promise jobs in FIFO order and exactly once;
 - running timers by deadline and insertion order;
 - tracking finite asynchronous tasks before their goroutines start;
-- continuing until jobs, timers, and tracked tasks are all idle.
+- continuing until jobs, timers, and tracked tasks are all idle;
+- recording the first language-level callback failure while remaining work
+  drains.
 
 `Evaluate` and `EvaluateModule` run the scheduler before returning. Callers do
 not separately poll an event loop or wait on a `sync.WaitGroup`.
@@ -84,7 +98,9 @@ promises share one turn model.
 2. Jobs queued by a running job execute later in the same drain.
 3. Timers with equal deadlines retain insertion order.
 4. A tracked asynchronous task increments the active count before launch.
-5. `RunUntilIdle` returns only when no queued, timed, or tracked work remains.
+5. `RunUntilIdle` completes only when no queued, timed, or tracked work remains.
+6. A JavaScript throw from a job or timer is reported after draining; any other
+   abrupt timer completion is an engine invariant failure.
 
 These invariants are covered by scheduler contract tests in
 `coldmoon/scheduler_test.go` and host-level regression tests in
@@ -147,10 +163,11 @@ migrated to explicit completion propagation.
 ## Module graph
 
 Each Agent owns one `ModuleGraph`. The host first resolves a referrer and
-specifier to a canonical identity; the graph checks its Realm-local cache; only
-a cache miss asks the host to load source and invokes the parser. Records enter
-the cache before dependency loading, so every edge in a cyclic graph converges
-on the same record.
+specifier to an opaque canonical identity; the graph checks its Realm-local
+cache; only a cache miss asks the host to load source and invokes the parser.
+Host-provided entry modules opt into the same cache through
+`EvaluateSourceWithModuleIdentity`. Records enter the cache before dependency
+loading, so every edge in a cyclic graph converges on the same record.
 
 The language core knows neither filesystem paths nor file-reading APIs.
 `runtime.FilesystemModuleLoader` implements the terminal/Test262 host seam and

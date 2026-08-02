@@ -1,4 +1,4 @@
-.PHONY: build build-all test test262 fmt cli-smoke
+.PHONY: build build-all test race test262 fmt cli-smoke
 
 BINARY := bin/coldmoon$(shell go env GOEXE)
 
@@ -10,6 +10,9 @@ build-all: build
 
 test: coldmoon tests
 	go test ./...
+
+race: coldmoon tests
+	go test -race ./...
 
 test262:
 	COLDMOON_RUN_TEST262=1 go test ./tests -run '^Test262WithCoverage$$' -count=1 -v
