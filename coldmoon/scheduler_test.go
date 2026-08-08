@@ -179,3 +179,49 @@ func TestConcurrentAgentsShareWellKnownSymbolsWithoutRacing(t *testing.T) {
 	close(start)
 	wg.Wait()
 }
+
+// TestSchedulerDoesNotWaitForAwaitSuspendedTasks reproduces the 1.2 deadlock:
+// a task goroutine suspended on an await that no promise job will ever settle
+// must not keep idle detection alive. RunUntilIdle returns, and a later wake
+// source can resume the continuation through ResumeAwait.
+func TestSchedulerDoesNotWaitForAwaitSuspendedTasks(t *testing.T) {
+	agent, _ := newSchedulerTestAgent(t)
+	wake := make(chan struct{})
+	agent.Scheduler.StartTask(func() {
+		agent.Scheduler.SuspendAwait()
+		<-wake
+		agent.Scheduler.ResumeAwait()
+	})
+
+	// RunUntilIdle must return even though the task goroutine is alive but
+	// suspended waiting for a future wake source.
+	agent.Scheduler.RunUntilIdle()
+
+	close(wake)
+	agent.Scheduler.RunUntilIdle()
+}
+
+// TestAbortAsyncContinuationsReleasesWaiters verifies that a panicked async
+// task closes the completion channels of suspended continuations, so promise
+// jobs sequencing through waitForAsyncContinuations cannot hang the main
+// thread on top of the crash.
+func TestAbortAsyncContinuationsReleasesWaiters(t *testing.T) {
+	agent := NewAgent()
+	context := &ExecutionContext{
+		awaitCh:               make(chan struct{}),
+		asyncContinuationDone: make(chan struct{}),
+	}
+	agent.asyncContinuationContexts[context] = struct{}{}
+
+	agent.abortAsyncContinuations()
+
+	if context.asyncContinuationDone != nil {
+		t.Fatal("asyncContinuationDone was not cleared")
+	}
+	if _, registered := agent.asyncContinuationContexts[context]; !registered {
+		t.Fatal("continuation was dropped from the registry")
+	}
+	if context.Result.t != CompletionTypeThrow {
+		t.Fatalf("Result type = %v, want throw", context.Result.t)
+	}
+}
