@@ -1189,7 +1189,10 @@ func (s *SourceTextModule) ExecuteModule(capability *PromiseCapability) (co Comp
 
 	// The initial handoff runs synchronously from the caller's perspective: it
 	// returns when the module either reaches its first await or completes. The
-	// scheduler then owns all later resumptions and capability settlement.
+	// scheduler then owns all later resumptions and capability settlement. The
+	// body task is scheduler-counted, so its awaits release the keepalive count
+	// while they wait on reaction jobs.
+	moduleContext.schedulerCounted = true
 	agent.Scheduler.StartTask(func() {
 		agent.resumeExecutionContext(moduleContext)
 		result := RunNode(agent, s.ECMAScriptCode)

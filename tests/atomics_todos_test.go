@@ -21,8 +21,15 @@ assertEqual(Atomics.compareExchange(values, 0, 10, 20), 10, "compareExchange mat
 assertEqual(Atomics.compareExchange(values, 0, 10, 30), 20, "compareExchange mismatch");
 assertEqual(Atomics.load(values, 0), 20, "compareExchange final value");
 
-assertEqual(Atomics.wait(values, 0, 19, 0), "not-equal", "wait mismatch");
-assertEqual(Atomics.wait(values, 0, 20, 0), "timed-out", "zero timeout");
+// The engine runs a single non-blockable agent, so Atomics.wait must throw a
+// TypeError instead of blocking forever with nobody able to notify it.
+let waitThrew = false;
+try {
+  Atomics.wait(values, 0, 19, 0);
+} catch (error) {
+  waitThrew = error instanceof TypeError;
+}
+assertEqual(waitThrew, true, "main-thread Atomics.wait throws TypeError");
 assertEqual(Atomics.notify(values, 0), 0, "empty waiter queue");
 assertEqual(Atomics.notify(new Int32Array(1), 0), 0, "non-shared notify");
 
@@ -47,8 +54,13 @@ assertEqual(Atomics.add(values, 0, 3n), -1n, "BigInt add previous");
 assertEqual(Atomics.load(values, 0), 2n, "BigInt add result");
 assertEqual(Atomics.compareExchange(values, 0, 2n, -4n), 2n, "BigInt compareExchange");
 assertEqual(Atomics.load(values, 0), -4n, "BigInt compareExchange result");
-assertEqual(Atomics.wait(values, 0, -3n, 0), "not-equal", "BigInt wait mismatch");
-assertEqual(Atomics.wait(values, 0, -4n, 0), "timed-out", "BigInt wait timeout");
+let waitThrew = false;
+try {
+  Atomics.wait(values, 0, -3n, 0);
+} catch (error) {
+  waitThrew = error instanceof TypeError;
+}
+assertEqual(waitThrew, true, "main-thread BigInt Atomics.wait throws TypeError");
 `)
 }
 

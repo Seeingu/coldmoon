@@ -556,8 +556,13 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 	}
 
 	var join BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		array := MustGetObject(this)
 		var co CompletionValue
+		// Array.prototype methods are generic: the receiver may be any value,
+		// and primitives must be boxed before LengthOfArrayLike can run.
+		array, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
 		if isAbrupt {
 			panic(rt)
@@ -642,8 +647,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return UndefinedValue
 	}
 	var push BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		array := MustGetObject(this)
 		var co CompletionValue
+		array, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
 		if isAbrupt {
 			panic(rt)
@@ -661,8 +669,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return NewNumberValue(length.ToNumber())
 	}
 	var pop BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		array := MustGetObject(this)
 		var co CompletionValue
+		array, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
 		if isAbrupt {
 			panic(rt)
@@ -687,8 +698,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		return element
 	}
 	var toLocaleString BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		array := MustGetObject(this)
 		var co CompletionValue
+		array, isAbrupt, rt := ReturnIfAbrupt(this.ToObject(agent), co)
+		if isAbrupt {
+			return rt
+		}
 		length, isAbrupt, rt := ReturnIfAbrupt(array.LengthOfArrayLike(), co)
 		if isAbrupt {
 			panic(rt)

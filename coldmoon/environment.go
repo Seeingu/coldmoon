@@ -7,7 +7,7 @@ type EnvironmentRecord interface {
 	CreateMutableBinding(name string, deletable bool)
 	CreateImmutableBinding(name string, strict bool)
 	InitializeBinding(name string, value Value)
-	SetMutableBinding(name string, value Value, strict bool)
+	SetMutableBinding(agent *Agent, name string, value Value, strict bool)
 	// GetBindingValue ( N, S ) returns either a normal completion value or a throw completion.
 	GetBindingValue(agent *Agent, name string, strict bool) Completion[Value]
 	DeleteBinding(name string) bool

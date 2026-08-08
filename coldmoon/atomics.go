@@ -326,6 +326,13 @@ func NewAtomics(realm *Realm) ObjectType {
 		return AtomicReadModifyWrite(agent, typedArray, index, value, AtomicOpSub)
 	}
 	atomicsWait := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		// ES2024 27.4.5 step 16: an agent whose [[CanBlock]] is false throws a
+		// TypeError. Without a Worker agent there is no one who could ever
+		// notify a main-thread waiter, so blocking would deadlock the process.
+		if !agent.CanBlock {
+			var co CompletionValue
+			return co.ThrowTypeError(agent, "Atomics.wait cannot block the main thread")
+		}
 		return atomicWaitOperation(agent, argumentAt(argumentsList, 0), argumentAt(argumentsList, 1), argumentAt(argumentsList, 2), argumentAt(argumentsList, 3))
 	}
 	atomicsNotify := func(this Value, argumentsList []Value, newTarget ObjectType) CompletionConvertable[Value] {

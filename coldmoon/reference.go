@@ -176,7 +176,7 @@ func (r *ReferenceRecord) PutValue(agent *Agent, value Value) (co CompletionValu
 			return co.ThrowTypeError(agent, "Assignment to constant variable")
 		}
 	}
-	env.SetMutableBinding(referencedName, value, r.Strict)
+	env.SetMutableBinding(agent, referencedName, value, r.Strict)
 	return
 }
 

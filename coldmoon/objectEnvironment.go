@@ -51,15 +51,15 @@ func (o *ObjectEnvironment) CreateMutableBinding(name string, deletable bool) {
 
 // 9.1.1.2.4
 func (o *ObjectEnvironment) InitializeBinding(name string, value Value) {
-	o.SetMutableBinding(name, value, false)
+	o.SetMutableBinding(o.BindingObject.Agent(), name, value, false)
 }
 
 // 9.1.1.2.5
-func (o *ObjectEnvironment) SetMutableBinding(name string, value Value, strict bool) {
+func (o *ObjectEnvironment) SetMutableBinding(agent *Agent, name string, value Value, strict bool) {
 	bindingObject := o.BindingObject
 	stillExists := bindingObject.HasProperty(NewStringPropertyKey(name))
 	if !stillExists && strict {
-		panic("ReferenceError")
+		panic(agent.ThrowException(ReferenceError, "ReferenceError: assignment to undeclared binding"))
 	}
 
 	throw := setThrowTypeIgnore

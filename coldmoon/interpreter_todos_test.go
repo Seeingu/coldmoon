@@ -32,7 +32,7 @@ func TestCreatePerIterationEnvironmentCopiesBindingCells(t *testing.T) {
 	if current.OuterEnv() != outer {
 		t.Fatal("fresh iteration environment did not retain the loop environment's outer environment")
 	}
-	current.SetMutableBinding("index", NewNumberValue(2), true)
+	current.SetMutableBinding(agent, "index", NewNumberValue(2), true)
 	if got := ReturnAssertNormal(previous.GetBindingValue(agent, "index", true)).(*NumberValue).Data; got != 1 {
 		t.Fatalf("previous iteration binding = %v, want 1", got)
 	}

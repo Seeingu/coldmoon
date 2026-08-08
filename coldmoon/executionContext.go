@@ -60,7 +60,12 @@ type ExecutionContext struct {
 	moduleResumeAllowsEmpty bool
 	moduleAwaiting          bool
 	asyncContinuationDone   chan struct{}
-	Result                  CompletionValue
+	// schedulerCounted records whether the task goroutine that runs this
+	// context's body was registered with the Scheduler's keepalive count. Only
+	// such tasks may suspend that count while awaiting; async generator bodies
+	// run on uncounted goroutines and must leave it alone.
+	schedulerCounted bool
+	Result           CompletionValue
 }
 
 func (e *ExecutionContext) Resume() {
@@ -190,6 +195,26 @@ func (a *Agent) releaseAsyncContinuationContext(context *ExecutionContext) {
 	Assert(context != nil && !context.moduleAsync)
 	delete(a.asyncContinuationContexts, context)
 	context.asyncContinuationDone = nil
+}
+
+// abortAsyncContinuations unblocks every promise job waiting on a suspended
+// async continuation after that continuation's task goroutine panicked. The
+// panicking task can no longer suspend itself; without this, the main thread
+// would block forever in waitForAsyncContinuations. The panic is rethrown by
+// the caller, so this only converts a hang into a crash with diagnostics.
+func (a *Agent) abortAsyncContinuations() {
+	a.executionContextMu.Lock()
+	defer a.executionContextMu.Unlock()
+	for context := range a.asyncContinuationContexts {
+		context.Result = CompletionValue{
+			t:   CompletionTypeThrow,
+			err: a.exception,
+		}
+		if context.asyncContinuationDone != nil {
+			close(context.asyncContinuationDone)
+			context.asyncContinuationDone = nil
+		}
+	}
 }
 
 // waitForAsyncContinuations keeps a promise job sequenced with every async
