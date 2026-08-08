@@ -2,7 +2,6 @@ package coldmoon
 
 import (
 	"fmt"
-	"strconv"
 )
 
 type PropertyConvertable interface {
@@ -39,11 +38,15 @@ type StringPropertyKey struct {
 var _ PropertyKey = StringPropertyKey{}
 
 func (s StringPropertyKey) GetIndex() (JSInt, error) {
-	if propertyKeyIndex, err := strconv.ParseFloat(s.Value, 64); err != nil {
-		return JSInt(0), err
-	} else {
-		return JSInt(propertyKeyIndex), nil
+	// Only canonical array indices (a decimal string of an integer in
+	// [0, 2^32-2] with no leading zeros) index an array. ParseFloat accepted
+	// "0.5", "1e2", "01", and "Infinity", corrupting Array length.
+	// propertyKeyArrayIndex performs the canonical check; reuse it.
+	index, ok := propertyKeyArrayIndex(s)
+	if !ok {
+		return JSInt(0), fmt.Errorf("StringPropertyKey %q is not an array index", s.Value)
 	}
+	return JSInt(index), nil
 }
 
 func (s StringPropertyKey) ToValue() Value {

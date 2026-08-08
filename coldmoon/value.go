@@ -668,10 +668,6 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) (co Completion[bool]) {
 		co.value = false
 		return
 	}
-	if x == NaNValue && y == NaNValue {
-		co.value = true
-		return
-	}
 
 	_, xIsString := x.(*StringValue)
 	_, xIsNumber := x.(*NumberValue)
@@ -746,7 +742,25 @@ func IsLooselyEqual(agent *Agent, x Value, y Value) (co Completion[bool]) {
 		return IsLooselyEqual(agent, xPrimitive, y)
 	}
 
+	// ES2024 7.2.14 steps 12-13: a Number and a BigInt are loosely equal when
+	// the Number's exact mathematical value equals the BigInt. Non-finite
+	// Numbers can never match.
 	if (xIsBigInt && yIsNumber) || (xIsNumber && yIsBigInt) {
+		var bigIntValue *BigIntValue
+		var numberValue *NumberValue
+		if xIsBigInt {
+			bigIntValue = x.(*BigIntValue)
+			numberValue = y.(*NumberValue)
+		} else {
+			bigIntValue = y.(*BigIntValue)
+			numberValue = x.(*NumberValue)
+		}
+		if !numberValue.IsFinite() {
+			co.value = false
+			return
+		}
+		co.value = numericRat(bigIntValue).Cmp(numericRat(numberValue)) == 0
+		return
 	}
 
 	co.value = false
@@ -760,7 +774,9 @@ func IsStrictlyEqual(x Value, y Value) bool {
 	}
 
 	if xNumber, xIsNumber := x.(*NumberValue); xIsNumber {
-		return xNumber.SameValue(y.(*NumberValue))
+		// Number::equal (7.2.15): NaN is not equal to itself and -0 equals +0.
+		// Go's float64 == has exactly these semantics; SameValue does not.
+		return xNumber.Data == y.(*NumberValue).Data
 	}
 	return SameValueNonNumber(x, y)
 }

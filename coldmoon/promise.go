@@ -672,8 +672,11 @@ func PerformPromiseThen(agent *Agent, promise ObjectType, onFulfilled Value, onR
 		agent.HostHooks.HostEnqueuePromiseJob(agent, fulfillJob.Job, fulfillJob.Realm)
 	case PromiseStateRejected:
 		reason := p.PromiseResult
+		// Attaching a reaction to an already-rejected promise handles the
+		// rejection (spec 27.2.1.9 step 6.b); reporting it again as unhandled
+		// would double-count.
 		if !p.PromiseIsHandled {
-			agent.HostHooks.HostPromiseRejectionTracker(p, PromiseRejectionTrackerOperationReject)
+			agent.HostHooks.HostPromiseRejectionTracker(p, PromiseRejectionTrackerOperationHandle)
 		}
 
 		rejectJob := NewPromiseReactionJob(agent, rejectReaction, reason)

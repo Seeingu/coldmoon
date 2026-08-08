@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -154,4 +155,27 @@ func TestSchedulerWaitsForTrackedTasksAndTheirJobs(t *testing.T) {
 	if !ran {
 		t.Fatal("tracked task's promise job did not run")
 	}
+}
+
+// TestConcurrentAgentsShareWellKnownSymbolsWithoutRacing guards the
+// initWellKnownSymbols registry: hosts such as the Test262 runner create
+// agents in parallel, and the shared map must be populated once under -race.
+func TestConcurrentAgentsShareWellKnownSymbolsWithoutRacing(t *testing.T) {
+	const agents = 16
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for range agents {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			agent := NewAgent()
+			if WellKnownSymbols[WellKnownSymbolsIterator] == nil {
+				t.Error("well-known symbols were not initialized")
+			}
+			InitializeHostDefinedRealm(agent, nil)
+		}()
+	}
+	close(start)
+	wg.Wait()
 }

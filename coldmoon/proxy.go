@@ -49,17 +49,23 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		if extensibleTarget {
 			if handlerProtoIsObject {
 				return handlerProtoObject.Object
-			} else {
-				return nil
 			}
+			return nil
 		}
 
 		targetProto := t.internalMethods().GetPrototypeOf(t)
-		if !SameValue(handlerPrototype, (targetProto).ToValue()) {
+		var targetProtoValue Value = NullValue
+		if targetProto != nil {
+			targetProtoValue = targetProto.ToValue()
+		}
+		if !SameValue(handlerPrototype, targetProtoValue) {
 			panic("TypeError")
 		}
 
-		return handlerProtoObject.Object
+		if handlerProtoIsObject {
+			return handlerProtoObject.Object
+		}
+		return nil
 	}
 	setPrototypeOf := func(object ObjectType, prototype ObjectType) bool {
 		proxy := object.(*ProxyObject)
@@ -104,7 +110,7 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		).value.ToBoolean()
 		targetExtensible := t.IsExtensible()
 		if booleanTrapResult != targetExtensible {
-			agent.ThrowTypeError("TypeError")
+			panic(agent.ThrowTypeError("TypeError"))
 		}
 		return booleanTrapResult
 	}
@@ -144,8 +150,9 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			h.ToValue(),
 			[]Value{t.ToValue(), pk.ToValue()},
 		).value
-		_, trapResultIsObject := trapResultObjValue.(*ObjectValue)
-		if !trapResultIsObject {
+		// ES2024 10.5.5.5: the trap may return undefined or a descriptor
+		// object; anything else is a TypeError.
+		if trapResultObjValue != UndefinedValue && !trapResultObjValue.IsObject() {
 			panic("TypeError")
 		}
 		targetDesc := t.internalMethods().GetOwnProperty(t, pk)
@@ -161,8 +168,17 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			if !extensibleTarget {
 				panic("TypeError")
 			}
+			return nil
 		}
-		return nil
+
+		// Convert the trap result with ToPropertyDescriptor and validate it
+		// against the target's own descriptor before returning it.
+		extensibleTarget := t.IsExtensible()
+		resultDesc := ReturnAssertNormal(ToPropertyDescriptorCompletion(agent, trapResultObjValue))
+		if !ValidateAndApplyPropertyDescriptor(nil, pk, extensibleTarget, resultDesc, targetDesc) {
+			panic("TypeError")
+		}
+		return resultDesc
 	}
 	defineOwnProperty := func(o ObjectType, pk PropertyKey, desc *PropertyDescriptor) (co Completion[bool]) {
 		proxy := o.(*ProxyObject)
@@ -189,7 +205,10 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 		}
 		targetDesc := t.internalMethods().GetOwnProperty(t, pk)
 		extensibleTarget := t.IsExtensible()
-		settingConfigFalse := desc.Configurable == false
+		// settingConfigFalse only applies when the descriptor explicitly sets
+		// Configurable to false; a plain {value: 1} descriptor leaves the field
+		// unset and must not be treated as an attempt to seal the property.
+		settingConfigFalse := desc.ConfigurableSet && !desc.Configurable
 		if targetDesc == nil {
 			if !extensibleTarget {
 				panic("TypeError")
@@ -364,11 +383,11 @@ func NewProxyObject(agent *Agent, target, handler Value) *ProxyObject {
 			return
 		}
 		if !targetDesc.Configurable {
-			agent.ThrowTypeError("TypeError")
+			panic(agent.ThrowTypeError("TypeError"))
 		}
 		extensibleTarget := t.IsExtensible()
 		if !extensibleTarget {
-			agent.ThrowTypeError("TypeError")
+			panic(agent.ThrowTypeError("TypeError"))
 		}
 		co.value = true
 		return

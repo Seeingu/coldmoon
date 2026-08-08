@@ -18,7 +18,7 @@ const replHelp = `.help  Show REPL commands
 // runREPL evaluates complete script submissions in one Realm. The parser's
 // typed incomplete diagnostic, rather than delimiter counting, decides when a
 // continuation line is required.
-func runREPL(invocation Invocation, realm *coldmoon.Realm) int {
+func runREPL(invocation Invocation, realm *coldmoon.Realm, tracker *rejectionTracker) int {
 	reader := bufio.NewReader(invocation.Stdin)
 	var sourceText strings.Builder
 	submission := 1
@@ -88,6 +88,9 @@ func runREPL(invocation Invocation, realm *coldmoon.Realm) int {
 			} else {
 				fmt.Fprintln(invocation.Stdout, runtime.FormatValue(value))
 			}
+			// Unhandled rejections are reported per submission; the REPL stays
+			// alive to accept the next input.
+			tracker.report(invocation.Stderr, source.Name)
 		}
 
 		sourceText.Reset()

@@ -35,6 +35,11 @@ func (s *SetObject) size() int {
 }
 
 func (s *SetObject) add(value Value) {
+	// A Set stores each value once; a repeated add must not append another
+	// iteration key or every duplicate would show up in iteration order.
+	if s.has(value) {
+		return
+	}
 	s.data[value.Hash()] = value
 	s.orderedHashKeys = append(s.orderedHashKeys, value.Hash())
 }
@@ -177,7 +182,10 @@ func NewSetPrototype(realm *Realm) ObjectType {
 	object.defineBuiltinFunction(realm, CMString("clear"), setClear, 0)
 	object.defineBuiltinFunction(realm, CMString("delete"), setDelete, 1)
 	object.defineBuiltinFunction(realm, CMString("has"), setHas, 1)
-	object.defineBuiltinFunction(realm, CMString("size"), setSize, 0)
+	// Set.prototype.size is an accessor (ES2024 24.2.3.9).
+	object.defineBuiltinAccessor(realm, CMString("size"), builtinAccessorParams{
+		Getter: setSize,
+	})
 	object.defineBuiltinFunction(realm, CMString("entries"), setEntries, 0)
 	object.defineBuiltinFunction(realm, CMString("values"), setValues, 0)
 	object.defineBuiltinFunction(realm, CMString("forEach"), forEach, 1)

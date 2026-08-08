@@ -2,6 +2,8 @@ package coldmoon
 
 import (
 	"reflect"
+
+	lo "github.com/samber/lo"
 )
 
 type VM struct {
@@ -393,7 +395,7 @@ func (v *VM) ForBodyEvaluation(
 		}
 		result := stmt.Evaluation(v)
 		if !LoopContinues(result, labelSet) {
-			return UpdateEmpty(result, V)
+			return loopResult(result, V, labelSet)
 		}
 		if !IsUndefinedOrNil(result.value) {
 			V = result.value
@@ -595,11 +597,11 @@ func (v *VM) ForInOfBodyEvaluation(
 		}
 		if !LoopContinues(result, labelSet) {
 			if iterationKind == ForInOfIterationKindEnumerate {
-				return UpdateEmpty(result, V)
+				return loopResult(result, V, labelSet)
 			} else {
 				Assert(iterationKind == ForInOfIterationKindIterate ||
 					iterationKind == ForInOfIterationKindAsyncIterate)
-				result = UpdateEmpty(result, V)
+				result = loopResult(result, V, labelSet)
 				if iteratorKind == IteratorKindAsync {
 					return iteratorRecord.AsyncIteratorClose(agent, result)
 				}
@@ -674,6 +676,8 @@ func (v *VM) CreatePerIterationEnvironment(perIterationBindings []string) (co Co
 
 // LoopContinues
 // spec: 14.7.1.1
+// reports whether a normal or continue completion keeps this loop iterating;
+// a break belonging to this loop is normalized by loopResult instead.
 func LoopContinues(result CompletionValue, labelSet LabelSet) bool {
 	if result.t == CompletionTypeNormal && result.err == nil {
 		return true
@@ -690,6 +694,18 @@ func LoopContinues(result CompletionValue, labelSet LabelSet) bool {
 		}
 	}
 	return false
+}
+
+// loopResult converts a body abrupt completion into the loop's return value.
+// A break that belongs to this loop (empty target, or a label in labelSet)
+// terminates the loop with a normal completion (spec 14.7.4.3 9.d.iii-iv);
+// other abrupts propagate unchanged so enclosing statements absorb them.
+func loopResult(result CompletionValue, V Value, labelSet LabelSet) CompletionValue {
+	if result.t == CompletionTypeBreak &&
+		(result.target == "" || lo.Contains(labelSet, result.target)) {
+		return V.ToCompletion()
+	}
+	return UpdateEmpty(result, V)
 }
 
 // UpdateEmpty

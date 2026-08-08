@@ -2030,6 +2030,23 @@ func (s *SuperPropertyExpression) String() string {
 	return "super." + s.Expression.String()
 }
 
+// Evaluation builds a super property reference with the current this value
+// (spec 13.3.5.2 MakeSuperPropertyReference).
+func (s *SuperPropertyExpression) Evaluation(vm *VM) (co CompletionValue) {
+	agent := vm.agent
+	propertyKeyValue, _, isAbrupt, rt := vm.EvalAndGetValue(s.Expression, co)
+	if isAbrupt {
+		return rt
+	}
+	propertyKey, isAbrupt, rt := ReturnIfAbrupt(ToPropertyKey(agent, propertyKeyValue), co)
+	if isAbrupt {
+		return rt
+	}
+	return NewReferenceRecordValue(
+		makeSuperPropertyReference(agent, propertyKey.ToReference(), vm.containedInStrictCode),
+	).ToCompletion()
+}
+
 type SuperPropertyIdentifier struct {
 	SuperProperty
 	IdentifierName IdentifierName
@@ -2042,6 +2059,31 @@ func (s *SuperPropertyIdentifier) AssignmentTargetType() AssignmentTargetType {
 
 func (s *SuperPropertyIdentifier) String() string {
 	return "super." + string(s.IdentifierName)
+}
+
+// Evaluation builds a super property reference for the named property
+// (spec 13.3.5.2 MakeSuperPropertyReference).
+func (s *SuperPropertyIdentifier) Evaluation(vm *VM) (co CompletionValue) {
+	return NewReferenceRecordValue(
+		makeSuperPropertyReference(vm.agent, &ReferencedName{String: string(s.IdentifierName)}, vm.containedInStrictCode),
+	).ToCompletion()
+}
+
+// makeSuperPropertyReference resolves the base through the current function
+// environment's [[HomeObject]] prototype and binds the reference's this value
+// to the current this binding, so super calls and accessors observe the
+// derived instance.
+func makeSuperPropertyReference(agent *Agent, propertyName *ReferencedName, strict bool) *ReferenceRecord {
+	env := agent.GetThisEnvironment()
+	functionEnv, ok := env.(*FunctionEnvironment)
+	Assert(ok && functionEnv.HasSuperBinding())
+	baseValue := functionEnv.GetSuperBase()
+	return NewReferenceRecord(
+		NewReferenceRecordBaseValue(baseValue),
+		propertyName,
+		strict,
+		agent.ResolveThisBinding(),
+	)
 }
 
 // MARK: - SuperCall
@@ -3820,14 +3862,15 @@ func GetTemplateObject(agent *Agent, templateLiteral *TemplateLiteral) ObjectTyp
 // coverCallExpressionAndAsyncArrowHead matches CallExpression : CoverCallExpressionAndAsyncArrowHead
 // spec: 13.3.6.1
 func (c *CallExpression) coverCallExpressionAndAsyncArrowHead(vm *VM) (co CompletionValue) {
-	callee := c.Callee.(*MemberExpression)
-	expr := callee
-	memberExpr := expr
-	arguments, isAbrupt, rt := ReturnIfAbrupt(c.Arguments.Evaluation(vm), co)
+	memberExpr := c.Callee.(*MemberExpression)
+	// ES2024 13.3.6.1 evaluates the member expression (including its getters)
+	// before the argument expressions, so argument side effects cannot be
+	// observed first. The previous ordering also left dead variable bindings.
+	f, ref, isAbrupt, rt := vm.EvalAndGetValue(memberExpr, co)
 	if isAbrupt {
 		return rt
 	}
-	f, ref, isAbrupt, rt := vm.EvalAndGetValue(memberExpr, co)
+	arguments, isAbrupt, rt := ReturnIfAbrupt(c.Arguments.Evaluation(vm), co)
 	if isAbrupt {
 		return rt
 	}
@@ -5306,7 +5349,7 @@ func (s *WhileStatement) WhileLoopEvaluation(vm *VM, labelSet []string) (co Comp
 		}
 		stmtResult := s.Body.Evaluation(vm)
 		if !LoopContinues(stmtResult, labelSet) {
-			return UpdateEmpty(stmtResult, V)
+			return loopResult(stmtResult, V, labelSet)
 		}
 		if !IsUndefinedOrNil(stmtResult.value) {
 			V = stmtResult.value
@@ -5346,7 +5389,7 @@ func (s *StatementDoWhile) DoWhileLoopEvaluation(vm *VM, labelSet LabelSet) (co 
 	for {
 		result := s.Body.Evaluation(vm)
 		if !LoopContinues(result, labelSet) {
-			return UpdateEmpty(result, value)
+			return loopResult(result, value, labelSet)
 		}
 		if result.value != nil {
 			value = result.value

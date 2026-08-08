@@ -1263,3 +1263,52 @@ func TestRunCheckRejectsDeclarationEarlyErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestRunReportsUnhandledRejection covers the HostPromiseRejectionTracker
+// hook: an async throw with no handler must print to stderr and exit non-zero
+// instead of silently succeeding.
+func TestRunReportsUnhandledRejection(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run(Invocation{
+		Argv:       []string{"/tmp/coldmoon", "-e", "async function f() { throw new Error('async boom'); } f();"},
+		Cwd:        t.TempDir(),
+		Stdin:      strings.NewReader(""),
+		Stdout:     &stdout,
+		Stderr:     &stderr,
+		Version:    "test",
+		StdinIsTTY: false,
+	})
+
+	if exitCode == 0 {
+		t.Fatalf("Run() exit code = 0, want non-zero for an unhandled rejection; stderr = %q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "Uncaught (in promise) Error: async boom") {
+		t.Fatalf("stderr = %q, want an unhandled-rejection report", stderr.String())
+	}
+}
+
+// TestRunHandledRejectionStaysSilent covers the Handle operation: a rejection
+// that gains a handler must not be reported.
+func TestRunHandledRejectionStaysSilent(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	exitCode := Run(Invocation{
+		Argv:       []string{"/tmp/coldmoon", "-e", "async function f() { throw new Error('handled'); } f().catch(function () {});"},
+		Cwd:        t.TempDir(),
+		Stdin:      strings.NewReader(""),
+		Stdout:     &stdout,
+		Stderr:     &stderr,
+		Version:    "test",
+		StdinIsTTY: false,
+	})
+
+	if exitCode != 0 {
+		t.Fatalf("Run() exit code = %d, want 0 for a handled rejection; stderr = %q", exitCode, stderr.String())
+	}
+	if stderr.String() != "" {
+		t.Fatalf("stderr = %q, want empty for a handled rejection", stderr.String())
+	}
+}

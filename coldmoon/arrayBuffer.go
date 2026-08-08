@@ -390,6 +390,23 @@ func NewArrayBufferConstructor(realm *Realm) ObjectType {
 		prototype:     realm.Intrinsics.FunctionPrototype,
 	})
 
+	// ArrayBuffer.isView is a static method on the constructor
+	// (ES2024 25.1.4.1), not a prototype method. It reports both DataView and
+	// typed-array views.
+	var isView BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
+		arg := argumentAt(arguments, 0)
+		if !arg.IsObject() {
+			return FalseValue
+		}
+		o := MustGetObject(arg)
+		if ObjectIs[*DataView](o) || ObjectIs[*TypedArrayObject](o) {
+			return TrueValue
+		}
+
+		return FalseValue
+	}
+	object.defineBuiltinFunction(realm, CMString("isView"), isView, 1)
+
 	BindPrototypeAndConstructor(realm.Intrinsics.ArrayBufferPrototype, object)
 
 	object.defineBuiltinAccessor(realm, WellKnownSymbolsSpecies, builtinAccessorParams{
@@ -404,18 +421,6 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 	agent := realm.Agent
 	object := NewObject(agent, realm.Intrinsics.ObjectPrototype, "ArrayBufferPrototype")
 
-	var isView BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
-		arg := argumentAt(arguments, 0)
-		if !arg.IsObject() {
-			return FalseValue
-		}
-		o := MustGetObject(arg)
-		if ObjectIs[*DataView](o) {
-			return TrueValue
-		}
-
-		return FalseValue
-	}
 	byteLength := func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		o := RequireInternalSlot[*ArrayBufferLike](this)
 		if IsDetachedBuffer(o) {
@@ -531,7 +536,6 @@ func NewArrayBufferPrototype(realm *Realm) ObjectType {
 		return UndefinedValue
 	}
 
-	object.defineBuiltinFunction(realm, CMString("isView"), isView, 1)
 	object.defineBuiltinFunction(realm, CMString("slice"), slice, 2)
 	object.defineBuiltinFunction(realm, CMString("resize"), resize, 1)
 

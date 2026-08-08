@@ -2,6 +2,7 @@ package coldmoon
 
 import (
 	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/Seeingu/coldmoon/pkg"
@@ -243,10 +244,12 @@ func (t *Tokenizer) peek() Token {
 			return t.number()
 		}
 		t.step()
-		if t.match('.') {
-			if t.match('.') {
-				return t.newToken(TDotDotDot, "...")
-			}
+		// "..." needs three dots. Peek without consuming so a lone second dot
+		// lexes as its own TDot instead of being swallowed by "..".
+		if t.Index+1 < t.Length && t.SourceText[t.Index] == '.' && t.SourceText[t.Index+1] == '.' {
+			t.step()
+			t.step()
+			return t.newToken(TDotDotDot, "...")
 		}
 		return t.newToken(TDot, ".")
 	case ';':
@@ -516,11 +519,98 @@ func (t *Tokenizer) string() Token {
 		case '\r':
 			// CRLF is a single LineTerminatorSequence.
 			t.match('\n')
+		case '0':
+			// \0 is NUL unless a decimal digit follows, which makes it a
+			// legacy octal escape (sloppy mode only).
+			if !t.atEnd() && t.SourceText[t.Index] >= '0' && t.SourceText[t.Index] <= '9' {
+				value.WriteRune(t.parseLegacyOctalEscape(escaped))
+			} else {
+				value.WriteRune(0)
+			}
+		case '1', '2', '3', '4', '5', '6', '7':
+			// Legacy octal escape sequences (ES2024 12.9.4).
+			value.WriteRune(t.parseLegacyOctalEscape(escaped))
+		case '8', '9':
+			// \8 and \9 are not octal digits; in sloppy mode they stand for
+			// themselves and any following octal digits belong to the next
+			// escape.
+			value.WriteRune(escaped)
+		case 'x':
+			code, ok := t.parseHexDigits(2)
+			if !ok {
+				panic(t.parseFailure("invalid hex escape sequence"))
+			}
+			value.WriteRune(code)
+		case 'u':
+			code, ok := t.parseUnicodeEscape()
+			if !ok {
+				panic(t.parseFailure("invalid unicode escape sequence"))
+			}
+			value.WriteRune(code)
 		default:
 			value.WriteRune(escaped)
 		}
 	}
 	panic(t.parseFailure("unterminated string"))
+}
+
+// parseLegacyOctalEscape consumes the octal digits that follow an escape
+// introducer and returns the decoded byte value (0-255). The introducer itself
+// has already been stepped over.
+func (t *Tokenizer) parseLegacyOctalEscape(first rune) rune {
+	code := int(first - '0')
+	for digits := 0; digits < 2 && !t.atEnd(); digits++ {
+		ch := t.SourceText[t.Index]
+		if ch < '0' || ch > '7' {
+			break
+		}
+		code = code*8 + int(ch-'0')
+		if code > 255 {
+			// A legacy octal escape is limited to three octal digits; values
+			// beyond 255 are a SyntaxError in engines. Decode modulo 256 to
+			// keep the scanner total.
+			code %= 256
+		}
+		t.step()
+	}
+	return rune(code)
+}
+
+// parseHexDigits reads exactly n hex digits starting at the current position.
+func (t *Tokenizer) parseHexDigits(n int) (rune, bool) {
+	if t.Index+n > t.Length {
+		return 0, false
+	}
+	code, err := strconv.ParseUint(string(t.SourceText[t.Index:t.Index+n]), 16, 32)
+	if err != nil {
+		return 0, false
+	}
+	for range n {
+		t.step()
+	}
+	return rune(code), true
+}
+
+// parseUnicodeEscape decodes \uXXXX or \u{CodePoint}.
+func (t *Tokenizer) parseUnicodeEscape() (rune, bool) {
+	if !t.atEnd() && t.SourceText[t.Index] == '{' {
+		t.step()
+		start := t.Index
+		for !t.atEnd() && t.SourceText[t.Index] != '}' {
+			t.step()
+		}
+		if t.atEnd() || t.Index == start {
+			return 0, false
+		}
+		code, err := strconv.ParseUint(string(t.SourceText[start:t.Index]), 16, 32)
+		t.step() // consume '}'
+		if err != nil || code > 0x10FFFF {
+			return 0, false
+		}
+		return rune(code), true
+	}
+	code, ok := t.parseHexDigits(4)
+	return code, ok
 }
 
 // MARK: - Number

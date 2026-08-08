@@ -314,6 +314,16 @@ func (p *Parser) exportSpecifier() (s *ExportSpecifier, ok bool) {
 
 func (p *Parser) importDeclaration() *ModuleItemImportDeclaration {
 	p.tokenizer.MustMatch(TImport)
+	// import "m"; — a side-effect-only import has no clause and no TFrom.
+	if p.tokenizer.CurrentToken.Type == TString {
+		moduleSpecifier := p.stringLiteral()
+		p.automaticSemicolonInsertion()
+		return &ModuleItemImportDeclaration{
+			ImportDeclaration: &ImportDeclaration{
+				ModuleSpecifier: moduleSpecifier,
+			},
+		}
+	}
 	importClause := p.importClause()
 	p.tokenizer.MustMatch(TFrom)
 	moduleSpecifier := p.stringLiteral()
@@ -327,15 +337,40 @@ func (p *Parser) importDeclaration() *ModuleItemImportDeclaration {
 }
 
 func (p *Parser) importClause() *ImportClause {
-	if identifier, ok := parserRecoverOk(p, p.bindingIdentifier); ok {
-		return &ImportClause{
-			ImportedDefaultBinding: identifier,
+	clause := &ImportClause{}
+	switch {
+	case p.tokenizer.Match(TStar):
+		// import * as ns from "m"
+		p.tokenizer.MustMatch(TAs)
+		namespace, ok := parserRecoverOk(p, p.bindingIdentifier)
+		if !ok {
+			panic(p.parseFailure("import namespace requires a binding identifier"))
 		}
-	} else {
-		return &ImportClause{
-			NamedImports: p.importsList(),
+		clause.NamespaceImport = namespace
+	case p.tokenizer.CurrentToken.Type == TLeftBrace:
+		// import { a, b } from "m" — importsList consumes the brace itself.
+		clause.NamedImports = p.importsList()
+	default:
+		// import default from "m" [ , { named } | * as ns ] from "m"
+		defaultBinding, ok := parserRecoverOk(p, p.bindingIdentifier)
+		if !ok {
+			panic(p.parseFailure("invalid import clause"))
+		}
+		clause.ImportedDefaultBinding = defaultBinding
+		if p.tokenizer.Match(TComma) {
+			if p.tokenizer.Match(TStar) {
+				p.tokenizer.MustMatch(TAs)
+				namespace, ok := parserRecoverOk(p, p.bindingIdentifier)
+				if !ok {
+					panic(p.parseFailure("import namespace requires a binding identifier"))
+				}
+				clause.NamespaceImport = namespace
+			} else {
+				clause.NamedImports = p.importsList()
+			}
 		}
 	}
+	return clause
 }
 
 func (p *Parser) importsList() *ImportsList {
@@ -1705,8 +1740,14 @@ func (p *Parser) forStatement() *ForStatement {
 			LexicalDeclaration: p.lexicalDeclaration(),
 		}
 	} else {
-		init = p.expression(p.acceptContextLowest())
-		p.tokenizer.MustMatch(TSemicolon)
+		// for (;;) — an empty initializer is allowed; consume its separator so
+		// the condition position starts after it.
+		if p.tokenizer.CurrentToken.Type == TSemicolon {
+			p.tokenizer.MustMatch(TSemicolon)
+		} else {
+			init = p.expression(p.acceptContextLowest())
+			p.tokenizer.MustMatch(TSemicolon)
+		}
 	}
 	var condition Expression
 	if p.tokenizer.CurrentToken.Type != TSemicolon {
@@ -2378,26 +2419,41 @@ func (p *Parser) memberExpression(left Expression) *MemberExpression {
 }
 
 func (p *Parser) superProperty() (sp SuperProperty, ok bool) {
-	if !p.inClassBody || p.inMethodDefinition {
+	// super property access is only valid inside class method definitions;
+	// the method-definition guard was previously inverted, rejecting super
+	// inside methods while accepting it in field initializers.
+	if !p.inClassBody || !p.inMethodDefinition {
 		return
 	}
-	p.tokenizer.Match(TSuper)
-	t := p.tokenizer.CurrentToken
-	switch t.Type {
+	// Only consume `super` when it is followed by `.` or `[`; a `super(...)`
+	// call belongs to superCall, so the consumption is rolled back otherwise.
+	p.tokenizer.store()
+	if !p.tokenizer.Match(TSuper) {
+		p.tokenizer.restore()
+		return
+	}
+	nextType := p.tokenizer.CurrentToken.Type
+	if nextType != TDot && nextType != TLeftBracket {
+		p.tokenizer.restore()
+		return
+	}
+	p.tokenizer.popCachedState()
+	switch nextType {
 	case TDot:
 		p.tokenizer.Next()
 		identifier := p.tokenizer.CurrentToken
+		p.tokenizer.Next()
 		return &SuperPropertyIdentifier{
 			IdentifierName: IdentifierName(identifier.Value),
 		}, true
-	case TLeftBracket:
+	default:
+		// TLeftBracket: consume the bracket before the property expression.
+		p.tokenizer.Next()
 		expr := p.expression(p.acceptContextLowest())
-		p.tokenizer.Match(TRightBracket)
+		p.tokenizer.MustMatch(TRightBracket)
 		return &SuperPropertyExpression{
 			Expression: expr,
 		}, true
-	default:
-		return
 	}
 }
 
