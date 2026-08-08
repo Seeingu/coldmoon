@@ -398,7 +398,7 @@ loop:
 			varEnv.CreateMutableBinding(name, false)
 			varEnv.InitializeBinding(name, functionObject.ToValue())
 		} else {
-			varEnv.SetMutableBinding(name, functionObject.ToValue(), false)
+			varEnv.SetMutableBinding(agent, name, functionObject.ToValue(), false)
 		}
 	}
 

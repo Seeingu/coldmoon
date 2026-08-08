@@ -159,7 +159,7 @@ func (s *ScriptRecord) evaluateInCurrentContext() CompletionValue {
 	for _, declaration := range s.Static.HoistableDeclarations {
 		name, function := instantiateHoistableDeclaration(agent, declaration, lexicalEnv, privateEnv)
 		createVariableBinding(variableEnv, name)
-		variableEnv.SetMutableBinding(name, function.ToValue(), false)
+		variableEnv.SetMutableBinding(agent, name, function.ToValue(), false)
 	}
 
 	return RunNode(agent, s.ECMAScriptCode)

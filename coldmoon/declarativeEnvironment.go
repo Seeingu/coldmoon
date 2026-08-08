@@ -94,11 +94,15 @@ func (d *DeclarativeEnvironment) InitializeBinding(name string, value Value) {
 }
 
 // 9.1.1.1.5
-func (d *DeclarativeEnvironment) SetMutableBinding(name string, value Value, strict bool) {
+func (d *DeclarativeEnvironment) SetMutableBinding(agent *Agent, name string, value Value, strict bool) {
 	binding, ok := d.Bindings[name]
 	if !ok {
 		if strict {
-			panic("ReferenceError")
+			// 9.1.1.1.5 step 1.b: an assignment to an undeclared binding is a
+			// ReferenceError in strict mode. The Value panic is recovered by the
+			// nearest builtin or source boundary and becomes a JS throw; a bare
+			// string panic would crash the host process instead.
+			panic(agent.ThrowException(ReferenceError, "ReferenceError: assignment to undeclared binding"))
 		}
 		d.CreateMutableBinding(name, true)
 		d.InitializeBinding(name, value)
@@ -111,14 +115,14 @@ func (d *DeclarativeEnvironment) SetMutableBinding(name string, value Value, str
 	}
 
 	if binding.Value == nil {
-		panic("ReferenceError")
+		panic(agent.ThrowException(ReferenceError, "Binding is not initialized"))
 	}
 
 	if binding.Mutable {
 		binding.Value = value
 	} else {
 		if s {
-			panic("ReferenceError")
+			panic(agent.ThrowException(TypeError, "Assignment to constant variable"))
 		}
 	}
 }

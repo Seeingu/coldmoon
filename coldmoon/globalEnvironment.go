@@ -87,14 +87,14 @@ func (g *GlobalEnvironment) HasBinding(name string) bool {
 	return ObjRec.HasBinding(name)
 }
 
-func (g *GlobalEnvironment) SetMutableBinding(name string, value Value, strict bool) {
+func (g *GlobalEnvironment) SetMutableBinding(agent *Agent, name string, value Value, strict bool) {
 	DclRec := g.DeclarativeRecord
 	if DclRec.HasBinding(name) {
-		DclRec.SetMutableBinding(name, value, strict)
+		DclRec.SetMutableBinding(agent, name, value, strict)
 		return
 	}
 	ObjRec := g.ObjectRecord
-	ObjRec.SetMutableBinding(name, value, strict)
+	ObjRec.SetMutableBinding(agent, name, value, strict)
 }
 
 // 9.1.1.4.6

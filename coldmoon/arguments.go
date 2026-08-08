@@ -245,7 +245,7 @@ func MakeArgSetter(agent *Agent, name string, env EnvironmentRecord) ObjectType 
 	var setterClosure BehaviorFn = func(this Value, arguments []Value, newTarget ObjectType) CompletionConvertable[Value] {
 		function := agent.ActiveFunctionObject()
 		_captures := function.(*BuiltinFunction).AdditionalFieldsV2.(*ArgGetterSetterCaptures)
-		_captures.Env.SetMutableBinding(_captures.Name, argumentAt(arguments, 0), false)
+		_captures.Env.SetMutableBinding(agent, _captures.Name, argumentAt(arguments, 0), false)
 		return UndefinedValue.ToCompletion()
 	}
 
