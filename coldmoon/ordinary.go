@@ -80,6 +80,7 @@ func OrdinaryGetOwnProperty(object ObjectType, key PropertyKey) *PropertyDescrip
 	if x.IsDataDescriptor() {
 		d.Value = x.Value
 		d.Writable = x.Writable
+		d.WritableSet = true
 	} else {
 		if !x.IsAccessorDescriptor() {
 			return nil
