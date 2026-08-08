@@ -490,8 +490,14 @@ func SameValue(x Value, y Value) bool {
 	if x.TypeString() != y.TypeString() {
 		return false
 	}
-	if number, _, ok := x.NumberOrBigInt(); ok {
-		return number.SameValue(y.(*NumberValue))
+	// NumberOrBigInt reports both Number and BigInt; only the Number branch
+	// carries a *NumberValue. Routing BigInt through the Number assertion below
+	// panics, so each kind must use its own comparison.
+	if number, bigInt, ok := x.NumberOrBigInt(); ok {
+		if number != nil {
+			return number.SameValue(y.(*NumberValue))
+		}
+		return bigInt.Equal(*y.(*BigIntValue))
 	}
 
 	return SameValueNonNumber(x, y)
@@ -502,8 +508,13 @@ func SameValueZero(x Value, y Value) bool {
 	if x.TypeString() != y.TypeString() {
 		return false
 	}
-	if number, _, ok := x.NumberOrBigInt(); ok {
-		return number.SameValueZero(y.(*NumberValue))
+	// SameValueZero shares SameValue's NumberOrBigInt shape; see SameValue for
+	// why the BigInt branch must not go through the *NumberValue assertion.
+	if number, bigInt, ok := x.NumberOrBigInt(); ok {
+		if number != nil {
+			return number.SameValueZero(y.(*NumberValue))
+		}
+		return bigInt.Equal(*y.(*BigIntValue))
 	}
 
 	return SameValueNonNumber(x, y)
