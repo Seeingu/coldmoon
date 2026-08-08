@@ -450,7 +450,7 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 		return co.ThrowTypeError(agent, "is not a constructor")
 	}
 	var mapping bool
-	if mapper == UndefinedValue {
+	if IsUndefinedOrNil(mapper) {
 		mapping = false
 	} else {
 		if !IsCallable(mapper) {
@@ -485,10 +485,15 @@ func typedArrayFrom(agent *Agent, this Value, source Value, mapper Value, thisAr
 		co.value = targetObj.ToValue()
 		return
 	}
-	arrayLike := MustGetObject(source)
+	// A primitive source is not iterable but is still boxed by ToObject before
+	// the array-like path reads its length.
+	arrayLike, isAbrupt, rt := ReturnIfAbrupt(source.ToObject(agent), co)
+	if isAbrupt {
+		return rt
+	}
 	length, isAbrupt, rt := ReturnIfAbrupt(arrayLike.LengthOfArrayLike(), co)
 	if isAbrupt {
-		panic(rt)
+		return rt
 	}
 
 	targetObj := TypedArrayCreateFromConstructor(agent, MustGetObject(C), []Value{NewNumberValue(length.ToNumber())})
@@ -855,9 +860,11 @@ func InitializeTypedArrayFromList(agent *Agent, O *TypedArrayObject, values []Va
 func AllocateTypedArray(agent *Agent, constructorName TypedArrayName, newTarget ObjectType, defaultProto IntrinsicName, length JSInt) *TypedArrayObject {
 	proto := GetPrototypeFromConstructor(newTarget, defaultProto)
 	obj := TypedArrayCreate(agent, constructorName, proto)
-	if length != 0 {
-		AllocateTypedArrayBuffer(agent, obj, length)
-	}
+	// Every typed array owns an ArrayBuffer, including zero-length ones
+	// (spec 23.2.5.1.1 step 6 always allocates). Skipping it for length 0 left
+	// ViewedArrayBuffer nil, which crashes validation paths such as
+	// %TypedArray%.from on an empty array-like.
+	AllocateTypedArrayBuffer(agent, obj, length)
 	return obj
 }
 
@@ -1904,9 +1911,15 @@ func typedArraySort(agent *Agent, this Value, compareFn Value) Value {
 	ta := taRecord.TypedArray
 	length := TypedArrayLength(taRecord)
 
+	// compareFn is optional: with no comparator the elements use their default
+	// numeric ordering, and a nil ObjectType must not be asserted to an object.
+	var compareObject ObjectType
+	if !IsUndefinedOrNil(compareFn) {
+		compareObject = MustGetObject(compareFn)
+	}
 	sortCompare := SortCompare{
 		impl:      CompareTypedArrayElements,
-		compareFn: MustGetObject(compareFn),
+		compareFn: compareObject,
 	}
 	sortedList := SortIndexedProperties(agent, ta, length, sortCompare, sortHolesTypeReadThroughHoles)
 
@@ -1928,9 +1941,13 @@ func typedArrayToSorted(agent *Agent, this Value, compareFn Value) Value {
 	ta := taRecord.TypedArray
 	length := TypedArrayLength(taRecord)
 
+	var compareObject ObjectType
+	if !IsUndefinedOrNil(compareFn) {
+		compareObject = MustGetObject(compareFn)
+	}
 	sortCompare := SortCompare{
 		impl:      CompareTypedArrayElements,
-		compareFn: MustGetObject(compareFn),
+		compareFn: compareObject,
 	}
 	sortedList := SortIndexedProperties(agent, ta, length, sortCompare, sortHolesTypeReadThroughHoles)
 
