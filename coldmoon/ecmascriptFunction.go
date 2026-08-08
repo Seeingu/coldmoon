@@ -186,14 +186,22 @@ func EvaluateAsyncFunctionBody(agent *Agent, function *ECMAScriptFunction, argum
 
 func EvaluateFunctionBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) CompletionValue {
 	functionBody := function.ECMAScriptCode
-	FunctionDeclarationInstantiation(agent, function, argumentsList)
+	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
+	if completion.IsError() {
+		// Parameter initializers (e.g. destructuring defaults) can throw; the
+		// body must not run when instantiation already failed.
+		return completion
+	}
 	return RunNode(agent, functionBody)
 }
 
 // EvaluateAsyncGeneratorBody
 // spec: 15.6.2
 func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (co CompletionValue) {
-	FunctionDeclarationInstantiation(agent, function, argumentsList)
+	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
+	if completion.IsError() {
+		return completion
+	}
 	o := OrdinaryCreateFromConstructor(agent, function, "%AsyncGeneratorFunction.prototype.prototype%", nil)
 	G := &AsyncGeneratorObject{
 		Object:         o,
@@ -209,7 +217,10 @@ func EvaluateAsyncGeneratorBody(agent *Agent, function *ECMAScriptFunction, argu
 // EvaluateGeneratorBody
 // spec: 15.5.2
 func EvaluateGeneratorBody(agent *Agent, function *ECMAScriptFunction, argumentsList []Value) (co CompletionValue) {
-	FunctionDeclarationInstantiation(agent, function, argumentsList)
+	completion := FunctionDeclarationInstantiation(agent, function, argumentsList)
+	if completion.IsError() {
+		return completion
+	}
 	o := OrdinaryCreateFromConstructor(agent, function, "%GeneratorFunction.prototype.prototype%", nil)
 	G := &GeneratorObject{
 		Object: o,
