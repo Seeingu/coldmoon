@@ -72,11 +72,11 @@ func Run(invocation Invocation) int {
 		if options.check {
 			return renderUsageError(invocation.Stderr, "--check requires a file, eval source, or non-TTY stdin")
 		}
-		realm := newTerminalRealm(invocation, prepared.processArgv)
-		return runREPL(invocation, realm)
+		realm, tracker := newTerminalRealm(invocation, prepared.processArgv)
+		return runREPL(invocation, realm, tracker)
 	}
 
-	realm := newTerminalRealm(invocation, prepared.processArgv)
+	realm, tracker := newTerminalRealm(invocation, prepared.processArgv)
 	if options.check {
 		if err := coldmoon.CheckSource(prepared.source, realm); err != nil {
 			renderError(invocation.Stderr, err)
@@ -95,11 +95,16 @@ func Run(invocation Invocation) int {
 		renderError(invocation.Stderr, err)
 		return 1
 	}
+	// The scheduler has drained by now; any still-unhandled rejection is a
+	// real failure the caller should see.
+	if tracker.report(invocation.Stderr, prepared.source.Name) {
+		return 1
+	}
 	if options.hasPrint {
 		fmt.Fprintln(invocation.Stdout, runtime.FormatValue(value))
 	}
 	if options.interactive {
-		return runREPL(invocation, realm)
+		return runREPL(invocation, realm, tracker)
 	}
 	return 0
 }
@@ -244,9 +249,11 @@ func absolutePath(cwd, path string) string {
 	return filepath.Clean(filepath.Join(cwd, path))
 }
 
-func newTerminalRealm(invocation Invocation, argv []string) *coldmoon.Realm {
+func newTerminalRealm(invocation Invocation, argv []string) (*coldmoon.Realm, *rejectionTracker) {
 	coldmoon.InitializeConstants()
 	agent := coldmoon.NewAgent()
+	tracker := newRejectionTracker()
+	agent.HostHooks.HostPromiseRejectionTracker = tracker.hook
 	coldmoon.InitializeHostDefinedRealm(agent, nil)
 	realm := agent.CurrentRealm()
 	runtime.RegisterTerminalRuntimeWithOptions(realm, runtime.TerminalOptions{
@@ -254,5 +261,5 @@ func newTerminalRealm(invocation Invocation, argv []string) *coldmoon.Realm {
 		Stderr: invocation.Stderr,
 		Argv:   argv,
 	})
-	return realm
+	return realm, tracker
 }

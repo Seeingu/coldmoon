@@ -90,6 +90,21 @@ func (s *Scheduler) ScheduleTimer(delay time.Duration, run func() CompletionValu
 	return id
 }
 
+// CancelTimer removes a pending timer by id and reports whether it was found.
+// Timers already taken by takeDueTimer are not affected.
+func (s *Scheduler) CancelTimer(id JSInt) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for index, timer := range s.timers {
+		if timer.id != id {
+			continue
+		}
+		s.timers = append(s.timers[:index], s.timers[index+1:]...)
+		return true
+	}
+	return false
+}
+
 // StartTask starts a finite asynchronous task and records it before launching
 // the goroutine. Recording first avoids the Add/Wait race of sync.WaitGroup.
 func (s *Scheduler) StartTask(run func()) {
