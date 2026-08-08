@@ -55,35 +55,44 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 			return co.ThrowError(agent, RangeError, "DataView offset is out of bounds")
 		}
 		bufferIsFixedLength := IsFixedLengthArrayBuffer(buffer)
-		viewByteLength := &ByteLength{}
+		// ES2024 25.3.1.1 steps 7-8: without an explicit byteLength a fixed-length
+		// buffer gets the auto view length, a resizable buffer gets the current
+		// remainder; with one, the value is indexed and bounds-checked against the
+		// whole buffer (not only fixed-length buffers). The old code shadowed the
+		// ToIndex result with := and discarded it.
+		var viewByteLength *ByteLength
 		if byteLength == nil {
 			if bufferIsFixedLength {
-				viewByteLength.Auto = true
+				viewByteLength = &ByteLength{Auto: true}
 			} else {
-				viewByteLength.Value = bufferByteLength - offset
+				viewByteLength = NewByteLength(bufferByteLength - offset)
 			}
 		} else {
-			viewByteLength, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, byteLength), co)
+			byteLengthIndex, isAbrupt, rt := ReturnIfAbrupt(ToIndex(agent, byteLength), co)
 			if isAbrupt {
 				return rt
 			}
-			if bufferIsFixedLength {
-				if viewByteLength > bufferByteLength-offset {
-					panic("RangeError")
-				}
+			if byteLengthIndex > bufferByteLength-offset {
+				return co.ThrowError(agent, RangeError, "DataView byteLength is out of bounds")
 			}
+			viewByteLength = NewByteLength(byteLengthIndex)
 		}
 
 		o := OrdinaryCreateFromConstructor(agent, newTarget, "%DataView.prototype%", []string{})
 		dataView := &DataView{
 			Object: o,
 		}
+		// The exotic object must point its ref back at itself; otherwise slot
+		// lookups such as RequireInternalSlot[*DataView] cannot identify it.
+		dataView.ref = dataView
+		// OrdinaryCreateFromConstructor may run user code through a custom
+		// newTarget, so the buffer invariants are revalidated (spec steps 10-12).
 		if IsDetachedBuffer(buffer) {
-			panic("TypeError")
+			return co.ThrowTypeError(agent, "DataView buffer is detached")
 		}
 		bufferByteLength = ArrayBufferByteLength(buffer, SeqCst)
 		if offset > bufferByteLength {
-			panic("RangeError")
+			return co.ThrowError(agent, RangeError, "DataView offset is out of bounds")
 		}
 
 		dataView.ViewedArrayBuffer = buffer
@@ -92,8 +101,9 @@ func NewDataViewConstructor(realm *Realm) ObjectType {
 		return (dataView).ToValue()
 	}
 	object := CreateBuiltinFunction(agent, behavior, 1, CMString("DataView"), builtinFunctionArgs{
-		realm:     realm,
-		prototype: realm.Intrinsics.FunctionPrototype,
+		realm:         realm,
+		isConstructor: true,
+		prototype:     realm.Intrinsics.FunctionPrototype,
 	})
 
 	BindPrototypeAndConstructor(realm.Intrinsics.DataViewPrototype, object)
