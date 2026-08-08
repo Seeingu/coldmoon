@@ -119,8 +119,45 @@ func (s *Scheduler) StartTask(run func()) {
 			s.mu.Unlock()
 			s.signal()
 		}()
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				// An async task runs arbitrary JavaScript. When it panics, the
+				// continuation can no longer suspend itself, so the promise jobs
+				// waiting on it in waitForAsyncContinuations would block the main
+				// thread forever on top of the crash. Release those waiters before
+				// rethrowing so the failure surfaces with its Go diagnostics
+				// instead of deadlocking.
+				s.agent.abortAsyncContinuations()
+				panic(recovered)
+			}
+		}()
 		run()
 	}()
+}
+
+// SuspendAwait removes an await-suspended continuation from the scheduler's
+// keepalive count. Such a continuation cannot produce scheduler work on its
+// own: only a promise reaction job or a timer (both visible to idle detection)
+// can wake it. Without this, awaiting a promise that never settles leaves idle
+// detection waiting on a wake that can never arrive, deadlocking the process.
+// The signal is required: idle detection may already be waiting on this task's
+// keepalive, and the decrement is the only event that tells it a wake source
+// vanished.
+func (s *Scheduler) SuspendAwait() {
+	s.mu.Lock()
+	s.activeTasks--
+	s.mu.Unlock()
+	s.signal()
+}
+
+// ResumeAwait restores the keepalive count when a reaction job wakes a
+// suspended continuation. The count is re-added before the body resumes so
+// that a later snapshot still sees a live task while the body runs.
+func (s *Scheduler) ResumeAwait() {
+	s.mu.Lock()
+	s.activeTasks++
+	s.mu.Unlock()
+	s.signal()
 }
 
 // RunJobs drains promise jobs in FIFO order. Each job is removed before it is

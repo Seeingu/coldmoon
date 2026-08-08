@@ -8347,7 +8347,18 @@ func Await(agent *Agent, value Value) (co CompletionValue) {
 		asyncContext.asyncCallerResumed = true
 		agent.Scheduler.StartTask(asyncContext.Resume)
 	}
+	// While suspended on awaitCh this continuation is not a wake source: only
+	// the reaction job that sent the value (or a timer resolving the promise)
+	// can resume it. Drop it from the keepalive count so that a promise which
+	// never settles does not deadlock idle detection. Async generator bodies
+	// run on uncounted goroutines and skip this bookkeeping.
+	if asyncContext.schedulerCounted {
+		agent.Scheduler.SuspendAwait()
+	}
 	<-asyncContext.awaitCh
+	if asyncContext.schedulerCounted {
+		agent.Scheduler.ResumeAwait()
+	}
 	agent.resumeExecutionContext(asyncContext)
 	Assert(asyncContext == agent.RunningExecutionContext())
 	return asyncContext.Result

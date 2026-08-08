@@ -39,6 +39,9 @@ func NewAsyncFunctionPrototype(realm *Realm) ObjectType {
 func AsyncFunctionStart(agent *Agent, promiseCapability *PromiseCapability, asyncFunction *ECMAScriptFunction) {
 	runningContext := agent.RunningExecutionContext()
 	asyncContext := runningContext
+	// The body task is registered with the scheduler, so its await suspensions
+	// may release the keepalive count while they wait on a reaction job.
+	asyncContext.schedulerCounted = true
 	agent.Scheduler.StartTask(func() {
 		defer agent.releaseAsyncContinuationContext(asyncContext)
 		AsyncBlockStart(agent, promiseCapability, asyncFunction, asyncContext)
