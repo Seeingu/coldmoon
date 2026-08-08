@@ -6,8 +6,8 @@ require (
 	github.com/bits-and-blooms/bitset v1.24.6
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/samber/lo v1.53.0
-	golang.org/x/term v0.27.0
+	golang.org/x/term v0.45.0
 	golang.org/x/text v0.40.0
 )
 
-require golang.org/x/sys v0.28.0 // indirect
+require golang.org/x/sys v0.47.0 // indirect
