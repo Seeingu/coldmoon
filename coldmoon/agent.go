@@ -26,6 +26,10 @@ type Agent struct {
 	GlobalSymbolRegistry       map[string]*SymbolValue
 	// [[IsLittleEndian]]
 	IsLittleEndian bool
+	// CanBlock mirrors the agent's [[CanBlock]] field (ES2024 9.4.3): whether
+	// this agent may suspend on Atomics.wait. The engine has no Worker agents,
+	// so the main thread cannot block: nothing could ever notify it.
+	CanBlock bool
 }
 
 // IncrementModuleAsyncEvaluationCount implements the agent-scoped counter
