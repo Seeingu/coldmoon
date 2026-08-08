@@ -564,19 +564,26 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 		sep := ","
 		if len(args) > 0 {
-			sep = argumentAt(args, 0).String()
+			sepValue, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, argumentAt(args, 0)), co)
+			if isAbrupt {
+				return rt
+			}
+			sep = sepValue.Data
 		}
 
 		var elements []string
 		for k := range length {
 			element := array.Get(NewIntegerIndexPropertyKey(k))
 
-			var next string
-			if element == nil || element == UndefinedValue || element == NullValue {
-			} else {
-				next = element.String()
+			if IsUndefinedOrNull(element) {
+				elements = append(elements, "")
+				continue
 			}
-			elements = append(elements, next)
+			next, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, element), co)
+			if isAbrupt {
+				return rt
+			}
+			elements = append(elements, next.Data)
 		}
 		return NewStringValue(strings.Join(elements, sep))
 	}
@@ -690,12 +697,21 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		var elements []string
 		for k := range length {
 			nextElement := array.Get(NewIntegerIndexPropertyKey(k))
-			if nextElement == nil || nextElement == UndefinedValue {
+			if IsUndefinedOrNil(nextElement) {
 				elements = append(elements, "")
-			} else {
-				s := ReturnAssertNormal(ValueInvoke(agent, nextElement, NewStringPropertyKey("toLocaleString"), nil)).String()
-				elements = append(elements, s)
+				continue
 			}
+			invoked, isAbrupt, rt := ReturnIfAbrupt(ValueInvoke(agent, nextElement, NewStringPropertyKey("toLocaleString"), nil), co)
+			if isAbrupt {
+				return rt
+			}
+			// toLocaleString must be stringified with ToString, not the Go debug
+			// representation used by Value.String().
+			s, isAbrupt, rt := ReturnIfAbrupt(ToStringCompletion(agent, invoked), co)
+			if isAbrupt {
+				return rt
+			}
+			elements = append(elements, s.Data)
 		}
 		return NewStringValue(strings.Join(elements, separator))
 	}
@@ -948,6 +964,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		if k < 0 {
 			k += length
 		}
+		// Per spec 23.1.3.1 an out-of-range index returns undefined rather than
+		// reading a stray property.
+		if k < 0 || k >= length {
+			return UndefinedValue
+		}
 		return o.Get(NewIntegerIndexPropertyKey(k))
 	}
 	var every BehaviorFn = func(this Value, args []Value, newTarget ObjectType) CompletionConvertable[Value] {
@@ -1059,6 +1080,11 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		actualIndex := relativeIndex
 		if actualIndex < 0 {
 			actualIndex += length
+		}
+		// Per spec 23.1.3.31 an out-of-range index is a RangeError, not a
+		// silently skipped replacement.
+		if actualIndex < 0 || actualIndex >= length {
+			return co.ThrowRangeError(agent, "with index is out of range")
 		}
 
 		array := ArrayCreate(agent, length, nil)
@@ -2039,6 +2065,9 @@ func NewArrayPrototype(realm *Realm) ObjectType {
 		}
 
 		newLen := length + insertCount - actualSkipCount
+		if float64(newLen) > POW_2_53-1 {
+			return co.ThrowError(agent, RangeError, "toSpliced length exceeds 2^53-1")
+		}
 
 		A := ArrayCreate(agent, newLen, nil)
 		i := JSInt(0)
