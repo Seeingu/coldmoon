@@ -364,9 +364,18 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 		return typedArrayWith(agent, this, index, value)
 	}
 	typedArray.defineBuiltinFunction(realm, CMString("at"), taAt, 1)
-	typedArray.defineBuiltinFunction(realm, CMString("buffer"), taBuffer, 0)
-	typedArray.defineBuiltinFunction(realm, CMString("byteLength"), taByteLength, 0)
-	typedArray.defineBuiltinFunction(realm, CMString("byteOffset"), taByteOffset, 0)
+	// buffer, byteLength, byteOffset, and length are accessor properties on
+	// %TypedArray%.prototype (ES2024 23.2.3.1/23.2.3.2/23.2.3.3/23.2.3.18);
+	// registering them as methods made t.length return the accessor function.
+	typedArray.defineBuiltinAccessor(realm, CMString("buffer"), builtinAccessorParams{
+		Getter: taBuffer,
+	})
+	typedArray.defineBuiltinAccessor(realm, CMString("byteLength"), builtinAccessorParams{
+		Getter: taByteLength,
+	})
+	typedArray.defineBuiltinAccessor(realm, CMString("byteOffset"), builtinAccessorParams{
+		Getter: taByteOffset,
+	})
 	typedArray.defineBuiltinFunction(realm, CMString("copyWithin"), taCopyWithin, 2)
 	typedArray.defineBuiltinFunction(realm, CMString("entries"), taEntries, 0)
 	typedArray.defineBuiltinFunction(realm, CMString("every"), taEvery, 1)
@@ -382,7 +391,9 @@ func NewTypedArrayPrototype(realm *Realm) ObjectType {
 	typedArray.defineBuiltinFunction(realm, CMString("join"), taJoin, 1)
 	typedArray.defineBuiltinFunction(realm, CMString("keys"), taKeys, 0)
 	typedArray.defineBuiltinFunction(realm, CMString("lastIndexOf"), taLastIndexOf, 1)
-	typedArray.defineBuiltinFunction(realm, CMString("length"), taLength, 0)
+	typedArray.defineBuiltinAccessor(realm, CMString("length"), builtinAccessorParams{
+		Getter: taLength,
+	})
 	typedArray.defineBuiltinFunction(realm, CMString("map"), taMap, 1)
 	typedArray.defineBuiltinFunction(realm, CMString("reduce"), taReduce, 1)
 	typedArray.defineBuiltinFunction(realm, CMString("reduceRight"), taReduceRight, 1)
@@ -427,14 +438,9 @@ func NewTypedArrayNamePrototype(realm *Realm, name TypedArrayName) ObjectType {
 		Configurable: false,
 		Enumerable:   false,
 	})
-	object.internalMethods().Get = func(o ObjectType, p PropertyKey, receiver Value) (co CompletionValue) {
-		if s, ok := p.(StringPropertyKey); ok {
-			if s.Value == "buffer" {
-				return co.ThrowTypeError(agent, "Method get %TypedArray%.prototype.buffer called on incompatible receiver")
-			}
-		}
-		return InternalGet(o, p, receiver)
-	}
+	// A Get override here used to intercept prototype-chain traversal and
+	// reject "buffer" on every instance; the accessors on %TypedArray%.prototype
+	// now guard their own receivers with RequireInternalSlot.
 	return object
 }
 
