@@ -664,9 +664,13 @@ func (p *Parser) functionBody(functionType FunctionType) *FunctionBody {
 	}()
 
 	list := p.statementList()
+	// Module code is strict mode code, and strictness propagates into every
+	// nested function body (ES2024 10.2.1). Without this, nested functions read
+	// module bindings through a non-strict execution context and the
+	// ModuleEnvironment's strict assertion fails.
 	return &FunctionBody{
 		StatementList: list,
-		Strict:        list.ContainsDirective("use strict"),
+		Strict:        list.ContainsDirective("use strict") || p.inModule,
 		Type:          functionType,
 	}
 }
@@ -1035,6 +1039,8 @@ func (p *Parser) asyncArrowFunction() *AsyncArrowFunction {
 					},
 				},
 			},
+			// Async arrow bodies in module code inherit module strictness.
+			Strict: p.inModule,
 		}
 	}
 	sourceText := p.SourceText[startOffset:p.tokenizer.PreviousToken.EndIndex]
@@ -2524,6 +2530,8 @@ func (p *Parser) arrowFunction() *ArrowFunction {
 					},
 				},
 			},
+			// Arrow bodies in module code inherit module strictness.
+			Strict: p.inModule,
 		}
 	}
 	return &ArrowFunction{
