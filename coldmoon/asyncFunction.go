@@ -82,7 +82,10 @@ func AsyncBlockStart(agent *Agent, promiseCapability *PromiseCapability, asyncFu
 	callerAlreadyResumed := asyncContext.asyncCallerResumed
 	if !callerAlreadyResumed {
 		asyncContext.asyncCallerResumed = true
-		asyncContext.Resume()
+		// The body has already suspended itself back onto the caller's frame.
+		// Assert that invariant before Resume: Resume unblocks AsyncFunctionStart
+		// on another goroutine, which may immediately mutate the stack.
 		Assert(runningContext == agent.RunningExecutionContext())
+		asyncContext.Resume()
 	}
 }
